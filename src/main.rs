@@ -13,10 +13,11 @@ fn main() {
 
     let search_tree = tsp::kdtree::build_tree(points);
     let needle = tsp::kdtree::KDPoint::new(&[933_550.0, 977_200.0]);
-    println!(
-        "The nearest to (933_550, 977_200): #{:?}",
-        search_tree.nearest(&needle)
-    );
+    let res = search_tree.nearest(&needle, 3);
+    println!("The nearest to (933_550, 977_200): #{:?}", res.point);
+
+    let nearest: Vec<&tsp::kdtree::KDPoint> = res.nearest().collect();
+    println!("Other points: #{:?}", nearest);
 }
 
 fn read_value<T>() -> T
