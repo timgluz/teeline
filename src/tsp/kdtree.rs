@@ -5,16 +5,27 @@ use std::collections::{vec_deque, VecDeque};
 pub type PointMatrix = Vec<Vec<f32>>;
 pub type KDSubTree = Option<Box<KDNode>>;
 
-pub fn build_tree(points: PointMatrix) -> KDTree {
+/// builds a collection of KDPoints from PointMatrix,
+/// where id would be the row_id of PointMatri
+pub fn build_points(rows: &[Vec<f32>]) -> Vec<KDPoint> {
+    let mut points = vec![];
+
+    for (i, coords) in rows.iter().enumerate() {
+        points.push(KDPoint::new_with_id(i, coords));
+    }
+    points
+}
+
+pub fn build_tree(points: &[KDPoint]) -> KDTree {
     let mut tree = KDTree::empty();
 
     if points.is_empty() {
         return tree;
     };
 
-    let k = points[0].len();
     let n_points = points.len();
-    if let Some(root) = build_subtree(points, 0, k) {
+    let tree_points = points.clone().to_vec();
+    if let Some(root) = build_subtree(tree_points, 0) {
         tree.size = n_points;
         tree.root = Some(root);
     }
@@ -22,44 +33,45 @@ pub fn build_tree(points: PointMatrix) -> KDTree {
     tree
 }
 
-fn build_subtree(points: PointMatrix, depth: usize, k: usize) -> KDSubTree {
+fn build_subtree(points: Vec<KDPoint>, depth: usize) -> KDSubTree {
     if points.is_empty() {
         return None;
     }
 
     if points.len() == 1 {
-        let leaf_node = KDNode::leaf(KDPoint::new(points[0].as_ref()), depth);
+        let leaf_node = KDNode::leaf(points[0].clone(), depth);
         return Some(Box::new(leaf_node));
     }
 
+    let k = points[0].dim();
     let (pivot_pt, left_points, right_points) = partition_points(points, depth, k);
     let root = KDNode::from_subtrees(
         pivot_pt,
         depth,
-        build_subtree(left_points, depth + 1, k),
-        build_subtree(right_points, depth + 1, k),
+        build_subtree(left_points, depth + 1),
+        build_subtree(right_points, depth + 1),
     );
 
     Some(Box::new(root))
 }
 
 fn partition_points(
-    points: PointMatrix,
+    points: Vec<KDPoint>,
     depth: usize,
     k: usize,
-) -> (KDPoint, PointMatrix, PointMatrix) {
+) -> (KDPoint, Vec<KDPoint>, Vec<KDPoint>) {
     let mut sorted_points = points.clone();
 
     if sorted_points.len() == 1 {
-        let pivot_pt = KDPoint::new(sorted_points[0].as_ref());
+        let pivot_pt = sorted_points[0].clone();
         return (pivot_pt, vec![], vec![]);
     }
 
-    let dim = depth % k;
-    sorted_points.sort_by(|a, b| a[dim].partial_cmp(&b[dim]).unwrap());
+    let coord = depth % k;
+    sorted_points.sort_by(|a, b| a.cmp_by_coord(&b, coord).unwrap());
 
     let pivot_idx = sorted_points.len() / 2;
-    let pivot_pt = KDPoint::new(sorted_points[pivot_idx].as_ref());
+    let pivot_pt = sorted_points[pivot_idx].clone();
 
     (
         pivot_pt,
@@ -93,7 +105,7 @@ impl KDTree {
             size: 0,
         }
     }
-    // usage: find parent, then add point
+
     fn add(&mut self, new_point: KDPoint) {
         self.size += 1;
         if self.dimensionality == 0 {
@@ -360,6 +372,7 @@ impl NearestResult {
 
 #[derive(Debug, Clone)]
 pub struct KDPoint {
+    id: usize,
     dimensionality: usize,
     coords: Vec<f32>,
 }
@@ -367,6 +380,15 @@ pub struct KDPoint {
 impl KDPoint {
     pub fn new(coords: &[f32]) -> Self {
         KDPoint {
+            id: 0,
+            dimensionality: coords.len(),
+            coords: coords.to_vec(),
+        }
+    }
+
+    pub fn new_with_id(id: usize, coords: &[f32]) -> Self {
+        KDPoint {
+            id,
             dimensionality: coords.len(),
             coords: coords.to_vec(),
         }
@@ -598,7 +620,7 @@ mod tests {
 
     #[test]
     fn partition_points_single_elem() {
-        let points = vec![vec![0.0, 0.0]];
+        let points = build_points(&[vec![0.0, 0.0]]);
 
         let res = partition_points(points, 0, 2);
         assert_eq!(&[0.0, 0.0], res.0.coords());
@@ -608,47 +630,47 @@ mod tests {
 
     #[test]
     fn partition_points_with_2points_with_left_subtree() {
-        let points = vec![vec![-1.0, 0.0], vec![0.0, 0.0]];
+        let points = build_points(&[vec![-1.0, 0.0], vec![0.0, 0.0]]);
 
         let res = partition_points(points, 0, 2);
         assert_eq!(&[0.0, 0.0], res.0.coords());
-        assert_eq!(vec![vec![-1.0, 0.0]], res.1);
+        assert_eq!(&[-1.0, 0.0], res.1[0].coords());
         assert!(res.2.is_empty());
     }
 
     #[test]
     fn partition_points_with_2points_with_right_subtree() {
-        let points = vec![vec![0.0, 0.0], vec![2.0, 0.0]];
+        let points = build_points(&vec![vec![0.0, 0.0], vec![2.0, 0.0]]);
 
         let res = partition_points(points, 0, 2);
         assert_eq!(&[2.0, 0.0], res.0.coords());
-        assert_eq!(vec![vec![0.0, 0.0]], res.1);
+        assert_eq!(&[0.0, 0.0], res.1[0].coords());
         assert!(res.2.is_empty());
     }
 
     #[test]
     fn partition_points_with_2points_with_full_tree() {
-        let points = vec![vec![-1.0, 0.0], vec![2.0, 0.0], vec![0.0, 0.0]];
+        let points = build_points(&vec![vec![-1.0, 0.0], vec![2.0, 0.0], vec![0.0, 0.0]]);
 
         let res = partition_points(points, 0, 2);
         assert_eq!(&[0.0, 0.0], res.0.coords());
-        assert_eq!(vec![vec![-1.0, 0.0]], res.1);
-        assert_eq!(vec![vec![2.0, 0.0]], res.2);
+        assert_eq!(&[-1.0, 0.0], res.1[0].coords());
+        assert_eq!(&[2.0, 0.0], res.2[0].coords());
     }
 
     #[test]
     fn partition_points_with_3points_by_second_dimension() {
-        let points = vec![vec![0.0, 0.0], vec![2.0, -1.0], vec![1.0, 2.0]];
+        let points = build_points(&vec![vec![0.0, 0.0], vec![2.0, -1.0], vec![1.0, 2.0]]);
 
         let res = partition_points(points, 1, 2);
         assert_eq!(&[0.0, 0.0], res.0.coords());
-        assert_eq!(vec![vec![2.0, -1.0]], res.1);
-        assert_eq!(vec![vec![1.0, 2.0]], res.2);
+        assert_eq!(&[2.0, -1.0], res.1[0].coords());
+        assert_eq!(&[1.0, 2.0], res.2[0].coords());
     }
 
     #[test]
     fn build_tree_example() {
-        let points = vec![
+        let points = build_points(&vec![
             vec![0.0, 0.0],
             vec![-1.0, 0.0],
             vec![1.0, 0.0],
@@ -656,8 +678,8 @@ mod tests {
             vec![-1.0, 1.0],
             vec![1.0, -1.0],
             vec![1.0, 1.0],
-        ];
-        let tree = build_tree(points);
+        ]);
+        let tree = build_tree(&points);
 
         assert_eq!(7, tree.len());
 
@@ -675,14 +697,14 @@ mod tests {
 
     #[test]
     fn kdtree_nearest_with_points_on_trees() {
-        let points = vec![
+        let points = build_points(&vec![
             vec![100.0, 100.0],
             vec![-100.0, 100.0],
             vec![100.0, -100.0],
             vec![-100.0, -100.0],
-        ];
+        ]);
 
-        let tree = build_tree(points);
+        let tree = build_tree(&points);
         assert_eq!(4, tree.len());
 
         // pt1 should return existing node and distance should be close to 0
@@ -715,15 +737,15 @@ mod tests {
 
     #[test]
     fn kdtree_nearest_with_points_around_node4() {
-        let points = vec![
+        let points = build_points(&vec![
             vec![100.0, 100.0],
             vec![-100.0, 100.0],
             vec![100.0, -100.0],
             vec![-100.0, -100.0], // it is node 4
-        ];
+        ]);
 
         let expected_coords = vec![-100.0, -100.0];
-        let tree = build_tree(points);
+        let tree = build_tree(&points);
         assert_eq!(4, tree.len());
 
         let pt1 = KDPoint::new(&[-110.0, -100.0]);

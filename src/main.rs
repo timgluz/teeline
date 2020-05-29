@@ -5,13 +5,14 @@ use teeline::tsp;
 
 fn main() {
     let n_points = read_value::<usize>();
-    let mut points = tsp::kdtree::PointMatrix::with_capacity(n_points);
+    let mut rows = tsp::kdtree::PointMatrix::with_capacity(n_points);
 
     for _ in 0..n_points {
-        points.push(read_vector::<f32>());
+        rows.push(read_vector::<f32>());
     }
 
-    let search_tree = tsp::kdtree::build_tree(points);
+    let cities = tsp::kdtree::build_points(&rows);
+    let search_tree = tsp::kdtree::build_tree(&cities);
     let needle = tsp::kdtree::KDPoint::new(&[933_550.0, 977_200.0]);
     let res = search_tree.nearest(&needle, 3);
     println!("The nearest to (933_550, 977_200): #{:?}", res.point);
