@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 
-type PointMatrix = Vec<Vec<f32>>;
-type KDSubTree = Option<Box<KDNode>>;
+pub type PointMatrix = Vec<Vec<f32>>;
+pub type KDSubTree = Option<Box<KDNode>>;
 
 pub fn build_tree(points: PointMatrix) -> KDTree {
     let mut tree = KDTree::empty();
