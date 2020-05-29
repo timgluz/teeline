@@ -372,7 +372,7 @@ impl NearestResult {
 
 #[derive(Debug, Clone)]
 pub struct KDPoint {
-    id: usize,
+    pub id: usize,
     dimensionality: usize,
     coords: Vec<f32>,
 }
