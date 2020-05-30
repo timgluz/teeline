@@ -42,45 +42,59 @@ pub fn solve(cities: &[kdtree::KDPoint]) -> Tour {
         let current_distance = city1.distance(&city2);
 
         let nearest_city = frontier.nearest().take(1).next().unwrap();
+        println!("nearest to {:?} is {:?}", id1, nearest_city);
+        println!("alternatives: {:?}", frontier);
+
         let next_distance = city1.distance(&nearest_city);
         if next_distance < current_distance {
-            //println!("swaping {:?} <-> {:?}", id2, nearest_city.id);
             route.swap(id2, nearest_city.id);
         }
     }
 
-    let tour = Tour::new(total_tour(&cities, &route), &route);
+    let tour = Tour::new(&route, cities);
 
     tour
-}
-
-fn total_tour(cities: &[kdtree::KDPoint], route: &[usize]) -> f32 {
-    let mut total = 0.0;
-    let n_cities = route.len();
-
-    for i in 1..n_cities {
-        total += cities[i].distance(&cities[i - 1]);
-    }
-
-    total += cities[n_cities - 1].distance(&cities[0]);
-    total
 }
 
 pub struct Tour {
     total: f32,
     route: Vec<usize>,
+    cities: Vec<kdtree::KDPoint>,
 }
 
 impl Tour {
-    pub fn new(total: f32, route: &[usize]) -> Self {
-        Tour {
-            total,
+    pub fn new(route: &[usize], cities: &[kdtree::KDPoint]) -> Self {
+        let mut tour = Tour {
+            total: 0.0,
             route: route.to_vec(),
-        }
+            cities: cities.to_vec(),
+        };
+
+        tour.update_total();
+
+        tour
     }
 
     pub fn len(&self) -> usize {
         self.route.len()
+    }
+
+    pub fn cities(&self) -> &[kdtree::KDPoint] {
+        &self.cities[..]
+    }
+
+    pub fn update_total(&mut self) {
+        let mut total = 0.0;
+        let last_idx = self.route.len() - 1;
+        let cities = self.cities();
+
+        for i in 0..last_idx {
+            let distance = cities[self.route[i]].distance(&cities[self.route[i + 1]]);
+            total += distance
+        }
+
+        total += cities[self.route[last_idx]].distance(&cities[self.route[0]]);
+        self.total = total;
     }
 }
 
