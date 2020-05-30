@@ -365,8 +365,11 @@ impl NearestResult {
         self.nearest.push_front(pt);
     }
 
-    pub fn nearest(&self) -> vec_deque::Iter<KDPoint> {
-        self.nearest.iter()
+    pub fn nearest(&self) -> Vec<&KDPoint> {
+        self.nearest
+            .iter()
+            .filter(|x| !x.eq(&self.point))
+            .collect::<Vec<&KDPoint>>()
     }
 }
 
@@ -456,15 +459,8 @@ impl KDPoint {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test::helpers::assert_approx;
     use std::cell::RefCell;
-
-    fn assert_approx(expected_val: f32, actual_val: f32) {
-        assert!(
-            (expected_val - actual_val).abs() < f32::EPSILON,
-            "res was: {}",
-            actual_val
-        );
-    }
 
     #[test]
     fn kdpoint_cmp_by_coord_with_empty_points() {
