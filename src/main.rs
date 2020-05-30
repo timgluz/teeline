@@ -1,13 +1,15 @@
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use teeline::tsp::{kdtree, nearest_neighbor, tour};
+use teeline::tsp::{kdtree, nearest_neighbor, tour, two_opt};
 
 fn main() {
     let n_points = read_value::<usize>();
     let cities = read_cities(n_points);
 
-    let tour = nearest_neighbor::solve(&cities);
+    //let tour = nearest_neighbor::solve(&cities);
+    let tour = two_opt::solve(&cities);
+
     print_solution(&tour, false);
 }
 
