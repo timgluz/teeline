@@ -3,7 +3,7 @@ extern crate rand;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use teeline::tsp::{kdtree, nearest_neighbor, stochastic_hill, tour, two_opt};
+use teeline::tsp::{kdtree, nearest_neighbor, simulated_annealing, stochastic_hill, tour, two_opt};
 
 fn main() {
     let n_points = read_value::<usize>();
