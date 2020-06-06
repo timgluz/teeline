@@ -9,9 +9,11 @@ fn main() {
     let n_points = read_value::<usize>();
     let cities = read_cities(n_points);
 
+    //TODO: read params from commandline
     //let tour = nearest_neighbor::solve(&cities);
     //let tour = two_opt::solve(&cities);
-    let tour = stochastic_hill::solve(&cities);
+    //let tour = stochastic_hill::solve(&cities);
+    let tour = simulated_annealing::solve(&cities);
 
     print_solution(&tour, false);
 }
