@@ -7,6 +7,9 @@ It currently implements:
 
 * greedy nearest neighbors using KD-tree
 * 2-opt
+* stochastic hill climbing with random restarts
+* simulated annealing
+* tabu search
 
 
 ### Usage
