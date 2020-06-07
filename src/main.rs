@@ -3,17 +3,18 @@ extern crate rand;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use teeline::tsp::{kdtree, nearest_neighbor, simulated_annealing, stochastic_hill, tour, two_opt};
+use teeline::tsp::{self, kdtree, tour};
 
 fn main() {
     let n_points = read_value::<usize>();
     let cities = read_cities(n_points);
 
     //TODO: read params from commandline
-    //let tour = nearest_neighbor::solve(&cities);
-    //let tour = two_opt::solve(&cities);
-    //let tour = stochastic_hill::solve(&cities);
-    let tour = simulated_annealing::solve(&cities);
+    //let tour = tsp::nearest_neighbor::solve(&cities);
+    //let tour = tsp::two_opt::solve(&cities);
+    //let tour = tsp::stochastic_hill::solve(&cities);
+    //let tour = tsp::simulated_annealing::solve(&cities);
+    let tour = tsp::tabu_search::solve(&cities);
 
     print_solution(&tour, false);
 }

@@ -46,6 +46,12 @@ impl Route {
     }
 }
 
+impl PartialEq for Route {
+    fn eq(&self, other: &Route) -> bool {
+        self.route == other.route
+    }
+}
+
 fn random_position_pair(n_items: usize) -> (usize, usize) {
     let mut pair = random_pair(n_items);
     let max_iter = 10;
