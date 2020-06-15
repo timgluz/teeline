@@ -1,24 +1,32 @@
+extern crate clap;
 extern crate rand;
 
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tour};
+use teeline::tsp::{self, kdtree, tour, Solvers};
 
 fn main() {
     let n_points = read_value::<usize>();
     let cities = read_cities(n_points);
 
-    //TODO: read params from commandline
-    //let tour = tsp::nearest_neighbor::solve(&cities);
-    //let tour = tsp::two_opt::solve(&cities);
-    //let tour = tsp::stochastic_hill::solve(&cities);
-    //let tour = tsp::simulated_annealing::solve(&cities);
-    let tour = tsp::tabu_search::solve(&cities);
+    let tour = solve(Solvers::TabuSearch, &cities);
 
     print_solution(&tour, false);
 }
 
+/// solves tsp for given cities by using solver
+fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint]) -> tour::Tour {
+    match algorithm {
+        Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities),
+        Solvers::TwoOpt => tsp::two_opt::solve(cities),
+        Solvers::StochasticHill => tsp::stochastic_hill::solve(cities),
+        Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities),
+        Solvers::TabuSearch => tsp::tabu_search::solve(cities),
+    }
+}
+
+/// prints output to stdin
 fn print_solution(tour: &tour::Tour, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };
 
@@ -30,7 +38,7 @@ fn print_solution(tour: &tour::Tour, is_optimized: bool) {
     print!("\n");
 }
 
-// k-opt
+/// reads cities from STDIN
 fn read_cities(n: usize) -> Vec<kdtree::KDPoint> {
     let mut rows = kdtree::PointMatrix::with_capacity(n);
 
