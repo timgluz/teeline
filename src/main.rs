@@ -1,16 +1,46 @@
 extern crate clap;
 extern crate rand;
 
+use clap::{arg_enum, App, Arg};
+
 use std::fmt::Debug;
 use std::str::FromStr;
 
 use teeline::tsp::{self, kdtree, tour, Solvers};
 
 fn main() {
+    //process command-line params
+    let args = App::new("Teeline")
+        .version(tsp::VERSION)
+        .author(tsp::AUTHOR)
+        .about("Solver for Traveling Salesman problem")
+        .arg(
+            Arg::with_name("FILEPATH")
+                .help("Sets the input file to read cities from, optional, if not specified it will read from STDIN")
+                .required(false)
+                .index(1),
+        )
+        .arg(
+            Arg::with_name("solver")
+                .long("solver")
+                .short("s")
+                .help("specify an algorithm to use")
+                .possible_values(&Solvers::variants())
+                .case_insensitive(true)
+                .takes_value(true),
+        )
+        .get_matches();
+
+    let solver_type = Solvers::from_str(args.value_of("solver").unwrap_or("unspecified"))
+        .expect("Unknown solver");
+
+    println!("Selected solver: {:?}", solver_type);
+
+    // todo: read stdin only if FILEPATH is not given
     let n_points = read_value::<usize>();
     let cities = read_cities(n_points);
 
-    let tour = solve(Solvers::TabuSearch, &cities);
+    let tour = solve(solver_type, &cities);
 
     print_solution(&tour, false);
 }
@@ -23,6 +53,7 @@ fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint]) -> tour::Tour {
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities),
         Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities),
         Solvers::TabuSearch => tsp::tabu_search::solve(cities),
+        _ => panic!("Unspecified solver"),
     }
 }
 
