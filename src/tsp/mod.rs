@@ -1,3 +1,4 @@
+pub mod distance_matrix;
 pub mod kdtree;
 pub mod nearest_neighbor;
 pub mod route;
