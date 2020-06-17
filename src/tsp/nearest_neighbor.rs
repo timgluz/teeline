@@ -25,6 +25,7 @@ pub fn solve(cities: &[kdtree::KDPoint]) -> Tour {
         }
 
         let nearest_city = search_result.first().unwrap();
+        // move behind verbose config
         //println!("nearest to city.{:?} is {:?}", id1, nearest_city.id);
         //println!("alternatives: {:?}", frontier);
 
