@@ -16,7 +16,23 @@ It currently implements:
 
 * build project: `cargo build`
 
-* using as CLI: `cat ./data/tsp_51_1 | ./target/debug/bin`
+```
+# check available settings and commands
+./target/debug/bin -h
+
+# use default settings
+cat ./data/tsp_51_1 | ./target/debug/bin
+
+# use Bellman-Held-Karp algoritm as solver
+# be careful, it wouldnt work for dataset bigger than 30
+cat ./data/tsp_5_1 | ./target/debug/bin --solver=bellman_karp
+```
+
+* compile runnable binary:
+
+```
+cargo build --release
+```
 
 
 *Visualizing solution*
