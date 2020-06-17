@@ -2,7 +2,11 @@ use super::distance_matrix::DistanceMatrix;
 /// Bellman-Help-Karp
 ///
 /// exact solver using Dynamic Programming
+/// source:
 ///
+/// Draft of Chapter 7 (Dynamic Programming) for the planned book A Practical Guide to Discrete
+/// Optimization, with D. Applegate, S. Dash, D. S. Johnson. December 29, 2014.
+/// https://www.math.uwaterloo.ca/~bico/papers/papers.html
 ///
 use super::kdtree::KDPoint;
 use super::route::Route;
