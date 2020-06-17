@@ -1,3 +1,4 @@
+pub mod bellman_karp;
 pub mod distance_matrix;
 pub mod kdtree;
 pub mod nearest_neighbor;
@@ -15,6 +16,7 @@ use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Solvers {
+    BellmanKarp,
     NearestNeighbor,
     SimulatedAnnealing,
     StochasticHill,
@@ -26,6 +28,8 @@ pub enum Solvers {
 impl Solvers {
     pub fn variants() -> Vec<&'static str> {
         vec![
+            "bellman_karp",
+            "bhk",
             "nearest_neighbor",
             "nn",
             "simulated_annealing",
@@ -42,6 +46,8 @@ impl FromStr for Solvers {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "bellman_karp" => Ok(Solvers::BellmanKarp),
+            "bhk" => Ok(Solvers::BellmanKarp),
             "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "nn" => Ok(Solvers::NearestNeighbor),
             "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),

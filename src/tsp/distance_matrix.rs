@@ -29,7 +29,7 @@ impl DistanceMatrix {
     }
 
     // assumes that cities are already sorted by id and ids are incrementally crowing
-    fn from_cities(cities: &[KDPoint]) -> Result<Self, &'static str> {
+    pub fn from_cities(cities: &[KDPoint]) -> Result<Self, &'static str> {
         let n = cities.len();
         if n < 2 {
             return Err("distance matrix requires at least 2 points");
