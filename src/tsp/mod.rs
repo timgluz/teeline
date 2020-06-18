@@ -1,5 +1,6 @@
 pub mod bellman_karp;
 pub mod distance_matrix;
+pub mod genetic_algorithm;
 pub mod kdtree;
 pub mod nearest_neighbor;
 pub mod route;
@@ -18,6 +19,7 @@ use std::str::FromStr;
 pub enum Solvers {
     BellmanKarp,
     NearestNeighbor,
+    GeneticAlgorithm,
     SimulatedAnnealing,
     StochasticHill,
     TabuSearch,
@@ -32,6 +34,8 @@ impl Solvers {
             "bhk",
             "nearest_neighbor",
             "nn",
+            "genetic_algorithm",
+            "ga",
             "simulated_annealing",
             "stochastic_hill",
             "tabu_search",
@@ -50,6 +54,8 @@ impl FromStr for Solvers {
             "bhk" => Ok(Solvers::BellmanKarp),
             "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "nn" => Ok(Solvers::NearestNeighbor),
+            "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
+            "ga" => Ok(Solvers::GeneticAlgorithm),
             "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),

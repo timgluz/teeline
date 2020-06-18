@@ -56,6 +56,7 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
     p < criteria
 }
 
+// TODO: double-check implementation as rust exp may behave differently
 fn metropolis(t: f32, e1: f32, e2: f32) -> f32 {
     (-(e2 - e1) / t).exp()
 }

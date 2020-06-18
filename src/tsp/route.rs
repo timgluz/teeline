@@ -52,7 +52,8 @@ impl PartialEq for Route {
     }
 }
 
-fn random_position_pair(n_items: usize) -> (usize, usize) {
+// maybe into utils?
+pub fn random_position_pair(n_items: usize) -> (usize, usize) {
     let mut pair = random_pair(n_items);
     let max_iter = 10;
 

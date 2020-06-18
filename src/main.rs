@@ -54,6 +54,7 @@ fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint]) -> tour::Tour {
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities),
         Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities),
         Solvers::TabuSearch => tsp::tabu_search::solve(cities),
+        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities),
         _ => panic!("Unspecified solver"),
     }
 }
