@@ -10,7 +10,7 @@ It currently implements:
 * stochastic hill climbing with random restarts
 * simulated annealing
 * tabu search
-
+* genetic search
 
 ### Usage
 
