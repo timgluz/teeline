@@ -103,6 +103,23 @@ impl DistanceMatrix {
 
         distances
     }
+
+    pub fn tour_length(&self, path: &[usize]) -> f32 {
+        let tour_length = path.len();
+        if tour_length < 2 {
+            return 0.0;
+        }
+
+        let mut total = self
+            .distance_between(path.last().unwrap().clone(), 0)
+            .unwrap();
+
+        for i in 1..tour_length {
+            total += self.distance_between(path[i], path[i - 1]).unwrap();
+        }
+
+        total
+    }
 }
 
 #[cfg(test)]
