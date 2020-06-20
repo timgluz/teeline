@@ -9,17 +9,16 @@ use super::route::{random_position_pair, Route};
 use super::tour::{self, Tour};
 
 // TODO: should come from configs
-const MAX_EPOCH: usize = 10000;
-const MUTATION_PROBALITY: f32 = 0.1;
-const POPULATION_SIZE: usize = 50;
-const ELITIST_SIZE: usize = 3; // how many best candidates pass directly into new population;
+const MAX_EPOCH: usize = 100_000;
+const MUTATION_PROBALITY: f32 = 0.01;
+const ELITIST_SIZE: usize = 5; // how many best candidates pass directly into new population;
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
 pub fn solve(cities: &[KDPoint]) -> Tour {
     let evaluator = build_evaluator(cities);
 
-    let population_size = POPULATION_SIZE;
+    let population_size = cities.len();
     let population = TspPopulation::from_cities(cities, population_size, &evaluator);
     let best_candidate = solve_ga(&population, evaluator);
 
@@ -27,13 +26,12 @@ pub fn solve(cities: &[KDPoint]) -> Tour {
 }
 
 fn solve_ga(population: &TspPopulation, fitness_fn: FitnessFn) -> TspGenotype {
-    let verbose = true;
+    let verbose = false;
     let population_size = population.len();
 
     let mut epoch = 0;
     let mut current_population = population.clone();
 
-    println!("Initial population:\n{:?}", current_population);
     while epoch < MAX_EPOCH {
         let mut new_population = TspPopulation::with_capacity(population_size);
 
@@ -43,7 +41,7 @@ fn solve_ga(population: &TspPopulation, fitness_fn: FitnessFn) -> TspGenotype {
             new_population.add(elite.clone());
         }
 
-        for _ in ELITIST_SIZE..(population_size / 2 + 1) {
+        for _ in ELITIST_SIZE..(population_size / 2) {
             let parent1 = current_population.random_selection();
             let parent2 = current_population.random_selection();
 
@@ -54,13 +52,6 @@ fn solve_ga(population: &TspPopulation, fitness_fn: FitnessFn) -> TspGenotype {
             if probability(MUTATION_PROBALITY) {
                 child2.mutate()
             };
-
-            /*
-            println!(
-                "Parent1: {:?}, Parent2: {:?}\nChild1: {:?}, Child2: {:?}",
-                parent1, parent2, child1, child2
-            );
-            */
 
             new_population.add(child1);
             new_population.add(child2);

@@ -234,4 +234,20 @@ mod tests {
         assert_approx(2.0, res[2]);
         assert_approx(4.0, res[3]);
     }
+
+    #[test]
+    fn test_distance_matrix_tour_length_with_tsp_5_1() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+
+        let route = vec![0, 1, 2, 3, 4];
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+
+        assert_approx(4.0, dm.tour_length(&route));
+    }
 }
