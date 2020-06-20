@@ -49,6 +49,14 @@ https://discreteoptimization.github.io/vis/tsp/ to visualize solution;
 
 ## Resources
 
+#### 2 - Opt
+
+* Algorithms Illuminated, vol.4: https://youtu.be/dYEWqrp-mho
+
+#### Dynamic Programming
+
+* Bellman-Held-Karp: https://youtu.be/D8aHqaFa8GE
+
 #### Genetic algorithm
 * Ch.4.1.4 - "Genetic Algorithms", AIMA, https://github.com/aimacode/aima-python/blob/ca301ea363674ec719b58f23e794998de4f623c9/search.py#L912
 * Ch7.5 - Random sampling for local search, Skiena: https://books.google.de/books?id=7XUSn0IKQEgC&lpg=PR1&pg=PA251#v=onepage&q&f=false
