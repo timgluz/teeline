@@ -52,7 +52,8 @@ impl PartialEq for Route {
     }
 }
 
-fn random_position_pair(n_items: usize) -> (usize, usize) {
+// maybe into utils?
+pub fn random_position_pair(n_items: usize) -> (usize, usize) {
     let mut pair = random_pair(n_items);
     let max_iter = 10;
 
@@ -68,6 +69,7 @@ fn random_position_pair(n_items: usize) -> (usize, usize) {
     pair
 }
 
+// from Skiena ch.7.5.1 - random sampling
 fn random_pair(n_items: usize) -> (usize, usize) {
     if n_items < 2 {
         panic!("n_items must be bigger than 2");

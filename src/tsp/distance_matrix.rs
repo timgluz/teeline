@@ -103,6 +103,23 @@ impl DistanceMatrix {
 
         distances
     }
+
+    pub fn tour_length(&self, path: &[usize]) -> f32 {
+        let tour_length = path.len();
+        if tour_length < 2 {
+            return 0.0;
+        }
+
+        let mut total = self
+            .distance_between(path.last().unwrap().clone(), 0)
+            .unwrap();
+
+        for i in 1..tour_length {
+            total += self.distance_between(path[i], path[i - 1]).unwrap();
+        }
+
+        total
+    }
 }
 
 #[cfg(test)]
@@ -216,5 +233,21 @@ mod tests {
         assert_approx(1.0, res[1]);
         assert_approx(2.0, res[2]);
         assert_approx(4.0, res[3]);
+    }
+
+    #[test]
+    fn test_distance_matrix_tour_length_with_tsp_5_1() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+
+        let route = vec![0, 1, 2, 3, 4];
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+
+        assert_approx(4.0, dm.tour_length(&route));
     }
 }
