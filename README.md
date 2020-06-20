@@ -46,3 +46,15 @@ cat ./data/tsp_51_1 | ./target/debug/bin > solution51.txt
 
 upload data file and solution file to:
 https://discreteoptimization.github.io/vis/tsp/ to visualize solution;
+
+## Resources
+
+#### Genetic algorithm
+
+* comparitions of selection https://arxiv.org/ftp/arxiv/papers/1203/1203.3099.pdf
+* ordered crossover: http://www.dmi.unict.it/mpavone/nc-cs/materiale/moscato89.pdf
+* Java implementation: https://learning.oreilly.com/library/view/genetic-algorithms-in/9781484203286/9781484203293_Ch04.xhtml
+* comparition of crossover methods: http://www.iro.umontreal.ca/~dift6751/ga_tsp_tr.pdf
+* Ch7.5 - Random sampling for local search, Skiena: https://books.google.de/books?id=7XUSn0IKQEgC&lpg=PR1&pg=PA251#v=onepage&q&f=false
+
+
