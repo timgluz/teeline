@@ -1,4 +1,5 @@
 pub mod bellman_karp;
+pub mod branch_bound;
 pub mod distance_matrix;
 pub mod genetic_algorithm;
 pub mod kdtree;
@@ -10,7 +11,7 @@ pub mod tabu_search;
 pub mod tour;
 pub mod two_opt;
 
-pub const VERSION: &'static str = "0.2.0";
+pub const VERSION: &'static str = "0.3.0";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
@@ -18,6 +19,7 @@ use std::str::FromStr;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Solvers {
     BellmanKarp,
+    BranchBound,
     NearestNeighbor,
     GeneticAlgorithm,
     SimulatedAnnealing,
@@ -32,6 +34,7 @@ impl Solvers {
         vec![
             "bellman_karp",
             "bhk",
+            "branch_bound",
             "nearest_neighbor",
             "nn",
             "genetic_algorithm",
@@ -51,6 +54,7 @@ impl FromStr for Solvers {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "bellman_karp" => Ok(Solvers::BellmanKarp),
+            "branch_bound" => Ok(Solvers::BranchBound),
             "bhk" => Ok(Solvers::BellmanKarp),
             "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "nn" => Ok(Solvers::NearestNeighbor),

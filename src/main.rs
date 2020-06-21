@@ -49,6 +49,7 @@ fn main() {
 fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint]) -> tour::Tour {
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities),
+        Solvers::BranchBound => tsp::branch_bound::solve(cities),
         Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities),
         Solvers::TwoOpt => tsp::two_opt::solve(cities),
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities),
