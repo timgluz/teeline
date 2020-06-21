@@ -3,12 +3,12 @@
 Teeline is collection of algorithms for the Traveling Salesman Problem.
 It could be used as command-line utility or as Rust package;
 
-Exact algorithms:
+### Exact algorithms:
 
 * branch-and-bound, exhaustive tree search with pruning;
 * Bellman-Karp-Held, dynamic algorithm
 
-Approximate algorithms:
+### Approximate algorithms:
 * greedy nearest neighbors using KD-tree
 * 2-opt heuristic
 * stochastic hill climbing with random restarts
