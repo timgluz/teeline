@@ -11,7 +11,7 @@ pub mod tabu_search;
 pub mod tour;
 pub mod two_opt;
 
-pub const VERSION: &'static str = "0.2.0";
+pub const VERSION: &'static str = "0.3.0";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;

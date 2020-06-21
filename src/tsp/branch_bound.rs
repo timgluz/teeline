@@ -7,9 +7,8 @@ use super::route::Route;
 use super::tour::Tour;
 
 const UNVISITED_NODE: usize = 0;
-const MAX_EPOCH: usize = 100;
 
-type TabuList = HashSet<usize>;
+type UniqSet = HashSet<usize>;
 type Path = Vec<usize>;
 type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 
@@ -20,11 +19,11 @@ pub fn solve(cities: &[KDPoint]) -> Tour {
     // todo: rename tour_length -> distance
     // todo: tour_length should return number of cities on final track
     let mut open_path: Path = vec![0; n_cities];
-    let mut unvisited_cities: TabuList = route.route()[1..].iter().map(|x| x.clone()).collect();
+    let mut unvisited_cities: UniqSet = route.route().iter().map(|x| x.clone()).collect();
     unvisited_cities.remove(&0); // we start always from 0
 
     let fitness_fn = build_evaluator(cities);
-    let (best_path, best_distance) = backtrack(
+    let (best_path, _best_distance) = backtrack(
         &fitness_fn,
         &mut open_path,
         &unvisited_cities,
@@ -45,7 +44,7 @@ fn build_evaluator(cities: &[KDPoint]) -> PathEvaluator {
 fn backtrack(
     evaluate_fn: &PathEvaluator,
     path: &mut Path,
-    unvisited_cities: &TabuList,
+    unvisited_cities: &UniqSet,
     k: usize,
     running_cost: f32,
     upper_bound: f32,
@@ -60,8 +59,6 @@ fn backtrack(
         if new_distance < upper_bound {
             best_path = path.clone();
             best_distance = new_distance;
-
-            println!("New upperbound: {:?}", best_distance);
         }
     };
 
@@ -103,14 +100,15 @@ fn backtrack(
 }
 
 fn is_solution(path: &Path, k: usize, n_cities: usize) -> bool {
-    // TODO: check that items are unique
-    k == n_cities && k > 1 && path[k - 1] != 0
+    let uniq_ids: UniqSet = path[0..k].iter().map(|c| c.clone()).collect();
+
+    k == n_cities && k > 1 && uniq_ids.len() == n_cities
 }
 
 fn construct_candidates(
     path: &Path,
     k: usize,
-    unvisited_cities: &TabuList,
+    unvisited_cities: &UniqSet,
     running_cost: f32,
     best_distance: f32,
     evaluate_fn: &PathEvaluator,
@@ -125,7 +123,7 @@ fn construct_candidates(
         }
     }
 
-    candidates.sort_by(|a, b| b.cmp(a)); // reverse order
+    candidates.sort(); // try to keep lexikographic order
     return candidates;
 }
 
