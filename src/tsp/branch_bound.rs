@@ -29,8 +29,8 @@ pub fn solve(cities: &[KDPoint]) -> Tour {
         &mut open_path,
         &unvisited_cities,
         1,
+        0.0,
         f32::MAX,
-        n_cities,
     );
 
     Tour::new(&best_path, cities)
@@ -47,28 +47,37 @@ fn backtrack(
     path: &mut Path,
     unvisited_cities: &TabuList,
     k: usize,
+    running_cost: f32,
     upper_bound: f32,
-    n_cities: usize,
 ) -> (Path, f32) {
-    let mut epoch = 0;
     let mut best_path = path.clone();
     let mut best_distance = upper_bound;
 
+    let n_cities = k + unvisited_cities.len();
     if is_solution(path.as_ref(), k, n_cities) {
         let new_distance = evaluate_fn(path);
 
-        if upper_bound > new_distance {
+        if new_distance < upper_bound {
             best_path = path.clone();
             best_distance = new_distance;
+
+            println!("New upperbound: {:?}", best_distance);
         }
     };
 
-    let candidates: Vec<usize> = construct_candidates(&path, k, &unvisited_cities, best_distance);
+    let candidates: Vec<usize> = construct_candidates(
+        &path,
+        k,
+        &unvisited_cities,
+        running_cost,
+        best_distance,
+        evaluate_fn,
+    );
 
-    println!("Current path: {:?}", path[0..k].to_vec());
     for candidate in candidates.iter() {
         make_move(path, k, candidate.clone());
-        println!("At city: {:?}, trying: {:?}", path[k - 1], candidate);
+        let prev_city = path[k - 1];
+        let next_distance = evaluate_fn(&vec![prev_city, candidate.clone()]);
 
         let mut next_cities = unvisited_cities.clone();
         next_cities.remove(candidate);
@@ -78,22 +87,16 @@ fn backtrack(
             path,
             &next_cities,
             k + 1,
+            running_cost + next_distance,
             best_distance,
-            n_cities,
         );
 
-        if best_distance > sub_dist {
-            println!("Found better distance: {:?}", sub_dist);
+        if sub_dist < best_distance {
             best_path = sub_res;
             best_distance = sub_dist;
         }
 
         undo_move(path, k);
-
-        epoch += 1;
-        if epoch > MAX_EPOCH {
-            break;
-        }
     }
 
     (best_path, best_distance)
@@ -108,16 +111,21 @@ fn construct_candidates(
     path: &Path,
     k: usize,
     unvisited_cities: &TabuList,
+    running_cost: f32,
     best_distance: f32,
+    evaluate_fn: &PathEvaluator,
 ) -> Path {
     let mut candidates: Path = vec![]; // always start from city.id 0
-    let visited_cities = path[0..k].to_vec();
 
     for city_id in unvisited_cities.iter() {
-        // TODO also prune bad branches
-        candidates.push(city_id.clone());
+        let next_distance = evaluate_fn(&vec![path[k - 1], city_id.clone()]);
+        // simple pruning
+        if best_distance > running_cost + next_distance {
+            candidates.push(city_id.clone());
+        }
     }
 
+    candidates.sort_by(|a, b| b.cmp(a)); // reverse order
     return candidates;
 }
 
