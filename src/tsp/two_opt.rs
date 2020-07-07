@@ -80,7 +80,8 @@ mod tests {
             vec![1.0, 0.0],
         ]);
 
-        let tour = solve(&cities);
+        let default_opts = SolverOptions::default();
+        let tour = solve(&cities, &default_opts);
         assert_eq!(4.0, tour.total);
         assert_eq!(&[0, 1, 2, 3, 4], tour.route());
     }
