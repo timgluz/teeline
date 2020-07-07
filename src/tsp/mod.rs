@@ -40,6 +40,7 @@ impl Solvers {
             "genetic_algorithm",
             "ga",
             "simulated_annealing",
+            "sa",
             "stochastic_hill",
             "tabu_search",
             "two_opt",
@@ -60,7 +61,7 @@ impl FromStr for Solvers {
             "nn" => Ok(Solvers::NearestNeighbor),
             "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "ga" => Ok(Solvers::GeneticAlgorithm),
-            "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
+            "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),
             "two_opt" => Ok(Solvers::TwoOpt),
@@ -79,6 +80,9 @@ pub struct SolverOptions {
     pub n_nearest: usize,
     pub mutation_probability: f32,
     pub n_elite: usize,
+    pub cooling_rate: f32,
+    pub max_temperature: f32,
+    pub min_temperature: f32,
 }
 
 impl SolverOptions {
@@ -90,6 +94,9 @@ impl SolverOptions {
             n_nearest: 3,
             mutation_probability: 0.001,
             n_elite: 3,
+            cooling_rate: 0.0001,
+            min_temperature: 0.001,
+            max_temperature: 1_000.0,
         }
     }
 }

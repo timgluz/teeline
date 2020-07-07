@@ -1,7 +1,7 @@
 extern crate clap;
 extern crate rand;
 
-use clap::{arg_enum, App, Arg, ArgMatches};
+use clap::{App, Arg, ArgMatches};
 
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -55,8 +55,28 @@ fn main() {
         .arg(
             Arg::with_name("mutation_probability")
                 .long("mutation_probability")
-                .short("mutp")
                 .help("specify mutation_probability that swaps 2 cities on new individual")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("cooling_rate")
+                .long("cooling_rate")
+                .help("specify cooling rate")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("min_temperature")
+                .long("min_temperature")
+                .help("specify minimum temperature")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("max_temperature")
+                .long("max_temperature")
+                .help("specify the maximum temperature")
                 .takes_value(true)
                 .required(false),
         )
@@ -94,7 +114,7 @@ fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions
         Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
         Solvers::TwoOpt => tsp::two_opt::solve(cities),
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
-        Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities),
+        Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, options),
         Solvers::TabuSearch => tsp::tabu_search::solve(cities),
         Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, options),
         _ => panic!("Unspecified solver"),
@@ -170,6 +190,10 @@ fn read_string() -> String {
 fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
     let mut options = SolverOptions::default();
 
+    if args.is_present("verbose") {
+        options.verbose = true;
+    }
+
     if let Some(n_epochs_str) = args.value_of("epochs") {
         options.epochs = usize::from_str(n_epochs_str).unwrap_or(0);
     }
@@ -190,8 +214,16 @@ fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
         options.mutation_probability = f32::from_str(mutation_prob_str).unwrap_or(0.0);
     }
 
-    if args.is_present("verbose") {
-        options.verbose = true;
+    if let Some(cooling_rate_str) = args.value_of("cooling_rate") {
+        options.cooling_rate = f32::from_str(cooling_rate_str).unwrap_or(0.0);
+    }
+
+    if let Some(min_temperature_str) = args.value_of("min_temperature") {
+        options.min_temperature = f32::from_str(min_temperature_str).unwrap_or(0.0);
+    }
+
+    if let Some(max_temperature_str) = args.value_of("max_temperature") {
+        options.max_temperature = f32::from_str(max_temperature_str).unwrap_or(0.0);
     }
 
     options
