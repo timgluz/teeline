@@ -54,18 +54,14 @@ impl FromStr for Solvers {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "bellman_karp" => Ok(Solvers::BellmanKarp),
+            "bhk" | "bellman_karp" => Ok(Solvers::BellmanKarp),
             "branch_bound" => Ok(Solvers::BranchBound),
-            "bhk" => Ok(Solvers::BellmanKarp),
-            "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
-            "nn" => Ok(Solvers::NearestNeighbor),
-            "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
-            "ga" => Ok(Solvers::GeneticAlgorithm),
+            "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
+            "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),
-            "two_opt" => Ok(Solvers::TwoOpt),
-            "2opt" => Ok(Solvers::TwoOpt),
+            "2opt" | "two_opt" => Ok(Solvers::TwoOpt),
             _ => Err("unknown solver"),
         }
     }
