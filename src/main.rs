@@ -1,12 +1,12 @@
 extern crate clap;
 extern crate rand;
 
-use clap::{arg_enum, App, Arg};
+use clap::{arg_enum, App, Arg, ArgMatches};
 
 use std::fmt::Debug;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tour, Solvers};
+use teeline::tsp::{self, kdtree, tour, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
@@ -15,19 +15,33 @@ fn main() {
         .author(tsp::AUTHOR)
         .about("Solver for Traveling Salesman problem")
         .arg(
-            Arg::with_name("FILEPATH")
-                .help("Sets the input file to read cities from, optional, if not specified it will read from STDIN")
-                .required(false)
-                .index(1),
-        )
-        .arg(
             Arg::with_name("solver")
-                .long("solver")
-                .short("s")
+                .index(1)
                 .help("specify an algorithm to use")
                 .possible_values(&Solvers::variants())
+                .required(true)
+                .value_name("SOLVER_NAME")
                 .case_insensitive(true)
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("epochs")
+                .long("epochs")
+                .help("specify how many maximum iterations before stopping, 0 is forever")
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("platoo_epochs")
+                .long("platoo_epochs")
+                .help("specify how many steps until stop searching on platoo")
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("verbose")
+                .long("verbose")
+                .short("v")
+                .help("allows solver to print out debug lines")
+                .required(false),
         )
         .get_matches();
 
@@ -35,24 +49,25 @@ fn main() {
         .expect("Unknown solver");
 
     println!("Selected solver: {:?}", solver_type);
+    let options = solver_options_from_args(&args);
 
     // todo: read stdin only if FILEPATH is not given
     let n_points = read_value::<usize>();
     let cities = read_cities(n_points);
 
-    let tour = solve(solver_type, &cities);
+    let tour = solve(solver_type, &cities, &options);
 
     print_solution(&tour, false);
 }
 
 /// solves tsp for given cities by using solver
-fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint]) -> tour::Tour {
+fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> tour::Tour {
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities),
         Solvers::BranchBound => tsp::branch_bound::solve(cities),
         Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities),
         Solvers::TwoOpt => tsp::two_opt::solve(cities),
-        Solvers::StochasticHill => tsp::stochastic_hill::solve(cities),
+        Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
         Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities),
         Solvers::TabuSearch => tsp::tabu_search::solve(cities),
         Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities),
@@ -124,4 +139,22 @@ fn read_string() -> String {
         .expect("Failed to read string from stding");
 
     buf
+}
+
+fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
+    let mut options = SolverOptions::default();
+
+    if let Some(n_epochs_str) = args.value_of("epochs") {
+        options.epochs = usize::from_str(n_epochs_str).unwrap_or(0);
+    }
+
+    if let Some(n_platoo_str) = args.value_of("platoo_epochs") {
+        options.platoo_epochs = usize::from_str(n_platoo_str).unwrap_or(0);
+    }
+
+    if args.is_present("verbose") {
+        options.verbose = true;
+    }
+
+    options
 }
