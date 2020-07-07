@@ -28,18 +28,36 @@ fn main() {
             Arg::with_name("epochs")
                 .long("epochs")
                 .help("specify how many maximum iterations before stopping, 0 is forever")
+                .takes_value(true)
                 .required(false),
         )
         .arg(
             Arg::with_name("platoo_epochs")
                 .long("platoo_epochs")
                 .help("specify how many steps until stop searching on platoo")
+                .takes_value(true)
                 .required(false),
         )
         .arg(
             Arg::with_name("n_nearest")
                 .long("n_nearest")
                 .help("specify how many nearest neighbors to look for")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("n_elite")
+                .long("n_elite")
+                .help("specify how many strongest individuals to pass directly to next gen")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
+            Arg::with_name("mutation_probability")
+                .long("mutation_probability")
+                .short("mutp")
+                .help("specify mutation_probability that swaps 2 cities on new individual")
+                .takes_value(true)
                 .required(false),
         )
         .arg(
@@ -78,7 +96,7 @@ fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
         Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities),
         Solvers::TabuSearch => tsp::tabu_search::solve(cities),
-        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities),
+        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, options),
         _ => panic!("Unspecified solver"),
     }
 }
@@ -161,7 +179,15 @@ fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
     }
 
     if let Some(n_nearest_str) = args.value_of("n_nearest") {
-        options.n_nearest = usize::from_str(n_nearest_str).unwrap_or(0)
+        options.n_nearest = usize::from_str(n_nearest_str).unwrap_or(0);
+    }
+
+    if let Some(n_elite_str) = args.value_of("n_elite") {
+        options.n_elite = usize::from_str(n_elite_str).unwrap_or(0);
+    }
+
+    if let Some(mutation_prob_str) = args.value_of("mutation_probability") {
+        options.mutation_probability = f32::from_str(mutation_prob_str).unwrap_or(0.0);
     }
 
     if args.is_present("verbose") {

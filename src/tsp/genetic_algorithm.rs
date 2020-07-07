@@ -6,50 +6,51 @@ use std::rc::Rc;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::route::{random_position_pair, Route};
-use super::tour::{self, Tour};
-
-// TODO: should come from configs
-const MAX_EPOCH: usize = 100_000;
-const MUTATION_PROBALITY: f32 = 0.01;
-const ELITIST_SIZE: usize = 5; // how many best candidates pass directly into new population;
+use super::tour::Tour;
+use super::SolverOptions;
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
-pub fn solve(cities: &[KDPoint]) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
     let evaluator = build_evaluator(cities);
 
     let population_size = cities.len();
     let population = TspPopulation::from_cities(cities, population_size, &evaluator);
-    let best_candidate = solve_ga(&population, evaluator);
+    let best_candidate = solve_ga(&population, evaluator, options);
 
     Tour::new(best_candidate.genotype(), cities)
 }
 
-fn solve_ga(population: &TspPopulation, fitness_fn: FitnessFn) -> TspGenotype {
-    let verbose = false;
+fn solve_ga(
+    population: &TspPopulation,
+    fitness_fn: FitnessFn,
+    options: &SolverOptions,
+) -> TspGenotype {
     let population_size = population.len();
+    let mutation_prob = options.mutation_probability;
+    let elite_size = options.n_elite;
 
     let mut epoch = 0;
     let mut current_population = population.clone();
 
-    while epoch < MAX_EPOCH {
+    while epoch < options.epochs {
         let mut new_population = TspPopulation::with_capacity(population_size);
 
         // pass n-fittest directly into new population;
         current_population.sort();
-        for elite in current_population.individuals().iter().take(ELITIST_SIZE) {
+        for elite in current_population.individuals().iter().take(elite_size) {
             new_population.add(elite.clone());
         }
 
-        for _ in ELITIST_SIZE..(population_size / 2) {
+        for _ in elite_size..(population_size / 2) {
             let parent1 = current_population.random_selection();
             let parent2 = current_population.random_selection();
 
             let (mut child1, mut child2) = ordered_crossover(&parent1, &parent2, &fitness_fn);
-            if probability(MUTATION_PROBALITY) {
+            if probability(mutation_prob) {
                 child1.mutate()
             };
-            if probability(MUTATION_PROBALITY) {
+            if probability(mutation_prob) {
                 child2.mutate()
             };
 
@@ -59,9 +60,9 @@ fn solve_ga(population: &TspPopulation, fitness_fn: FitnessFn) -> TspGenotype {
 
         current_population = new_population;
 
-        if verbose == true {
+        if options.verbose {
             println!(
-                "# -- Epoch: {:?}\n best individual:\n{:?}",
+                "GA: epoch.{:?} - best individual:\n{:?}",
                 epoch,
                 current_population.best()
             );
