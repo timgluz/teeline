@@ -37,6 +37,12 @@ fn main() {
                 .required(false),
         )
         .arg(
+            Arg::with_name("n_nearest")
+                .long("n_nearest")
+                .help("specify how many nearest neighbors to look for")
+                .required(false),
+        )
+        .arg(
             Arg::with_name("verbose")
                 .long("verbose")
                 .short("v")
@@ -67,7 +73,7 @@ fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
         Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
-        Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities),
+        Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
         Solvers::TwoOpt => tsp::two_opt::solve(cities),
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
         Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities),
@@ -152,6 +158,10 @@ fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
 
     if let Some(n_platoo_str) = args.value_of("platoo_epochs") {
         options.platoo_epochs = usize::from_str(n_platoo_str).unwrap_or(0);
+    }
+
+    if let Some(n_nearest_str) = args.value_of("n_nearest") {
+        options.n_nearest = usize::from_str(n_nearest_str).unwrap_or(0)
     }
 
     if args.is_present("verbose") {

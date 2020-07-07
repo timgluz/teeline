@@ -76,6 +76,7 @@ pub struct SolverOptions {
     pub epochs: usize,        // how many iteration to run
     pub platoo_epochs: usize, // how many iterations to do on the platoo
     pub verbose: bool,
+    pub n_nearest: usize,
 }
 
 impl SolverOptions {
@@ -84,6 +85,7 @@ impl SolverOptions {
             epochs: 10_000,
             platoo_epochs: 500,
             verbose: false,
+            n_nearest: 3,
         }
     }
 }
