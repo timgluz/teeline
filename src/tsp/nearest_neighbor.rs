@@ -1,9 +1,10 @@
 use super::kdtree;
 use super::tour::Tour;
+use super::SolverOptions;
 
-pub fn solve(cities: &[kdtree::KDPoint]) -> Tour {
+pub fn solve(cities: &[kdtree::KDPoint], options: &SolverOptions) -> Tour {
     let search_tree = kdtree::build_tree(&cities);
-    let n_nearest = 3;
+    let n_nearest = options.n_nearest;
 
     let mut route: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
@@ -20,28 +21,18 @@ pub fn solve(cities: &[kdtree::KDPoint]) -> Tour {
 
         let search_result = frontier.nearest();
         if search_result.is_empty() {
-            //println!("No nearest for city: #{:?}", id1);
+            if options.verbose {
+                println!("No nearest for city: #{:?}", id1);
+            }
+
             continue;
         }
 
         let nearest_city = search_result.first().unwrap();
-        // move behind verbose config
-        //println!("nearest to city.{:?} is {:?}", id1, nearest_city.id);
-        //println!("alternatives: {:?}", frontier);
-
         let next_distance = city1.distance(&nearest_city);
+
         if next_distance < current_distance {
             if let Some(nearest_pos) = route.iter().position(|&x| x == nearest_city.id) {
-                /*
-                println!(
-                    "swapping city.{:?} at {:?} <-> city.{:?} at {:?}",
-                    id2,
-                    i + 1,
-                    nearest_city.id,
-                    nearest_pos
-                );
-                */
-
                 route.swap(i + 1, nearest_pos);
             }
         }

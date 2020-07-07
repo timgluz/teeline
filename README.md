@@ -5,16 +5,116 @@ It could be used as command-line utility or as Rust package;
 
 ### Exact algorithms:
 
-* branch-and-bound, exhaustive tree search with pruning;
-* Bellman-Karp-Held, dynamic algorithm
+TBD
+
+##### branch-and-bound
+
+exhaustive tree search with pruning;
+
+```
+./teeline branch_bound --verbose
+./teeling branch_bound
+```
+
+##### Bellman-Karp-Held
+
+dynamic algorithm
+
+```
+./teeline bellman_karp
+./teeline bhk
+./teeline bhk --verbose
+```
 
 ### Approximate algorithms:
-* greedy nearest neighbors using KD-tree
-* 2-opt heuristic
-* stochastic hill climbing with random restarts
-* simulated annealing
-* tabu search
-* genetic search
+
+TBD
+
+##### greedy nearest neighbors using KD-tree
+
+TBD
+
+```
+./teeline nn
+./teeline nn --verbose
+```
+
+##### 2-opt heuristic
+
+```
+./teeline two_opt
+./teeline 2opt
+```
+
+##### stochastic hill climbing
+
+Hill Climbing with random restarts
+
+available settings:
+
+* `verbose` - prints some debugging details onto std-out
+
+* `epochs` - max iterations, if 0 then it would run forever
+
+* `platoo_epochs` - max number of iterations without improvement before restarting the search
+
+```
+./teeline stochastic_hill
+./teeline stochastic_hill --epochs=100
+./teeling stochastic_hill --platoo_epochs=10
+```
+
+##### simulated annealing
+
+TODO
+
+available settings:
+
+* `cooling_rate` - specifies how fast should the temperature decrease
+
+* `max_temperature` - sets initial temperature, default 1000.0
+
+* `min_temperature` - sets the final temperature, default 0.001
+
+* `epochs` - how many iteration run before stopping the search
+
+```
+./teeline simulated_annealing
+./teeline sa --verbose
+./teeline sa --cooling_rate=0.1 --min_temperature=1.0
+./teeline sa --max_temperature
+```
+
+##### tabu search
+
+TODO
+
+available options:
+
+* `epochs` - how many iterations to run before giving up
+
+```
+./teeline tabu_search --epochs=5
+```
+
+##### genetic search
+
+TODO
+
+available options:
+
+* `epochs` - limits the max number of iteration before stopping the search, default 10.000
+
+* `mutation_probability` - sets the probability of applying random mutation for new child, default 0.001
+
+* `n_elite` - how many individuals of each population should sent directly to next generation, default 3
+
+```
+./teeline genetic_algorithm
+./teeline ga --verbose
+./teeline ga --epochs = 5 --mutation_probability = 0.2
+./teeline ga --n_elite = 7
+```
 
 ### Usage
 
@@ -29,7 +129,7 @@ cat ./data/tsp_51_1 | ./target/debug/bin
 
 # use Bellman-Held-Karp algoritm as solver
 # be careful, it wouldnt work for dataset bigger than 30
-cat ./data/tsp_5_1 | ./target/debug/bin --solver=bellman_karp
+cat ./data/tsp_5_1 | ./target/debug/bin bellman_karp
 ```
 
 * compile runnable binary:

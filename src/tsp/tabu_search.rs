@@ -3,12 +3,10 @@ use std::collections::VecDeque;
 use super::kdtree::KDPoint;
 use super::route::Route;
 use super::tour::{self, Tour};
+use super::SolverOptions;
 
-const MAX_EPOCH: usize = 100_000;
-
-pub fn solve(cities: &[KDPoint]) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
     let tabu_capacity = cities.len();
-    let verbose = false;
 
     let mut tabu_list = TabuList::new(tabu_capacity);
 
@@ -22,13 +20,15 @@ pub fn solve(cities: &[KDPoint]) -> Tour {
     while !done {
         let (local_best, local_distance) = select(cities, &u, &tabu_list);
         if local_distance < best_distance {
-            // TODO: read this from option map
-            if verbose {
-                println!("Epoch: {:?} => {:?}", epoch, local_distance);
-            }
-
             best_route = local_best.clone();
             best_distance = local_distance;
+
+            if options.verbose {
+                println!(
+                    "Tabusearch: epoch.{:?} new best {:?}",
+                    epoch, local_distance
+                );
+            }
         }
 
         // refine tabu list
@@ -36,7 +36,7 @@ pub fn solve(cities: &[KDPoint]) -> Tour {
         u = local_best; // continue search from local best
 
         epoch += 1;
-        done = update_terminate(epoch);
+        done = update_terminate(epoch, options.epochs);
     }
 
     Tour::new(best_route.route(), cities)
@@ -65,8 +65,8 @@ fn distance(cities: &[KDPoint], route: &Route) -> f32 {
     tour::total_distance(cities, route.route())
 }
 
-fn update_terminate(epoch: usize) -> bool {
-    epoch >= MAX_EPOCH
+fn update_terminate(epoch: usize, max_epochs: usize) -> bool {
+    max_epochs > 0 && epoch > max_epochs
 }
 
 struct TabuList {

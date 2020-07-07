@@ -3,26 +3,30 @@ use rand::Rng;
 use super::kdtree::KDPoint;
 use super::route::Route;
 use super::tour::{self, Tour};
+use super::SolverOptions;
 
-const MAX_TEMPERATURE: f32 = 1_000.0;
-const MIN_TEMPERATURE: f32 = 0.000_1;
-const MAX_EPOCH: usize = 100_000;
-
-pub fn solve(cities: &[KDPoint]) -> Tour {
-    let cooling_rate = 0.000_1;
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
+    let cooling_rate = options.cooling_rate;
     let mut epoch = 0;
 
     let mut best_route = Route::from_cities(cities);
     let mut best_distance = tour::total_distance(cities, best_route.route());
 
-    let mut temperature = MAX_TEMPERATURE;
-    while epoch < MAX_EPOCH || temperature > MIN_TEMPERATURE {
+    let mut temperature = options.max_temperature;
+    while epoch < options.epochs || temperature > options.min_temperature {
         let candidate = best_route.random_successor();
         let candidate_distance = tour::total_distance(cities, candidate.route());
 
         if is_acceptable(temperature, best_distance, candidate_distance) {
             best_route = candidate;
             best_distance = candidate_distance;
+
+            if options.verbose {
+                println!(
+                    "SA: epoch.{:?} new best distance: {:?}",
+                    epoch, best_distance
+                );
+            }
         }
 
         temperature = cooling(temperature, cooling_rate);
@@ -50,8 +54,6 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
 
     let p: f32 = rng.gen();
     let criteria = metropolis(temperature, old_distance, new_distance);
-
-    //println!("P {:?} < {:?}", p, criteria);
 
     p < criteria
 }

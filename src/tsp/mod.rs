@@ -11,7 +11,7 @@ pub mod tabu_search;
 pub mod tour;
 pub mod two_opt;
 
-pub const VERSION: &'static str = "0.3.0";
+pub const VERSION: &'static str = "0.4.0";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
@@ -40,6 +40,7 @@ impl Solvers {
             "genetic_algorithm",
             "ga",
             "simulated_annealing",
+            "sa",
             "stochastic_hill",
             "tabu_search",
             "two_opt",
@@ -53,19 +54,46 @@ impl FromStr for Solvers {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "bellman_karp" => Ok(Solvers::BellmanKarp),
+            "bhk" | "bellman_karp" => Ok(Solvers::BellmanKarp),
             "branch_bound" => Ok(Solvers::BranchBound),
-            "bhk" => Ok(Solvers::BellmanKarp),
-            "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
-            "nn" => Ok(Solvers::NearestNeighbor),
-            "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
-            "ga" => Ok(Solvers::GeneticAlgorithm),
-            "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
+            "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
+            "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
+            "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),
-            "two_opt" => Ok(Solvers::TwoOpt),
-            "2opt" => Ok(Solvers::TwoOpt),
+            "2opt" | "two_opt" => Ok(Solvers::TwoOpt),
             _ => Err("unknown solver"),
+        }
+    }
+}
+
+// -- SolverOptions
+
+#[derive(Clone, Debug)]
+pub struct SolverOptions {
+    pub epochs: usize,        // how many iteration to run
+    pub platoo_epochs: usize, // how many iterations to do on the platoo
+    pub verbose: bool,
+    pub n_nearest: usize,
+    pub mutation_probability: f32,
+    pub n_elite: usize,
+    pub cooling_rate: f32,
+    pub max_temperature: f32,
+    pub min_temperature: f32,
+}
+
+impl SolverOptions {
+    pub fn default() -> Self {
+        SolverOptions {
+            epochs: 10_000,
+            platoo_epochs: 500,
+            verbose: false,
+            n_nearest: 3,
+            mutation_probability: 0.001,
+            n_elite: 3,
+            cooling_rate: 0.0001,
+            min_temperature: 0.001,
+            max_temperature: 1_000.0,
         }
     }
 }

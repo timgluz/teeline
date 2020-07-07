@@ -9,14 +9,14 @@ use super::distance_matrix::DistanceMatrix;
 /// https://www.math.uwaterloo.ca/~bico/papers/papers.html
 ///
 use super::kdtree::KDPoint;
-use super::route::Route;
 use super::tour::Tour;
+use super::SolverOptions;
 
 // 0-1 Set, where 1 means that city N is collected
 type FlagSet = u64;
 type DPTable = Vec<Vec<f32>>;
 
-pub fn solve(cities: &[KDPoint]) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
     let n_cities = cities.len();
     let n_others = n_cities - 1;
     let n_powersets = 1 << n_others;
@@ -24,19 +24,26 @@ pub fn solve(cities: &[KDPoint]) -> Tour {
     let dists = DistanceMatrix::from_cities(cities).unwrap();
     let mut opt = vec![vec![0.0; n_powersets]; n_others];
 
+    if options.verbose == true {
+        println!("BHK: initializing the table with subresults");
+    }
     // inialize tables first row with distance from city.o to city.i
     for i in 0..n_others {
         opt[i][1 << i] = dists.distance_between(i, n_others).unwrap_or(0.0);
     }
 
-    let mut best_val = f32::MAX;
     let selected_set = (1 << n_others) - 1;
     for city_id in 0..n_others {
-        let sub_val = solve_bhk(&mut opt, &dists, selected_set, city_id);
+        solve_bhk(&mut opt, &dists, selected_set, city_id);
     }
 
-    let route_vec = read_optimal_route(&opt, &dists, n_cities, best_val);
+    if options.verbose == true {
+        println!("BHK: done with calculations, preparing the result");
+    }
+
+    let route_vec = read_optimal_route(&opt, &dists, n_cities, f32::MAX);
     let tour = Tour::new(&route_vec, cities);
+
     tour
 }
 
