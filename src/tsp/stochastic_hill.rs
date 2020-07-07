@@ -13,6 +13,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
 
     let mut epoch = 0;
     let mut n_stale = 0;
+    let mut best_distance = tour::total_distance(cities, &best_route.route());
     loop {
         let candidate = current_route.random_successor();
         let candidate_distance = tour::total_distance(&cities, candidate.route());
@@ -23,7 +24,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
 
             n_stale = 0;
 
-            if options.verbose == true {
+            if options.verbose {
                 println!("Epoch: {:?}, new best distance: {:}", epoch, best_distance);
             }
         } else {
@@ -34,7 +35,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
 
         // restart search if been wandering too long on the platoo
         if n_stale > options.platoo_epochs && options.platoo_epochs > 0 {
-            if options.verbose == true {
+            if options.verbose {
                 println!(
                     "Epoch: {:?}, got stuck after {:?} steps, going to restart search",
                     epoch, options.platoo_epochs

@@ -5,6 +5,7 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::route::Route;
 use super::tour::Tour;
+use super::SolverOptions;
 
 const UNVISITED_NODE: usize = 0;
 
@@ -12,7 +13,8 @@ type UniqSet = HashSet<usize>;
 type Path = Vec<usize>;
 type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 
-pub fn solve(cities: &[KDPoint]) -> Tour {
+// TODO: add better strategy for Bounding step
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
     let route = Route::from_cities(cities);
     let n_cities = route.len();
 
@@ -30,6 +32,7 @@ pub fn solve(cities: &[KDPoint]) -> Tour {
         1,
         0.0,
         f32::MAX,
+        options,
     );
 
     Tour::new(&best_path, cities)
@@ -48,6 +51,7 @@ fn backtrack(
     k: usize,
     running_cost: f32,
     upper_bound: f32,
+    options: &SolverOptions,
 ) -> (Path, f32) {
     let mut best_path = path.clone();
     let mut best_distance = upper_bound;
@@ -59,6 +63,10 @@ fn backtrack(
         if new_distance < upper_bound {
             best_path = path.clone();
             best_distance = new_distance;
+
+            if options.verbose {
+                println!("B&B: epoch.{:?}, new best distance {:?}", k, best_distance);
+            }
         }
     };
 
@@ -86,6 +94,7 @@ fn backtrack(
             k + 1,
             running_cost + next_distance,
             best_distance,
+            options,
         );
 
         if sub_dist < best_distance {

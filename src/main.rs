@@ -48,8 +48,10 @@ fn main() {
     let solver_type = Solvers::from_str(args.value_of("solver").unwrap_or("unspecified"))
         .expect("Unknown solver");
 
-    println!("Selected solver: {:?}", solver_type);
     let options = solver_options_from_args(&args);
+    if options.verbose {
+        println!("Selected solver: {:?}", solver_type);
+    }
 
     // todo: read stdin only if FILEPATH is not given
     let n_points = read_value::<usize>();
@@ -64,7 +66,7 @@ fn main() {
 fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> tour::Tour {
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
-        Solvers::BranchBound => tsp::branch_bound::solve(cities),
+        Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
         Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities),
         Solvers::TwoOpt => tsp::two_opt::solve(cities),
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
