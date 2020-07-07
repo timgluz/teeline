@@ -69,6 +69,7 @@ impl FromStr for Solvers {
 
 // -- SolverOptions
 
+#[derive(Clone, Debug)]
 pub struct SolverOptions {
     pub epochs: usize,        // how many iteration to run
     pub platoo_epochs: usize, // how many iterations to do on the platoo
