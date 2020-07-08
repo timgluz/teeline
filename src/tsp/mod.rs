@@ -9,6 +9,7 @@ pub mod simulated_annealing;
 pub mod stochastic_hill;
 pub mod tabu_search;
 pub mod tour;
+pub mod tsplib;
 pub mod two_opt;
 
 pub const VERSION: &'static str = "0.4.0";

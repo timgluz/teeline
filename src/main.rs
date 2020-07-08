@@ -1,12 +1,14 @@
 extern crate clap;
 extern crate rand;
+extern crate regex;
 
 use clap::{App, Arg, ArgMatches};
 
 use std::fmt::Debug;
+use std::path::Path;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tour, SolverOptions, Solvers};
+use teeline::tsp::{self, kdtree, tour, tsplib, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
@@ -81,6 +83,15 @@ fn main() {
                 .required(false),
         )
         .arg(
+            Arg::with_name("input")
+                .long("input")
+                .short("i")
+                .value_name("FILE_PATH")
+                .help("filepath to input file, must be in TSPLIB format")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
             Arg::with_name("verbose")
                 .long("verbose")
                 .short("v")
@@ -97,7 +108,16 @@ fn main() {
         println!("Selected solver: {:?}", solver_type);
     }
 
-    // todo: read stdin only if FILEPATH is not given
+    if let Some(input_file_path) = args.value_of("input") {
+        let file_path = Path::new(input_file_path);
+        if !file_path.exists() {
+            eprintln!("File doesnt exists: {:?}", file_path);
+        }
+
+        let tsp_dt = tsplib::read_from_file(file_path);
+        return; // TODO: make it work
+    }
+
     let n_points = read_value::<usize>();
     let cities = read_cities(n_points);
 
