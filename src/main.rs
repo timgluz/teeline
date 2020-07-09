@@ -1,4 +1,5 @@
 extern crate clap;
+extern crate lazy_static;
 extern crate rand;
 extern crate regex;
 
@@ -114,7 +115,16 @@ fn main() {
             eprintln!("File doesnt exists: {:?}", file_path);
         }
 
-        let tsp_dt = tsplib::read_from_file(file_path);
+        match tsplib::read_from_file(file_path) {
+            Err(err_msg) => {
+                eprintln!("Error in TSPLIB file: {:?}", err_msg);
+                std::process::exit(1);
+            }
+            Ok(tsp_data) => {
+                println!("Parsed data: {:?}", tsp_data);
+            }
+        }
+
         return; // TODO: make it work
     }
 
