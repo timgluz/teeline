@@ -52,11 +52,15 @@ pub fn read_from_file(path: &Path) -> Result<TspLibData, String> {
 
     let reader = BufReader::new(f_res.unwrap());
 
+    process_lines(reader)
+}
+
+fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
     let mut metadata: HashMap<String, String> = HashMap::new();
     let mut nodes: Vec<KDPoint> = vec![];
 
     let mut state = TspReaderStates::START;
-    let mut line_no = 0;
+    let mut line_no = 1;
     for line_res in reader.lines() {
         if line_res.is_err() {
             return Err(format!("Failed to read line.{:?}", line_no));
@@ -99,13 +103,22 @@ pub fn read_from_file(path: &Path) -> Result<TspLibData, String> {
         }
     }
 
+    if nodes.is_empty() {
+        return Err("Found no valid city coordinates".to_string());
+    }
+
     let unspecified_val = "unspecified".to_string();
     let dt = TspLibData::new(
-        metadata.get("NAME").unwrap_or(&unspecified_val).to_owned(),
+        metadata
+            .get("NAME")
+            .unwrap_or(&unspecified_val)
+            .to_owned()
+            .to_lowercase(),
         metadata
             .get("COMMENT")
             .unwrap_or(&unspecified_val)
-            .to_owned(),
+            .to_owned()
+            .to_lowercase(),
         nodes,
     );
 
@@ -219,5 +232,81 @@ mod tests {
         assert_eq!(Some(1.0), pt.get(0));
         assert_eq!(Some(-2.0), pt.get(1));
         assert_eq!(Some(3.0), pt.get(2));
+    }
+
+    #[test]
+    fn test_is_state_marker_with_empty_string() {
+        let line = "".to_string();
+
+        assert!(!is_state_marker(&line))
+    }
+
+    #[test]
+    fn test_is_state_marker_with_metadata() {
+        let line = "KEY: VALUE".to_string();
+
+        assert!(!is_state_marker(&line));
+    }
+
+    #[test]
+    fn test_is_state_marker_with_state_key() {
+        let line = "EOF".to_string();
+
+        assert!(is_state_marker(&line));
+    }
+
+    #[test]
+    fn test_next_state_with_end_marker() {
+        let state = TspReaderStates::OUTSECTION;
+
+        assert_eq!(TspReaderStates::END, next_state(&state, &"EOF".to_string()))
+    }
+
+    #[test]
+    fn test_next_state_with_beginning_of_coord_section() {
+        let state = TspReaderStates::START;
+
+        let res = next_state(&state, &"NODE_COORD_SECTION".to_string());
+        assert_eq!(
+            TspReaderStates::INSECTION(COORD_SECTION_KEY.to_string()),
+            res
+        );
+    }
+
+    #[test]
+    fn test_state_from_coord_section_switches_to_outsection() {
+        let state = TspReaderStates::INSECTION(COORD_SECTION_KEY.to_string());
+
+        let res = next_state(&state, &"KEY: VAL1".to_string());
+        assert_eq!(TspReaderStates::OUTSECTION, res);
+    }
+
+    #[test]
+    fn test_process_lines_happy_case() {
+        let cursor =
+            "NAME: case1\nCOMMENT: happy case\nNODE_COORD_SECTION\n1 2.0 3.0\nEOF\n".as_bytes();
+
+        let reader = BufReader::new(cursor);
+
+        let res = process_lines(reader);
+        assert!(res.is_ok());
+
+        let dt = res.unwrap();
+        assert_eq!("case1".to_string(), dt.name);
+        assert_eq!("happy case".to_string(), dt.comment);
+        assert_eq!(1, dt.len());
+
+        let pt = dt.nodes().get(0).unwrap();
+        assert_eq!(1, pt.id);
+        assert_eq!(Some(2.0), pt.get(0));
+        assert_eq!(Some(3.0), pt.get(1));
+    }
+
+    #[test]
+    fn test_process_lines_with_empty_string() {
+        let cursor = "".as_bytes();
+        let reader = BufReader::new(cursor);
+
+        assert!(process_lines(reader).is_err());
     }
 }
