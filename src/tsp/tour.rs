@@ -1,23 +1,34 @@
-use crate::tsp::kdtree;
+use std::collections::HashMap;
 
-pub fn total_distance(cities: &[kdtree::KDPoint], route: &[usize]) -> f32 {
+use crate::tsp::kdtree::{self, KDPoint};
+
+pub type CityTable = HashMap<usize, KDPoint>;
+
+pub fn total_distance(cities: &[KDPoint], route: &[usize]) -> f32 {
     let mut total = 0.0;
     let last_idx = route.len() - 1;
 
+    let cities_table = city_table_from_vec(cities);
     for i in 0..last_idx {
-        let distance = cities[route[i]].distance(&cities[route[i + 1]]);
+        let distance = cities_table[&route[i]].distance(&cities_table[&route[i + 1]]);
         total += distance
     }
 
-    total += cities[route[last_idx]].distance(&cities[route[0]]);
+    total += cities_table[&route[last_idx]].distance(&cities_table[&route[0]]);
 
     total
+}
+
+pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
+    let table: CityTable = cities.iter().map(|c| (c.id, c.clone())).collect();
+
+    return table;
 }
 
 pub struct Tour {
     pub total: f32,
     route: Vec<usize>,
-    cities: Vec<kdtree::KDPoint>,
+    cities: Vec<KDPoint>, //todo: cities: CityTable,
 }
 
 impl Tour {
@@ -26,6 +37,8 @@ impl Tour {
             total: 0.0,
             route: route.to_vec(),
             cities: cities.to_vec(),
+            // TODO: keep it as hash-map because Point.Id may not start from 0
+            //cities: cities.iter().map(|c| (c.id, c.clone())).collect(),
         };
 
         tour.update_total();

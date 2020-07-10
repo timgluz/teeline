@@ -21,26 +21,26 @@ lazy_static! {
 
 #[derive(Debug, Clone)]
 pub struct TspLibData {
-    name: String,
-    comment: String,
-    nodes: Vec<KDPoint>,
+    pub name: String,
+    pub comment: String,
+    cities: Vec<KDPoint>,
 }
 
 impl TspLibData {
-    pub fn new(name: String, comment: String, nodes: Vec<KDPoint>) -> Self {
+    pub fn new(name: String, comment: String, cities: Vec<KDPoint>) -> Self {
         TspLibData {
             name,
             comment,
-            nodes,
+            cities,
         }
     }
 
-    pub fn nodes(&self) -> &[KDPoint] {
-        self.nodes.as_ref()
+    pub fn cities(&self) -> &[KDPoint] {
+        self.cities.as_ref()
     }
 
     pub fn len(&self) -> usize {
-        self.nodes.len()
+        self.cities.len()
     }
 }
 
@@ -55,9 +55,15 @@ pub fn read_from_file(path: &Path) -> Result<TspLibData, String> {
     process_lines(reader)
 }
 
+pub fn read_from_stdin() -> Result<TspLibData, String> {
+    let reader = std::io::stdin();
+
+    process_lines(reader.lock())
+}
+
 fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
     let mut metadata: HashMap<String, String> = HashMap::new();
-    let mut nodes: Vec<KDPoint> = vec![];
+    let mut cities: Vec<KDPoint> = vec![];
 
     let mut state = TspReaderStates::START;
     let mut line_no = 1;
@@ -93,7 +99,7 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
             {
                 match coords_from_text(line_no, &line) {
                     Err(msg) => return Err(msg),
-                    Ok(pt) => nodes.push(pt),
+                    Ok(pt) => cities.push(pt),
                 }
             }
             TspReaderStates::END => {
@@ -103,7 +109,7 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
         }
     }
 
-    if nodes.is_empty() {
+    if cities.is_empty() {
         return Err("Found no valid city coordinates".to_string());
     }
 
@@ -119,7 +125,7 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
             .unwrap_or(&unspecified_val)
             .to_owned()
             .to_lowercase(),
-        nodes,
+        cities,
     );
 
     Ok(dt)
@@ -296,7 +302,7 @@ mod tests {
         assert_eq!("happy case".to_string(), dt.comment);
         assert_eq!(1, dt.len());
 
-        let pt = dt.nodes().get(0).unwrap();
+        let pt = dt.cities().get(0).unwrap();
         assert_eq!(1, pt.id);
         assert_eq!(Some(2.0), pt.get(0));
         assert_eq!(Some(3.0), pt.get(1));
