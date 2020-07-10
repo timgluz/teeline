@@ -1,9 +1,10 @@
 use super::kdtree::KDPoint;
-use super::tour::Tour;
+use super::tour::{self, Tour};
 use super::SolverOptions;
 
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
     let n_indices = cities.len() - 1;
+    let cities_table = tour::city_table_from_vec(cities);
     let mut route: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
     let mut improved = true;
@@ -11,11 +12,12 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
         improved = false;
         for i in 0..(n_indices - 2) {
             for j in (i + 2)..n_indices {
-                let current_distance = cities[route[i]].distance(&cities[route[i + 1]])
-                    + cities[route[j]].distance(&cities[route[j + 1]]);
+                let current_distance = cities_table[&route[i]]
+                    .distance(&cities_table[&route[i + 1]])
+                    + cities_table[&route[j]].distance(&cities_table[&route[j + 1]]);
 
-                let new_distance = cities[route[i]].distance(&cities[route[j]])
-                    + cities[route[i + 1]].distance(&cities[route[j + 1]]);
+                let new_distance = cities_table[&route[i]].distance(&cities_table[&route[j]])
+                    + cities_table[&route[i + 1]].distance(&cities_table[&route[j + 1]]);
 
                 if new_distance < current_distance {
                     swap_2opt(&mut route, i + 1, j);

@@ -1,12 +1,15 @@
 extern crate clap;
+extern crate lazy_static;
 extern crate rand;
+extern crate regex;
 
 use clap::{App, Arg, ArgMatches};
 
 use std::fmt::Debug;
+use std::path::Path;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tour, SolverOptions, Solvers};
+use teeline::tsp::{self, kdtree, tour, tsplib, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
@@ -81,6 +84,15 @@ fn main() {
                 .required(false),
         )
         .arg(
+            Arg::with_name("input")
+                .long("input")
+                .short("i")
+                .value_name("FILE_PATH")
+                .help("filepath to input file, must be in TSPLIB format")
+                .takes_value(true)
+                .required(false),
+        )
+        .arg(
             Arg::with_name("verbose")
                 .long("verbose")
                 .short("v")
@@ -97,12 +109,23 @@ fn main() {
         println!("Selected solver: {:?}", solver_type);
     }
 
-    // todo: read stdin only if FILEPATH is not given
-    let n_points = read_value::<usize>();
-    let cities = read_cities(n_points);
+    let tsp_data = if let Some(input_file_path) = args.value_of("input") {
+        let file_path = Path::new(input_file_path);
+        read_tsp_data_from_file(&file_path)
+    } else {
+        read_tsp_data_from_stdin()
+    };
 
-    let tour = solve(solver_type, &cities, &options);
+    if options.verbose {
+        println!(
+            "Problem details:\n\tname:{:?}\n\tcomment:{:?}\n\tcities:{:?}",
+            tsp_data.name,
+            tsp_data.comment,
+            tsp_data.len()
+        );
+    }
 
+    let tour = solve(solver_type, tsp_data.cities(), &options);
     print_solution(&tour, false);
 }
 
@@ -133,58 +156,31 @@ fn print_solution(tour: &tour::Tour, is_optimized: bool) {
     print!("\n");
 }
 
-/// reads cities from STDIN
-fn read_cities(n: usize) -> Vec<kdtree::KDPoint> {
-    let mut rows = kdtree::PointMatrix::with_capacity(n);
-
-    for _ in 0..n {
-        rows.push(read_vector::<f32>());
+fn read_tsp_data_from_file(file_path: &Path) -> tsplib::TspLibData {
+    if !file_path.exists() {
+        eprintln!("File doesnt exists: {:?}", file_path);
+        std::process::exit(1);
     }
 
-    let cities = kdtree::build_points(&rows);
-
-    cities
+    match tsplib::read_from_file(file_path) {
+        Err(err_msg) => {
+            eprintln!("Error in TSPLIB file: {:?}", err_msg);
+            std::process::exit(1);
+        }
+        Ok(tsp_data_) => {
+            return tsp_data_;
+        }
+    }
 }
 
-fn read_value<T>() -> T
-where
-    T: FromStr,
-    T::Err: Debug,
-{
-    let line = read_string();
-
-    let res: T = line
-        .trim()
-        .parse::<T>()
-        .expect("Failed to parse valur from stdin");
-
-    res
-}
-
-fn read_vector<T>() -> Vec<T>
-where
-    T: FromStr,
-    T::Err: Debug,
-{
-    let line = read_string();
-
-    let res: Vec<T> = line
-        .trim()
-        .split_whitespace()
-        .map(|token| token.parse::<T>().expect("Failed to parse vector row"))
-        .collect();
-
-    res
-}
-
-fn read_string() -> String {
-    let mut buf = String::new();
-
-    std::io::stdin()
-        .read_line(&mut buf)
-        .expect("Failed to read string from stding");
-
-    buf
+fn read_tsp_data_from_stdin() -> tsplib::TspLibData {
+    match tsplib::read_from_stdin() {
+        Err(err_msg) => {
+            eprintln!("Failed to read TSPLIB file from STDIN: {:?}", err_msg);
+            std::process::exit(1);
+        }
+        Ok(tsp_data_) => return tsp_data_,
+    }
 }
 
 fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {

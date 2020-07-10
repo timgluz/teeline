@@ -176,7 +176,7 @@ impl TspPopulation {
         let mut population = TspPopulation::with_capacity(n);
         let initial_route = Route::from_cities(cities);
 
-        for i in 0..n {
+        for _ in 0..n {
             let random_route = initial_route.random_successor();
             let fitness = fitness_fn(random_route.route());
             population.add(TspGenotype::new(fitness, random_route.route()));

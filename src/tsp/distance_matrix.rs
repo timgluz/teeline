@@ -8,23 +8,34 @@
     The upper-half is achived by reversing indexes, so that bigger coordinate reflects to row number
 */
 
+use std::collections::HashMap;
+
 use super::kdtree::KDPoint;
+use super::tour::CityTable;
 
 #[derive(Debug, Clone)]
 pub struct DistanceMatrix {
-    first_id: usize, // the first city id, default 0
+    first_id: usize, // TODO: remove - the first city id, default 0
     n: usize,        // how many cities
     size: usize,     // how many distances under diagonal
     items: Vec<f32>,
+    cities: CityTable,
+    city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
 }
 
 impl DistanceMatrix {
-    pub fn new(first_id: usize, n: usize, distances: Vec<f32>) -> Self {
+    pub fn new(first_id: usize, n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
+        let city_idx: HashMap<usize, usize> =
+            cities.iter().map(|(k, c)| (c.id, k.clone())).collect();
+
+        assert!(n == city_idx.len(), "city_idx size differs from n cities");
         DistanceMatrix {
-            first_id,
+            first_id,              // TODO: remove
             n,                     // how many cities
             size: distances.len(), // how many distances under diagonal
             items: distances,
+            cities,
+            city_idx,
         }
     }
 
@@ -37,9 +48,12 @@ impl DistanceMatrix {
 
         let size = n * (n - 1) / 2; // how many items on distance vec
 
+        let mut city_table = CityTable::new();
+
         let mut distances = Vec::with_capacity(size);
-        for i in 1..n {
+        for i in 0..n {
             let pt1 = &cities[i];
+            city_table.insert(i, pt1.clone());
 
             for j in 0..i {
                 let pt2 = &cities[j];
@@ -49,7 +63,7 @@ impl DistanceMatrix {
 
         distances.shrink_to_fit();
 
-        Ok(DistanceMatrix::new(0, n, distances))
+        Ok(DistanceMatrix::new(0, n, distances, city_table))
     }
 
     pub fn len(&self) -> usize {
@@ -69,11 +83,21 @@ impl DistanceMatrix {
             return Ok(0.0); // elements on the diagonal
         }
 
-        let from_city = std::cmp::max(city_id1, city_id2);
-        let to_city = std::cmp::min(city_id1, city_id2);
+        // translate city ids to matrix id
+        let id1 = self
+            .city_idx
+            .get(&city_id1)
+            .expect("city_id1 doesnt exists in index");
 
-        let prev_city = from_city - self.first_id;
-        let n_items_before = (prev_city - 1) * prev_city / 2;
+        let id2 = self
+            .city_idx
+            .get(&city_id2)
+            .expect("city_id2 doesnt exists in index");
+
+        let from_city = std::cmp::max(id1, id2);
+        let to_city = std::cmp::min(id1, id2);
+
+        let n_items_before = (from_city - 1) * from_city / 2;
         if n_items_before > self.size {
             return Err("city with biggest id is not in distance matrix");
         }
@@ -86,18 +110,23 @@ impl DistanceMatrix {
     /// returns list of distances from city N, where 0 distance from the city;
     pub fn distances_from(&self, city_id: usize) -> Vec<f32> {
         let mut distances: Vec<f32> = vec![];
+        let id: usize = self
+            .city_idx
+            .get(&city_id)
+            .expect("Unknown city id")
+            .clone();
 
         // all the values from the city row
-        for i in self.first_id..city_id {
-            let d = self.distance_between(city_id, i).unwrap_or(-1.0); //-1 would mean error
+        for i in 0..id {
+            let d = self.distance_between(id, i).unwrap_or(-1.0); //-1 would mean error
             distances.push(d);
         }
 
         // all the values form the cities with bigger ID
-        // it starts from city_id, which would return distance 0, which we need for place holder
+        // it starts from city , which would return distance 0, which we need for place holder
         let n_cities = self.n;
-        for i in city_id..n_cities {
-            let d = self.distance_between(i, city_id).unwrap_or(-1.0);
+        for i in id..n_cities {
+            let d = self.distance_between(i, id).unwrap_or(-1.0);
             distances.push(d);
         }
 
@@ -111,7 +140,7 @@ impl DistanceMatrix {
         }
 
         let mut total = self
-            .distance_between(path.last().unwrap().clone(), 0)
+            .distance_between(path.last().unwrap().clone(), path[0])
             .unwrap();
 
         for i in 1..tour_length {
