@@ -1,7 +1,16 @@
 # Teeline
 
-Teeline is collection of algorithms for the Traveling Salesman Problem.
-It could be used as command-line utility or as Rust package;
+Teeline is a solver for Traveling Salesman Problem, written in Rust.
+
+It still in progress. It currently has implementations for all algorithms teached by any CS courses.
+More advanced algorithms would be implemented after the structure and interfaces are stabilized.
+
+### Preparing data
+
+Teeline works now only with data data in TSPLIB format.
+
+TODO: how to download files
+TODO: how to convert CSVs into TSBLIB
 
 ### Exact algorithms:
 
@@ -125,11 +134,14 @@ available options:
 ./target/debug/bin -h
 
 # use default settings
-cat ./data/tsp_51_1 | ./target/debug/bin
+cat ./data/tsplib/berlin52.tsp | ./target/debug/bin
+
+# or pass files as cli argument if no extra processing is required
+./target/debug/bin -i ./data/tsplib/berlin52.tsp
 
 # use Bellman-Held-Karp algoritm as solver
 # be careful, it wouldnt work for dataset bigger than 30
-cat ./data/tsp_5_1 | ./target/debug/bin bellman_karp
+cat ./data/tsplib/bayg29.tsp | ./target/debug/bin bellman_karp
 ```
 
 * compile runnable binary:

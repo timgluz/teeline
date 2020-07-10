@@ -12,7 +12,7 @@ pub mod tour;
 pub mod tsplib;
 pub mod two_opt;
 
-pub const VERSION: &'static str = "0.4.0";
+pub const VERSION: &'static str = "0.5.0";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
