@@ -1,20 +1,36 @@
 # Teeline
 
-Teeline is a solver for Traveling Salesman Problem, written in Rust.
+Teeline is a solver for symmetric Traveling Salesman Problem, written in Rust.
 
-It still in progress. It currently has implementations for all algorithms teached by any CS courses.
-More advanced algorithms would be implemented after the structure and interfaces are stabilized.
+It still work in progress. Although it already has for all algorithms teached by any CS courses.
+More advanced algorithms would be implemented after the structure of code and interfaces has been stabilized.
+
+
+It all started from the ["In Pursuit of the Traveling Salesman"](https://www.amazon.de/Pursuit-Traveling-Salesman-Mathematics-Computation-ebook/dp/B0073X0IR2/ref=sr_1_1?_encoding=UTF8) book,
+which fired my interest in Linear Programming, that is backbone of Concorde the best TSP solver;
+
+After i finished the book, i took the [Discrete Optimization](https://coursera.org/share/1428f00fd18abc041afcf9105c02365b) course on the Coursera
+to learn more about discrete optimization and TSP behind a theory covered by standard CS course.
+And one of the homeworks was to implement the TSP solver, that could get also solve problem that has more than 10_000 cities,
+which encouraged me to look alternative solutions.
 
 ### Preparing data
 
-Teeline works now only with data data in TSPLIB format.
+Teeline works only subset TSLIB files. It expects that cities are presented as euclidean coordinates
+either in `NODE_COORD_SECTION` or `DISPLAY_DATA_SECTION`.
 
-TODO: how to download files
-TODO: how to convert CSVs into TSBLIB
+```
+# chmod +x download_data
+
+./download_data.sh
+```
 
 ### Exact algorithms:
 
 TBD
+
+Exact algorithms are guaranteed to give optimal solutions.
+Although there's small catch, their running time is exponential and they cant solve problems beyond 15-20 cities.
 
 ##### branch-and-bound
 
@@ -53,6 +69,8 @@ TBD
 ```
 ./teeline two_opt
 ./teeline 2opt
+
+./target/debug/bin 2opt -i ./data/discopt/tsp_5_1.tsp
 ```
 
 ##### stochastic hill climbing
