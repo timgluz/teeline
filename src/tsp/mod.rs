@@ -14,7 +14,7 @@ pub mod two_opt;
 use crate::tsp::kdtree::KDPoint;
 use std::collections::HashMap;
 
-pub const VERSION: &'static str = "0.5.0";
+pub const VERSION: &'static str = "0.6.0";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
