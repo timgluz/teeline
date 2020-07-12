@@ -1,10 +1,9 @@
 use super::kdtree::KDPoint;
-use super::tour::{self, Tour};
-use super::SolverOptions;
+use super::{city_table_from_vec, Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let n_indices = cities.len() - 1;
-    let cities_table = tour::city_table_from_vec(cities);
+    let cities_table = city_table_from_vec(cities);
     let mut route: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
     let mut improved = true;
@@ -34,7 +33,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
         }
     }
 
-    Tour::new(&route, cities)
+    Solution::new(&route, cities)
 }
 
 fn swap_2opt(route: &mut Vec<usize>, from: usize, to: usize) {
