@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use super::kdtree::KDPoint;
-use super::tour::CityTable;
+use super::CityTable;
 
 #[derive(Debug, Clone)]
 pub struct DistanceMatrix {

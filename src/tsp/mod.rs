@@ -8,7 +8,6 @@ pub mod route;
 pub mod simulated_annealing;
 pub mod stochastic_hill;
 pub mod tabu_search;
-pub mod tour; // remove it
 pub mod tsplib;
 pub mod two_opt;
 

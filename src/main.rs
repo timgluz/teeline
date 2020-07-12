@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tour, tsplib, Solution, SolverOptions, Solvers};
+use teeline::tsp::{self, kdtree, tsplib, Solution, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
