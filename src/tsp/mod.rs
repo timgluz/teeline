@@ -8,11 +8,13 @@ pub mod route;
 pub mod simulated_annealing;
 pub mod stochastic_hill;
 pub mod tabu_search;
-pub mod tour;
 pub mod tsplib;
 pub mod two_opt;
 
-pub const VERSION: &'static str = "0.5.0";
+use crate::tsp::kdtree::KDPoint;
+use std::collections::HashMap;
+
+pub const VERSION: &'static str = "0.6.0";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
@@ -96,5 +98,99 @@ impl SolverOptions {
             min_temperature: 0.001,
             max_temperature: 1_000.0,
         }
+    }
+}
+
+// -- solution implementation
+pub type CityTable = HashMap<usize, KDPoint>;
+
+pub fn total_distance(cities: &[KDPoint], route: &[usize]) -> f32 {
+    let mut total = 0.0;
+    let last_idx = route.len() - 1;
+
+    let cities_table = city_table_from_vec(cities);
+    for i in 0..last_idx {
+        let distance = cities_table[&route[i]].distance(&cities_table[&route[i + 1]]);
+        total += distance
+    }
+
+    total += cities_table[&route[last_idx]].distance(&cities_table[&route[0]]);
+
+    total
+}
+
+pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
+    let table: CityTable = cities.iter().map(|c| (c.id, c.clone())).collect();
+
+    return table;
+}
+
+pub struct Solution {
+    pub total: f32,
+    route: Vec<usize>,
+    cities: Vec<KDPoint>,
+    cities_idx: HashMap<usize, usize>, // it maps city.id to internal vector_id
+}
+
+impl Solution {
+    pub fn new(route: &[usize], cities: &[kdtree::KDPoint]) -> Self {
+        let idx: HashMap<usize, usize> =
+            cities.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
+
+        let mut solution = Solution {
+            total: 0.0,
+            route: route.to_vec(),
+            cities: cities.to_vec(),
+            cities_idx: idx,
+        };
+
+        solution.update_total();
+
+        solution
+    }
+
+    pub fn len(&self) -> usize {
+        self.route.len()
+    }
+
+    pub fn route(&self) -> &[usize] {
+        self.route[..].as_ref()
+    }
+
+    pub fn cities(&self) -> &[kdtree::KDPoint] {
+        &self.cities[..]
+    }
+
+    pub fn get_by_city_id(&self, city_id: usize) -> Option<&KDPoint> {
+        if let Some(vec_pos) = self.cities_idx.get(&city_id) {
+            self.cities.get(*vec_pos)
+        } else {
+            None
+        }
+    }
+
+    pub fn update_total(&mut self) {
+        self.total = total_distance(self.cities(), self.route());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test::helpers::assert_approx;
+
+    #[test]
+    fn test_total_distance_for_tsp_5_1() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+
+        let route = vec![0, 1, 2, 3, 4];
+
+        assert_approx(4.0, total_distance(&cities, &route));
     }
 }

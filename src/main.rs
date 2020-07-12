@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tour, tsplib, SolverOptions, Solvers};
+use teeline::tsp::{self, kdtree, tsplib, Solution, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
@@ -130,7 +130,7 @@ fn main() {
 }
 
 /// solves tsp for given cities by using solver
-fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> tour::Tour {
+fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> Solution {
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
         Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
@@ -145,7 +145,7 @@ fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions
 }
 
 /// prints output to stdin
-fn print_solution(tour: &tour::Tour, is_optimized: bool) {
+fn print_solution(tour: &Solution, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };
 
     println!("{:.5} {}", tour.total, optimization_flag);

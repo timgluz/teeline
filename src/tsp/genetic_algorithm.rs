@@ -6,19 +6,18 @@ use std::rc::Rc;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::route::{random_position_pair, Route};
-use super::tour::Tour;
-use super::SolverOptions;
+use super::{Solution, SolverOptions};
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let evaluator = build_evaluator(cities);
 
     let population_size = cities.len();
     let population = TspPopulation::from_cities(cities, population_size, &evaluator);
     let best_candidate = solve_ga(&population, evaluator, options);
 
-    Tour::new(best_candidate.genotype(), cities)
+    Solution::new(best_candidate.genotype(), cities)
 }
 
 fn solve_ga(
