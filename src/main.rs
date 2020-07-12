@@ -138,8 +138,8 @@ fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions
         Solvers::TwoOpt => tsp::two_opt::solve(cities, options),
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
         Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, options),
-        //Solvers::TabuSearch => tsp::tabu_search::solve(cities, options),
-        //Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, options),
+        Solvers::TabuSearch => tsp::tabu_search::solve(cities, options),
+        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, options),
         _ => panic!("Unspecified solver"),
     }
 }

@@ -2,10 +2,9 @@ use std::collections::VecDeque;
 
 use super::kdtree::KDPoint;
 use super::route::Route;
-use super::tour::{self, Tour};
-use super::SolverOptions;
+use super::{total_distance, Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let tabu_capacity = cities.len();
 
     let mut tabu_list = TabuList::new(tabu_capacity);
@@ -39,7 +38,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
         done = update_terminate(epoch, options.epochs);
     }
 
-    Tour::new(best_route.route(), cities)
+    Solution::new(best_route.route(), cities)
 }
 
 fn select(cities: &[KDPoint], route: &Route, tabu_list: &TabuList) -> (Route, f32) {
@@ -62,7 +61,7 @@ fn select(cities: &[KDPoint], route: &Route, tabu_list: &TabuList) -> (Route, f3
 }
 
 fn distance(cities: &[KDPoint], route: &Route) -> f32 {
-    tour::total_distance(cities, route.route())
+    total_distance(cities, route.route())
 }
 
 fn update_terminate(epoch: usize, max_epochs: usize) -> bool {
