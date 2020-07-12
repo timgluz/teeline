@@ -133,7 +133,7 @@ fn main() {
 fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> Solution {
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
-        //Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
+        Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
         //Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
         //Solvers::TwoOpt => tsp::two_opt::solve(cities, options),
         //Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),

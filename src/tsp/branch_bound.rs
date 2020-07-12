@@ -4,8 +4,7 @@ use std::rc::Rc;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::route::Route;
-use super::tour::Tour;
-use super::SolverOptions;
+use super::{Solution, SolverOptions};
 
 const UNVISITED_NODE: usize = 0;
 
@@ -13,29 +12,32 @@ type UniqSet = HashSet<usize>;
 type Path = Vec<usize>;
 type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 
-// TODO: add better strategy for Bounding step
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
-    let route = Route::from_cities(cities);
+// TODO: add better strategy or constraints for Bounding step
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+    let mut route = Route::from_cities(cities);
     let n_cities = route.len();
 
-    // todo: rename tour_length -> distance
-    // todo: tour_length should return number of cities on final track
+    // we will start from city with smallest ID
+    route.sort();
+
     let mut open_path: Path = vec![0; n_cities];
-    let mut unvisited_cities: UniqSet = route.route().iter().map(|x| x.clone()).collect();
-    unvisited_cities.remove(&0); // we start always from 0
+    open_path[0] = route.get(0).unwrap();
+
+    // at the beginning all cities the except the first city are unvisited
+    let unvisited_cities: UniqSet = route.route().iter().skip(1).map(|x| x.clone()).collect();
 
     let fitness_fn = build_evaluator(cities);
     let (best_path, _best_distance) = backtrack(
         &fitness_fn,
         &mut open_path,
         &unvisited_cities,
-        1,
+        1, // we start backtracking from second city
         0.0,
         f32::MAX,
         options,
     );
 
-    Tour::new(&best_path, cities)
+    Solution::new(&best_path, cities)
 }
 
 fn build_evaluator(cities: &[KDPoint]) -> PathEvaluator {
@@ -137,15 +139,11 @@ fn construct_candidates(
 }
 
 fn make_move(path: &mut Path, k: usize, candidate: usize) {
-    path[k] = if k == 0 {
-        // alwaws start from city_id=0
-        0
-    } else {
-        candidate
-    }
+    path[k] = candidate
 }
 
 fn undo_move(path: &mut Path, k: usize) {
+    // we wouldnt change the first city
     if k > 0 {
         path[k] = UNVISITED_NODE;
     }

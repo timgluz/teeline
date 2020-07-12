@@ -44,6 +44,10 @@ impl Route {
 
         Route { route: candidate }
     }
+
+    pub fn sort(&mut self) {
+        self.route.sort()
+    }
 }
 
 impl PartialEq for Route {

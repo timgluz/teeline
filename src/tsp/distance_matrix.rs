@@ -149,9 +149,8 @@ impl DistanceMatrix {
             return 0.0;
         }
 
-        let mut total = self
-            .distance_between(path.last().unwrap().clone(), path[0])
-            .unwrap();
+        let last_city_id = path.last().unwrap().clone();
+        let mut total = self.distance_between(last_city_id, path[0]).unwrap();
 
         for i in 1..tour_length {
             total += self.distance_between(path[i], path[i - 1]).unwrap();
