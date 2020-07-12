@@ -74,6 +74,26 @@ impl DistanceMatrix {
         &self.items
     }
 
+    // It returns distance by raw vector ids for backward support for some solutions
+    // preferred solution: distance_between as it checks if city exists on table
+    pub fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
+        if pos1 == pos2 {
+            return Ok(0.0);
+        }
+
+        let from_city = std::cmp::max(pos1, pos2);
+        let to_city = std::cmp::min(pos1, pos2);
+
+        let n_items_before = (from_city - 1) * from_city / 2;
+        if n_items_before > self.size {
+            return Err("city with biggest id is not in distance matrix");
+        }
+
+        let distance_idx = n_items_before + to_city;
+
+        Ok(self.items[distance_idx])
+    }
+
     /// returns distance between city n and m
     /// array is packed version of bottom triangle with given structure
     /// ||d2,1|d3,1|d3,2|d4,1|d4,2|d4,3||
@@ -84,27 +104,17 @@ impl DistanceMatrix {
         }
 
         // translate city ids to matrix id
-        let id1 = self
+        let pos1 = self
             .city_idx
             .get(&city_id1)
             .expect("city_id1 doesnt exists in index");
 
-        let id2 = self
+        let pos2 = self
             .city_idx
             .get(&city_id2)
             .expect("city_id2 doesnt exists in index");
 
-        let from_city = std::cmp::max(id1, id2);
-        let to_city = std::cmp::min(id1, id2);
-
-        let n_items_before = (from_city - 1) * from_city / 2;
-        if n_items_before > self.size {
-            return Err("city with biggest id is not in distance matrix");
-        }
-
-        let distance_idx = n_items_before + to_city;
-
-        Ok(self.items[distance_idx])
+        self.distance_by_pos(*pos1, *pos2)
     }
 
     /// returns list of distances from city N, where 0 distance from the city;
@@ -148,6 +158,18 @@ impl DistanceMatrix {
         }
 
         total
+    }
+
+    pub fn city_index(&self) -> &HashMap<usize, usize> {
+        &self.city_idx
+    }
+
+    pub fn pos2city_id(&self, pos: &usize) -> Option<usize> {
+        self.cities.get(pos).map(|c| c.id.clone())
+    }
+
+    pub fn city_id2pos(&self, city_id: &usize) -> Option<usize> {
+        self.city_idx.get(city_id).map(|i| i.clone())
     }
 }
 

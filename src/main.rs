@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use std::path::Path;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tour, tsplib, SolverOptions, Solvers};
+use teeline::tsp::{self, kdtree, tour, tsplib, Solution, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
@@ -130,22 +130,22 @@ fn main() {
 }
 
 /// solves tsp for given cities by using solver
-fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> tour::Tour {
+fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> Solution {
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
-        Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
-        Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
-        Solvers::TwoOpt => tsp::two_opt::solve(cities, options),
-        Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
-        Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, options),
-        Solvers::TabuSearch => tsp::tabu_search::solve(cities, options),
-        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, options),
+        //Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
+        //Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
+        //Solvers::TwoOpt => tsp::two_opt::solve(cities, options),
+        //Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
+        //Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, options),
+        //Solvers::TabuSearch => tsp::tabu_search::solve(cities, options),
+        //Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, options),
         _ => panic!("Unspecified solver"),
     }
 }
 
 /// prints output to stdin
-fn print_solution(tour: &tour::Tour, is_optimized: bool) {
+fn print_solution(tour: &Solution, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };
 
     println!("{:.5} {}", tour.total, optimization_flag);
