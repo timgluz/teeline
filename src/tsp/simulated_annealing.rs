@@ -2,20 +2,19 @@ use rand::Rng;
 
 use super::kdtree::KDPoint;
 use super::route::Route;
-use super::tour::{self, Tour};
-use super::SolverOptions;
+use super::{total_distance, Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let cooling_rate = options.cooling_rate;
     let mut epoch = 0;
 
     let mut best_route = Route::from_cities(cities);
-    let mut best_distance = tour::total_distance(cities, best_route.route());
+    let mut best_distance = total_distance(cities, best_route.route());
 
     let mut temperature = options.max_temperature;
     while epoch < options.epochs || temperature > options.min_temperature {
         let candidate = best_route.random_successor();
-        let candidate_distance = tour::total_distance(cities, candidate.route());
+        let candidate_distance = total_distance(cities, candidate.route());
 
         if is_acceptable(temperature, best_distance, candidate_distance) {
             best_route = candidate;
@@ -33,7 +32,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
         epoch += 1;
     }
 
-    Tour::new(best_route.route(), cities)
+    Solution::new(best_route.route(), cities)
 }
 
 fn cooling(temperature: f32, cooling_rate: f32) -> f32 {

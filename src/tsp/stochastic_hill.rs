@@ -5,7 +5,6 @@ use super::{total_distance, Solution, SolverOptions};
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let mut current_route = Route::from_cities(cities);
     let mut best_route = current_route.clone();
-    let mut best_distance = f32::MAX;
 
     //mix up the cities to avoid getting stuck due bad initial state
     current_route.shuffle();
