@@ -1,9 +1,8 @@
 use super::kdtree::KDPoint;
 use super::route::Route;
-use super::tour::{self, Tour};
-use super::SolverOptions;
+use super::{total_distance, Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let mut current_route = Route::from_cities(cities);
     let mut best_route = current_route.clone();
     let mut best_distance = f32::MAX;
@@ -13,10 +12,10 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
 
     let mut epoch = 0;
     let mut n_stale = 0;
-    let mut best_distance = tour::total_distance(cities, &best_route.route());
+    let mut best_distance = total_distance(cities, &best_route.route());
     loop {
         let candidate = current_route.random_successor();
-        let candidate_distance = tour::total_distance(&cities, candidate.route());
+        let candidate_distance = total_distance(&cities, candidate.route());
 
         if candidate_distance < best_distance {
             best_route = candidate;
@@ -52,5 +51,5 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
         }
     }
 
-    Tour::new(best_route.route(), cities)
+    Solution::new(best_route.route(), cities)
 }
