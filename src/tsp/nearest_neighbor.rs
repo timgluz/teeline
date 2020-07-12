@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
 use super::kdtree::{self, KDPoint};
-use super::tour::Tour;
-use super::SolverOptions;
+use super::{Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let search_tree = kdtree::build_tree(&cities);
     let n_nearest = options.n_nearest;
 
@@ -39,7 +38,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Tour {
         }
     }
 
-    let tour = Tour::new(&route, cities);
+    let tour = Solution::new(&route, cities);
 
     tour
 }
