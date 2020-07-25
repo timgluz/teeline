@@ -1,17 +1,65 @@
 /*
-    DistanceMatrix is data collection to keep euclidean distances between 2D points;
+    DistanceMatrix is a data collection for keeping euclidean distances between array of 2D points;
 
-    Because TSP problem makes simplification and only considers symmetrical and positive distances.
-    It also discards self-symmetrical path aka return to same node.
-    We can save disk and computational time by only considering bottom half of the distance matrix;
+    Given the fact the teeline only tackles symmetrical TSP problems with only positive distances.
+    We can optimize the memory footprint by just keeping triangle under main diagonal,
+    and then flatten it into 1D array;
 
-    The upper-half is achived by reversing indexes, so that bigger coordinate reflects to row number
+    Visual representation with 2 cities:
+    step1: we have a full 3x3 matrix
+    +---+---+---+
+    |1_1|1_2|1_3|
+    +---+---+---+
+    |2_1|2_2|2_3|
+    +---+---|---|
+    |3_1|3_2|3_3|
+    +---+---+---+
+
+    step2: we take only items under main diagonal
+    +---+
+    |2_1|
+    +---+---+
+    |3_1|3_2|
+    +---+---+
+
+    step3: we flatten it into 1D matrix
+
+    +---+---+---+
+    |2_1|3_1|3_2|
+    +---+---+---+
+
+    As result, we have a array with  N_cities * ( N_cities - 1) / 2 elements
+
+    *Lookup logic*
+    As you probably noticed, that this represention has limitation:
+        the first city id must be bigger than second city id;
+
+    from_id = max(city1_id, city2_id)
+    to_city = min(city1_id, city2_id)
+
+    Then the lookup would calculate a padding before the from_id, which is
+    the size of small triangle top of from_id; and then we add the to_city to the padding;
+
+    Example:
+        city1 = 3, city2 = 2;
+        prev_city = city1 - 1
+        padding = (2-1) * 2 / 2 = 1
+        pos = padding + city2 = 3
+        distance[pos-1] // as Rust start counting from 0
+
+    ps: this high-complexity doesnt make anysense outside this hobby project,
+    because it adds more complexity than any actual benefits;
 */
 
 use std::collections::HashMap;
 
 use super::kdtree::KDPoint;
-use super::CityTable;
+use super::{CityTable, NearestResult};
+
+// to have similar builder as kdtree
+pub fn from_cities(cities: &[KDPoint]) -> DistanceMatrix {
+    DistanceMatrix::from_cities(cities).unwrap()
+}
 
 #[derive(Debug, Clone)]
 pub struct DistanceMatrix {
@@ -119,28 +167,13 @@ impl DistanceMatrix {
 
     /// returns list of distances from city N, where 0 distance from the city;
     pub fn distances_from(&self, city_id: usize) -> Vec<f32> {
-        let mut distances: Vec<f32> = vec![];
-        let id: usize = self
+        let pos: usize = self
             .city_idx
             .get(&city_id)
             .expect("Unknown city id")
             .clone();
 
-        // all the values from the city row
-        for i in 0..id {
-            let d = self.distance_between(id, i).unwrap_or(-1.0); //-1 would mean error
-            distances.push(d);
-        }
-
-        // all the values form the cities with bigger ID
-        // it starts from city , which would return distance 0, which we need for place holder
-        let n_cities = self.n;
-        for i in id..n_cities {
-            let d = self.distance_between(i, id).unwrap_or(-1.0);
-            distances.push(d);
-        }
-
-        distances
+        self.distances_from_index(pos)
     }
 
     pub fn tour_length(&self, path: &[usize]) -> f32 {
@@ -169,6 +202,46 @@ impl DistanceMatrix {
 
     pub fn city_id2pos(&self, city_id: &usize) -> Option<usize> {
         self.city_idx.get(city_id).map(|i| i.clone())
+    }
+
+    pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
+        let mut search_result = NearestResult::new(target.clone(), f32::INFINITY, n);
+
+        if let Some(city_pos) = self.city_id2pos(&target.id) {
+            let distances_from_target = self.distances_from_index(city_pos);
+            for (pos, distance) in distances_from_target.iter().enumerate() {
+                let city_id = self.pos2city_id(&pos).unwrap();
+
+                // the NearestResult takes care of ordering the results
+                if let Some(pt) = self.cities.get(&city_id) {
+                    search_result.add(pt.clone(), distance.clone());
+                }
+            }
+        } else {
+            panic!("DistanceMatrix.nearest with unknow_id");
+        }
+
+        search_result
+    }
+
+    fn distances_from_index(&self, pos: usize) -> Vec<f32> {
+        let mut distances: Vec<f32> = vec![];
+
+        // all the values from the city row aka with smalled_ids
+        for i in 0..pos {
+            let d = self.distance_between(pos, i).unwrap_or(-1.0); //-1 would mean error
+            distances.push(d);
+        }
+
+        // all the values form the cities with bigger ID
+        // it starts from city , which would return distance 0, which we need for place holder
+        let n_cities = self.n;
+        for i in pos..n_cities {
+            let d = self.distance_between(i, pos).unwrap_or(-1.0);
+            distances.push(d);
+        }
+
+        distances
     }
 }
 
@@ -299,5 +372,33 @@ mod tests {
         let dm = DistanceMatrix::from_cities(&cities).unwrap();
 
         assert_approx(4.0, dm.tour_length(&route));
+    }
+
+    #[test]
+    fn test_nearest_for_tsp_5_1() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+
+        let dm = from_cities(&cities);
+
+        let res = dm.nearest(&cities[0], 3);
+        assert_eq!(cities[1].id, res.point.id);
+
+        let res2 = dm.nearest(&cities[1], 3);
+        assert_eq!(cities[0].id, res2.point.id);
+
+        let res3 = dm.nearest(&cities[2], 3);
+        assert_eq!(cities[1].id, res3.point.id);
+
+        let res4 = dm.nearest(&cities[3], 3);
+        assert_eq!(cities[2].id, res4.point.id);
+
+        let res5 = dm.nearest(&cities[4], 2);
+        assert_eq!(cities[0].id, res5.point.id);
     }
 }

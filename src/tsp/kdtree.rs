@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::collections::{vec_deque, VecDeque};
+
+use super::NearestResult;
 
 pub type PointMatrix = Vec<Vec<f32>>;
 pub type KDSubTree = Option<Box<KDNode>>;
@@ -16,7 +17,7 @@ pub fn build_points(rows: &[Vec<f32>]) -> Vec<KDPoint> {
     points
 }
 
-pub fn build_tree(points: &[KDPoint]) -> KDTree {
+pub fn from_cities(points: &[KDPoint]) -> KDTree {
     let mut tree = KDTree::empty();
 
     if points.is_empty() {
@@ -234,24 +235,12 @@ impl KDNode {
 
         let distance_from_target = self.point.distance(target_point);
 
-        // TODO: remove
-        /*
-                println!(
-                    "Nearest from #{:?} distance: #{:?}, best: {:?}",
-                    self.point(),
-                    distance_from_target,
-                    best_result
-                );
-        */
         let best_distance = best_result.distance;
         let mut nearest_result = best_result;
 
         if distance_from_target <= best_distance {
-            let old_pt = nearest_result.point;
-            nearest_result.point = self.point.clone();
-            nearest_result.distance = distance_from_target;
-
-            nearest_result.add(old_pt);
+            let pt = self.point.clone();
+            nearest_result.add(pt, distance_from_target);
         };
 
         let (closest_branch, futher_branch) = match self.cmp_by_point(&target_point) {
@@ -261,15 +250,22 @@ impl KDNode {
         };
 
         if closest_branch.is_some() {
-            nearest_result = closest_branch
+            let closest_result = closest_branch
                 .unwrap()
-                .nearest(target_point, nearest_result);
+                .nearest(target_point, nearest_result.clone());
+
+            let pt_distance = closest_result.closest_distance();
+            nearest_result.add(closest_result.point, pt_distance);
         }
 
         // check distance from split line
         let split_dist = self.point.split_distance(&target_point, self.level_coord());
-        if nearest_result.distance > split_dist && futher_branch.is_some() {
-            nearest_result = futher_branch.unwrap().nearest(target_point, nearest_result);
+        if nearest_result.closest_distance() > split_dist && futher_branch.is_some() {
+            let further_result = futher_branch
+                .unwrap()
+                .nearest(target_point, nearest_result.clone());
+            let pt_distance = further_result.closest_distance();
+            nearest_result.add(further_result.point, pt_distance);
         }
 
         nearest_result
@@ -329,47 +325,6 @@ impl KDNode {
 
             1 + std::cmp::max(left_height, right_height)
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct NearestResult {
-    pub point: KDPoint, // the best result, may be the exact match
-    pub distance: f32,
-    pub n: usize, // how many nearest items to keep
-    nearest: VecDeque<KDPoint>,
-}
-
-impl NearestResult {
-    pub fn new(point: KDPoint, distance: f32, n: usize) -> Self {
-        let nearest = VecDeque::with_capacity(n);
-
-        NearestResult {
-            point,
-            distance,
-            n,
-            nearest,
-        }
-    }
-
-    fn add(&mut self, pt: KDPoint) {
-        if self.n == 0 {
-            return;
-        }
-
-        // if stack is full, then remove the oldest
-        if self.nearest.len() >= self.n {
-            self.nearest.pop_back();
-        }
-
-        self.nearest.push_front(pt);
-    }
-
-    pub fn nearest(&self) -> Vec<&KDPoint> {
-        self.nearest
-            .iter()
-            .filter(|x| !x.eq(&self.point))
-            .collect::<Vec<&KDPoint>>()
     }
 }
 
@@ -665,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    fn build_tree_example() {
+    fn from_cities_example() {
         let points = build_points(&vec![
             vec![0.0, 0.0],
             vec![-1.0, 0.0],
@@ -675,7 +630,7 @@ mod tests {
             vec![1.0, -1.0],
             vec![1.0, 1.0],
         ]);
-        let tree = build_tree(&points);
+        let tree = from_cities(&points);
 
         assert_eq!(7, tree.len());
 
@@ -692,43 +647,31 @@ mod tests {
     }
 
     #[test]
-    fn kdtree_nearest_with_points_on_trees() {
-        let points = build_points(&vec![
-            vec![100.0, 100.0],
-            vec![-100.0, 100.0],
-            vec![100.0, -100.0],
-            vec![-100.0, -100.0],
+    fn kdtree_nearest_for_tsp_5_1() {
+        let cities = build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
         ]);
 
-        let tree = build_tree(&points);
-        assert_eq!(4, tree.len());
+        let kd = from_cities(&cities);
 
-        // pt1 should return existing node and distance should be close to 0
-        let pt1 = KDPoint::new(&[100.0, 100.0]);
-        let res = tree.nearest(&pt1, 1);
+        let res = kd.nearest(&cities[0], 2);
+        assert_eq!(cities[1].id, res.point.id);
 
-        assert_approx(0.0, res.distance);
-        assert_eq!(pt1.coords, res.point.coords);
-        // check pt2
-        let pt2 = KDPoint::new(&[-100.0, 100.0]);
-        let res = tree.nearest(&pt2, 1);
+        let res2 = kd.nearest(&cities[1], 2);
+        assert_eq!(cities[2].id, res2.point.id);
 
-        assert_approx(0.0, res.distance);
-        assert_eq!(pt2.coords, res.point.coords);
+        let res3 = kd.nearest(&cities[2], 2);
+        assert_eq!(cities[1].id, res3.point.id);
 
-        // check pt3
-        let pt3 = KDPoint::new(&[100.0, -100.0]);
-        let res = tree.nearest(&pt3, 1);
+        let res4 = kd.nearest(&cities[3], 2);
+        assert_eq!(cities[2].id, res4.point.id);
 
-        assert_approx(0.0, res.distance);
-        assert_eq!(pt3.coords, res.point.coords);
-
-        // check pt4
-        let pt4 = KDPoint::new(&[-100.0, -100.0]);
-        let res = tree.nearest(&pt4, 1);
-
-        assert_approx(0.0, res.distance);
-        assert_eq!(pt4.coords, res.point.coords);
+        let res5 = kd.nearest(&cities[4], 2);
+        assert_eq!(cities[3].id, res5.point.id);
     }
 
     #[test]
@@ -741,7 +684,7 @@ mod tests {
         ]);
 
         let expected_coords = vec![-100.0, -100.0];
-        let tree = build_tree(&points);
+        let tree = from_cities(&points);
         assert_eq!(4, tree.len());
 
         let pt1 = KDPoint::new(&[-110.0, -100.0]);
