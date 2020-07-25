@@ -4,7 +4,7 @@ use super::kdtree::{self, KDPoint};
 use super::{Solution, SolverOptions};
 
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
-    let search_tree = kdtree::build_tree(&cities);
+    let search_tree = kdtree::from_cities(&cities);
     let n_nearest = options.n_nearest;
 
     let cities_table: HashMap<usize, KDPoint> = cities.iter().map(|c| (c.id, c.clone())).collect();
@@ -28,11 +28,12 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
             continue;
         }
 
-        let nearest_city = search_result.first().unwrap();
-        let next_distance = city1.distance(&nearest_city);
+        let closest_item = search_result.first().unwrap();
+        let next_distance = closest_item.distance;
 
         if next_distance < current_distance {
-            if let Some(nearest_pos) = route.iter().position(|&x| x == nearest_city.id) {
+            let nearest_city_id = closest_item.point.id;
+            if let Some(nearest_pos) = route.iter().position(|&x| x == nearest_city_id) {
                 route.swap(i + 1, nearest_pos);
             }
         }

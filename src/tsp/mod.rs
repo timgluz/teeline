@@ -12,9 +12,10 @@ pub mod tsplib;
 pub mod two_opt;
 
 use crate::tsp::kdtree::KDPoint;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 
-pub const VERSION: &'static str = "0.6.0";
+pub const VERSION: &'static str = "0.6.1";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
@@ -171,6 +172,89 @@ impl Solution {
 
     pub fn update_total(&mut self) {
         self.total = total_distance(self.cities(), self.route());
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NearestResult {
+    pub target: KDPoint,
+    pub point: KDPoint, // the best result, may be the exact match
+    pub distance: f32,  // best distance
+    pub n: usize,       // how many nearest items to keep
+    // we expect that we look only small number of items
+    results: Vec<NearestResultItem>,
+}
+
+impl NearestResult {
+    pub fn new(point: KDPoint, distance: f32, n: usize) -> Self {
+        let results = Vec::with_capacity(n);
+
+        NearestResult {
+            target: point.clone(),
+            point,
+            distance,
+            n,
+            results,
+        }
+    }
+
+    fn add(&mut self, pt: KDPoint, new_distance: f32) {
+        if self.n == 0 || pt.id == self.target.id {
+            return;
+        }
+
+        if new_distance < self.closest_distance() {
+            self.distance = new_distance;
+            self.point = pt.clone();
+        }
+
+        // we only keep the best results
+        if new_distance < self.farthest_distance() {
+            // if stack is full, then remove the weakest result
+            if self.results.len() >= self.n {
+                self.results.pop();
+            }
+
+            let new_result = NearestResultItem::new(pt, new_distance);
+            self.results.push(new_result);
+            self.results.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        }
+    }
+
+    pub fn nearest(&self) -> Vec<&NearestResultItem> {
+        self.results.iter().collect::<Vec<&NearestResultItem>>()
+    }
+
+    pub fn closest_distance(&self) -> f32 {
+        self.distance
+    }
+
+    pub fn farthest_distance(&self) -> f32 {
+        self.results.last().map(|x| x.distance).unwrap_or(f32::MAX)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NearestResultItem {
+    pub distance: f32,
+    pub point: KDPoint,
+}
+
+impl NearestResultItem {
+    pub fn new(point: KDPoint, distance: f32) -> Self {
+        NearestResultItem { point, distance }
+    }
+}
+
+impl PartialOrd for NearestResultItem {
+    fn partial_cmp(&self, other: &NearestResultItem) -> Option<Ordering> {
+        self.distance.partial_cmp(&other.distance)
+    }
+}
+
+impl PartialEq for NearestResultItem {
+    fn eq(&self, other: &NearestResultItem) -> bool {
+        self.distance == other.distance
     }
 }
 
