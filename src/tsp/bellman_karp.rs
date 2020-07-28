@@ -1,4 +1,3 @@
-use super::distance_matrix::DistanceMatrix;
 /// Bellman-Help-Karp
 ///
 /// exact solver using Dynamic Programming
@@ -8,14 +7,18 @@ use super::distance_matrix::DistanceMatrix;
 /// Optimization, with D. Applegate, S. Dash, D. S. Johnson. December 29, 2014.
 /// https://www.math.uwaterloo.ca/~bico/papers/papers.html
 ///
+///
+///
+use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
+use super::progress::{ProgressMessage, PublisherFn};
 use super::{Solution, SolverOptions};
 
 // 0-1 Set, where 1 means that city N is collected
 type FlagSet = u64;
 type DPTable = Vec<Vec<f32>>;
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherFn) -> Solution {
     let n_cities = cities.len();
     let n_others = n_cities - 1; // we start from last city
     let n_powersets = 1 << n_others;
@@ -30,6 +33,8 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let last_pos = n_others;
     for i in 0..n_others {
         opt[i][1 << i] = dists.distance_by_pos(i, last_pos).unwrap_or(0.0);
+
+        progressfn(ProgressMessage::CityChange(i));
     }
 
     let selected_set = (1 << n_others) - 1;

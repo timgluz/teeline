@@ -4,6 +4,7 @@ pub mod distance_matrix;
 pub mod genetic_algorithm;
 pub mod kdtree;
 pub mod nearest_neighbor;
+pub mod progress;
 pub mod route;
 pub mod simulated_annealing;
 pub mod stochastic_hill;
@@ -18,6 +19,7 @@ use std::collections::HashMap;
 pub const VERSION: &'static str = "0.6.1";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
+use std::fmt;
 use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -84,6 +86,7 @@ pub struct SolverOptions {
     pub cooling_rate: f32,
     pub max_temperature: f32,
     pub min_temperature: f32,
+    pub show_progress: bool, // should we show and print progress
 }
 
 impl SolverOptions {
@@ -98,6 +101,7 @@ impl SolverOptions {
             cooling_rate: 0.0001,
             min_temperature: 0.001,
             max_temperature: 1_000.0,
+            show_progress: true,
         }
     }
 }

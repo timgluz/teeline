@@ -6,10 +6,13 @@ extern crate regex;
 use clap::{App, Arg, ArgMatches};
 
 use std::fmt::Debug;
+use std::sync::mpsc;
+use std::thread;
+
 use std::path::Path;
 use std::str::FromStr;
 
-use teeline::tsp::{self, kdtree, tsplib, Solution, SolverOptions, Solvers};
+use teeline::tsp::{self, kdtree, progress, tsplib, Solution, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
@@ -99,6 +102,12 @@ fn main() {
                 .help("allows solver to print out debug lines")
                 .required(false),
         )
+        .arg(
+            Arg::with_name("disable_progress")
+                .long("disable_progress")
+                .help("Doesnt show any progress or visualization, default false")
+                .required(false),
+        )
         .get_matches();
 
     let solver_type = Solvers::from_str(args.value_of("solver").unwrap_or("unspecified"))
@@ -125,14 +134,50 @@ fn main() {
         );
     }
 
-    let tour = solve(solver_type, tsp_data.cities(), &options);
-    print_solution(&tour, false);
+    let (progress_publisher, progress_listener) = mpsc::channel();
+    let progress_display = progress::ProgressPlot::new(solver_type.clone(), options.clone());
+
+    // start progress listener
+    let handler1 = thread::spawn(move || {
+        progress_display.run(progress_listener);
+    });
+
+    // execute solver
+    let handler2 = thread::spawn(move || {
+        let publisherfn = if options.show_progress {
+            progress::build_publisher(progress_publisher.clone())
+        } else {
+            progress::build_dummy_publisher(options.verbose)
+        };
+
+        let tour = solve(
+            solver_type,
+            tsp_data.cities(),
+            &options.clone(),
+            publisherfn,
+        );
+        print_solution(&tour, false);
+
+        // send listener that we are done
+        progress_publisher
+            .send(progress::ProgressMessage::Done)
+            .unwrap();
+    });
+
+    // run threads
+    handler1.join().expect("Progress Thread Failed");
+    handler2.join().expect("Solver thread failed");
 }
 
 /// solves tsp for given cities by using solver
-fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> Solution {
+fn solve(
+    algorithm: Solvers,
+    cities: &[kdtree::KDPoint],
+    options: &SolverOptions,
+    publisherfn: progress::PublisherFn,
+) -> Solution {
     match algorithm {
-        Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
+        Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options, publisherfn),
         Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
         Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
         Solvers::TwoOpt => tsp::two_opt::solve(cities, options),
@@ -188,6 +233,10 @@ fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
 
     if args.is_present("verbose") {
         options.verbose = true;
+    }
+
+    if args.is_present("disable_progress") {
+        options.show_progress = false;
     }
 
     if let Some(n_epochs_str) = args.value_of("epochs") {
