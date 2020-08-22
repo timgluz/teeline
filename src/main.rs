@@ -1,9 +1,9 @@
 extern crate clap;
 extern crate lazy_static;
-extern crate rand;
-extern crate regex;
 extern crate piston;
 extern crate piston_window;
+extern crate rand;
+extern crate regex;
 
 use clap::{App, Arg, ArgMatches};
 
@@ -137,10 +137,12 @@ fn main() {
     }
 
     let (progress_publisher, progress_listener) = mpsc::channel();
-    let mut progress_display = progress::ProgressPlot::new(tsp_data.cities(), options.clone());
 
+    let cities = tsp_data.cities().to_vec();
     // start progress listener
     let handler1 = thread::spawn(move || {
+        let mut progress_display = progress::ProgressPlot::new(&cities);
+
         progress_display.run(progress_listener);
     });
 

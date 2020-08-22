@@ -1,14 +1,15 @@
 //use piston::window::WindowSettings;
-use piston::event_loop::{Events, EventLoop, EventSettings};
+//use piston::event_loop::{EventLoop, EventSettings, Events};
 use piston_window::*;
 
+use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
 use super::route::Route;
-use super::{SolverOptions, KDPoint};
+use super::KDPoint;
 
 pub type PublishChannel = Sender<ProgressMessage>;
 pub type ReceiverChannel = Receiver<ProgressMessage>;
@@ -16,6 +17,7 @@ pub type PublisherFn = Arc<dyn Fn(ProgressMessage) -> ()>;
 
 type RGBA = [f32; 4];
 type RectCoords = [f64; 4];
+type Point2D = (f64, f64);
 
 const WHITE: RGBA = [1.0; 4];
 const RED: RGBA = [1.0, 0.0, 0.0, 0.9];
@@ -59,19 +61,35 @@ pub fn build_dummy_publisher(verbose: bool) -> PublisherFn {
 }
 
 #[derive(Debug, Clone)]
+enum Shape {
+    Edge,
+    Node,
+    TextBox,
+}
+
+trait Renderable {
+    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs);
+
+    fn belongs_to_city(&self, other_city_id: usize) -> bool;
+
+    fn set_color(&mut self, new_color: RGBA);
+    fn is_edge(&self) -> bool;
+}
+
+#[derive(Debug, Clone)]
 struct Node {
-    id: usize,
+    city_id: Option<usize>,
     x: f64,
     y: f64,
     height: f64,
     width: f64,
-    color: RGBA
+    color: RGBA,
 }
 
 impl Node {
-    fn new(id: usize,x: f64, y: f64, height: f64, width: f64, color: RGBA) -> Self {
+    fn new(city_id: Option<usize>, x: f64, y: f64, height: f64, width: f64, color: RGBA) -> Self {
         Node {
-            id,
+            city_id,
             x,
             y,
             height,
@@ -81,84 +99,176 @@ impl Node {
     }
 
     fn to_rect(&self) -> RectCoords {
-		let half_h = self.height / 2.0;
-		let half_w = self.width / 2.0;
+        let half_h = self.height / 2.0;
+        let half_w = self.width / 2.0;
 
-        [
-            self.x - half_w, self.y - half_h, self.width, self.height
-        ]
+        [self.x - half_w, self.y - half_h, self.width, self.height]
+    }
+}
+
+impl Renderable for Node {
+    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs) {
+        rectangle::Rectangle::new(self.color).draw(
+            self.to_rect(),
+            &ctx.draw_state,
+            ctx.transform,
+            renderer,
+        );
+
+        TextBox::new(
+            format!("id.{:?}", self.city_id),
+            self.x,
+            self.y,
+            self.color,
+            16,
+        )
+        .render(ctx, renderer, glyphs);
+    }
+
+    fn belongs_to_city(&self, other_city_id: usize) -> bool {
+        self.city_id
+            .map(|c_id| c_id == other_city_id)
+            .unwrap_or(false)
+    }
+
+    fn set_color(&mut self, new_color: RGBA) {
+        self.color = new_color;
+    }
+
+    fn is_edge(&self) -> bool {
+        false
     }
 }
 
 #[derive(Debug, Clone)]
 struct Edge {
-	from: Node,
-	to: Node,
-	width: f64,
-	color: RGBA
+    from: Point2D,
+    to: Point2D,
+    width: f64,
+    color: RGBA,
 }
 
 impl Edge {
-	fn new(from: Node, to: Node, color: RGBA, width: f64) -> Self {
-		Edge { from, to, width, color }
-	}
+    fn new(from: Point2D, to: Point2D, color: RGBA, width: f64) -> Self {
+        Edge {
+            from,
+            to,
+            width,
+            color,
+        }
+    }
 
-	pub fn to_line(&self) -> RectCoords {
-		[
-			self.from.x, self.from.y,
-			self.to.x, self.to.y
-		]
-	}
+    fn to_line(&self) -> RectCoords {
+        [self.from.0, self.from.1, self.to.0, self.to.1]
+    }
+}
+
+impl Renderable for Edge {
+    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs) {
+        line::Line::new(self.color, self.width).draw(
+            self.to_line(),
+            &ctx.draw_state,
+            ctx.transform,
+            renderer,
+        );
+    }
+
+    fn belongs_to_city(&self, other_city_id: usize) -> bool {
+        false
+    }
+
+    fn set_color(&mut self, new_color: RGBA) {
+        self.color = new_color;
+    }
+
+    fn is_edge(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TextBox {
+    text: String,
+    x: f64,
+    y: f64,
+    font_size: u32,
+    color: RGBA,
+}
+
+impl TextBox {
+    pub fn new<S: Into<String>>(text: S, x: f64, y: f64, color: RGBA, font_size: u32) -> Self {
+        TextBox {
+            text: text.into(),
+            x,
+            y,
+            color,
+            font_size,
+        }
+    }
+}
+
+//unsafe impl Send for TextBox {}
+//unsafe impl Sync for TextBox {}
+
+impl Renderable for TextBox {
+    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs) {
+        text::Text::new_color(self.color, self.font_size)
+            .draw(
+                self.text.as_ref(),
+                glyphs,
+                &ctx.draw_state,
+                ctx.transform.trans(self.x, self.y),
+                renderer,
+            )
+            .unwrap();
+    }
+
+    fn belongs_to_city(&self, other_city_id: usize) -> bool {
+        false
+    }
+
+    fn set_color(&mut self, new_color: RGBA) {
+        self.color = new_color;
+    }
+
+    fn is_edge(&self) -> bool {
+        false
+    }
 }
 
 pub struct ProgressPlot {
-    options: SolverOptions,
-    nodes: Vec<Box<Node>>,
-	edges: Vec<Box<Edge>>,
-    height: u32,
-    width: u32,
-    margin: u32,
+    city_table: HashMap<usize, KDPoint>,
+    shapes: Vec<Box<dyn Renderable>>,
+    viewport_dimensions: ViewportDimensions,
+    cities_bounding_box: RectCoords,
 }
 
 impl ProgressPlot {
-    pub fn new(cities: &[KDPoint], options: SolverOptions) -> Self {
+    pub fn new(cities: &[KDPoint]) -> Self {
         // TODO: read window settings from CLI
-        let width = 1024;
-        let height = 1024;
+        let width = 1024.0;
+        let height = 1024.0;
 
         let mut plot = ProgressPlot {
-            options,
-            nodes: Vec::new(),
-			edges: Vec::new(),
-            height: width,
-            width: height,
-            margin: 10,
+            city_table: HashMap::new(),
+            shapes: Vec::new(),
+            viewport_dimensions: ViewportDimensions::new(width, height, 10.0),
+            cities_bounding_box: cities_bounding_box(&cities),
         };
 
         plot.add_cities(cities);
-
-		// TODO: publish path and build path from nodes
-		// add fake nodes between node1 , node2
-
-		let from_city = plot.nodes[0].clone();
-		let to_city = plot.nodes[1].clone();
-
-		plot.add_edge(*from_city, *to_city, BLUE);
+        plot.add_nodes();
         plot
     }
 
-	fn add_edge(&mut self, from_city: Node, to_city: Node, color: RGBA) {
-		let new_edge = Edge::new(from_city, to_city, color, 2.0);
-		self.edges.push(Box::new(new_edge));
-	}
-
     pub fn run(&mut self, in_channel: ReceiverChannel) {
         let mut done = false;
-        let settings = WindowSettings::new("Teeline - TSP solver", [self.height, self.width])
-                                .exit_on_esc(true)
-                                .resizable(false);
+        let settings = WindowSettings::new("Teeline - TSP solver", self.window_size())
+            .exit_on_esc(true)
+            .resizable(false);
 
-        let mut window: PistonWindow = settings.build()
+        let mut window: PistonWindow = settings
+            .build()
             .expect("ProgressPlot: Failed to create window");
 
         let mut glyphs = window.load_font("./assets/FiraSans-Light.ttf").unwrap();
@@ -168,120 +278,194 @@ impl ProgressPlot {
             window.draw_2d(&e, |ctx, renderer, device| {
                 clear(WHITE, renderer);
 
-                // render cities
-                for s in &self.nodes {
-                    rectangle(s.color, s.to_rect(), ctx.transform, renderer);
-
-                    let text_transformer = ctx.transform.trans(s.x + s.width, s.y + s.height);
-                    text(RED, FONT_SIZE, format!("{}", s.id).as_ref(), &mut glyphs, text_transformer, renderer).unwrap();
+                // render shapes
+                for shape in &self.shapes {
+                    shape.render(&ctx, renderer, &mut glyphs);
                 }
 
-				// render edges
-				for edge in &self.edges {
-					line(edge.color, edge.width, edge.to_line(), ctx.transform, renderer);
-				}
                 // update glyphs before rendering
                 glyphs.factory.encoder.flush(device);
             });
 
-
             // update state
             match in_channel.recv_timeout(Duration::from_millis(10)) {
-                Ok(ProgressMessage::Done) => done = true,
                 Ok(msg) => self.update(&msg),
-                Err(_) => { done = true }
+                Err(_) => done = true,
             }
         }
     }
 
     fn update(&mut self, msg: &ProgressMessage) {
         match msg {
+            ProgressMessage::Done => self.add_textbox(TextBox::new("Done", 100.0, 100.0, RED, 24)),
             ProgressMessage::PathUpdate(route, distance) => {
-                self.update_route(route, distance.clone());
-            },
+                self.clean_path();
+                self.add_path(route);
+            }
             ProgressMessage::CityChange(city_id) => self.highlight_city(city_id.clone()),
-            _ => println!("ProgressUpdate: {:?}",  msg)
+            _ => println!("ProgressUpdate: {:?}", msg),
         }
+    }
+
+    fn add_textbox(&mut self, textbox: TextBox) {
+        self.shapes.push(Box::new(textbox));
     }
 
     fn add_cities(&mut self, cities: &[KDPoint]) {
-        let window_dims = self.window_dimensions(cities);
-
         for city in cities.iter() {
-            let x = city.get(0).unwrap_or(-1.0) as f64;
-            let y = city.get(1).unwrap_or(-1.0) as f64;
-
-            let (x_v, y_v) = self.point_to_viewport(x, y, window_dims);
-            let shape = Node::new(
-                city.id,
-                x_v,
-                y_v,
-                10.0,
-                10.0,
-                DISACTIVE_COLOR
-            );
-
-            self.nodes.push(Box::new(shape));
+            self.city_table.insert(city.id, city.clone());
         }
     }
 
-    fn update_route(&mut self, route: &Route, distance: f32) {
-        println!("Going to update the route");
+    fn clean_path(&mut self) {
+        self.shapes.retain(|x| !x.is_edge());
+    }
 
-        // TODO: draw lines between cities
+    fn add_path(&mut self, route: &Route) {
+        let path = route.route().to_vec();
+        let mut from_city_id = path[0];
+
+        for to_city_id in path.iter().skip(1) {
+            println!("Path from {:?} -> {:?}", from_city_id, to_city_id);
+
+            let from_city = self.city_table.get(&from_city_id).unwrap();
+            let to_city = self.city_table.get(&to_city_id).unwrap();
+
+            let new_edge = self.build_edge(&from_city, &to_city, GREY);
+            self.shapes.push(Box::new(new_edge));
+
+            from_city_id = to_city_id.clone();
+        }
+
+        // connect the last city and the first
+        let from_city = self.city_table.get(&from_city_id).unwrap();
+        let to_city = self.city_table.get(&path[0]).unwrap();
+
+        let new_edge = self.build_edge(&from_city, &to_city, GREY);
+        self.shapes.push(Box::new(new_edge));
+    }
+
+    fn build_edge(&self, from_city: &KDPoint, to_city: &KDPoint, color: RGBA) -> Edge {
+        let from_point = scaled_point(
+            from_city,
+            &self.cities_bounding_box,
+            &self.viewport_dimensions,
+        );
+        let to_point = scaled_point(
+            to_city,
+            &self.cities_bounding_box,
+            &self.viewport_dimensions,
+        );
+
+        Edge::new(from_point, to_point, color, 2.0)
+    }
+
+    fn add_nodes(&mut self) {
+        for city in self.city_table.values() {
+            let city_pt = scaled_point(city, &self.cities_bounding_box, &self.viewport_dimensions);
+            let shape = Node::new(
+                Some(city.id),
+                city_pt.0,
+                city_pt.1,
+                10.0,
+                10.0,
+                DISACTIVE_COLOR,
+            );
+
+            self.shapes.push(Box::new(shape));
+        }
     }
 
     fn highlight_city(&mut self, city_id: usize) {
-        for city in self.nodes.iter_mut() {
-            // mark previous active city as visited
-            if city.color == ACTIVE_COLOR {
-                city.color = VISITED_COLOR;
-            }
-
-            // mark current city as active
-            if city.id == city_id {
-                city.color = ACTIVE_COLOR;
+        for shape in self.shapes.iter_mut() {
+            if shape.belongs_to_city(city_id) {
+                shape.set_color(ACTIVE_COLOR);
             }
         }
     }
-
-    fn window_dimensions(&self, cities: &[KDPoint]) -> RectCoords {
-        let mut x_min = f32::MAX;
-        let mut x_max = f32::MIN;
-        let mut y_min = f32::MAX;
-        let mut y_max = f32::MIN;
-
-        for city in cities.iter() {
-            if let Some(x) = city.get(0) {
-                if x < x_min { x_min = x; }
-                if x > x_max { x_max = x; }
-            }
-
-            if let Some(y) = city.get(1) {
-                if y < y_min { y_min = y }
-                if y > y_max { y_max = y }
-            }
-        }
-
-        [x_min as f64, y_min as f64, x_max as f64, y_max as f64]
-    }
-
-    // converts EUC2D space into GUI coords [0..self.height, 0..self.width]
-    fn point_to_viewport(&self, x: f64, y: f64, window: RectCoords) -> (f64, f64) {
-        let x_min = window[0];
-        let y_min = window[1];
-        let x_max = window[2];
-        let y_max = window[3];
-
-        // TODO: research how to scale viewport itself, so we can get rid of margin here
-        let x_v = (self.width - self.margin * 2) as f64 * (x - x_min) / (x_max - x_min);
-        let y_v = (self.height- self.margin * 2) as f64 * (y - y_min) / (y_max - y_min);
-
-        (x_v + (self.margin as f64), y_v + (self.margin as f64))
-    }
-
 
     fn update_error(&self, err: String) {
         println!("ProgressError: {:?}", err)
     }
+
+    fn window_size(&self) -> [f64; 2] {
+        [
+            self.viewport_dimensions.width,
+            self.viewport_dimensions.height,
+        ]
+    }
+}
+
+// -- helper functions
+
+#[derive(Debug, Clone)]
+struct ViewportDimensions {
+    height: f64,
+    width: f64,
+    margin: f64,
+}
+
+impl ViewportDimensions {
+    fn new(width: f64, height: f64, margin: f64) -> Self {
+        ViewportDimensions {
+            height,
+            width,
+            margin,
+        }
+    }
+}
+
+fn scaled_point(point: &KDPoint, window: &RectCoords, viewport: &ViewportDimensions) -> Point2D {
+    point_to_viewport(point.x() as f64, point.y() as f64, window, viewport)
+}
+
+fn cities_bounding_box(cities: &[KDPoint]) -> RectCoords {
+    let mut x_min = f32::MAX;
+    let mut x_max = f32::MIN;
+    let mut y_min = f32::MAX;
+    let mut y_max = f32::MIN;
+
+    for city in cities.iter() {
+        if let Some(x) = city.get(0) {
+            if x < x_min {
+                x_min = x;
+            }
+            if x > x_max {
+                x_max = x;
+            }
+        }
+
+        if let Some(y) = city.get(1) {
+            if y < y_min {
+                y_min = y
+            }
+            if y > y_max {
+                y_max = y
+            }
+        }
+    }
+
+    [x_min as f64, y_min as f64, x_max as f64, y_max as f64]
+}
+
+// converts EUC2D space into GUI coords [0..self.height, 0..self.width]
+fn point_to_viewport(
+    x: f64,
+    y: f64,
+    window: &RectCoords,
+    viewport: &ViewportDimensions,
+) -> Point2D {
+    let x_min = window[0];
+    let y_min = window[1];
+    let x_max = window[2];
+    let y_max = window[3];
+
+    // TODO: research how to scale viewport itself, so we can get rid of margin here
+    let x_v = (viewport.width - viewport.margin * 2.0) as f64 * (x - x_min) / (x_max - x_min);
+    let y_v = (viewport.height - viewport.margin * 2.0) as f64 * (y - y_min) / (y_max - y_min);
+
+    (
+        x_v + (viewport.margin as f64),
+        y_v + (viewport.margin as f64),
+    )
 }

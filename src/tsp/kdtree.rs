@@ -409,6 +409,22 @@ impl KDPoint {
 
         Some(res)
     }
+
+    pub fn x(&self) -> f32 {
+        if self.dimensionality < 1 {
+            panic!("for accessing y, dimensionality must be > 0");
+        }
+
+        self.coords[0].clone()
+    }
+
+    pub fn y(&self) -> f32 {
+        if self.dimensionality < 2 {
+            panic!("for accessing y, dimensionality must be > 1");
+        }
+
+        self.coords[1].clone()
+    }
 }
 
 #[cfg(test)]

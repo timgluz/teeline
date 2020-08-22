@@ -12,6 +12,7 @@
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::{ProgressMessage, PublisherFn};
+use super::route::Route;
 use super::{Solution, SolverOptions};
 
 // 0-1 Set, where 1 means that city N is collected
@@ -47,6 +48,10 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherF
     }
 
     let route_vec = read_optimal_route(&opt, &dists, n_cities, f32::MAX);
+
+    // send final route to the visualizer
+    let route = Route::new(route_vec.as_ref());
+    progressfn(ProgressMessage::PathUpdate(route, 0.0));
 
     let tour = Solution::new(&route_vec, cities);
 
