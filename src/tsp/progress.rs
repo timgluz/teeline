@@ -1,3 +1,7 @@
+use lazy_static::lazy_static;
+use std::sync::mpsc;
+use std::sync::Mutex;
+
 use piston::window::WindowSettings;
 //use piston::event_loop::{EventLoop, EventSettings, Events};
 use piston_window::*;
@@ -5,7 +9,6 @@ use piston_window::*;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
-use std::thread;
 use std::time::Duration;
 
 use super::route::Route;
@@ -33,6 +36,46 @@ const FONT_SIZE: u32 = 16;
 
 const RENDER_FRQ: u64 = 5;
 
+lazy_static! {
+    static ref PUBLISH_CHANNEL: Mutex<Option<PublishChannel>> = Mutex::new(None);
+    static ref RECEIVER_CHANNEL: Mutex<Option<ReceiverChannel>> = Mutex::new(None);
+}
+
+fn init_channels() {
+    let (out_ch, in_ch) = mpsc::channel();
+    let mut mtx = PUBLISH_CHANNEL.lock().unwrap();
+    *mtx = Some(out_ch);
+
+    let mut inmtx = RECEIVER_CHANNEL.lock().unwrap();
+    *inmtx = Some(in_ch);
+}
+
+pub fn get_publisher() -> Option<PublishChannel> {
+    match PUBLISH_CHANNEL.lock() {
+        Ok(mtx) => mtx.clone().map(|m| m.clone()),
+        Err(_) => None,
+    }
+}
+
+pub fn send_progress(msg: ProgressMessage) {
+    let publish_ch = PUBLISH_CHANNEL.lock().unwrap();
+    if publish_ch.is_some() {
+        publish_ch
+            .clone()
+            .unwrap()
+            .send(msg)
+            .expect("Failed to publish message");
+    }
+}
+
+fn retrieve_message() -> Option<ProgressMessage> {
+    let ch = RECEIVER_CHANNEL.lock().unwrap();
+
+    ch.as_ref()
+        .map(|x| x.recv_timeout(Duration::from_millis(RENDER_FRQ)).ok())
+        .unwrap_or(None)
+}
+
 #[derive(Debug, Clone)]
 pub enum ProgressMessage {
     CityChange(usize),
@@ -40,26 +83,6 @@ pub enum ProgressMessage {
     EpochUpdate(usize),
     Done,
     Restart,
-}
-
-pub fn build_publisher(publish_ch: PublishChannel) -> PublisherFn {
-    Arc::new(move |msg: ProgressMessage| {
-        publish_ch
-            .send(msg)
-            .expect("Failed to publish progress updates");
-
-        thread::sleep(Duration::from_millis(RENDER_FRQ));
-    })
-}
-
-pub fn build_dummy_publisher(verbose: bool) -> PublisherFn {
-    Arc::new(move |msg: ProgressMessage| {
-        if verbose {
-            println!("DummyPublisher: {:?}", msg);
-        }
-
-        thread::sleep(Duration::from_millis(RENDER_FRQ));
-    })
 }
 
 trait Renderable {
@@ -227,7 +250,6 @@ impl Renderable for TextBox {
         false
     }
 }
-
 pub struct ProgressPlot {
     city_table: HashMap<usize, KDPoint>,
     shapes: Vec<Box<dyn Renderable>>,
@@ -249,7 +271,9 @@ impl ProgressPlot {
         plot
     }
 
-    pub fn run(&mut self, in_channel: ReceiverChannel) {
+    pub fn run(&mut self) {
+        init_channels();
+
         let settings = WindowSettings::new("Teeline - TSP solver", self.window_size())
             .exit_on_esc(true)
             .resizable(false);
@@ -275,7 +299,7 @@ impl ProgressPlot {
             });
 
             // update state
-            if let Ok(msg) = in_channel.recv_timeout(Duration::from_millis(RENDER_FRQ)) {
+            if let Some(msg) = retrieve_message() {
                 self.update(&msg);
             }
         }
@@ -368,10 +392,6 @@ impl ProgressPlot {
                 shape.set_color(ACTIVE_COLOR);
             }
         }
-    }
-
-    fn update_error(&self, err: String) {
-        println!("ProgressError: {:?}", err)
     }
 
     fn window_size(&self) -> [f64; 2] {

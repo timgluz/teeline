@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
+use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -19,6 +20,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
 
     // we will start from city with smallest ID
     route.sort();
+    send_progress(ProgressMessage::PathUpdate(route.clone(), 0.0));
 
     let mut open_path: Path = vec![0; n_cities];
     open_path[0] = route.get(0).unwrap();
@@ -37,6 +39,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         options,
     );
 
+    send_progress(ProgressMessage::Done);
     Solution::new(&best_path, cities)
 }
 

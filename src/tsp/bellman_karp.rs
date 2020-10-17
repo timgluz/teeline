@@ -11,7 +11,7 @@
 ///
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{ProgressMessage, PublisherFn};
+use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -23,7 +23,7 @@ const UNKNOWN_DISTANCE: f32 = f32::MAX;
 
 /// TODO: fix bug with duplicated city.1, and missing city.4
 /// replication: use ./data/discopt/tsp_5_1.tsp;
-pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherFn) -> Solution {
+pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let n_cities = cities.len();
     let n_others = n_cities - 1; // we start from last city
     let n_powersets = 1 << n_others;
@@ -42,7 +42,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherF
             .unwrap_or(UNKNOWN_DISTANCE);
 
         if let Some(city_id) = dists.pos2city_id(&i) {
-            progressfn(ProgressMessage::CityChange(city_id));
+            send_progress(ProgressMessage::CityChange(city_id));
         }
     }
 
@@ -60,8 +60,8 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherF
 
     // send final route to the visualizer
     let route = Route::new(route_vec.as_ref());
-    progressfn(ProgressMessage::PathUpdate(route, 0.0));
-    progressfn(ProgressMessage::Done);
+    send_progress(ProgressMessage::PathUpdate(route, 0.0));
+    send_progress(ProgressMessage::Done);
 
     let tour = Solution::new(&route_vec, cities);
 

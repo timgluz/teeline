@@ -7,12 +7,9 @@ extern crate regex;
 
 use clap::{App, Arg, ArgMatches};
 
-use std::fmt::Debug;
-use std::sync::mpsc;
-use std::thread;
-
 use std::path::Path;
 use std::str::FromStr;
+use std::thread;
 
 use teeline::tsp::{self, kdtree, progress, tsplib, Solution, SolverOptions, Solvers};
 
@@ -136,36 +133,18 @@ fn main() {
         );
     }
 
-    let (progress_publisher, progress_listener) = mpsc::channel();
-
     let cities = tsp_data.cities().to_vec();
     // start progress listener
     let handler1 = thread::spawn(move || {
         let mut progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
 
-        progress_display.run(progress_listener);
+        progress_display.run();
     });
 
     // execute solver
     let handler2 = thread::spawn(move || {
-        let publisherfn = if options.show_progress {
-            progress::build_publisher(progress_publisher.clone())
-        } else {
-            progress::build_dummy_publisher(options.verbose)
-        };
-
-        let tour = solve(
-            solver_type,
-            tsp_data.cities(),
-            &options.clone(),
-            publisherfn,
-        );
+        let tour = solve(solver_type, tsp_data.cities(), &options.clone());
         print_solution(&tour, false);
-
-        // send listener that we are done
-        progress_publisher
-            .send(progress::ProgressMessage::Done)
-            .unwrap();
     });
 
     // run threads
@@ -174,14 +153,9 @@ fn main() {
 }
 
 /// solves tsp for given cities by using solver
-fn solve(
-    algorithm: Solvers,
-    cities: &[kdtree::KDPoint],
-    options: &SolverOptions,
-    publisherfn: progress::PublisherFn,
-) -> Solution {
+fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> Solution {
     match algorithm {
-        Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options, publisherfn),
+        Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
         Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
         Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
         Solvers::TwoOpt => tsp::two_opt::solve(cities, options),
