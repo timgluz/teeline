@@ -19,13 +19,17 @@ use super::{Solution, SolverOptions};
 type FlagSet = u64;
 type DPTable = Vec<Vec<f32>>;
 
+const UNKNOWN_DISTANCE: f32 = f32::MAX;
+
+/// TODO: fix bug with duplicated city.1, and missing city.4
+/// replication: use ./data/discopt/tsp_5_1.tsp;
 pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherFn) -> Solution {
     let n_cities = cities.len();
     let n_others = n_cities - 1; // we start from last city
     let n_powersets = 1 << n_others;
 
     let dists = DistanceMatrix::from_cities(cities).unwrap();
-    let mut opt = vec![vec![0.0; n_powersets]; n_others];
+    let mut opt = vec![vec![UNKNOWN_DISTANCE; n_powersets]; n_others];
 
     if options.verbose == true {
         println!("BHK: initializing the table with subresults");
@@ -33,9 +37,13 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherF
     // inialize tables first row with distance from first cities to other cities
     let last_pos = n_others;
     for i in 0..n_others {
-        opt[i][1 << i] = dists.distance_by_pos(i, last_pos).unwrap_or(0.0);
+        opt[i][1 << i] = dists
+            .distance_by_pos(i, last_pos)
+            .unwrap_or(UNKNOWN_DISTANCE);
 
-        progressfn(ProgressMessage::CityChange(i));
+        if let Some(city_id) = dists.pos2city_id(&i) {
+            progressfn(ProgressMessage::CityChange(city_id));
+        }
     }
 
     let selected_set = (1 << n_others) - 1;
@@ -45,6 +53,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherF
 
     if options.verbose == true {
         println!("BHK: done with calculations, preparing the result");
+        show_table(&opt);
     }
 
     let route_vec = read_optimal_route(&opt, &dists, n_cities, f32::MAX);
@@ -52,6 +61,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions, progressfn: PublisherF
     // send final route to the visualizer
     let route = Route::new(route_vec.as_ref());
     progressfn(ProgressMessage::PathUpdate(route, 0.0));
+    progressfn(ProgressMessage::Done);
 
     let tour = Solution::new(&route_vec, cities);
 
@@ -68,7 +78,7 @@ fn solve_bhk(
 
     // distance is already calculated
     let selected_pos = selected_set as usize;
-    if opt[city_pos][selected_pos] > 0.0 {
+    if opt[city_pos][selected_pos] < UNKNOWN_DISTANCE {
         return opt[city_pos][selected_pos];
     }
 
@@ -133,4 +143,25 @@ fn read_optimal_route(opt: &DPTable, dm: &DistanceMatrix, n: usize, best_val: f3
 
 fn approx(x1: f32, x2: f32) -> bool {
     (x1 - x2).abs() < f32::EPSILON
+}
+
+fn show_table(opt: &DPTable) {
+    println!("=============================================");
+    println!("Dynamic programming table");
+
+    for row in opt.iter() {
+        print!("| ");
+
+        for val in row.iter() {
+            let fval = if approx(*val, UNKNOWN_DISTANCE) {
+                " - ".to_string()
+            } else {
+                format!("{:.2}", val)
+            };
+
+            print!("{:^10} |", fval);
+        }
+
+        println!(" |");
+    }
 }

@@ -1,4 +1,4 @@
-//use piston::window::WindowSettings;
+use piston::window::WindowSettings;
 //use piston::event_loop::{EventLoop, EventSettings, Events};
 use piston_window::*;
 
@@ -26,10 +26,12 @@ const BLUE: RGBA = [0.0, 0.0, 1.0, 0.9];
 const GREY: RGBA = [0.7, 0.7, 0.7, 0.9];
 
 const ACTIVE_COLOR: RGBA = RED;
-const DISACTIVE_COLOR: RGBA = GREY;
+const INACTIVE_COLOR: RGBA = GREY;
 const VISITED_COLOR: RGBA = GREEN;
 
 const FONT_SIZE: u32 = 16;
+
+const RENDER_FRQ: u64 = 5;
 
 #[derive(Debug, Clone)]
 pub enum ProgressMessage {
@@ -46,7 +48,7 @@ pub fn build_publisher(publish_ch: PublishChannel) -> PublisherFn {
             .send(msg)
             .expect("Failed to publish progress updates");
 
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(RENDER_FRQ));
     })
 }
 
@@ -56,15 +58,8 @@ pub fn build_dummy_publisher(verbose: bool) -> PublisherFn {
             println!("DummyPublisher: {:?}", msg);
         }
 
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(RENDER_FRQ));
     })
-}
-
-#[derive(Debug, Clone)]
-enum Shape {
-    Edge,
-    Node,
-    TextBox,
 }
 
 trait Renderable {
@@ -116,11 +111,11 @@ impl Renderable for Node {
         );
 
         TextBox::new(
-            format!("id.{:?}", self.city_id),
+            format!("id.{:?}", self.city_id.unwrap_or(0)),
             self.x,
-            self.y,
+            self.y + FONT_SIZE as f64,
             self.color,
-            16,
+            FONT_SIZE,
         )
         .render(ctx, renderer, glyphs);
     }
@@ -164,7 +159,7 @@ impl Edge {
 }
 
 impl Renderable for Edge {
-    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs) {
+    fn render(&self, ctx: &Context, renderer: &mut G2d, _glyphs: &mut Glyphs) {
         line::Line::new(self.color, self.width).draw(
             self.to_line(),
             &ctx.draw_state,
@@ -173,7 +168,7 @@ impl Renderable for Edge {
         );
     }
 
-    fn belongs_to_city(&self, other_city_id: usize) -> bool {
+    fn belongs_to_city(&self, _other_city_id: usize) -> bool {
         false
     }
 
@@ -207,9 +202,6 @@ impl TextBox {
     }
 }
 
-//unsafe impl Send for TextBox {}
-//unsafe impl Sync for TextBox {}
-
 impl Renderable for TextBox {
     fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs) {
         text::Text::new_color(self.color, self.font_size)
@@ -223,7 +215,7 @@ impl Renderable for TextBox {
             .unwrap();
     }
 
-    fn belongs_to_city(&self, other_city_id: usize) -> bool {
+    fn belongs_to_city(&self, _other_city_id: usize) -> bool {
         false
     }
 
@@ -244,15 +236,11 @@ pub struct ProgressPlot {
 }
 
 impl ProgressPlot {
-    pub fn new(cities: &[KDPoint]) -> Self {
-        // TODO: read window settings from CLI
-        let width = 1024.0;
-        let height = 1024.0;
-
+    pub fn new(cities: &[KDPoint], width: f64, height: f64, margin: f64) -> Self {
         let mut plot = ProgressPlot {
             city_table: HashMap::new(),
             shapes: Vec::new(),
-            viewport_dimensions: ViewportDimensions::new(width, height, 10.0),
+            viewport_dimensions: ViewportDimensions::new(width, height, margin),
             cities_bounding_box: cities_bounding_box(&cities),
         };
 
@@ -262,7 +250,6 @@ impl ProgressPlot {
     }
 
     pub fn run(&mut self, in_channel: ReceiverChannel) {
-        let mut done = false;
         let settings = WindowSettings::new("Teeline - TSP solver", self.window_size())
             .exit_on_esc(true)
             .resizable(false);
@@ -288,9 +275,8 @@ impl ProgressPlot {
             });
 
             // update state
-            match in_channel.recv_timeout(Duration::from_millis(10)) {
-                Ok(msg) => self.update(&msg),
-                Err(_) => done = true,
+            if let Ok(msg) = in_channel.recv_timeout(Duration::from_millis(RENDER_FRQ)) {
+                self.update(&msg);
             }
         }
     }
@@ -298,7 +284,7 @@ impl ProgressPlot {
     fn update(&mut self, msg: &ProgressMessage) {
         match msg {
             ProgressMessage::Done => self.add_textbox(TextBox::new("Done", 100.0, 100.0, RED, 24)),
-            ProgressMessage::PathUpdate(route, distance) => {
+            ProgressMessage::PathUpdate(route, _distance) => {
                 self.clean_path();
                 self.add_path(route);
             }
@@ -369,7 +355,7 @@ impl ProgressPlot {
                 city_pt.1,
                 10.0,
                 10.0,
-                DISACTIVE_COLOR,
+                INACTIVE_COLOR,
             );
 
             self.shapes.push(Box::new(shape));
