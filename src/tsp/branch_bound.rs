@@ -86,6 +86,18 @@ fn backtrack(
 
     for candidate in candidates.iter() {
         make_move(path, k, candidate.clone());
+
+        let visited_path: Vec<usize> = path
+            .to_vec()
+            .iter()
+            .filter(|&&x| x != UNVISITED_NODE)
+            .map(|x| x.clone())
+            .collect();
+        send_progress(ProgressMessage::PathUpdate(
+            Route::new(&visited_path),
+            best_distance,
+        ));
+
         let prev_city = path[k - 1];
         let next_distance = evaluate_fn(&vec![prev_city, candidate.clone()]);
 
@@ -142,7 +154,8 @@ fn construct_candidates(
 }
 
 fn make_move(path: &mut Path, k: usize, candidate: usize) {
-    path[k] = candidate
+    path[k] = candidate;
+    send_progress(ProgressMessage::CityChange(candidate));
 }
 
 fn undo_move(path: &mut Path, k: usize) {

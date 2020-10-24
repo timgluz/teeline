@@ -336,15 +336,16 @@ impl ProgressPlot {
         let mut from_city_id = path[0];
 
         for to_city_id in path.iter().skip(1) {
-            println!("Path from {:?} -> {:?}", from_city_id, to_city_id);
+            let from_city = self.city_table.get(&from_city_id);
+            let to_city = self.city_table.get(&to_city_id);
 
-            let from_city = self.city_table.get(&from_city_id).unwrap();
-            let to_city = self.city_table.get(&to_city_id).unwrap();
+            // only add the path if both city IDs exist
+            if from_city.is_some() && to_city.is_some() {
+                let new_edge = self.build_edge(&from_city.unwrap(), &to_city.unwrap(), GREY);
+                self.shapes.push(Box::new(new_edge));
 
-            let new_edge = self.build_edge(&from_city, &to_city, GREY);
-            self.shapes.push(Box::new(new_edge));
-
-            from_city_id = to_city_id.clone();
+                from_city_id = to_city_id.clone();
+            }
         }
 
         // connect the last city and the first
