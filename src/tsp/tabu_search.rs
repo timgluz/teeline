@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
 use super::kdtree::KDPoint;
+use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
 use super::{total_distance, Solution, SolverOptions};
 
@@ -12,6 +13,8 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let mut best_route = Route::from_cities(cities);
     tabu_list.add(best_route.clone());
 
+    send_progress(ProgressMessage::PathUpdate(best_route.clone(), 0.0));
+
     let mut u = best_route.clone();
     let mut best_distance = distance(cities, &u);
     let mut done = false;
@@ -21,6 +24,11 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         if local_distance < best_distance {
             best_route = local_best.clone();
             best_distance = local_distance;
+
+            send_progress(ProgressMessage::PathUpdate(
+                best_route.clone(),
+                best_distance,
+            ));
 
             if options.verbose {
                 println!(
@@ -38,6 +46,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         done = update_terminate(epoch, options.epochs);
     }
 
+    send_progress(ProgressMessage::Done);
     Solution::new(best_route.route(), cities)
 }
 
