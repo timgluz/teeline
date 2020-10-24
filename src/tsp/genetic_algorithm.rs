@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
+use super::progress::{send_progress, ProgressMessage};
 use super::route::{random_position_pair, Route};
 use super::{Solution, SolverOptions};
 
@@ -17,6 +18,12 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let population = TspPopulation::from_cities(cities, population_size, &evaluator);
     let best_candidate = solve_ga(&population, evaluator, options);
 
+    let best_route = Route::new(best_candidate.genotype());
+    send_progress(ProgressMessage::PathUpdate(
+        best_route,
+        best_candidate.fitness(),
+    ));
+    send_progress(ProgressMessage::Done);
     Solution::new(best_candidate.genotype(), cities)
 }
 
@@ -58,6 +65,13 @@ fn solve_ga(
         }
 
         current_population = new_population;
+
+        let best_candidate = current_population.best().clone();
+        let best_route = Route::new(best_candidate.genotype());
+        send_progress(ProgressMessage::PathUpdate(
+            best_route,
+            best_candidate.fitness(),
+        ));
 
         if options.verbose {
             println!(

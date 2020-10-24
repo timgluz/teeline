@@ -1,6 +1,7 @@
 use rand::Rng;
 
 use super::kdtree::KDPoint;
+use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
 use super::{total_distance, Solution, SolverOptions};
 
@@ -11,6 +12,11 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let mut best_route = Route::from_cities(cities);
     let mut best_distance = total_distance(cities, best_route.route());
 
+    send_progress(ProgressMessage::PathUpdate(
+        best_route.clone(),
+        best_distance,
+    ));
+
     let mut temperature = options.max_temperature;
     while epoch < options.epochs || temperature > options.min_temperature {
         let candidate = best_route.random_successor();
@@ -20,6 +26,10 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
             best_route = candidate;
             best_distance = candidate_distance;
 
+            send_progress(ProgressMessage::PathUpdate(
+                best_route.clone(),
+                best_distance,
+            ));
             if options.verbose {
                 println!(
                     "SA: epoch.{:?} new best distance: {:?}",
@@ -32,6 +42,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         epoch += 1;
     }
 
+    send_progress(ProgressMessage::Done);
     Solution::new(best_route.route(), cities)
 }
 
@@ -61,3 +72,5 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
 fn metropolis(t: f32, e1: f32, e2: f32) -> f32 {
     (-(e2 - e1) / t).exp()
 }
+
+// TODO: add missing tests

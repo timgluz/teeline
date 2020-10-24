@@ -11,6 +11,12 @@ pub struct Route {
 }
 
 impl Route {
+    pub fn new(path: &[usize]) -> Self {
+        Route {
+            route: path.to_vec(),
+        }
+    }
+
     pub fn from_cities(cities: &[KDPoint]) -> Self {
         let route: Vec<usize> = cities.iter().map(|x| x.id.clone()).collect();
 

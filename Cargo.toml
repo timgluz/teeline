@@ -1,6 +1,6 @@
 [package]
 name = "teeline"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Timo Sulg <timgluz@gmail.com>"]
 edition = "2018"
 
@@ -19,3 +19,5 @@ clap = "2.33.1"
 rand = "0.7.3"
 regex = "1.3.9"
 lazy_static = "1.4.0"
+piston = "0.52.0"
+piston_window = "0.111.0"

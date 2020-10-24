@@ -1,15 +1,17 @@
 extern crate clap;
 extern crate lazy_static;
+extern crate piston;
+extern crate piston_window;
 extern crate rand;
 extern crate regex;
 
 use clap::{App, Arg, ArgMatches};
 
-use std::fmt::Debug;
 use std::path::Path;
 use std::str::FromStr;
+use std::thread;
 
-use teeline::tsp::{self, kdtree, tsplib, Solution, SolverOptions, Solvers};
+use teeline::tsp::{self, kdtree, progress, tsplib, Solution, SolverOptions, Solvers};
 
 fn main() {
     //process command-line params
@@ -99,6 +101,12 @@ fn main() {
                 .help("allows solver to print out debug lines")
                 .required(false),
         )
+        .arg(
+            Arg::with_name("disable_progress")
+                .long("disable_progress")
+                .help("Doesnt show any progress or visualization, default false")
+                .required(false),
+        )
         .get_matches();
 
     let solver_type = Solvers::from_str(args.value_of("solver").unwrap_or("unspecified"))
@@ -125,8 +133,23 @@ fn main() {
         );
     }
 
-    let tour = solve(solver_type, tsp_data.cities(), &options);
-    print_solution(&tour, false);
+    let cities = tsp_data.cities().to_vec();
+    // start progress listener
+    let handler1 = thread::spawn(move || {
+        let mut progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
+
+        progress_display.run();
+    });
+
+    // execute solver
+    let handler2 = thread::spawn(move || {
+        let tour = solve(solver_type, tsp_data.cities(), &options.clone());
+        print_solution(&tour, false);
+    });
+
+    // run threads
+    handler1.join().expect("Progress Thread Failed");
+    handler2.join().expect("Solver thread failed");
 }
 
 /// solves tsp for given cities by using solver
@@ -188,6 +211,10 @@ fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
 
     if args.is_present("verbose") {
         options.verbose = true;
+    }
+
+    if args.is_present("disable_progress") {
+        options.show_progress = false;
     }
 
     if let Some(n_epochs_str) = args.value_of("epochs") {
