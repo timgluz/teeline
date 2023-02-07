@@ -47,8 +47,15 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     }
 
     let selected_set = (1 << n_others) - 1;
+    let mut best_val = f32::MAX;
     for city_pos in 0..n_others {
-        solve_bhk(&mut opt, &dists, selected_set, city_pos);
+        let sub_val = solve_bhk(&mut opt, &dists, selected_set, city_pos)
+            + dists
+                .distance_by_pos(city_pos, last_pos)
+                .unwrap_or(UNKNOWN_DISTANCE);
+        if sub_val < best_val {
+            best_val = sub_val;
+        }
     }
 
     if options.verbose == true {
@@ -56,7 +63,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         show_table(&opt);
     }
 
-    let route_vec = read_optimal_route(&opt, &dists, n_cities, f32::MAX);
+    let route_vec = read_optimal_route(&opt, &dists, n_cities, best_val);
 
     // send final route to the visualizer
     let route = Route::new(route_vec.as_ref());
@@ -84,7 +91,7 @@ fn solve_bhk(
 
     // rest_selected R = S \ t , all other than city_id
     let rest_selected = selected_set & !(1 << city_pos);
-    let n_other = opt.len() - 1; // opt has n_city rows
+    let n_other = opt.len(); // opt has n_city rows
     for i in 0..n_other {
         // if city i is not in rest_selected
         if (rest_selected & (1 << i)) == 0 {
@@ -163,5 +170,27 @@ fn show_table(opt: &DPTable) {
         }
 
         println!(" |");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsp::kdtree;
+
+    #[test]
+    fn test_solve_with_tsp5_example() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+
+        let default_opts = SolverOptions::default();
+        let tour = solve(&cities, &default_opts);
+        assert_eq!(4.0, tour.total);
+        assert_eq!(&[4, 0, 1, 2, 3], tour.route());
     }
 }
