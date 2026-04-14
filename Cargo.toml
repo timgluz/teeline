@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = "2.33.1"
-rand = "0.7.3"
+rand = "0.9.3"
 regex = "1.5.5"
 lazy_static = "1.4.0"
 piston = "0.52.0"
