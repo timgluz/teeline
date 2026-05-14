@@ -18,13 +18,13 @@ impl Route {
     }
 
     pub fn from_cities(cities: &[KDPoint]) -> Self {
-        let route: Vec<usize> = cities.iter().map(|x| x.id.clone()).collect();
+        let route: Vec<usize> = cities.iter().map(|x| x.id).collect();
 
         Route { route }
     }
 
     pub fn get(&self, pos: usize) -> Option<usize> {
-        self.route.get(pos).map(|r| r.clone())
+        self.route.get(pos).copied()
     }
 
     pub fn len(&self) -> usize {
@@ -36,8 +36,7 @@ impl Route {
     }
 
     pub fn shuffle(&mut self) {
-        let mut rng = rand::thread_rng();
-
+        let mut rng = rand::rng();
         self.route.shuffle(&mut rng);
     }
 
@@ -85,9 +84,9 @@ fn random_pair(n_items: usize) -> (usize, usize) {
         panic!("n_items must be bigger than 2");
     }
 
-    let mut rng = rand::thread_rng();
-    let pos1 = rng.gen_range(0, n_items);
-    let pos2 = rng.gen_range(0, n_items);
+    let mut rng = rand::rng();
+    let pos1 = rng.random_range(0..n_items);
+    let pos2 = rng.random_range(0..n_items);
 
     if pos1 < pos2 {
         (pos1, pos2)
@@ -101,12 +100,11 @@ fn swap_cities(route: &mut Vec<usize>, from: usize, to: usize) {
         panic!("to can not be same or bigger than route size");
     }
 
-    // 2-OPT keeps changes in more stable
-    let reversed_seq: Vec<usize> = route[from..=to].iter().map(|x| x.clone()).rev().collect();
+    // 2-OPT keeps changes more stable
+    let reversed_seq: Vec<usize> = route[from..=to].iter().copied().rev().collect();
 
-    // swap values from routes with reversed_seq
     for (i, swapped_val) in reversed_seq.iter().enumerate() {
-        route[from + i] = swapped_val.clone();
+        route[from + i] = *swapped_val;
     }
 }
 

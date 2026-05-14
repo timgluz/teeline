@@ -4,20 +4,20 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::str::FromStr;
 
-use lazy_static::lazy_static;
+use std::sync::LazyLock;
+
 use regex::Regex;
 
 use super::kdtree::KDPoint;
 
-const COORD_SECTION_KEY: &'static str = "NODE_COORD_SECTION";
-const DISPLAY_DATA_SECTION_KEY: &'static str = "DISPLAY_DATA_SECTION";
-const EOF_KEY: &'static str = "EOF";
+const COORD_SECTION_KEY: &str = "NODE_COORD_SECTION";
+const DISPLAY_DATA_SECTION_KEY: &str = "DISPLAY_DATA_SECTION";
+const EOF_KEY: &str = "EOF";
 
-lazy_static! {
-    static ref SECTION_START_MATCHER: Regex = Regex::new(r"^(?P<key>\w+)$").unwrap();
-    // it matches key value pairs separated by colon(:)
-    static ref KEY_VALUE_MATCHER: Regex = Regex::new(r"^(?P<key>\w+)\s*:\s*(?P<val>.+)$").unwrap();
-}
+static SECTION_START_MATCHER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?P<key>\w+)$").unwrap());
+static KEY_VALUE_MATCHER: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^(?P<key>\w+)\s*:\s*(?P<val>.+)$").unwrap());
 
 #[derive(Debug, Clone)]
 pub struct TspLibData {
@@ -175,7 +175,7 @@ fn coords_from_text<S: AsRef<str>>(line_no: usize, txt: S) -> Result<KDPoint, St
     if starts_with_number(txt.as_ref()) {
         let text = String::from_str(txt.as_ref()).unwrap();
         let mut tokens = text.split_whitespace();
-        let id_str = tokens.next().unwrap().clone();
+        let id_str = tokens.next().unwrap();
         let id: usize = usize::from_str(id_str).unwrap();
 
         // it is important we take id first out, then we dont need skip(1) here

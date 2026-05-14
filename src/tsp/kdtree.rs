@@ -25,7 +25,7 @@ pub fn from_cities(points: &[KDPoint]) -> KDTree {
     };
 
     let n_points = points.len();
-    let tree_points = points.clone().to_vec();
+    let tree_points = points.to_vec();
     if let Some(root) = build_subtree(tree_points, 0) {
         tree.size = n_points;
         tree.root = Some(root);
@@ -84,17 +84,13 @@ fn partition_points(
 #[derive(Debug)]
 pub struct KDTree {
     size: usize,
-    dimensionality: usize,
     root: KDSubTree,
 }
 
 impl KDTree {
     pub fn new(root: KDNode) -> Self {
-        let pt_dimension = root.point.dim();
-
         KDTree {
             root: Some(Box::new(root)),
-            dimensionality: pt_dimension,
             size: 1,
         }
     }
@@ -102,38 +98,7 @@ impl KDTree {
     pub fn empty() -> Self {
         KDTree {
             root: None,
-            dimensionality: 0,
             size: 0,
-        }
-    }
-
-    fn add(&mut self, new_point: KDPoint) {
-        self.size += 1;
-        if self.dimensionality == 0 {
-            self.dimensionality = new_point.dim();
-        }
-
-        let parent = std::mem::replace(&mut self.root, None);
-        self.root = self.add_rec(parent, new_point, 0);
-    }
-
-    fn add_rec(&mut self, parent: KDSubTree, new_point: KDPoint, depth: usize) -> KDSubTree {
-        if parent.is_none() {
-            return Some(Box::new(KDNode::leaf(new_point, depth + 1)));
-        }
-
-        let mut node = parent.unwrap();
-        match node.cmp_by_point(&new_point) {
-            None => panic!("Point dimensionality is not matching with tree"), // fails with broken data
-            Some(Ordering::Greater) => {
-                // if parent is greater than new point then the newpoint should go left
-                node.left = self.add_rec(node.left, new_point, depth + 1);
-                Some(node)
-            }
-            _ => {
-                node.right = self.add_rec(node.right, new_point, depth + 1);
-                Some(node)
-            }
         }
     }
 
@@ -271,14 +236,6 @@ impl KDNode {
         nearest_result
     }
 
-    fn point(&self) -> &KDPoint {
-        &self.point
-    }
-
-    fn cmp(&self, other: &KDNode) -> Option<Ordering> {
-        self.cmp_by_point(&other.point)
-    }
-
     fn cmp_by_point(&self, other: &KDPoint) -> Option<Ordering> {
         self.point.cmp_by_coord(other, self.level_coord())
     }
@@ -289,11 +246,11 @@ impl KDNode {
     }
 
     pub fn left(&self) -> Option<&Box<KDNode>> {
-        self.left.as_ref().map(|n| n.clone())
+        self.left.as_ref()
     }
 
     pub fn right(&self) -> Option<&Box<KDNode>> {
-        self.right.as_ref().map(|n| n.clone())
+        self.right.as_ref()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -513,33 +470,6 @@ mod tests {
     }
 
     #[test]
-    fn kdtree_add_new_node_to_empty_tree() {
-        let mut tree = KDTree::empty();
-
-        assert_eq!(0, tree.len());
-
-        tree.add(KDPoint::new(&[0.0, 0.0]));
-
-        assert_eq!(1, tree.len());
-        assert_eq!(2, tree.dimensionality);
-    }
-
-    #[test]
-    fn kdtree_add_new_node_to_tree_with_root() {
-        let root = KDNode::new(KDPoint::new(&[0.0, 0.0]), 0, None, None);
-
-        let mut tree = KDTree::new(root);
-
-        assert_eq!(1, tree.len());
-        assert_eq!(2, tree.dimensionality);
-
-        tree.add(KDPoint::new(&[-1.0, 0.0]));
-
-        assert_eq!(2, tree.len());
-        assert_eq!(2, tree.dimensionality);
-    }
-
-    #[test]
     fn kdtree_walk_with_empty_tree() {
         let tree = KDTree::empty();
 
@@ -560,29 +490,6 @@ mod tests {
         assert!(!pts.borrow().is_empty());
         assert_eq!(1, pts.borrow().len());
         assert_eq!(&[0.0, 0.0], pts.borrow().get(0).unwrap().coords());
-    }
-
-    #[test]
-    fn kdtree_walk_balances_1level_tree() {
-        let mut tree = KDTree::empty();
-
-        //add some nodes
-        tree.add(KDPoint::new(&[0.0, 0.0]));
-        tree.add(KDPoint::new(&[-1.0, 0.0]));
-        tree.add(KDPoint::new(&[1.0, 0.0]));
-
-        // double-check insertion
-        assert_eq!(3, tree.len());
-        assert_eq!(2, tree.dimensionality);
-
-        // check insertion order
-        let pts: RefCell<Vec<KDPoint>> = RefCell::new(vec![]);
-        tree.walk(|pt| pts.borrow_mut().push(pt.clone()));
-
-        assert_eq!(3, pts.borrow().len());
-        assert_eq!(&[0.0, 0.0], pts.borrow().get(0).unwrap().coords());
-        assert_eq!(&[-1.0, 0.0], pts.borrow().get(1).unwrap().coords());
-        assert_eq!(&[1.0, 0.0], pts.borrow().get(2).unwrap().coords());
     }
 
     #[test]

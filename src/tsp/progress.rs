@@ -1,10 +1,10 @@
-use lazy_static::lazy_static;
 use std::sync::mpsc;
 use std::sync::Mutex;
+use std::sync::LazyLock;
 
-use piston::window::WindowSettings;
-//use piston::event_loop::{EventLoop, EventSettings, Events};
 use piston_window::*;
+use piston_window::graphics::Context;
+use piston_window::wgpu_graphics::WgpuGraphics;
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
@@ -24,22 +24,19 @@ type Point2D = (f64, f64);
 
 const WHITE: RGBA = [1.0; 4];
 const RED: RGBA = [1.0, 0.0, 0.0, 0.9];
-const GREEN: RGBA = [0.0, 1.0, 0.0, 0.9];
-const BLUE: RGBA = [0.0, 0.0, 1.0, 0.9];
 const GREY: RGBA = [0.7, 0.7, 0.7, 0.9];
 
 const ACTIVE_COLOR: RGBA = RED;
 const INACTIVE_COLOR: RGBA = GREY;
-const VISITED_COLOR: RGBA = GREEN;
 
 const FONT_SIZE: u32 = 16;
 
 const RENDER_FRQ: u64 = 5;
 
-lazy_static! {
-    static ref PUBLISH_CHANNEL: Mutex<Option<PublishChannel>> = Mutex::new(None);
-    static ref RECEIVER_CHANNEL: Mutex<Option<ReceiverChannel>> = Mutex::new(None);
-}
+static PUBLISH_CHANNEL: LazyLock<Mutex<Option<PublishChannel>>> =
+    LazyLock::new(|| Mutex::new(None));
+static RECEIVER_CHANNEL: LazyLock<Mutex<Option<ReceiverChannel>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 fn init_channels() {
     let (out_ch, in_ch) = mpsc::channel();
@@ -86,7 +83,7 @@ pub enum ProgressMessage {
 }
 
 trait Renderable {
-    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs);
+    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, glyphs: &mut Glyphs);
 
     fn belongs_to_city(&self, other_city_id: usize) -> bool;
 
@@ -125,8 +122,9 @@ impl Node {
 }
 
 impl Renderable for Node {
-    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs) {
-        rectangle::Rectangle::new(self.color).draw(
+    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, glyphs: &mut Glyphs) {
+        use graphics::*;
+        Rectangle::new(self.color).draw(
             self.to_rect(),
             &ctx.draw_state,
             ctx.transform,
@@ -182,8 +180,9 @@ impl Edge {
 }
 
 impl Renderable for Edge {
-    fn render(&self, ctx: &Context, renderer: &mut G2d, _glyphs: &mut Glyphs) {
-        line::Line::new(self.color, self.width).draw(
+    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, _glyphs: &mut Glyphs) {
+        use graphics::*;
+        Line::new(self.color, self.width).draw(
             self.to_line(),
             &ctx.draw_state,
             ctx.transform,
@@ -226,8 +225,9 @@ impl TextBox {
 }
 
 impl Renderable for TextBox {
-    fn render(&self, ctx: &Context, renderer: &mut G2d, glyphs: &mut Glyphs) {
-        text::Text::new_color(self.color, self.font_size)
+    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, glyphs: &mut Glyphs) {
+        use graphics::*;
+        Text::new_color(self.color, self.font_size)
             .draw(
                 self.text.as_ref(),
                 glyphs,
@@ -263,7 +263,7 @@ impl ProgressPlot {
             city_table: HashMap::new(),
             shapes: Vec::new(),
             viewport_dimensions: ViewportDimensions::new(width, height, margin),
-            cities_bounding_box: cities_bounding_box(&cities),
+            cities_bounding_box: cities_bounding_box(cities),
         };
 
         plot.add_cities(cities);
@@ -282,23 +282,23 @@ impl ProgressPlot {
             .build()
             .expect("ProgressPlot: Failed to create window");
 
-        let mut glyphs = window.load_font("./assets/FiraSans-Light.ttf").unwrap();
+        let mut glyphs = window
+            .load_font(
+                "./assets/FiraSans-Light.ttf",
+                wgpu_graphics::TextureSettings::new(),
+            )
+            .unwrap();
 
         while let Some(e) = window.next() {
-            // render updates
-            window.draw_2d(&e, |ctx, renderer, device| {
+            window.draw_2d(&e, |ctx, renderer, _device| {
+                use graphics::*;
                 clear(WHITE, renderer);
 
-                // render shapes
                 for shape in &self.shapes {
                     shape.render(&ctx, renderer, &mut glyphs);
                 }
-
-                // update glyphs before rendering
-                glyphs.factory.encoder.flush(device);
             });
 
-            // update state
             if let Some(msg) = retrieve_message() {
                 self.update(&msg);
             }
@@ -312,7 +312,7 @@ impl ProgressPlot {
                 self.clean_path();
                 self.add_path(route);
             }
-            ProgressMessage::CityChange(city_id) => self.highlight_city(city_id.clone()),
+            ProgressMessage::CityChange(city_id) => self.highlight_city(*city_id),
             _ => println!("ProgressUpdate: {:?}", msg),
         }
     }
@@ -339,16 +339,14 @@ impl ProgressPlot {
             let from_city = self.city_table.get(&from_city_id);
             let to_city = self.city_table.get(&to_city_id);
 
-            // only add the path if both city IDs exist
             if from_city.is_some() && to_city.is_some() {
                 let new_edge = self.build_edge(&from_city.unwrap(), &to_city.unwrap(), GREY);
                 self.shapes.push(Box::new(new_edge));
 
-                from_city_id = to_city_id.clone();
+                from_city_id = *to_city_id;
             }
         }
 
-        // connect the last city and the first
         let from_city = self.city_table.get(&from_city_id).unwrap();
         let to_city = self.city_table.get(&path[0]).unwrap();
 
@@ -402,8 +400,6 @@ impl ProgressPlot {
         ]
     }
 }
-
-// -- helper functions
 
 #[derive(Debug, Clone)]
 struct ViewportDimensions {

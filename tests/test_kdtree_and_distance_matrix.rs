@@ -1,5 +1,3 @@
-extern crate teeline;
-
 use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::{distance_matrix, kdtree};
 
