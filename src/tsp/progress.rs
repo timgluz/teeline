@@ -255,6 +255,7 @@ pub struct ProgressPlot {
     shapes: Vec<Box<dyn Renderable>>,
     viewport_dimensions: ViewportDimensions,
     cities_bounding_box: RectCoords,
+    status: String,
 }
 
 impl ProgressPlot {
@@ -267,6 +268,7 @@ impl ProgressPlot {
             shapes: Vec::new(),
             viewport_dimensions: ViewportDimensions::new(width, height, margin),
             cities_bounding_box: cities_bounding_box(cities),
+            status: "Preparing...".to_string(),
         };
 
         plot.add_cities(cities);
@@ -303,6 +305,8 @@ impl ProgressPlot {
             .unwrap();
 
         while let Some(e) = window.next() {
+            let status = self.status.clone();
+            let margin = self.viewport_dimensions.margin;
             window.draw_2d(&e, |ctx, renderer, _device| {
                 use graphics::*;
                 clear(WHITE, renderer);
@@ -310,6 +314,9 @@ impl ProgressPlot {
                 for shape in &self.shapes {
                     shape.render(&ctx, renderer, &mut glyphs);
                 }
+
+                TextBox::new(&status, margin, margin / 2.0, RED, FONT_SIZE)
+                    .render(&ctx, renderer, &mut glyphs);
             });
 
             if let Some(msg) = retrieve_message() {
@@ -320,13 +327,18 @@ impl ProgressPlot {
 
     fn update(&mut self, msg: &ProgressMessage) {
         match msg {
-            ProgressMessage::Done => self.add_textbox(TextBox::new("Done", 100.0, 100.0, RED, 24)),
-            ProgressMessage::PathUpdate(route, _distance) => {
+            ProgressMessage::Done => {
+                self.status = "Done".to_string();
+            }
+            ProgressMessage::PathUpdate(route, distance) => {
+                self.status = format!("Solving... | best: {:.2}", distance);
                 self.clean_path();
                 self.add_path(route);
             }
-            ProgressMessage::CityChange(city_id) => self.highlight_city(*city_id),
-            _ => println!("ProgressUpdate: {:?}", msg),
+            ProgressMessage::CityChange(_) => {
+                self.status = "Solving...".to_string();
+            }
+            _ => {}
         }
     }
 
