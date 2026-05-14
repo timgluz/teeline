@@ -69,7 +69,7 @@ fn partition_points(
     }
 
     let coord = depth % k;
-    sorted_points.sort_by(|a, b| a.cmp_by_coord(&b, coord).unwrap());
+    sorted_points.sort_by(|a, b| a.cmp_by_coord(b, coord).unwrap());
 
     let pivot_idx = sorted_points.len() / 2;
     let pivot_pt = sorted_points[pivot_idx].clone();
@@ -102,11 +102,11 @@ impl KDTree {
         }
     }
 
-    pub fn walk(&self, callback: impl Fn(&KDPoint) -> ()) {
+    pub fn walk(&self, callback: impl Fn(&KDPoint)) {
         self.walk_in_order(&self.root, &callback);
     }
 
-    pub fn walk_in_order(&self, subtree: &KDSubTree, callback: &impl Fn(&KDPoint) -> ()) {
+    pub fn walk_in_order(&self, subtree: &KDSubTree, callback: &impl Fn(&KDPoint)) {
         if let Some(node) = subtree {
             self.walk_in_order(&node.left, callback);
             callback(&node.point);
@@ -125,6 +125,10 @@ impl KDTree {
 
     pub fn len(&self) -> usize {
         self.size
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
     }
 
     pub fn to_vec(&self) -> PointMatrix {
@@ -148,15 +152,8 @@ pub struct KDNode {
 
 impl KDNode {
     pub fn new(point: KDPoint, depth: usize, left: Option<KDNode>, right: Option<KDNode>) -> Self {
-        let left_node = match left {
-            Some(node) => Some(Box::new(node)),
-            None => None,
-        };
-
-        let right_node = match right {
-            Some(node) => Some(Box::new(node)),
-            None => None,
-        };
+        let left_node = left.map(Box::new);
+        let right_node = right.map(Box::new);
 
         let left_size = left_node.as_ref().map_or(0, |n| n.len());
         let right_size = right_node.as_ref().map_or(0, |n| n.len());
@@ -208,29 +205,26 @@ impl KDNode {
             nearest_result.add(pt, distance_from_target);
         };
 
-        let (closest_branch, futher_branch) = match self.cmp_by_point(&target_point) {
+        let (closest_branch, futher_branch) = match self.cmp_by_point(target_point) {
             None => panic!("Dimension conflict in nearest function"),
             Some(Ordering::Greater) => (self.left(), self.right()),
             Some(_) => (self.right(), self.left()),
         };
 
-        if closest_branch.is_some() {
-            let closest_result = closest_branch
-                .unwrap()
-                .nearest(target_point, nearest_result.clone());
-
+        if let Some(branch) = closest_branch {
+            let closest_result = branch.nearest(target_point, nearest_result.clone());
             let pt_distance = closest_result.closest_distance();
             nearest_result.add(closest_result.point, pt_distance);
         }
 
         // check distance from split line
-        let split_dist = self.point.split_distance(&target_point, self.level_coord());
-        if nearest_result.closest_distance() > split_dist && futher_branch.is_some() {
-            let further_result = futher_branch
-                .unwrap()
-                .nearest(target_point, nearest_result.clone());
-            let pt_distance = further_result.closest_distance();
-            nearest_result.add(further_result.point, pt_distance);
+        let split_dist = self.point.split_distance(target_point, self.level_coord());
+        if nearest_result.closest_distance() > split_dist {
+            if let Some(branch) = futher_branch {
+                let further_result = branch.nearest(target_point, nearest_result.clone());
+                let pt_distance = further_result.closest_distance();
+                nearest_result.add(further_result.point, pt_distance);
+            }
         }
 
         nearest_result
@@ -245,20 +239,16 @@ impl KDNode {
         self.depth % self.point.dimensionality
     }
 
-    pub fn left(&self) -> Option<&Box<KDNode>> {
-        self.left.as_ref()
+    pub fn left(&self) -> Option<&KDNode> {
+        self.left.as_deref()
     }
 
-    pub fn right(&self) -> Option<&Box<KDNode>> {
-        self.right.as_ref()
+    pub fn right(&self) -> Option<&KDNode> {
+        self.right.as_deref()
     }
 
     pub fn is_empty(&self) -> bool {
-        if self.len() == 0 {
-            true
-        } else {
-            false
-        }
+        self.len() == 0
     }
 
     pub fn is_leaf(&self) -> bool {
@@ -318,18 +308,9 @@ impl KDPoint {
     }
 
     pub fn get(&self, dimension: usize) -> Option<f32> {
-        self.coords.get(dimension).map(|x| x.clone())
+        self.coords.get(dimension).copied()
     }
 
-    // TODO: finish and add tests
-    pub fn eq(&self, other: &KDPoint) -> bool {
-        if self.dimensionality != other.dimensionality {
-            return false;
-        }
-
-        let diff = self.distance(other);
-        diff < f32::EPSILON
-    }
 
     pub fn distance(&self, other: &KDPoint) -> f32 {
         let distance: f32 = self
@@ -372,7 +353,7 @@ impl KDPoint {
             panic!("for accessing y, dimensionality must be > 0");
         }
 
-        self.coords[0].clone()
+        self.coords[0]
     }
 
     pub fn y(&self) -> f32 {
@@ -380,7 +361,16 @@ impl KDPoint {
             panic!("for accessing y, dimensionality must be > 1");
         }
 
-        self.coords[1].clone()
+        self.coords[1]
+    }
+}
+
+impl PartialEq for KDPoint {
+    fn eq(&self, other: &KDPoint) -> bool {
+        if self.dimensionality != other.dimensionality {
+            return false;
+        }
+        self.distance(other) < f32::EPSILON
     }
 }
 

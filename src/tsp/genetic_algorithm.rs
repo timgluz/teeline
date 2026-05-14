@@ -52,7 +52,7 @@ fn solve_ga(
             let parent1 = current_population.random_selection();
             let parent2 = current_population.random_selection();
 
-            let (mut child1, mut child2) = ordered_crossover(&parent1, &parent2, &fitness_fn);
+            let (mut child1, mut child2) = ordered_crossover(parent1, parent2, &fitness_fn);
             if probability(mutation_prob) {
                 child1.mutate()
             };
@@ -87,7 +87,7 @@ fn solve_ga(
     current_population.best().clone()
 }
 
-fn build_evaluator(cities: &[KDPoint]) -> Rc<dyn Fn(&[usize]) -> f32> {
+fn build_evaluator(cities: &[KDPoint]) -> FitnessFn {
     let dm = Rc::new(DistanceMatrix::from_cities(cities).unwrap());
 
     Rc::new(move |path: &[usize]| {
@@ -129,10 +129,8 @@ fn ordered_crossover_genes(
     let range_b: HashSet<usize> = parent2[from..=to].iter().copied().collect();
 
     // copy cross-overs from parents
-    for i in from..=to {
-        gene1[i] = parent2[i];
-        gene2[i] = parent1[i];
-    }
+    gene1[from..=to].copy_from_slice(&parent2[from..=to]);
+    gene2[from..=to].copy_from_slice(&parent1[from..=to]);
 
     // copy other values like rolling-shift to -> from
     let mut k = (to + 1) % gene_len;
@@ -201,6 +199,10 @@ impl TspPopulation {
         self.individuals.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.individuals.is_empty()
+    }
+
     pub fn individuals(&self) -> &[TspGenotype] {
         &self.individuals
     }
@@ -267,6 +269,10 @@ impl TspGenotype {
 
     pub fn len(&self) -> usize {
         self.genotype.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.genotype.is_empty()
     }
 
     pub fn set_fitness(&mut self, new_fitness: f32) {

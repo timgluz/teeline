@@ -42,6 +42,10 @@ impl TspLibData {
     pub fn len(&self) -> usize {
         self.cities.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.cities.is_empty()
+    }
 }
 
 pub fn read_from_file(path: &Path) -> Result<TspLibData, String> {
@@ -65,7 +69,7 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
     let mut metadata: HashMap<String, String> = HashMap::new();
     let mut cities: Vec<KDPoint> = vec![];
 
-    let mut state = TspReaderStates::START;
+    let mut state = TspReaderStates::Start;
     let mut line_no = 1;
     for line_res in reader.lines() {
         if line_res.is_err() {
@@ -75,7 +79,7 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
         let line = line_res.unwrap().trim().to_uppercase();
         line_no += 1;
 
-        if state == TspReaderStates::END {
+        if state == TspReaderStates::End {
             break;
         }
 
@@ -87,14 +91,14 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
 
         // -- EXTRACT VALUE
         match &state {
-            TspReaderStates::START => match KEY_VALUE_MATCHER.captures(&line) {
+            TspReaderStates::Start => match KEY_VALUE_MATCHER.captures(&line) {
                 None => return Err(format!("Failed to extract meta data on line.{:?}", line_no)),
                 Some(res) => {
                     metadata.insert(res["key"].to_string(), res["val"].to_string());
                 }
             },
             // we parse coords only from those 2 sections
-            TspReaderStates::INSECTION(section_id)
+            TspReaderStates::Insection(section_id)
                 if (section_id == COORD_SECTION_KEY || section_id == DISPLAY_DATA_SECTION_KEY) =>
             {
                 match coords_from_text(line_no, &line) {
@@ -102,7 +106,7 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
                     Ok(pt) => cities.push(pt),
                 }
             }
-            TspReaderStates::END => {
+            TspReaderStates::End => {
                 break;
             }
             _ => continue,
@@ -131,25 +135,23 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
     Ok(dt)
 }
 
-fn is_state_marker(line: &String) -> bool {
+fn is_state_marker(line: &str) -> bool {
     SECTION_START_MATCHER.captures(line).is_some()
 }
 
-fn next_state(state: &TspReaderStates, line: &String) -> TspReaderStates {
+fn next_state(state: &TspReaderStates, line: &str) -> TspReaderStates {
     if line == EOF_KEY {
-        return TspReaderStates::END;
+        return TspReaderStates::End;
     }
 
     // if it section keyword
-    if let Some(res) = SECTION_START_MATCHER.captures(&line) {
-        let next_state = TspReaderStates::INSECTION(res["key"].to_string());
-
-        return next_state;
+    if let Some(res) = SECTION_START_MATCHER.captures(line) {
+        return TspReaderStates::Insection(res["key"].to_string());
     }
 
     // check if we are already out of coord section
     match &state {
-        TspReaderStates::INSECTION(_) if !starts_with_number(&line) => TspReaderStates::OUTSECTION,
+        TspReaderStates::Insection(_) if !starts_with_number(line) => TspReaderStates::Outsection,
         st => st.to_owned().clone(),
     }
 }
@@ -165,10 +167,10 @@ fn starts_with_number<S: AsRef<str>>(txt: S) -> bool {
 
 #[derive(Debug, Clone, PartialEq)]
 enum TspReaderStates {
-    START,
-    INSECTION(String),
-    OUTSECTION,
-    END,
+    Start,
+    Insection(String),
+    Outsection,
+    End,
 }
 
 fn coords_from_text<S: AsRef<str>>(line_no: usize, txt: S) -> Result<KDPoint, String> {
@@ -179,7 +181,7 @@ fn coords_from_text<S: AsRef<str>>(line_no: usize, txt: S) -> Result<KDPoint, St
         let id: usize = usize::from_str(id_str).unwrap();
 
         // it is important we take id first out, then we dont need skip(1) here
-        let coords_res: Result<Vec<f32>, _> = tokens.map(|x| f32::from_str(x)).collect();
+        let coords_res: Result<Vec<f32>, _> = tokens.map(f32::from_str).collect();
         if coords_res.is_err() {
             return Err(format!("Error on line.{:?} - invalid number", line_no));
         }
@@ -263,28 +265,28 @@ mod tests {
 
     #[test]
     fn test_next_state_with_end_marker() {
-        let state = TspReaderStates::OUTSECTION;
+        let state = TspReaderStates::Outsection;
 
-        assert_eq!(TspReaderStates::END, next_state(&state, &"EOF".to_string()))
+        assert_eq!(TspReaderStates::End, next_state(&state, "EOF"))
     }
 
     #[test]
     fn test_next_state_with_beginning_of_coord_section() {
-        let state = TspReaderStates::START;
+        let state = TspReaderStates::Start;
 
-        let res = next_state(&state, &"NODE_COORD_SECTION".to_string());
+        let res = next_state(&state, "NODE_COORD_SECTION");
         assert_eq!(
-            TspReaderStates::INSECTION(COORD_SECTION_KEY.to_string()),
+            TspReaderStates::Insection(COORD_SECTION_KEY.to_string()),
             res
         );
     }
 
     #[test]
     fn test_state_from_coord_section_switches_to_outsection() {
-        let state = TspReaderStates::INSECTION(COORD_SECTION_KEY.to_string());
+        let state = TspReaderStates::Insection(COORD_SECTION_KEY.to_string());
 
-        let res = next_state(&state, &"KEY: VAL1".to_string());
-        assert_eq!(TspReaderStates::OUTSECTION, res);
+        let res = next_state(&state, "KEY: VAL1");
+        assert_eq!(TspReaderStates::Outsection, res);
     }
 
     #[test]

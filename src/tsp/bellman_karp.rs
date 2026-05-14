@@ -29,7 +29,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let dists = DistanceMatrix::from_cities(cities).unwrap();
     let mut opt = vec![vec![UNKNOWN_DISTANCE; n_powersets]; n_others];
 
-    if options.verbose == true {
+    if options.verbose {
         println!("BHK: initializing the table with subresults");
     }
     // inialize tables first row with distance from first cities to other cities
@@ -49,7 +49,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         solve_bhk(&mut opt, &dists, selected_set, city_pos);
     }
 
-    if options.verbose == true {
+    if options.verbose {
         println!("BHK: done with calculations, preparing the result");
         show_table(&opt);
     }
@@ -75,9 +75,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     send_progress(ProgressMessage::PathUpdate(route, 0.0));
     send_progress(ProgressMessage::Done);
 
-    let tour = Solution::new(&route_vec, cities);
-
-    tour
+    Solution::new(&route_vec, cities)
 }
 
 fn solve_bhk(
@@ -128,12 +126,12 @@ fn read_optimal_route(opt: &DPTable, dm: &DistanceMatrix, n: usize, best_val: f3
             break;
         }
 
-        for j in 0..(n - 1) {
+        for (j, row) in opt[0..(n - 1)].iter().enumerate() {
             let step_dist = dm
                 .distance_by_pos(j, route_ids[i - 1])
                 .expect("step_dist points are out range");
 
-            let cur_dist = opt[j][unread_set] + step_dist;
+            let cur_dist = row[unread_set] + step_dist;
             let is_unprocessed = (unread_set & (1 << j)) > 0;
             if is_unprocessed && approx(left_dist, cur_dist) {
                 left_dist -= step_dist;

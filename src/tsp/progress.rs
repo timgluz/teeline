@@ -15,17 +15,17 @@ use super::KDPoint;
 
 pub type PublishChannel = Sender<ProgressMessage>;
 pub type ReceiverChannel = Receiver<ProgressMessage>;
-pub type PublisherFn = Arc<dyn Fn(ProgressMessage) -> ()>;
+pub type PublisherFn = Arc<dyn Fn(ProgressMessage)>;
 
-type RGBA = [f32; 4];
+type Rgba = [f32; 4];
 type RectCoords = [f64; 4];
 type Point2D = (f64, f64);
 
-const WHITE: RGBA = [1.0; 4];
-const RED: RGBA = [1.0, 0.0, 0.0, 0.9];
-const GREY: RGBA = [0.7, 0.7, 0.7, 0.9];
+const WHITE: Rgba = [1.0; 4];
+const RED: Rgba = [1.0, 0.0, 0.0, 0.9];
+const GREY: Rgba = [0.7, 0.7, 0.7, 0.9];
 
-const INACTIVE_COLOR: RGBA = GREY;
+const INACTIVE_COLOR: Rgba = GREY;
 
 const FONT_SIZE: u32 = 16;
 
@@ -46,7 +46,7 @@ fn init_channels() {
 
 pub fn get_publisher() -> Option<PublishChannel> {
     match PUBLISH_CHANNEL.lock() {
-        Ok(mtx) => mtx.clone().map(|m| m.clone()),
+        Ok(mtx) => mtx.clone(),
         Err(_) => None,
     }
 }
@@ -88,11 +88,11 @@ struct Node {
     y: f64,
     height: f64,
     width: f64,
-    color: RGBA,
+    color: Rgba,
 }
 
 impl Node {
-    fn new(city_id: Option<usize>, x: f64, y: f64, height: f64, width: f64, color: RGBA) -> Self {
+    fn new(city_id: Option<usize>, x: f64, y: f64, height: f64, width: f64, color: Rgba) -> Self {
         Node {
             city_id,
             x,
@@ -141,11 +141,11 @@ struct Edge {
     from: Point2D,
     to: Point2D,
     width: f64,
-    color: RGBA,
+    color: Rgba,
 }
 
 impl Edge {
-    fn new(from: Point2D, to: Point2D, color: RGBA, width: f64) -> Self {
+    fn new(from: Point2D, to: Point2D, color: Rgba, width: f64) -> Self {
         Edge {
             from,
             to,
@@ -181,11 +181,11 @@ struct TextBox {
     x: f64,
     y: f64,
     font_size: u32,
-    color: RGBA,
+    color: Rgba,
 }
 
 impl TextBox {
-    pub fn new<S: Into<String>>(text: S, x: f64, y: f64, color: RGBA, font_size: u32) -> Self {
+    pub fn new<S: Into<String>>(text: S, x: f64, y: f64, color: Rgba, font_size: u32) -> Self {
         TextBox {
             text: text.into(),
             x,
@@ -327,10 +327,10 @@ impl ProgressPlot {
 
         for to_city_id in path.iter().skip(1) {
             let from_city = self.city_table.get(&from_city_id);
-            let to_city = self.city_table.get(&to_city_id);
+            let to_city = self.city_table.get(to_city_id);
 
-            if from_city.is_some() && to_city.is_some() {
-                let new_edge = self.build_edge(&from_city.unwrap(), &to_city.unwrap(), GREY);
+            if let (Some(from), Some(to)) = (from_city, to_city) {
+                let new_edge = self.build_edge(from, to, GREY);
                 self.shapes.push(Box::new(new_edge));
 
                 from_city_id = *to_city_id;
@@ -340,11 +340,11 @@ impl ProgressPlot {
         let from_city = self.city_table.get(&from_city_id).unwrap();
         let to_city = self.city_table.get(&path[0]).unwrap();
 
-        let new_edge = self.build_edge(&from_city, &to_city, GREY);
+        let new_edge = self.build_edge(from_city, to_city, GREY);
         self.shapes.push(Box::new(new_edge));
     }
 
-    fn build_edge(&self, from_city: &KDPoint, to_city: &KDPoint, color: RGBA) -> Edge {
+    fn build_edge(&self, from_city: &KDPoint, to_city: &KDPoint, color: Rgba) -> Edge {
         let from_point = scaled_point(
             from_city,
             &self.cities_bounding_box,
@@ -446,11 +446,11 @@ fn point_to_viewport(
     let y_max = window[3];
 
     // TODO: research how to scale viewport itself, so we can get rid of margin here
-    let x_v = (viewport.width - viewport.margin * 2.0) as f64 * (x - x_min) / (x_max - x_min);
-    let y_v = (viewport.height - viewport.margin * 2.0) as f64 * (y - y_min) / (y_max - y_min);
+    let x_v = (viewport.width - viewport.margin * 2.0) * (x - x_min) / (x_max - x_min);
+    let y_v = (viewport.height - viewport.margin * 2.0) * (y - y_min) / (y_max - y_min);
 
     (
-        x_v + (viewport.margin as f64),
-        y_v + (viewport.margin as f64),
+        x_v + viewport.margin,
+        y_v + viewport.margin,
     )
 }
