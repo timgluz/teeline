@@ -1,2 +1,8 @@
 /target
 /data
+
+# GitKB
+.kb/.cache/
+.kb/store/
+.kb/workspace/
+.kb/workspaces/
