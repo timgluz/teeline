@@ -18,12 +18,15 @@ pub type PublisherFn = Arc<dyn Fn(ProgressMessage)>;
 
 type RectCoords = [f64; 4];
 type Point2D = (f64, f64);
+type EdgeData = (Pos2, Pos2);
 
-const WHITE: Color32 = Color32::from_rgb(255, 255, 255);
-// Premultiplied: rgb * (alpha/255). Alpha ≈ 230 (≈90% opacity).
-const RED: Color32 = Color32::from_rgba_premultiplied(230, 0, 0, 230);
-const GREY: Color32 = Color32::from_rgba_premultiplied(162, 162, 162, 230);
-const INACTIVE_COLOR: Color32 = GREY;
+const WHITE:              Color32 = Color32::from_rgb(255, 255, 255);
+const CITY_COLOR:         Color32 = Color32::from_rgb(30,  30,  30);   // near-black nodes
+const CURRENT_CITY_COLOR: Color32 = Color32::from_rgb(220, 30,  30);   // red — active city
+const BEST_EDGE_COLOR:    Color32 = Color32::from_rgb(34,  139, 34);   // green — best route
+const CURRENT_EDGE_COLOR: Color32 = Color32::from_rgb(30,  100, 220);  // blue — exploring route
+const ACTIVE_EDGE_COLOR:  Color32 = Color32::from_rgb(255, 140, 0);    // orange — current step
+const STATUS_COLOR:       Color32 = Color32::from_rgb(220, 30,  30);   // red — status text
 const FONT_SIZE: f32 = 16.0;
 
 static PUBLISH_CHANNEL: LazyLock<Mutex<Option<PublishChannel>>> =
@@ -75,15 +78,16 @@ pub enum ProgressMessage {
 struct NodeData {
     city_id: usize,
     pos: Pos2,
-    color: Color32,
 }
-
-type EdgeData = (Pos2, Pos2);
 
 pub struct ProgressPlot {
     city_table: HashMap<usize, KDPoint>,
     nodes: Vec<NodeData>,
-    edges: Vec<EdgeData>,
+    best_edges: Vec<EdgeData>,    // green  — best route found so far
+    current_edges: Vec<EdgeData>, // blue   — route being explored right now
+    current_city_id: Option<usize>,
+    prev_city_id: Option<usize>,
+    best_distance: f32,
     viewport_dimensions: ViewportDimensions,
     cities_bounding_box: RectCoords,
     status: String,
@@ -97,7 +101,11 @@ impl ProgressPlot {
         let mut plot = ProgressPlot {
             city_table: HashMap::new(),
             nodes: Vec::new(),
-            edges: Vec::new(),
+            best_edges: Vec::new(),
+            current_edges: Vec::new(),
+            current_city_id: None,
+            prev_city_id: None,
+            best_distance: f32::MAX,
             viewport_dimensions: ViewportDimensions::new(width, height, margin),
             cities_bounding_box: cities_bounding_box(cities),
             status: "Preparing...".to_string(),
@@ -142,14 +150,21 @@ impl ProgressPlot {
     fn handle_message(&mut self, msg: &ProgressMessage) {
         match msg {
             ProgressMessage::Done => {
-                self.status = "Done".to_string();
+                self.status = format!("Done | best: {:.2}", self.best_distance);
             }
             ProgressMessage::PathUpdate(route, distance) => {
-                self.status = format!("Solving... | best: {:.2}", distance);
-                self.edges.clear();
-                self.add_path(route);
+                self.current_edges = self.build_route_edges(route);
+
+                if *distance > 0.0 && *distance < self.best_distance {
+                    self.best_distance = *distance;
+                    self.best_edges = self.current_edges.clone();
+                }
+
+                self.status = format!("Solving... | best: {:.2}", self.best_distance);
             }
-            ProgressMessage::CityChange(_) => {
+            ProgressMessage::CityChange(id) => {
+                self.prev_city_id = self.current_city_id;
+                self.current_city_id = Some(*id);
                 self.status = "Solving...".to_string();
             }
             _ => {}
@@ -169,33 +184,33 @@ impl ProgressPlot {
             self.nodes.push(NodeData {
                 city_id: city.id,
                 pos: Pos2::new(sx as f32, sy as f32),
-                color: INACTIVE_COLOR,
             });
         }
     }
 
-    fn add_path(&mut self, route: &Route) {
+    fn build_route_edges(&self, route: &Route) -> Vec<EdgeData> {
         let path = route.route().to_vec();
-        let mut from_city_id = path[0];
+        let mut edges = Vec::new();
+        let mut from_id = path[0];
 
-        for to_city_id in path.iter().skip(1) {
-            let from_city = self.city_table.get(&from_city_id).cloned();
-            let to_city = self.city_table.get(to_city_id).cloned();
-
-            if let (Some(from), Some(to)) = (from_city, to_city) {
-                let edge = build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions);
-                self.edges.push(edge);
-                from_city_id = *to_city_id;
+        for to_id in path.iter().skip(1) {
+            if let (Some(from), Some(to)) = (
+                self.city_table.get(&from_id).cloned(),
+                self.city_table.get(to_id).cloned(),
+            ) {
+                edges.push(build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions));
+                from_id = *to_id;
             }
         }
 
         if let (Some(from), Some(to)) = (
-            self.city_table.get(&from_city_id).cloned(),
+            self.city_table.get(&from_id).cloned(),
             self.city_table.get(&path[0]).cloned(),
         ) {
-            let edge = build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions);
-            self.edges.push(edge);
+            edges.push(build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions));
         }
+
+        edges
     }
 }
 
@@ -210,22 +225,43 @@ impl eframe::App for ProgressPlot {
             .show(ctx, |ui| {
                 let painter = ui.painter();
 
-                for (from, to) in &self.edges {
-                    painter.line_segment([*from, *to], Stroke::new(2.0, GREY));
+                // Layer 1: blue edges (current exploring route — background)
+                for (from, to) in &self.current_edges {
+                    painter.line_segment([*from, *to], Stroke::new(1.5, CURRENT_EDGE_COLOR));
                 }
 
+                // Layer 2: green edges (best route found — on top of blue)
+                for (from, to) in &self.best_edges {
+                    painter.line_segment([*from, *to], Stroke::new(2.5, BEST_EDGE_COLOR));
+                }
+
+                // Layer 3: orange edge from previous city to current city (B&B active step)
+                if let (Some(prev_id), Some(curr_id)) = (self.prev_city_id, self.current_city_id) {
+                    let prev_pos = self.nodes.iter().find(|n| n.city_id == prev_id).map(|n| n.pos);
+                    let curr_pos = self.nodes.iter().find(|n| n.city_id == curr_id).map(|n| n.pos);
+                    if let (Some(p), Some(c)) = (prev_pos, curr_pos) {
+                        painter.line_segment([p, c], Stroke::new(3.0, ACTIVE_EDGE_COLOR));
+                    }
+                }
+
+                // Layer 4: city nodes (black; current city = red)
                 for node in &self.nodes {
+                    let color = if self.current_city_id == Some(node.city_id) {
+                        CURRENT_CITY_COLOR
+                    } else {
+                        CITY_COLOR
+                    };
                     painter.rect_filled(
                         Rect::from_center_size(node.pos, egui::Vec2::splat(10.0)),
                         0.0,
-                        node.color,
+                        color,
                     );
                     painter.text(
                         Pos2::new(node.pos.x, node.pos.y + FONT_SIZE),
                         Align2::LEFT_TOP,
                         format!("id.{}", node.city_id),
                         FontId::proportional(FONT_SIZE),
-                        node.color,
+                        color,
                     );
                 }
 
@@ -235,7 +271,7 @@ impl eframe::App for ProgressPlot {
                     Align2::LEFT_TOP,
                     &self.status,
                     FontId::proportional(FONT_SIZE),
-                    RED,
+                    STATUS_COLOR,
                 );
             });
 
