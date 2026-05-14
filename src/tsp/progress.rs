@@ -26,7 +26,6 @@ const WHITE: RGBA = [1.0; 4];
 const RED: RGBA = [1.0, 0.0, 0.0, 0.9];
 const GREY: RGBA = [0.7, 0.7, 0.7, 0.9];
 
-const ACTIVE_COLOR: RGBA = RED;
 const INACTIVE_COLOR: RGBA = GREY;
 
 const FONT_SIZE: u32 = 16;
@@ -84,10 +83,6 @@ pub enum ProgressMessage {
 
 trait Renderable {
     fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, glyphs: &mut Glyphs);
-
-    fn belongs_to_city(&self, other_city_id: usize) -> bool;
-
-    fn set_color(&mut self, new_color: RGBA);
     fn is_edge(&self) -> bool;
 }
 
@@ -141,16 +136,6 @@ impl Renderable for Node {
         .render(ctx, renderer, glyphs);
     }
 
-    fn belongs_to_city(&self, other_city_id: usize) -> bool {
-        self.city_id
-            .map(|c_id| c_id == other_city_id)
-            .unwrap_or(false)
-    }
-
-    fn set_color(&mut self, new_color: RGBA) {
-        self.color = new_color;
-    }
-
     fn is_edge(&self) -> bool {
         false
     }
@@ -188,14 +173,6 @@ impl Renderable for Edge {
             ctx.transform,
             renderer,
         );
-    }
-
-    fn belongs_to_city(&self, _other_city_id: usize) -> bool {
-        false
-    }
-
-    fn set_color(&mut self, new_color: RGBA) {
-        self.color = new_color;
     }
 
     fn is_edge(&self) -> bool {
@@ -236,14 +213,6 @@ impl Renderable for TextBox {
                 renderer,
             )
             .unwrap();
-    }
-
-    fn belongs_to_city(&self, _other_city_id: usize) -> bool {
-        false
-    }
-
-    fn set_color(&mut self, new_color: RGBA) {
-        self.color = new_color;
     }
 
     fn is_edge(&self) -> bool {
@@ -342,10 +311,6 @@ impl ProgressPlot {
         }
     }
 
-    fn add_textbox(&mut self, textbox: TextBox) {
-        self.shapes.push(Box::new(textbox));
-    }
-
     fn add_cities(&mut self, cities: &[KDPoint]) {
         for city in cities.iter() {
             self.city_table.insert(city.id, city.clone());
@@ -407,14 +372,6 @@ impl ProgressPlot {
             );
 
             self.shapes.push(Box::new(shape));
-        }
-    }
-
-    fn highlight_city(&mut self, city_id: usize) {
-        for shape in self.shapes.iter_mut() {
-            if shape.belongs_to_city(city_id) {
-                shape.set_color(ACTIVE_COLOR);
-            }
         }
     }
 
