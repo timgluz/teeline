@@ -2,7 +2,7 @@
 name = "teeline"
 version = "0.3.0"
 authors = ["Timo Sulg <timgluz@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "teeline"
@@ -15,9 +15,8 @@ path = "src/main.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = "2.33.1"
-rand = "0.7.3"
-regex = "1.5.5"
-lazy_static = "1.4.0"
-piston = "0.52.0"
-piston_window = "0.111.0"
+clap = "4.6.1"
+rand = "0.9"
+regex = "1.12.3"
+piston = "1.0.0"
+piston_window = "0.147.0"

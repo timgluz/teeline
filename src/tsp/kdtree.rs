@@ -25,7 +25,7 @@ pub fn from_cities(points: &[KDPoint]) -> KDTree {
     };
 
     let n_points = points.len();
-    let tree_points = points.clone().to_vec();
+    let tree_points = points.to_vec();
     if let Some(root) = build_subtree(tree_points, 0) {
         tree.size = n_points;
         tree.root = Some(root);
@@ -289,11 +289,11 @@ impl KDNode {
     }
 
     pub fn left(&self) -> Option<&Box<KDNode>> {
-        self.left.as_ref().map(|n| n.clone())
+        self.left.as_ref()
     }
 
     pub fn right(&self) -> Option<&Box<KDNode>> {
-        self.right.as_ref().map(|n| n.clone())
+        self.right.as_ref()
     }
 
     pub fn is_empty(&self) -> bool {

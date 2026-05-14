@@ -60,9 +60,9 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
         return false;
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
-    let p: f32 = rng.gen();
+    let p: f32 = rng.random();
     let criteria = metropolis(temperature, old_distance, new_distance);
 
     p < criteria

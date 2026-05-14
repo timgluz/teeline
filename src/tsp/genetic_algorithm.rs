@@ -42,7 +42,7 @@ fn solve_ga(
     while epoch < options.epochs {
         let mut new_population = TspPopulation::with_capacity(population_size);
 
-        // pass n-fittest directly into new population;
+        // pass n-fittest directly into new population
         current_population.sort();
         for elite in current_population.individuals().iter().take(elite_size) {
             new_population.add(elite.clone());
@@ -84,9 +84,7 @@ fn solve_ga(
         epoch += 1;
     }
 
-    let best_candidate = current_population.best().clone();
-
-    best_candidate
+    current_population.best().clone()
 }
 
 fn build_evaluator(cities: &[KDPoint]) -> Rc<dyn Fn(&[usize]) -> f32> {
@@ -127,13 +125,13 @@ fn ordered_crossover_genes(
     let mut gene1: Vec<usize> = vec![0; gene_len];
     let mut gene2: Vec<usize> = vec![0; gene_len];
 
-    let range_a: HashSet<usize> = parent1[from..=to].iter().map(|x| x.clone()).collect();
-    let range_b: HashSet<usize> = parent2[from..=to].iter().map(|x| x.clone()).collect();
+    let range_a: HashSet<usize> = parent1[from..=to].iter().copied().collect();
+    let range_b: HashSet<usize> = parent2[from..=to].iter().copied().collect();
 
-    // copy cross-overs from parents;
+    // copy cross-overs from parents
     for i in from..=to {
-        gene1[i] = parent2[i].clone();
-        gene2[i] = parent1[i].clone();
+        gene1[i] = parent2[i];
+        gene2[i] = parent1[i];
     }
 
     // copy other values like rolling-shift to -> from
@@ -141,16 +139,14 @@ fn ordered_crossover_genes(
     let mut j1 = k;
     let mut j2 = k;
 
-    for i in 0..gene_len {
-        // copy other values from parent1 into child1
-        let x_a = parent1[k].clone();
+    for _ in 0..gene_len {
+        let x_a = parent1[k];
         if !range_b.contains(&x_a) {
             gene1[j1] = x_a;
             j1 = (j1 + 1) % gene_len;
         }
 
-        // copy other values from parent2 into child2
-        let x_b = parent2[k].clone();
+        let x_b = parent2[k];
         if !range_a.contains(&x_b) {
             gene2[j2] = x_b;
             j2 = (j2 + 1) % gene_len;
@@ -164,12 +160,9 @@ fn ordered_crossover_genes(
 
 // returns true with given probability
 fn probability(p: f32) -> bool {
-    let mut rng = rand::thread_rng();
-
-    p > rng.gen()
+    let mut rng = rand::rng();
+    p > rng.random::<f32>()
 }
-
-// Add Population, Genotype
 
 #[derive(Debug, Clone)]
 pub struct TspPopulation {
@@ -220,7 +213,7 @@ impl TspPopulation {
     }
 
     fn total_fitness(&self) -> f32 {
-        self.individuals.iter().map(|x| x.fitness.clone()).sum()
+        self.individuals.iter().map(|x| x.fitness).sum()
     }
 
     fn sort(&mut self) {
@@ -232,9 +225,9 @@ impl TspPopulation {
     // roulette wheel selection
     fn random_selection(&self) -> &TspGenotype {
         let total = self.total_fitness();
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
-        let r = rng.gen_range(0.0, total);
+        let r = rng.random_range(0.0..total);
         let mut up_to = 0.0;
 
         let mut candidate = self.individuals.last().unwrap();
@@ -246,7 +239,7 @@ impl TspPopulation {
 
             up_to += g.fitness
         }
-        &candidate
+        candidate
     }
 }
 

@@ -19,7 +19,6 @@ use std::collections::HashMap;
 pub const VERSION: &'static str = "0.6.1";
 pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
 
-use std::fmt;
 use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
