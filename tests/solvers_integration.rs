@@ -17,7 +17,7 @@ use teeline::tsp::{bellman_karp, branch_bound, genetic_algorithm, kdtree, neares
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 fn load_berlin52() -> Vec<kdtree::KDPoint> {
-    let path = Path::new("data/tsplib/berlin52.tsp");
+    let path = Path::new("tests/fixtures/berlin52.tsp");
     tsplib::read_from_file(path)
         .expect("failed to read berlin52.tsp")
         .cities()
