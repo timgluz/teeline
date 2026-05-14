@@ -259,6 +259,9 @@ pub struct ProgressPlot {
 
 impl ProgressPlot {
     pub fn new(cities: &[KDPoint], width: f64, height: f64, margin: f64) -> Self {
+        // Initialise channels here so they are ready before the solver thread starts.
+        init_channels();
+
         let mut plot = ProgressPlot {
             city_table: HashMap::new(),
             shapes: Vec::new(),
@@ -272,7 +275,6 @@ impl ProgressPlot {
     }
 
     pub fn run(&mut self, show_progress: bool) {
-        init_channels();
 
         if !show_progress {
             // Drain messages sent by solvers so channels don't block, then exit.
