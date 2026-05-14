@@ -21,8 +21,6 @@ type DPTable = Vec<Vec<f32>>;
 
 const UNKNOWN_DISTANCE: f32 = f32::MAX;
 
-/// TODO: fix bug with duplicated city.1, and missing city.4
-/// replication: use ./data/discopt/tsp_5_1.tsp;
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let n_cities = cities.len();
     let n_others = n_cities - 1; // we start from last city
@@ -56,7 +54,21 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         show_table(&opt);
     }
 
-    let route_vec = read_optimal_route(&opt, &dists, n_cities, f32::MAX);
+    // Find the actual optimal tour distance: min over all ending cities of
+    // (cost to visit all n_others cities ending at i) + (return edge to start city)
+    let optimal_distance = (0..n_others)
+        .filter_map(|i| {
+            let return_dist = dists.distance_by_pos(i, last_pos).ok()?;
+            let sub_cost = opt[i][selected_set as usize];
+            if sub_cost < UNKNOWN_DISTANCE && return_dist < UNKNOWN_DISTANCE {
+                Some(sub_cost + return_dist)
+            } else {
+                None
+            }
+        })
+        .fold(f32::MAX, f32::min);
+
+    let route_vec = read_optimal_route(&opt, &dists, n_cities, optimal_distance);
 
     // send final route to the visualizer
     let route = Route::new(route_vec.as_ref());
@@ -163,5 +175,72 @@ fn show_table(opt: &DPTable) {
         }
 
         println!(" |");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsp::kdtree;
+
+    fn default_options() -> SolverOptions {
+        SolverOptions::default()
+    }
+
+    // tsp_5_1 shape: five cities forming a rectangle with a midpoint on one side
+    // optimal tour visits them in order and has total length 4.0
+    fn tsp_5_1_cities() -> Vec<kdtree::KDPoint> {
+        kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ])
+    }
+
+    #[test]
+    fn test_solve_returns_all_cities() {
+        let cities = tsp_5_1_cities();
+        let solution = solve(&cities, &default_options());
+
+        let mut visited: Vec<usize> = solution.route().to_vec();
+        visited.sort();
+        assert_eq!(
+            visited,
+            vec![0, 1, 2, 3, 4],
+            "every city must appear exactly once"
+        );
+    }
+
+    #[test]
+    fn test_solve_finds_optimal_tour_length() {
+        let cities = tsp_5_1_cities();
+        let solution = solve(&cities, &default_options());
+
+        // optimal tour: 0→1→2→3→4→0 = 0.5 + 0.5 + 1.0 + 1.0 + 1.0 = 4.0
+        assert!(
+            (solution.total - 4.0).abs() < 1e-3,
+            "expected tour length ~4.0, got {}",
+            solution.total
+        );
+    }
+
+    #[test]
+    fn test_solve_with_3_cities() {
+        // simple triangle: right angle at origin
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![3.0, 0.0],
+            vec![0.0, 4.0],
+        ]);
+        let solution = solve(&cities, &default_options());
+
+        let mut visited: Vec<usize> = solution.route().to_vec();
+        visited.sort();
+        assert_eq!(visited, vec![0, 1, 2]);
+
+        // tour is 3 + 4 + 5 = 12.0
+        assert!((solution.total - 12.0).abs() < 1e-3, "got {}", solution.total);
     }
 }
