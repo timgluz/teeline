@@ -3,7 +3,9 @@ use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
 use super::{city_table_from_vec, Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], _options: &SolverOptions) -> Solution {
+    tracing::info!(cities = cities.len(), "2-opt starting");
+
     let n_indices = cities.len() - 1;
     let cities_table = city_table_from_vec(cities);
     let mut path: Vec<usize> = cities.iter().map(|c| c.id).collect();
@@ -28,13 +30,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
                     improved = true;
 
                     send_progress(ProgressMessage::PathUpdate(Route::new(&path), new_distance));
-
-                    if options.verbose {
-                        println!(
-                            "2OPT: cities(i: {:?}, j: {:?}) new best {:?}",
-                            i, j, new_distance
-                        );
-                    }
+                    tracing::debug!(i, j, tour_length = new_distance, "2-opt: improvement");
                 }
             }
         }

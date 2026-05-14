@@ -26,12 +26,12 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let n_others = n_cities - 1; // we start from last city
     let n_powersets = 1 << n_others;
 
+    tracing::info!(n_cities, n_subsets = n_powersets, "BHK starting");
+
     let dists = DistanceMatrix::from_cities(cities).unwrap();
     let mut opt = vec![vec![UNKNOWN_DISTANCE; n_powersets]; n_others];
 
-    if options.verbose {
-        println!("BHK: initializing the table with subresults");
-    }
+    tracing::info!("BHK: initialising DP table");
     // inialize tables first row with distance from first cities to other cities
     let last_pos = n_others;
     for i in 0..n_others {
@@ -49,8 +49,8 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         solve_bhk(&mut opt, &dists, selected_set, city_pos);
     }
 
+    tracing::info!("BHK: DP complete");
     if options.verbose {
-        println!("BHK: done with calculations, preparing the result");
         show_table(&opt);
     }
 
@@ -68,6 +68,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         })
         .fold(f32::MAX, f32::min);
 
+    tracing::info!(optimal_distance, "BHK: optimal tour found");
     let route_vec = read_optimal_route(&opt, &dists, n_cities, optimal_distance);
 
     // send final route to the visualizer

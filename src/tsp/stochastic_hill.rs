@@ -4,6 +4,12 @@ use super::route::Route;
 use super::{total_distance, Solution, SolverOptions};
 
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+    tracing::info!(
+        epochs = options.epochs,
+        platoo_epochs = options.platoo_epochs,
+        "hill climbing starting"
+    );
+
     let mut current_route = Route::from_cities(cities);
     let mut best_route = current_route.clone();
 
@@ -29,9 +35,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
                 best_distance,
             ));
 
-            if options.verbose {
-                println!("Epoch: {:?}, new best distance: {:}", epoch, best_distance);
-            }
+            tracing::info!(epoch, tour_length = best_distance, "hill: new best");
         } else {
             n_stale += 1; // to measure how long we have been walking around on the platoo
         }
@@ -40,12 +44,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
 
         // restart search if been wandering too long on the platoo
         if n_stale > options.platoo_epochs && options.platoo_epochs > 0 {
-            if options.verbose {
-                println!(
-                    "Epoch: {:?}, got stuck after {:?} steps, going to restart search",
-                    epoch, options.platoo_epochs
-                );
-            }
+            tracing::warn!(epoch, plateau_epochs = options.platoo_epochs, "hill: plateau, restarting");
 
             current_route.shuffle();
             n_stale = 0;
