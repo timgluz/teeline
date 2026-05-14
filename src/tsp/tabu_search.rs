@@ -101,3 +101,76 @@ impl TabuList {
         self.items.contains(route)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsp::kdtree;
+    use crate::tsp::route::Route;
+
+    fn tsp5_cities() -> Vec<KDPoint> {
+        kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ])
+    }
+
+    #[test]
+    fn test_tabu_list_does_not_contain_unseen_route() {
+        let tabu = TabuList::new(5);
+        assert!(!tabu.contains(&Route::new(&[0, 1, 2])));
+    }
+
+    #[test]
+    fn test_tabu_list_contains_added_route() {
+        let mut tabu = TabuList::new(5);
+        let route = Route::new(&[0, 1, 2]);
+        tabu.add(route.clone());
+        assert!(tabu.contains(&route));
+    }
+
+    #[test]
+    fn test_tabu_list_evicts_oldest_when_full() {
+        let mut tabu = TabuList::new(2);
+        let r1 = Route::new(&[0, 1, 2]);
+        let r2 = Route::new(&[1, 0, 2]);
+        let r3 = Route::new(&[2, 1, 0]);
+        tabu.add(r1.clone());
+        tabu.add(r2.clone());
+        tabu.add(r3.clone()); // r1 (oldest, at back) should be evicted
+        assert!(!tabu.contains(&r1), "oldest route should have been evicted");
+        assert!(tabu.contains(&r2));
+        assert!(tabu.contains(&r3));
+    }
+
+    #[test]
+    fn test_tabu_list_capacity_is_set_correctly() {
+        let tabu = TabuList::new(7);
+        assert_eq!(tabu.capacity, 7);
+    }
+
+    #[test]
+    fn test_solve_visits_all_cities() {
+        let cities = tsp5_cities();
+        let mut options = SolverOptions::default();
+        options.epochs = 200;
+        let tour = solve(&cities, &options);
+
+        let mut visited: Vec<usize> = tour.route().to_vec();
+        visited.sort();
+        assert_eq!(visited, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_solve_tour_length_is_positive() {
+        let cities = tsp5_cities();
+        let mut options = SolverOptions::default();
+        options.epochs = 200;
+        let tour = solve(&cities, &options);
+
+        assert!(tour.total > 0.0, "tour length must be positive");
+    }
+}

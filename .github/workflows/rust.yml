@@ -22,3 +22,13 @@ jobs:
       run: cargo test --verbose
     - name: Clippy
       run: cargo clippy -- -D warnings
+    - name: Install cargo-llvm-cov
+      uses: taiki-e/install-action@cargo-llvm-cov
+    - name: Coverage
+      run: cargo llvm-cov --lcov --output-path lcov.info
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      with:
+        files: lcov.info
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
