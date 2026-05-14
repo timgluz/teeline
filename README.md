@@ -54,9 +54,37 @@ cp ./target/release/bin ~/bin/teeline   # or any directory on your PATH
 
 All examples below assume this step has been done. If you skipped it, replace `teeline` with `./target/release/bin`.
 
-### Run your first solve
+---
 
-Teeline reads city data in [TSPLIB](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) format, either from a file or from stdin, and prints the tour cost followed by the ordered city IDs.
+## Preparing Data
+
+Teeline reads a subset of the TSPLIB format — cities must be given as 2D Euclidean coordinates in either a `NODE_COORD_SECTION` or `DISPLAY_DATA_SECTION`.
+
+### Downloading TSPLIB benchmark instances
+
+1. Go to the [TSPLIB symmetric TSP page](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp.html).
+2. Download the archive(s) you want (`ALL_tsp.tar.gz` for everything, or individual `.tsp.gz` files).
+3. Unpack into the `data/` folder:
+
+```bash
+mkdir -p data/tsplib
+tar -xzf ALL_tsp.tar.gz -C data/tsplib        # full archive
+gunzip -c berlin52.tsp.gz > data/tsplib/berlin52.tsp  # single file
+```
+
+### Converting your own coordinates
+
+To convert a plain list of coordinates to TSPLIB format use the included helper:
+
+```bash
+python3 convert2tsplib.py
+```
+
+---
+
+## Run your first solve
+
+Teeline reads city data from a file or stdin and prints the tour cost followed by the ordered city IDs.
 
 ```bash
 # from a file
@@ -64,9 +92,6 @@ teeline nn -i ./data/tsplib/berlin52.tsp
 
 # from stdin
 cat ./data/tsplib/berlin52.tsp | teeline nn
-
-# show a progress window while solving (opens automatically by default)
-teeline nn -i ./data/tsplib/berlin52.tsp
 
 # headless / CI — skip the visualisation window
 teeline nn -i ./data/tsplib/berlin52.tsp --disable_progress
@@ -228,38 +253,6 @@ teeline ga -i ./data/tsplib/berlin52.tsp --n_elite=7
 Resources:
 - [Genetic algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Genetic_algorithm)
 - *AIMA*, Section 4.1.4 — Genetic Algorithms
-
----
-
-## Preparing Data
-
-Teeline reads a subset of the TSPLIB format — cities must be given as 2D Euclidean coordinates in either a `NODE_COORD_SECTION` or `DISPLAY_DATA_SECTION`.
-
-### Downloading TSPLIB benchmark instances
-
-1. Go to the [TSPLIB symmetric TSP page](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp.html).
-2. Download the archive(s) you want (e.g. `ALL_tsp.tar.gz` for everything, or individual `.tsp.gz` files).
-3. Unpack into the `data/` folder:
-
-```bash
-mkdir -p data/tsplib
-tar -xzf ALL_tsp.tar.gz -C data/tsplib   # for the full archive
-gunzip -c berlin52.tsp.gz > data/tsplib/berlin52.tsp  # for a single file
-```
-
-4. Run a solver against any unpacked file:
-
-```bash
-teeline nn -i ./data/tsplib/berlin52.tsp
-```
-
-### Converting your own coordinates
-
-To convert a plain list of coordinates to TSPLIB format use the included helper:
-
-```bash
-python3 convert2tsplib.py
-```
 
 ---
 
