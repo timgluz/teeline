@@ -23,6 +23,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
 
     let mut epoch = 0;
     let mut n_stale = 0;
+    let mut found_improvement = false;
     loop {
         let candidate = current_route.random_successor();
         let candidate_distance = total_distance(cities, candidate.route());
@@ -31,6 +32,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
             current_route = candidate.clone(); // follow the gradient
             best_route = candidate;
             best_distance = candidate_distance;
+            found_improvement = true;
 
             n_stale = 0;
 
@@ -60,6 +62,10 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         if options.epochs > 0 && epoch > options.epochs {
             break;
         }
+    }
+
+    if !found_improvement {
+        tracing::warn!(epochs = options.epochs, tour_length = best_distance, "hill: no improvement found");
     }
 
     send_progress(ProgressMessage::Done);
