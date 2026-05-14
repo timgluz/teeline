@@ -235,17 +235,30 @@ Resources:
 
 Teeline reads a subset of the TSPLIB format — cities must be given as 2D Euclidean coordinates in either a `NODE_COORD_SECTION` or `DISPLAY_DATA_SECTION`.
 
+### Downloading TSPLIB benchmark instances
+
+1. Go to the [TSPLIB symmetric TSP page](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp.html).
+2. Download the archive(s) you want (e.g. `ALL_tsp.tar.gz` for everything, or individual `.tsp.gz` files).
+3. Unpack into the `data/` folder:
+
+```bash
+mkdir -p data/tsplib
+tar -xzf ALL_tsp.tar.gz -C data/tsplib   # for the full archive
+gunzip -c berlin52.tsp.gz > data/tsplib/berlin52.tsp  # for a single file
+```
+
+4. Run a solver against any unpacked file:
+
+```bash
+teeline nn -i ./data/tsplib/berlin52.tsp
+```
+
+### Converting your own coordinates
+
 To convert a plain list of coordinates to TSPLIB format use the included helper:
 
 ```bash
 python3 convert2tsplib.py
-```
-
-To download a set of standard benchmark instances:
-
-```bash
-chmod +x download_data.sh
-./download_data.sh
 ```
 
 ---
