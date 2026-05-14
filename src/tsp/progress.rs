@@ -155,7 +155,16 @@ impl ProgressPlot {
                 self.is_solved = true;
                 self.current_city_id = None;
                 self.prev_city_id = None;
-                self.status = format!("Done | best: {:.2}", self.best_distance);
+                // If no PathUpdate with distance>0 arrived, fall back to whatever
+                // route was last displayed so we always show something on finish.
+                if self.best_edges.is_empty() {
+                    self.best_edges = self.current_edges.clone();
+                }
+                self.status = if self.best_distance < f32::MAX {
+                    format!("Done | best: {:.2}", self.best_distance)
+                } else {
+                    "Done".to_string()
+                };
             }
             ProgressMessage::PathUpdate(route, distance) => {
                 self.current_edges = self.build_route_edges(route);

@@ -11,20 +11,24 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     );
 
     let mut current_route = Route::from_cities(cities);
-    let mut best_route = current_route.clone();
 
     //mix up the cities to avoid getting stuck due bad initial state
     current_route.shuffle();
     send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
 
+    // Baseline from the shuffled state — sequential ordering would be
+    // an artificially low bar that random successors can never beat.
+    let mut best_route = current_route.clone();
+    let mut best_distance = total_distance(cities, best_route.route());
+
     let mut epoch = 0;
     let mut n_stale = 0;
-    let mut best_distance = total_distance(cities, best_route.route());
     loop {
         let candidate = current_route.random_successor();
         let candidate_distance = total_distance(cities, candidate.route());
 
         if candidate_distance < best_distance {
+            current_route = candidate.clone(); // follow the gradient
             best_route = candidate;
             best_distance = candidate_distance;
 
