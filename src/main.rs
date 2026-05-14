@@ -120,18 +120,18 @@ fn main() {
 
     let cities = tsp_data.cities().to_vec();
     let show_progress = options.show_progress;
-    let handler1 = thread::spawn(move || {
-        let mut progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
-        progress_display.run(show_progress);
-    });
 
-    let handler2 = thread::spawn(move || {
+    // winit (used by piston_window) requires the event loop on the main thread,
+    // so the solver runs in a background thread and the window stays on main.
+    let solver_handle = thread::spawn(move || {
         let tour = solve(solver_type, tsp_data.cities(), &options.clone());
         print_solution(&tour, false);
     });
 
-    handler1.join().expect("Progress Thread Failed");
-    handler2.join().expect("Solver thread failed");
+    let mut progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
+    progress_display.run(show_progress);
+
+    solver_handle.join().expect("Solver thread failed");
 }
 
 fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> Solution {
