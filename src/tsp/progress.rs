@@ -9,7 +9,6 @@ use piston_window::wgpu_graphics::WgpuGraphics;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
-use std::time::Duration;
 
 use super::route::Route;
 use super::KDPoint;
@@ -30,7 +29,6 @@ const INACTIVE_COLOR: RGBA = GREY;
 
 const FONT_SIZE: u32 = 16;
 
-const RENDER_FRQ: u64 = 5;
 
 static PUBLISH_CHANNEL: LazyLock<Mutex<Option<PublishChannel>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -64,12 +62,9 @@ pub fn send_progress(msg: ProgressMessage) {
     }
 }
 
-fn retrieve_message() -> Option<ProgressMessage> {
+fn try_retrieve_message() -> Option<ProgressMessage> {
     let ch = RECEIVER_CHANNEL.lock().unwrap();
-
-    ch.as_ref()
-        .map(|x| x.recv_timeout(Duration::from_millis(RENDER_FRQ)).ok())
-        .unwrap_or(None)
+    ch.as_ref().and_then(|x| x.try_recv().ok())
 }
 
 #[derive(Debug, Clone)]
@@ -248,10 +243,11 @@ impl ProgressPlot {
     pub fn run(&mut self, show_progress: bool) {
 
         if !show_progress {
-            // Drain messages sent by solvers so channels don't block, then exit.
+            // Drain messages so the solver's channel send never blocks, then exit.
             loop {
-                match retrieve_message() {
-                    Some(ProgressMessage::Done) | None => break,
+                match try_retrieve_message() {
+                    Some(ProgressMessage::Done) => break,
+                    None => std::thread::sleep(std::time::Duration::from_millis(5)),
                     _ => {}
                 }
             }
@@ -274,6 +270,14 @@ impl ProgressPlot {
             .unwrap();
 
         while let Some(e) = window.next() {
+            // Drain all pending solver messages before rendering so the
+            // visualisation reflects the latest state every frame, even
+            // when a fast solver (e.g. NN) sends all messages in one burst
+            // before the window finishes opening.
+            while let Some(msg) = try_retrieve_message() {
+                self.update(&msg);
+            }
+
             let status = self.status.clone();
             let margin = self.viewport_dimensions.margin;
             window.draw_2d(&e, |ctx, renderer, _device| {
@@ -287,10 +291,6 @@ impl ProgressPlot {
                 TextBox::new(&status, margin, margin / 2.0, RED, FONT_SIZE)
                     .render(&ctx, renderer, &mut glyphs);
             });
-
-            if let Some(msg) = retrieve_message() {
-                self.update(&msg);
-            }
         }
     }
 
