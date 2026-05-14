@@ -83,11 +83,12 @@ struct NodeData {
 pub struct ProgressPlot {
     city_table: HashMap<usize, KDPoint>,
     nodes: Vec<NodeData>,
-    best_edges: Vec<EdgeData>,    // green  — best route found so far
-    current_edges: Vec<EdgeData>, // blue   — route being explored right now
+    best_edges: Vec<EdgeData>,    // shown in green after Done
+    current_edges: Vec<EdgeData>, // shown in blue while solving
     current_city_id: Option<usize>,
     prev_city_id: Option<usize>,
     best_distance: f32,
+    is_solved: bool,
     viewport_dimensions: ViewportDimensions,
     cities_bounding_box: RectCoords,
     status: String,
@@ -106,6 +107,7 @@ impl ProgressPlot {
             current_city_id: None,
             prev_city_id: None,
             best_distance: f32::MAX,
+            is_solved: false,
             viewport_dimensions: ViewportDimensions::new(width, height, margin),
             cities_bounding_box: cities_bounding_box(cities),
             status: "Preparing...".to_string(),
@@ -150,6 +152,9 @@ impl ProgressPlot {
     fn handle_message(&mut self, msg: &ProgressMessage) {
         match msg {
             ProgressMessage::Done => {
+                self.is_solved = true;
+                self.current_city_id = None;
+                self.prev_city_id = None;
                 self.status = format!("Done | best: {:.2}", self.best_distance);
             }
             ProgressMessage::PathUpdate(route, distance) => {
@@ -225,17 +230,19 @@ impl eframe::App for ProgressPlot {
             .show(ctx, |ui| {
                 let painter = ui.painter();
 
-                // Layer 1: blue edges (current exploring route — background)
-                for (from, to) in &self.current_edges {
-                    painter.line_segment([*from, *to], Stroke::new(1.5, CURRENT_EDGE_COLOR));
+                // While solving: current exploring route in blue.
+                // After Done: best route in green (replaces live view).
+                if self.is_solved {
+                    for (from, to) in &self.best_edges {
+                        painter.line_segment([*from, *to], Stroke::new(2.5, BEST_EDGE_COLOR));
+                    }
+                } else {
+                    for (from, to) in &self.current_edges {
+                        painter.line_segment([*from, *to], Stroke::new(1.5, CURRENT_EDGE_COLOR));
+                    }
                 }
 
-                // Layer 2: green edges (best route found — on top of blue)
-                for (from, to) in &self.best_edges {
-                    painter.line_segment([*from, *to], Stroke::new(2.5, BEST_EDGE_COLOR));
-                }
-
-                // Layer 3: orange edge from previous city to current city (B&B active step)
+                // Orange edge from previous city to current city (B&B active step)
                 if let (Some(prev_id), Some(curr_id)) = (self.prev_city_id, self.current_city_id) {
                     let prev_pos = self.nodes.iter().find(|n| n.city_id == prev_id).map(|n| n.pos);
                     let curr_pos = self.nodes.iter().find(|n| n.city_id == curr_id).map(|n| n.pos);
