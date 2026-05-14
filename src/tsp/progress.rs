@@ -2,9 +2,8 @@ use std::sync::mpsc;
 use std::sync::Mutex;
 use std::sync::LazyLock;
 
-use piston_window::*;
-use piston_window::graphics::Context;
-use piston_window::wgpu_graphics::WgpuGraphics;
+use eframe;
+use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, Stroke};
 
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
@@ -17,18 +16,15 @@ pub type PublishChannel = Sender<ProgressMessage>;
 pub type ReceiverChannel = Receiver<ProgressMessage>;
 pub type PublisherFn = Arc<dyn Fn(ProgressMessage)>;
 
-type Rgba = [f32; 4];
 type RectCoords = [f64; 4];
 type Point2D = (f64, f64);
 
-const WHITE: Rgba = [1.0; 4];
-const RED: Rgba = [1.0, 0.0, 0.0, 0.9];
-const GREY: Rgba = [0.7, 0.7, 0.7, 0.9];
-
-const INACTIVE_COLOR: Rgba = GREY;
-
-const FONT_SIZE: u32 = 16;
-
+const WHITE: Color32 = Color32::from_rgb(255, 255, 255);
+// Premultiplied: rgb * (alpha/255). Alpha ≈ 230 (≈90% opacity).
+const RED: Color32 = Color32::from_rgba_premultiplied(230, 0, 0, 230);
+const GREY: Color32 = Color32::from_rgba_premultiplied(162, 162, 162, 230);
+const INACTIVE_COLOR: Color32 = GREY;
+const FONT_SIZE: f32 = 16.0;
 
 static PUBLISH_CHANNEL: LazyLock<Mutex<Option<PublishChannel>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -76,147 +72,18 @@ pub enum ProgressMessage {
     Restart,
 }
 
-trait Renderable {
-    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, glyphs: &mut Glyphs);
-    fn is_edge(&self) -> bool;
+struct NodeData {
+    city_id: usize,
+    pos: Pos2,
+    color: Color32,
 }
 
-#[derive(Debug, Clone)]
-struct Node {
-    city_id: Option<usize>,
-    x: f64,
-    y: f64,
-    height: f64,
-    width: f64,
-    color: Rgba,
-}
+type EdgeData = (Pos2, Pos2);
 
-impl Node {
-    fn new(city_id: Option<usize>, x: f64, y: f64, height: f64, width: f64, color: Rgba) -> Self {
-        Node {
-            city_id,
-            x,
-            y,
-            height,
-            width,
-            color,
-        }
-    }
-
-    fn to_rect(&self) -> RectCoords {
-        let half_h = self.height / 2.0;
-        let half_w = self.width / 2.0;
-
-        [self.x - half_w, self.y - half_h, self.width, self.height]
-    }
-}
-
-impl Renderable for Node {
-    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, glyphs: &mut Glyphs) {
-        use graphics::*;
-        Rectangle::new(self.color).draw(
-            self.to_rect(),
-            &ctx.draw_state,
-            ctx.transform,
-            renderer,
-        );
-
-        TextBox::new(
-            format!("id.{:?}", self.city_id.unwrap_or(0)),
-            self.x,
-            self.y + FONT_SIZE as f64,
-            self.color,
-            FONT_SIZE,
-        )
-        .render(ctx, renderer, glyphs);
-    }
-
-    fn is_edge(&self) -> bool {
-        false
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Edge {
-    from: Point2D,
-    to: Point2D,
-    width: f64,
-    color: Rgba,
-}
-
-impl Edge {
-    fn new(from: Point2D, to: Point2D, color: Rgba, width: f64) -> Self {
-        Edge {
-            from,
-            to,
-            width,
-            color,
-        }
-    }
-
-    fn to_line(&self) -> RectCoords {
-        [self.from.0, self.from.1, self.to.0, self.to.1]
-    }
-}
-
-impl Renderable for Edge {
-    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, _glyphs: &mut Glyphs) {
-        use graphics::*;
-        Line::new(self.color, self.width).draw(
-            self.to_line(),
-            &ctx.draw_state,
-            ctx.transform,
-            renderer,
-        );
-    }
-
-    fn is_edge(&self) -> bool {
-        true
-    }
-}
-
-#[derive(Debug, Clone)]
-struct TextBox {
-    text: String,
-    x: f64,
-    y: f64,
-    font_size: u32,
-    color: Rgba,
-}
-
-impl TextBox {
-    pub fn new<S: Into<String>>(text: S, x: f64, y: f64, color: Rgba, font_size: u32) -> Self {
-        TextBox {
-            text: text.into(),
-            x,
-            y,
-            color,
-            font_size,
-        }
-    }
-}
-
-impl Renderable for TextBox {
-    fn render(&self, ctx: &Context, renderer: &mut WgpuGraphics<'_>, glyphs: &mut Glyphs) {
-        use graphics::*;
-        Text::new_color(self.color, self.font_size)
-            .draw(
-                self.text.as_ref(),
-                glyphs,
-                &ctx.draw_state,
-                ctx.transform.trans(self.x, self.y),
-                renderer,
-            )
-            .unwrap();
-    }
-
-    fn is_edge(&self) -> bool {
-        false
-    }
-}
 pub struct ProgressPlot {
     city_table: HashMap<usize, KDPoint>,
-    shapes: Vec<Box<dyn Renderable>>,
+    nodes: Vec<NodeData>,
+    edges: Vec<EdgeData>,
     viewport_dimensions: ViewportDimensions,
     cities_bounding_box: RectCoords,
     status: String,
@@ -229,7 +96,8 @@ impl ProgressPlot {
 
         let mut plot = ProgressPlot {
             city_table: HashMap::new(),
-            shapes: Vec::new(),
+            nodes: Vec::new(),
+            edges: Vec::new(),
             viewport_dimensions: ViewportDimensions::new(width, height, margin),
             cities_bounding_box: cities_bounding_box(cities),
             status: "Preparing...".to_string(),
@@ -240,8 +108,7 @@ impl ProgressPlot {
         plot
     }
 
-    pub fn run(&mut self, show_progress: bool) {
-
+    pub fn run(self, show_progress: bool) {
         if !show_progress {
             // Drain messages so the solver's channel send never blocks, then exit.
             loop {
@@ -254,54 +121,32 @@ impl ProgressPlot {
             return;
         }
 
-        let settings = WindowSettings::new("Teeline - TSP solver", self.window_size())
-            .exit_on_esc(true)
-            .resizable(false);
+        let options = eframe::NativeOptions {
+            viewport: egui::ViewportBuilder::default()
+                .with_inner_size([
+                    self.viewport_dimensions.width as f32,
+                    self.viewport_dimensions.height as f32,
+                ])
+                .with_resizable(false),
+            ..Default::default()
+        };
 
-        let mut window: PistonWindow = settings
-            .build()
-            .expect("ProgressPlot: Failed to create window");
-
-        let mut glyphs = window
-            .load_font(
-                "./assets/FiraSans-Light.ttf",
-                wgpu_graphics::TextureSettings::new(),
-            )
-            .unwrap();
-
-        while let Some(e) = window.next() {
-            // Drain all pending solver messages before rendering so the
-            // visualisation reflects the latest state every frame, even
-            // when a fast solver (e.g. NN) sends all messages in one burst
-            // before the window finishes opening.
-            while let Some(msg) = try_retrieve_message() {
-                self.update(&msg);
-            }
-
-            let status = self.status.clone();
-            let margin = self.viewport_dimensions.margin;
-            window.draw_2d(&e, |ctx, renderer, _device| {
-                use graphics::*;
-                clear(WHITE, renderer);
-
-                for shape in &self.shapes {
-                    shape.render(&ctx, renderer, &mut glyphs);
-                }
-
-                TextBox::new(&status, margin, margin / 2.0, RED, FONT_SIZE)
-                    .render(&ctx, renderer, &mut glyphs);
-            });
-        }
+        eframe::run_native(
+            "Teeline - TSP solver",
+            options,
+            Box::new(|_cc| Ok(Box::new(self) as Box<dyn eframe::App>)),
+        )
+        .expect("ProgressPlot: Failed to create window");
     }
 
-    fn update(&mut self, msg: &ProgressMessage) {
+    fn handle_message(&mut self, msg: &ProgressMessage) {
         match msg {
             ProgressMessage::Done => {
                 self.status = "Done".to_string();
             }
             ProgressMessage::PathUpdate(route, distance) => {
                 self.status = format!("Solving... | best: {:.2}", distance);
-                self.clean_path();
+                self.edges.clear();
                 self.add_path(route);
             }
             ProgressMessage::CityChange(_) => {
@@ -317,8 +162,16 @@ impl ProgressPlot {
         }
     }
 
-    fn clean_path(&mut self) {
-        self.shapes.retain(|x| !x.is_edge());
+    #[allow(clippy::cast_possible_truncation)]
+    fn add_nodes(&mut self) {
+        for city in self.city_table.values() {
+            let (sx, sy) = scaled_point(city, &self.cities_bounding_box, &self.viewport_dimensions);
+            self.nodes.push(NodeData {
+                city_id: city.id,
+                pos: Pos2::new(sx as f32, sy as f32),
+                color: INACTIVE_COLOR,
+            });
+        }
     }
 
     fn add_path(&mut self, route: &Route) {
@@ -326,60 +179,68 @@ impl ProgressPlot {
         let mut from_city_id = path[0];
 
         for to_city_id in path.iter().skip(1) {
-            let from_city = self.city_table.get(&from_city_id);
-            let to_city = self.city_table.get(to_city_id);
+            let from_city = self.city_table.get(&from_city_id).cloned();
+            let to_city = self.city_table.get(to_city_id).cloned();
 
             if let (Some(from), Some(to)) = (from_city, to_city) {
-                let new_edge = self.build_edge(from, to, GREY);
-                self.shapes.push(Box::new(new_edge));
-
+                let edge = build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions);
+                self.edges.push(edge);
                 from_city_id = *to_city_id;
             }
         }
 
-        let from_city = self.city_table.get(&from_city_id).unwrap();
-        let to_city = self.city_table.get(&path[0]).unwrap();
-
-        let new_edge = self.build_edge(from_city, to_city, GREY);
-        self.shapes.push(Box::new(new_edge));
-    }
-
-    fn build_edge(&self, from_city: &KDPoint, to_city: &KDPoint, color: Rgba) -> Edge {
-        let from_point = scaled_point(
-            from_city,
-            &self.cities_bounding_box,
-            &self.viewport_dimensions,
-        );
-        let to_point = scaled_point(
-            to_city,
-            &self.cities_bounding_box,
-            &self.viewport_dimensions,
-        );
-
-        Edge::new(from_point, to_point, color, 2.0)
-    }
-
-    fn add_nodes(&mut self) {
-        for city in self.city_table.values() {
-            let city_pt = scaled_point(city, &self.cities_bounding_box, &self.viewport_dimensions);
-            let shape = Node::new(
-                Some(city.id),
-                city_pt.0,
-                city_pt.1,
-                10.0,
-                10.0,
-                INACTIVE_COLOR,
-            );
-
-            self.shapes.push(Box::new(shape));
+        if let (Some(from), Some(to)) = (
+            self.city_table.get(&from_city_id).cloned(),
+            self.city_table.get(&path[0]).cloned(),
+        ) {
+            let edge = build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions);
+            self.edges.push(edge);
         }
     }
+}
 
-    fn window_size(&self) -> [f64; 2] {
-        [
-            self.viewport_dimensions.width,
-            self.viewport_dimensions.height,
-        ]
+impl eframe::App for ProgressPlot {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        while let Some(msg) = try_retrieve_message() {
+            self.handle_message(&msg);
+        }
+
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE.fill(WHITE))
+            .show(ctx, |ui| {
+                let painter = ui.painter();
+
+                for (from, to) in &self.edges {
+                    painter.line_segment([*from, *to], Stroke::new(2.0, GREY));
+                }
+
+                for node in &self.nodes {
+                    painter.rect_filled(
+                        Rect::from_center_size(node.pos, egui::Vec2::splat(10.0)),
+                        0.0,
+                        node.color,
+                    );
+                    painter.text(
+                        Pos2::new(node.pos.x, node.pos.y + FONT_SIZE),
+                        Align2::LEFT_TOP,
+                        format!("id.{}", node.city_id),
+                        FontId::proportional(FONT_SIZE),
+                        node.color,
+                    );
+                }
+
+                let margin = self.viewport_dimensions.margin as f32;
+                painter.text(
+                    Pos2::new(margin, margin / 2.0),
+                    Align2::LEFT_TOP,
+                    &self.status,
+                    FontId::proportional(FONT_SIZE),
+                    RED,
+                );
+            });
+
+        // Poll at ~60fps while solver runs; avoids burning a full CPU core.
+        ctx.request_repaint_after(std::time::Duration::from_millis(16));
     }
 }
 
@@ -398,6 +259,18 @@ impl ViewportDimensions {
             margin,
         }
     }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn build_edge(
+    from: &KDPoint,
+    to: &KDPoint,
+    bbox: &RectCoords,
+    vp: &ViewportDimensions,
+) -> EdgeData {
+    let (fx, fy) = scaled_point(from, bbox, vp);
+    let (tx, ty) = scaled_point(to, bbox, vp);
+    (Pos2::new(fx as f32, fy as f32), Pos2::new(tx as f32, ty as f32))
 }
 
 fn scaled_point(point: &KDPoint, window: &RectCoords, viewport: &ViewportDimensions) -> Point2D {
@@ -449,8 +322,5 @@ fn point_to_viewport(
     let x_v = (viewport.width - viewport.margin * 2.0) * (x - x_min) / (x_max - x_min);
     let y_v = (viewport.height - viewport.margin * 2.0) * (y - y_min) / (y_max - y_min);
 
-    (
-        x_v + viewport.margin,
-        y_v + viewport.margin,
-    )
+    (x_v + viewport.margin, y_v + viewport.margin)
 }

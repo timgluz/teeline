@@ -124,7 +124,7 @@ fn main() {
     let cities = tsp_data.cities().to_vec();
     let show_progress = options.show_progress;
 
-    // winit (used by piston_window) requires the event loop on the main thread,
+    // eframe (winit) requires the event loop on the main thread,
     // so the solver runs in a background thread and the window stays on main.
     let span = tracing::info_span!("solver", algorithm = ?solver_type);
     let solver_handle = thread::spawn(move || {
@@ -134,7 +134,7 @@ fn main() {
         print_solution(&tour, false);
     });
 
-    let mut progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
+    let progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
     progress_display.run(show_progress);
 
     solver_handle.join().expect("Solver thread failed");

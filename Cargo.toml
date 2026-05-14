@@ -18,7 +18,6 @@ path = "src/main.rs"
 clap = "4.6.1"
 rand = "0.9"
 regex = "1.12.3"
-piston = "1.0.0"
-piston_window = "0.147.0"
+eframe = { version = "0.33", features = ["x11", "wayland"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
