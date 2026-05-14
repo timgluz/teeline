@@ -5,6 +5,7 @@ use std::str::FromStr;
 use std::thread;
 
 use teeline::tsp::{self, kdtree, progress, tsplib, Solution, SolverOptions, Solvers};
+use tracing_subscriber::EnvFilter;
 
 fn main() {
     let args = Command::new("Teeline")
@@ -98,9 +99,17 @@ fn main() {
             .expect("Unknown solver");
 
     let options = solver_options_from_args(&args);
-    if options.verbose {
-        println!("Selected solver: {:?}", solver_type);
-    }
+
+    let default_level = if options.verbose { "debug" } else { "info" };
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::from_default_env()
+                .add_directive(format!("teeline={default_level}").parse().unwrap()),
+        )
+        .with_writer(std::io::stderr)
+        .init();
+
+    tracing::info!(algorithm = ?solver_type, "solver selected");
 
     let tsp_data = if let Some(input_file_path) = args.get_one::<String>("input") {
         let file_path = Path::new(input_file_path.as_str());
@@ -109,22 +118,19 @@ fn main() {
         read_tsp_data_from_stdin()
     };
 
-    if options.verbose {
-        println!(
-            "Problem details:\n\tname:{:?}\n\tcomment:{:?}\n\tcities:{:?}",
-            tsp_data.name,
-            tsp_data.comment,
-            tsp_data.len()
-        );
-    }
+    tracing::info!(name = %tsp_data.name, comment = %tsp_data.comment,
+                   cities = tsp_data.len(), "problem loaded");
 
     let cities = tsp_data.cities().to_vec();
     let show_progress = options.show_progress;
 
     // winit (used by piston_window) requires the event loop on the main thread,
     // so the solver runs in a background thread and the window stays on main.
+    let span = tracing::info_span!("solver", algorithm = ?solver_type);
     let solver_handle = thread::spawn(move || {
+        let _enter = span.entered();
         let tour = solve(solver_type, tsp_data.cities(), &options.clone());
+        tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
     });
 

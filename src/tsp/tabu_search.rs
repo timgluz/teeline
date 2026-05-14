@@ -8,6 +8,8 @@ use super::{total_distance, Solution, SolverOptions};
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let tabu_capacity = cities.len();
 
+    tracing::info!(epochs = options.epochs, tabu_capacity, "tabu search starting");
+
     let mut tabu_list = TabuList::new(tabu_capacity);
 
     let mut best_route = Route::from_cities(cities);
@@ -30,12 +32,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
                 best_distance,
             ));
 
-            if options.verbose {
-                println!(
-                    "Tabusearch: epoch.{:?} new best {:?}",
-                    epoch, local_distance
-                );
-            }
+            tracing::info!(epoch, tour_length = local_distance, "tabu: new best");
         }
 
         // refine tabu list

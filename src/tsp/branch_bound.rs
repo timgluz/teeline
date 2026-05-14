@@ -18,6 +18,8 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let mut route = Route::from_cities(cities);
     let n_cities = route.len();
 
+    tracing::info!(n_cities, "B&B starting");
+
     // we will start from city with smallest ID
     route.sort();
     send_progress(ProgressMessage::PathUpdate(route.clone(), 0.0));
@@ -49,6 +51,7 @@ fn build_evaluator(cities: &[KDPoint]) -> PathEvaluator {
     Rc::new(move |path: &Path| dm.tour_length(path))
 }
 
+#[allow(clippy::only_used_in_recursion)]
 fn backtrack(
     evaluate_fn: &PathEvaluator,
     path: &mut Path,
@@ -69,9 +72,7 @@ fn backtrack(
             best_path = path.clone();
             best_distance = new_distance;
 
-            if options.verbose {
-                println!("B&B: epoch.{:?}, new best distance {:?}", k, best_distance);
-            }
+            tracing::info!(depth = k, tour_length = best_distance, "B&B: new best");
         }
     };
 

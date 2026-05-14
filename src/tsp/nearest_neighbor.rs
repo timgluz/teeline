@@ -6,6 +6,8 @@ use super::route::Route;
 use super::{Solution, SolverOptions};
 
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+    tracing::info!(n_nearest = options.n_nearest, cities = cities.len(), "NN starting");
+
     let search_tree = kdtree::from_cities(cities);
     let n_nearest = options.n_nearest;
 
@@ -26,10 +28,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
 
         let search_result = frontier.nearest();
         if search_result.is_empty() {
-            if options.verbose {
-                println!("No nearest for city: #{:?}", id1);
-            }
-
+            tracing::debug!(city_id = id1, "NN: no nearest found");
             continue;
         }
 
@@ -39,6 +38,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         if next_distance < current_distance {
             let nearest_city_id = closest_item.point.id;
             if let Some(nearest_pos) = path.iter().position(|&x| x == nearest_city_id) {
+                tracing::debug!(from = id2, to = nearest_city_id, "NN: swap");
                 path.swap(i + 1, nearest_pos);
 
                 send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));

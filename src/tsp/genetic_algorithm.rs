@@ -36,6 +36,13 @@ fn solve_ga(
     let mutation_prob = options.mutation_probability;
     let elite_size = options.n_elite;
 
+    tracing::info!(
+        population_size,
+        elite_size = options.n_elite,
+        mutation_prob = options.mutation_probability,
+        "GA starting"
+    );
+
     let mut epoch = 0;
     let mut current_population = population.clone();
 
@@ -73,13 +80,7 @@ fn solve_ga(
             best_candidate.fitness(),
         ));
 
-        if options.verbose {
-            println!(
-                "GA: epoch.{:?} - best individual:\n{:?}",
-                epoch,
-                current_population.best()
-            );
-        }
+        tracing::debug!(epoch, fitness = current_population.best().fitness(), "GA: generation");
 
         epoch += 1;
     }

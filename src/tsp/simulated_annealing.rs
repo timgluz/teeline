@@ -9,6 +9,13 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let cooling_rate = options.cooling_rate;
     let mut epoch = 0;
 
+    tracing::info!(
+        epochs = options.epochs,
+        max_temp = options.max_temperature,
+        cooling_rate = options.cooling_rate,
+        "SA starting"
+    );
+
     let mut best_route = Route::from_cities(cities);
     let mut best_distance = total_distance(cities, best_route.route());
 
@@ -30,14 +37,10 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
                 best_route.clone(),
                 best_distance,
             ));
-            if options.verbose {
-                println!(
-                    "SA: epoch.{:?} new best distance: {:?}",
-                    epoch, best_distance
-                );
-            }
+            tracing::info!(epoch, tour_length = best_distance, "SA: new best");
         }
 
+        tracing::debug!(epoch, temperature, "SA: tick");
         temperature = cooling(temperature, cooling_rate);
         epoch += 1;
     }
