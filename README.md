@@ -75,6 +75,12 @@ mkdir -p data/tsplib
 tar -xzf ALL_tsp.tar.gz -C data/tsplib
 ```
 
+3. The archive contains individually gzipped files — decompress them all in one go:
+
+```bash
+gunzip data/tsplib/*.gz
+```
+
 ### Converting your own coordinates
 
 To convert a plain list of coordinates to TSPLIB format use the included helper:
