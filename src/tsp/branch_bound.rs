@@ -165,3 +165,59 @@ fn undo_move(path: &mut Path, k: usize) {
         path[k] = UNVISITED_NODE;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsp::{bellman_karp, kdtree};
+
+    fn tsp5_cities() -> Vec<kdtree::KDPoint> {
+        kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ])
+    }
+
+    #[test]
+    fn test_solve_visits_all_cities() {
+        let cities = tsp5_cities();
+        let options = SolverOptions::default();
+        let tour = solve(&cities, &options);
+
+        let mut visited: Vec<usize> = tour.route().to_vec();
+        visited.sort();
+        assert_eq!(visited, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_solve_finds_optimal_tour_on_tsp5() {
+        let cities = tsp5_cities();
+        let options = SolverOptions::default();
+        let tour = solve(&cities, &options);
+
+        // optimal tour 0→1→2→3→4→0 = 0.5 + 0.5 + 1.0 + 1.0 + 1.0 = 4.0
+        assert!(
+            (tour.total - 4.0).abs() < 1e-3,
+            "expected optimal tour ~4.0, got {}",
+            tour.total
+        );
+    }
+
+    #[test]
+    fn test_solve_matches_bellman_karp_on_tsp5() {
+        let cities = tsp5_cities();
+        let options = SolverOptions::default();
+        let bb_tour = solve(&cities, &options);
+        let bhk_tour = bellman_karp::solve(&cities, &options);
+
+        assert!(
+            (bb_tour.total - bhk_tour.total).abs() < 1e-3,
+            "B&B tour {} should match BHK tour {}",
+            bb_tour.total,
+            bhk_tour.total
+        );
+    }
+}

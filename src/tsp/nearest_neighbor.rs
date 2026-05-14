@@ -5,6 +5,59 @@ use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsp::kdtree;
+
+    fn tsp5_cities() -> Vec<KDPoint> {
+        kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ])
+    }
+
+    #[test]
+    fn test_solve_visits_all_cities() {
+        let cities = tsp5_cities();
+        let options = SolverOptions::default();
+        let tour = solve(&cities, &options);
+
+        let mut visited: Vec<usize> = tour.route().to_vec();
+        visited.sort();
+        assert_eq!(visited, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_solve_tour_length_is_positive_and_finite() {
+        let cities = tsp5_cities();
+        let options = SolverOptions::default();
+        let tour = solve(&cities, &options);
+
+        assert!(tour.total > 0.0, "tour length should be positive, got {}", tour.total);
+        assert!(tour.total.is_finite(), "tour length should be finite");
+    }
+
+    #[test]
+    fn test_solve_on_collinear_cities_visits_all() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![2.0, 0.0],
+            vec![3.0, 0.0],
+        ]);
+        let options = SolverOptions::default();
+        let tour = solve(&cities, &options);
+
+        let mut visited: Vec<usize> = tour.route().to_vec();
+        visited.sort();
+        assert_eq!(visited, vec![0, 1, 2, 3]);
+    }
+}
+
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     tracing::info!(n_nearest = options.n_nearest, cities = cities.len(), "NN starting");
 
