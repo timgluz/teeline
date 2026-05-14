@@ -2,282 +2,278 @@
 
 Teeline is a solver for the symmetric Traveling Salesman Problem, written in Rust.
 
-*The Traveling Salesman Problem (TSP) is the searchfor  a  minimum  cost  Hamiltonian  circuit  connecting  aset  of  locations.*[source](http://www.optimization-online.org/DB_FILE/2017/12/6370.pdf)
+> *The Traveling Salesman Problem (TSP) is the search for a minimum cost Hamiltonian circuit connecting a set of locations.* — [source](http://www.optimization-online.org/DB_FILE/2017/12/6370.pdf)
 
-It still work in progress. Although it already has for all algorithms teached by any CS courses.
-More advanced algorithms would be implemented after the structure of code and interfaces has been stabilized.
+It is a work in progress. It already implements all algorithms typically covered by a CS algorithms course. More advanced algorithms will be added once the code structure and interfaces have stabilised.
 
-###### Backstory
+## Backstory
 
-It all started from the ["In Pursuit of the Traveling Salesman"](https://www.amazon.de/Pursuit-Traveling-Salesman-Mathematics-Computation-ebook/dp/B0073X0IR2/ref=sr_1_1?_encoding=UTF8) book. It is an fantastic book, it covers history of the Salesman problem and the big idea behind the Concorde solver.
-I was sincerely suprised that the Linear Programming worked so well for this problem and can provide exact solutions for very big problems.
+It all started from the ["In Pursuit of the Traveling Salesman"](https://www.amazon.de/Pursuit-Traveling-Salesman-Mathematics-Computation-ebook/dp/B0073X0IR2/) book — a fantastic read that covers the history of the problem and the big ideas behind the Concorde solver. I was genuinely surprised that Linear Programming works so well here and can provide exact solutions for very large instances.
 
+After finishing the book I took the [Discrete Optimization](https://coursera.org/share/1428f00fd18abc041afcf9105c02365b) course on Coursera to learn more about the theory behind Concorde. One of the assignments asked for a solver that could handle more than 10,000 cities, which pushed me to experiment with different heuristics — and gave me a great opportunity to learn Rust.
 
-After i finished the book, i took the [Discrete Optimization](https://coursera.org/share/1428f00fd18abc041afcf9105c02365b) course on the Coursera.
-So i could learn more about discrete optimization and a theory behind the Concorde solver.
+---
 
-One of the homeworks also asked to build the TSP solver, that could get also solve problem that has more than 10_000 cities,
-which encouraged me to experiment alternative solutions and give me good chance to learn Rust.
+## Getting Started
 
-### Getting started
+### Prerequisites
 
-* install rust: [](https://www.rust-lang.org/tools/install)
+- **Rust toolchain** — install via [rustup](https://www.rust-lang.org/tools/install):
+  ```bash
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  ```
+- Rust 1.80 or later is required (uses `std::sync::LazyLock`).
 
-* compile binary: `cargo build --release`
+### Build
 
-* copy binary to your workfolder: `cp ./target/release/bin teeline`
+```bash
+# debug build (faster compile, slower runtime)
+cargo build
 
-* test the binary: `./teeline -h`
-
-
-* compile runnable binary:
-
-```
+# optimised release build (recommended for real use)
 cargo build --release
 ```
 
+### Quick test
 
-*Visualizing solution*
+```bash
+# run the test suite
+cargo test
 
-
-generate solution file
-
-```
-cat ./data/tsp_51_1 | ./target/debug/bin > solution51.txt
-```
-
-upload data file and solution file to:
-https://discreteoptimization.github.io/vis/tsp/ to visualize solution;
-
-
-### Using dev version
-
-```
-# build project
-cargo build
-
-# check available settings and commands
-./target/debug/bin -h
-
-# use default settings
-cat ./data/tsplib/berlin52.tsp | ./target/debug/bin
-
-# or pass files as cli argument if no extra processing is required
-./target/debug/bin -i ./data/tsplib/berlin52.tsp
-
-# use Bellman-Held-Karp algoritm as solver
-# be careful, it wouldnt work for dataset bigger than 30
-cat ./data/tsplib/bayg29.tsp | ./target/debug/bin bellman_karp
+# check the CLI help
+./target/release/bin --help
 ```
 
-### Preparing data
+### Install locally (optional)
 
-Teeline works only subset TSPLIB files - it expects that cities are presented as euclidean coordinates
-either in `NODE_COORD_SECTION` or `DISPLAY_DATA_SECTION`.
+Copy or symlink the binary so you can call it as `teeline`:
 
-One can use the [convert2tsplib](https://github.com/timgluz/teeline/blob/master/convert2tsplib.py) to convert list of euclidean coordinates to TSPLIB file;
+```bash
+cp ./target/release/bin ~/bin/teeline   # or any directory on your PATH
+```
 
+All examples below assume this step has been done. If you skipped it, replace `teeline` with `./target/release/bin`.
+
+### Run your first solve
+
+Teeline reads city data in [TSPLIB](http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) format, either from a file or from stdin, and prints the tour cost followed by the ordered city IDs.
+
+```bash
+# from a file
+teeline nn -i ./data/tsplib/berlin52.tsp
+
+# from stdin
+cat ./data/tsplib/berlin52.tsp | teeline nn
+
+# show a progress window while solving (opens automatically by default)
+teeline nn -i ./data/tsplib/berlin52.tsp
+
+# headless / CI — skip the visualisation window
+teeline nn -i ./data/tsplib/berlin52.tsp --disable_progress
+```
+
+Output format:
 
 ```
-# chmod +x download_data
+10628.46302 0
+1 49 32 45 19 41 8 9 10 43 33 51 11 52 6 22 ...
+```
 
+First line: `<tour_cost> <optimised_flag>`. Second line: space-separated city IDs in visit order.
+
+---
+
+## Algorithms
+
+### Exact algorithms
+
+Exact algorithms always find the optimal solution but have exponential or factorial time complexity. **Do not use them on more than ~20 cities.**
+
+#### Bellman–Held–Karp (`bellman_karp`, `bhk`)
+
+Dynamic programming algorithm that solves TSP in O(2ⁿ · n²) time.
+
+```bash
+teeline bhk -i ./data/discopt/tsp_5_1.tsp
+teeline bellman_karp -i ./data/discopt/tsp_5_1.tsp --verbose
+```
+
+Resources:
+- [Bellman-Held-Karp walkthrough (YouTube)](https://youtu.be/D8aHqaFa8GE)
+- *Algorithms Illuminated, Part 4* — Tim Roughgarden
+
+#### Branch and Bound (`branch_bound`)
+
+Systematic enumeration of candidate solutions; prunes branches that cannot improve on the best solution found so far.
+
+```bash
+teeline branch_bound -i ./data/discopt/tsp_5_1.tsp
+teeline branch_bound -i ./data/discopt/tsp_5_1.tsp --verbose
+```
+
+Resources:
+- [EECS 281: Backtracking and Branch & Bound (YouTube)](https://www.youtube.com/watch?v=hNs7G1b2iFY&t=5480s)
+- [GeeksForGeeks article](https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/)
+
+---
+
+### Approximate algorithms
+
+Approximate (heuristic) algorithms trade optimality guarantees for speed, making them practical for large instances.
+
+#### Nearest Neighbor (`nearest_neighbor`, `nn`)
+
+Greedy construction: from the current city, always move to the closest unvisited city. Uses a KD-tree for fast lookups.
+
+```bash
+teeline nn -i ./data/tsplib/berlin52.tsp
+teeline nn -i ./data/tsplib/berlin52.tsp --verbose
+```
+
+Resources:
+- *Algorithms and Data Structures in Action* — Marcello La Rocca
+- [Nearest neighbour algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Nearest_neighbour_algorithm)
+
+#### 2-opt (`two_opt`, `2opt`)
+
+Local search: repeatedly reverse sub-segments of the tour to remove crossings until no improving swap exists.
+
+```bash
+teeline 2opt -i ./data/tsplib/berlin52.tsp
+teeline two_opt -i ./data/tsplib/berlin52.tsp --verbose
+```
+
+Resources:
+- [Section 20.4: The 2-OPT Heuristic (YouTube)](https://youtu.be/dYEWqrp-mho)
+- [2-opt (Wikipedia)](https://en.wikipedia.org/wiki/2-opt)
+
+#### Stochastic Hill Climbing (`stochastic_hill`)
+
+Iterative improvement with random restarts to escape plateaus and local optima.
+
+Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--epochs` | Maximum iterations (0 = unlimited) | 0 |
+| `--platoo_epochs` | Steps without improvement before restart | — |
+
+```bash
+teeline stochastic_hill -i ./data/tsplib/berlin52.tsp
+teeline stochastic_hill -i ./data/tsplib/berlin52.tsp --epochs=1000
+teeline stochastic_hill -i ./data/tsplib/berlin52.tsp --platoo_epochs=50
+```
+
+Resources:
+- *AIMA*, Chapter 4.1 — Local Search and Optimization Problems
+- [Hill climbing (Wikipedia)](https://en.wikipedia.org/wiki/Hill_climbing)
+
+#### Simulated Annealing (`simulated_annealing`, `sa`)
+
+Probabilistic local search that accepts worsening moves with a probability that decreases as the "temperature" cools, allowing escape from local optima.
+
+Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--max_temperature` | Starting temperature | 1000.0 |
+| `--min_temperature` | Stopping temperature | 0.001 |
+| `--cooling_rate` | Fractional temperature drop per step | — |
+| `--epochs` | Maximum iterations | — |
+
+```bash
+teeline sa -i ./data/tsplib/berlin52.tsp
+teeline sa -i ./data/tsplib/berlin52.tsp --verbose
+teeline sa -i ./data/tsplib/berlin52.tsp --cooling_rate=0.003 --max_temperature=500.0
+```
+
+Resources:
+- *AIMA*, Section 4.1.2 — Simulated Annealing
+- [Simulated annealing (Wikipedia)](https://en.wikipedia.org/wiki/Simulated_annealing)
+
+#### Tabu Search (`tabu_search`)
+
+Local search that maintains a short-term memory (the *tabu list*) of recently visited solutions to avoid cycling, and accepts worsening moves when no improvement is available.
+
+Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--epochs` | Maximum iterations | — |
+
+```bash
+teeline tabu_search -i ./data/tsplib/berlin52.tsp
+teeline tabu_search -i ./data/tsplib/berlin52.tsp --epochs=500
+```
+
+Resources:
+- [Tabu search (Wikipedia)](https://en.wikipedia.org/wiki/Tabu_search)
+- *Heuristic Search*, Chapter 14.4
+
+#### Genetic Algorithm (`genetic_algorithm`, `ga`)
+
+Evolutionary metaheuristic: maintains a population of candidate tours and iteratively applies selection, crossover, and mutation to evolve better solutions.
+
+Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--epochs` | Maximum generations | 10 000 |
+| `--mutation_probability` | Probability of random swap on a child | 0.001 |
+| `--n_elite` | Individuals passed unchanged to next generation | 3 |
+
+```bash
+teeline ga -i ./data/tsplib/berlin52.tsp
+teeline ga -i ./data/tsplib/berlin52.tsp --verbose
+teeline ga -i ./data/tsplib/berlin52.tsp --epochs=500 --mutation_probability=0.2
+teeline ga -i ./data/tsplib/berlin52.tsp --n_elite=7
+```
+
+Resources:
+- [Genetic algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Genetic_algorithm)
+- *AIMA*, Section 4.1.4 — Genetic Algorithms
+
+---
+
+## Preparing Data
+
+Teeline reads a subset of the TSPLIB format — cities must be given as 2D Euclidean coordinates in either a `NODE_COORD_SECTION` or `DISPLAY_DATA_SECTION`.
+
+To convert a plain list of coordinates to TSPLIB format use the included helper:
+
+```bash
+python3 convert2tsplib.py
+```
+
+To download a set of standard benchmark instances:
+
+```bash
+chmod +x download_data.sh
 ./download_data.sh
 ```
 
-## Exact algorithms:
+---
 
-*In computer science and operations research, exact algorithms are algorithms that always solve an optimization problem to optimality. *[wiki](https://en.wikipedia.org/wiki/Exact_algorithm)
+## Visualising Results
 
-Exact algorithms are guaranteed to give optimal solutions.
-Although there's a small catch - a running time is exponential and they can solve only very small problems, 
-because their running time complexity is either factorial or exponential.
+While solving, Teeline opens a Piston window that shows the current best route updating in real time. Pass `--disable_progress` to suppress it (required in headless / CI environments).
 
-#### branch-and-bound
+You can also upload your input file and the solution output to the [Discrete Optimization visualiser](https://discreteoptimization.github.io/vis/tsp/) to inspect tours interactively.
 
+---
 
-A **branch-and-bound** algorithm consists of a systematic enumeration of candidate solutions by means of state space search: the set of candidate solutions is thought of as forming a rooted tree with the full set at the root. 
+## Contributing
 
-The algorithm explores branches of this tree(*branching*), which represent subsets of the solution set. Before enumerating the candidate solutions of a branch, the branch is checked against *upper* and *lower* estimated bounds on the optimal solution (*bounding*), and is discarded if it cannot produce a better solution than the best one found so far by the algorithm. [wiki](https://en.wikipedia.org/wiki/Branch_and_bound)
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
 
+In short:
 
-```
-./teeline branch_bound --verbose
-./teeling branch_bound -i ./data/discopt/tsp_5_1.tsp
-```
+1. Open a GitHub issue to discuss the change before writing code.
+2. Implement the feature or fix on a dedicated branch.
+3. Add tests — unit tests go inline with the source file; integration tests go in `tests/`.
+4. Open a pull request and wait for a code review.
 
-###### Resources
+When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, registered in the `Solvers` enum in `src/tsp/mod.rs` and the `solve` match arm in `src/main.rs`.
 
+---
 
-* Backtracking from Skiena's "Algorithm Design Manual": http://www.algorist.com/algorist.html
-* EECS 281: S20 Lecture 21 - Backtracking and Branch & Bound (Traveling Salesperson Problem) - https://www.youtube.com/watch?v=hNs7G1b2iFY&t=5480s
+## Contributors
 
-* GeekForGeeks article: https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/
-* Optimization Methods, Lecture.13, https://ocw.mit.edu/courses/sloan-school-of-management/15-093j-optimization-methods-fall-2009/lecture-notes/
-
-#### Bellman-Karp-Held
-
-The Held–Karp algorithm, also called **Bellman–Held–Karp** algorithm, is a dynamic programming algorithm proposed in 1962 independently by Bellman[1] and by Held and Karp[2] to solve the Traveling Salesman Problem (TSP). [wiki](https://en.wikipedia.org/wiki/Held%E2%80%93Karp_algorithm)
-
-1. Compute the solutions of all subproblems starting with the smallest.
-2. Whenever computing a solution requires solutions for smaller problems using the above recursive equations, look up these solutions which are already computed.
-3. To compute a minimum distance tour, use the final equation to generate the 1st node, and repeat for the other nodes. For this problem, we cannot know which subproblems we need to solve, so we solve them all.
-
-
-```
-./teeline bellman_karp  -i ./data/discopt/tsp_5_1.tsp
-./teeline bhk
-./teeline bhk --verbose
-```
-
-###### Resources
-
-* Bellman-Held-Karp: https://youtu.be/D8aHqaFa8GE
-* Algorithms Illuminated, part.4 - https://www.amazon.com/dp/B08D4T91RL
-
-
-### Approximate algorithms:
-
-In computer science and operations research, approximation algorithms are efficient algorithms that find approximate solutions to optimization problems (in particular NP-hard problems) with provable guarantees on the distance of the returned solution to the optimal one. [wiki](https://en.wikipedia.org/wiki/Approximation_algorithm)
-
-
-#### greedy nearest neighbors using KD-tree
-
-It iterates over list of cities and selects the closest neighbor as next city.
-This implementation uses KD-tree for a lookup.
-
-```
-./teeline nn
-./teeline nn --verbose
-```
-
-###### Resources
-
-* "Algorithms and Data Structures in Action", https://www.manning.com/books/algorithms-and-data-structures-in-action
-* "Nearest neighbor algorithm", https://en.wikipedia.org/wiki/Nearest_neighbour_algorithm
-
-
-
-#### 2-opt heuristic
-
-In optimization, 2-opt is a simple local search algorithm for solving the traveling salesman problem. 
-The main idea behind it is to take a route that crosses over itself and reorder it so that it does not. 
-
-```
-./teeline two_opt
-./teeline 2opt
-
-./target/debug/bin 2opt -i ./data/discopt/tsp_5_1.tsp
-```
-
-###### Resources
-
-* Section 20.4: The 2-OPT Heuristic for the TSP - https://youtu.be/dYEWqrp-mho
-* 2-opt wiki: https://en.wikipedia.org/wiki/2-opt
-* The Traveling Salesman Problem:A Case Study in Local Optimization, https://www.cs.ubc.ca/~hutter/previous-earg/EmpAlgReadingGroup/TSP-JohMcg97.pdf
-
-
-
-##### stochastic hill climbing
-
-It is an iterative algorithm that starts with an arbitrary solution to a problem, then attempts to find a better solution by making an incremental change to the solution. If the change produces a better solution, another incremental change is made to the new solution, and so on until no further improvements can be found.
-
-The solver implements a version called Hill Climbing with random restarts to avoid getting stuck on plateu or local maxima;
-
-
-Possible metaheuristics for tuning:
-
-* `verbose` - prints some debugging details onto std-out
-
-* `epochs` - max iterations, if 0 then it would run forever
-
-* `platoo_epochs` - how long to keep walking without any progress
-
-```
-./teeline stochastic_hill
-./teeline stochastic_hill --epochs=100
-./teeling stochastic_hill --platoo_epochs=10
-```
-
-###### Resources
-
-* AIMA, Chapter 4.1 Local Search and Optimization Problems, http://aima.cs.berkeley.edu/contents.html
-* wiki: https://en.wikipedia.org/wiki/Hill_climbing
-
-##### simulated annealing
-
-TODO
-
-Simulated annealing (SA) is a probabilistic technique for approximating the global optimum of a given function.
-
-
-available settings:
-
-* `cooling_rate` - specifies how fast should the temperature decrease
-
-* `max_temperature` - sets initial temperature, default 1000.0
-
-* `min_temperature` - sets the final temperature, default 0.001
-
-* `epochs` - how many iteration run before stopping the search
-
-```
-./teeline simulated_annealing
-./teeline sa --verbose
-./teeline sa --cooling_rate=0.1 --min_temperature=1.0
-./teeline sa --max_temperature
-```
-
-###### Resources
-
-* AIMA, 4.1.2   Simulated annealing, http://aima.cs.berkeley.edu/contents.html
-* wiki, Simulated annealing, https://en.wikipedia.org/wiki/Simulated_annealing
-
-##### tabu search
-
-Tabu search enhances the performance of local search by relaxing its basic rule. First, at each step worsening moves can be accepted if no improving move is available (like when the search is stuck at a strict local minimum). In addition, prohibitions (henceforth the term tabu) are introduced to discourage the search from coming back to previously-visited solutions.
-
-available options:
-
-* `epochs` - how many iterations to run before giving up
-
-```
-./teeline tabu_search --epochs=5
-```
-
-###### Resources
-
-* Wiki, https://en.wikipedia.org/wiki/Tabu_search
-* Heuristic Search, chapter 14.4. Tabu Search, https://learning.oreilly.com/library/view/heuristic-search/9780123725127/B9780123725127000146.xhtml
-* AIMA 3rd Edition
-
-##### genetic search
-
-
-In computer science and operations research, a genetic algorithm (GA) is a metaheuristic inspired by the process of natural selection that belongs to the larger class of evolutionary algorithms (EA).
-
-available metaheuristics:
-
-* `epochs` - limits the max number of iteration before stopping the search, default 10.000
-
-* `mutation_probability` - sets the probability of applying random mutation for new child, default 0.001
-
-* `n_elite` - how many individuals of each population should sent directly to next generation, default 3
-
-```
-./teeline genetic_algorithm
-./teeline ga --verbose
-./teeline ga --epochs = 5 --mutation_probability = 0.2
-./teeline ga --n_elite = 7
-```
-
-###### Resources
-
-* Ch.4.1.4 - "Genetic Algorithms", AIMA, https://github.com/aimacode/aima-python/blob/ca301ea363674ec719b58f23e794998de4f623c9/search.py#L912
-* Ch7.5 - Random sampling for local search, Skiena: https://books.google.de/books?id=7XUSn0IKQEgC&lpg=PR1&pg=PA251#v=onepage&q&f=false
-* ch.4 "TSP", Genetic Algorithms in Java: https://learning.oreilly.com/library/view/genetic-algorithms-in/9781484203286/9781484203293_Ch04.xhtml
-* comparitions of selection https://arxiv.org/ftp/arxiv/papers/1203/1203.3099.pdf
-* ordered crossover: http://www.dmi.unict.it/mpavone/nc-cs/materiale/moscato89.pdf
-* comparition of crossover methods: http://www.iro.umontreal.ca/~dift6751/ga_tsp_tr.pdf
-* Wiki, https://en.wikipedia.org/wiki/Genetic_algorithm
-
-
+- **[Timo Sulg](https://github.com/timgluz)** — author and maintainer
+- **[equalis3r](https://github.com/equalis3r)** — Bellman–Held–Karp fix and test (PR #25)
