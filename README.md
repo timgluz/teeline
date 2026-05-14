@@ -62,14 +62,17 @@ Teeline reads a subset of the TSPLIB format — cities must be given as 2D Eucli
 
 ### Downloading TSPLIB benchmark instances
 
-1. Go to the [TSPLIB symmetric TSP page](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp.html).
-2. Download the archive(s) you want (`ALL_tsp.tar.gz` for everything, or individual `.tsp.gz` files).
-3. Unpack into the `data/` folder:
+1. Download the archive from the [TSPLIB symmetric TSP page](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp.html):
+
+```bash
+curl -O -L https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/ALL_tsp.tar.gz
+```
+
+2. Unpack into the `data/` folder:
 
 ```bash
 mkdir -p data/tsplib
-tar -xzf ALL_tsp.tar.gz -C data/tsplib        # full archive
-gunzip -c berlin52.tsp.gz > data/tsplib/berlin52.tsp  # single file
+tar -xzf ALL_tsp.tar.gz -C data/tsplib
 ```
 
 ### Converting your own coordinates
