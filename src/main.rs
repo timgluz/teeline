@@ -119,9 +119,10 @@ fn main() {
     }
 
     let cities = tsp_data.cities().to_vec();
+    let show_progress = options.show_progress;
     let handler1 = thread::spawn(move || {
         let mut progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
-        progress_display.run();
+        progress_display.run(show_progress);
     });
 
     let handler2 = thread::spawn(move || {

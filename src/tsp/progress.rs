@@ -271,8 +271,19 @@ impl ProgressPlot {
         plot
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, show_progress: bool) {
         init_channels();
+
+        if !show_progress {
+            // Drain messages sent by solvers so channels don't block, then exit.
+            loop {
+                match retrieve_message() {
+                    Some(ProgressMessage::Done) | None => break,
+                    _ => {}
+                }
+            }
+            return;
+        }
 
         let settings = WindowSettings::new("Teeline - TSP solver", self.window_size())
             .exit_on_esc(true)
