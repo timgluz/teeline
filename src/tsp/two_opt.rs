@@ -44,15 +44,15 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     Solution::new(&path, cities)
 }
 
-fn swap_2opt(path: &mut Vec<usize>, from: usize, to: usize) {
+fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
     if from >= to {
-        return; // ignore if from to are equal or wrong order
+        return;
     }
 
-    let reversed_seq: Vec<usize> = path[from..=to].iter().map(|x| x.clone()).rev().collect();
+    let reversed_seq: Vec<usize> = path[from..=to].iter().copied().rev().collect();
 
     for (i, swapped_val) in reversed_seq.iter().enumerate() {
-        path[from + i] = swapped_val.clone();
+        path[from + i] = *swapped_val;
     }
 }
 

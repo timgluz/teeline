@@ -16,8 +16,8 @@ use crate::tsp::kdtree::KDPoint;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 
-pub const VERSION: &'static str = "0.6.1";
-pub const AUTHOR: &'static str = "Timo Sulg <timo@sulg.dev>";
+pub const VERSION: &str = "0.6.1";
+pub const AUTHOR: &str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
 
@@ -88,8 +88,8 @@ pub struct SolverOptions {
     pub show_progress: bool, // should we show and print progress
 }
 
-impl SolverOptions {
-    pub fn default() -> Self {
+impl Default for SolverOptions {
+    fn default() -> Self {
         SolverOptions {
             epochs: 10_000,
             platoo_epochs: 500,
@@ -126,7 +126,7 @@ pub fn total_distance(cities: &[KDPoint], route: &[usize]) -> f32 {
 pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
     let table: CityTable = cities.iter().map(|c| (c.id, c.clone())).collect();
 
-    return table;
+    table
 }
 
 pub struct Solution {
@@ -155,6 +155,10 @@ impl Solution {
 
     pub fn len(&self) -> usize {
         self.route.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.route.is_empty()
     }
 
     pub fn route(&self) -> &[usize] {

@@ -26,7 +26,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     open_path[0] = route.get(0).unwrap();
 
     // at the beginning all cities the except the first city are unvisited
-    let unvisited_cities: UniqSet = route.route().iter().skip(1).map(|x| x.clone()).collect();
+    let unvisited_cities: UniqSet = route.route().iter().skip(1).copied().collect();
 
     let fitness_fn = build_evaluator(cities);
     let (best_path, _best_distance) = backtrack(
@@ -46,7 +46,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
 fn build_evaluator(cities: &[KDPoint]) -> PathEvaluator {
     let dm = Rc::new(DistanceMatrix::from_cities(cities).expect("Failed to build distance matrix"));
 
-    return Rc::new(move |path: &Path| dm.tour_length(path));
+    Rc::new(move |path: &Path| dm.tour_length(path))
 }
 
 fn backtrack(
@@ -62,7 +62,7 @@ fn backtrack(
     let mut best_distance = upper_bound;
 
     let n_cities = k + unvisited_cities.len();
-    if is_solution(path.as_ref(), k, n_cities) {
+    if is_solution(path, k, n_cities) {
         let new_distance = evaluate_fn(path);
 
         if new_distance < upper_bound {
@@ -76,22 +76,22 @@ fn backtrack(
     };
 
     let candidates: Vec<usize> = construct_candidates(
-        &path,
+        path,
         k,
-        &unvisited_cities,
+        unvisited_cities,
         running_cost,
         best_distance,
         evaluate_fn,
     );
 
     for candidate in candidates.iter() {
-        make_move(path, k, candidate.clone());
+        make_move(path, k, *candidate);
 
         let visited_path: Vec<usize> = path
             .to_vec()
             .iter()
             .filter(|&&x| x != UNVISITED_NODE)
-            .map(|x| x.clone())
+            .copied()
             .collect();
         send_progress(ProgressMessage::PathUpdate(
             Route::new(&visited_path),
@@ -99,7 +99,7 @@ fn backtrack(
         ));
 
         let prev_city = path[k - 1];
-        let next_distance = evaluate_fn(&vec![prev_city, candidate.clone()]);
+        let next_distance = evaluate_fn(&vec![prev_city, *candidate]);
 
         let mut next_cities = unvisited_cities.clone();
         next_cities.remove(candidate);
@@ -126,7 +126,7 @@ fn backtrack(
 }
 
 fn is_solution(path: &Path, k: usize, n_cities: usize) -> bool {
-    let uniq_ids: UniqSet = path[0..k].iter().map(|c| c.clone()).collect();
+    let uniq_ids: UniqSet = path[0..k].iter().copied().collect();
 
     k == n_cities && k > 1 && uniq_ids.len() == n_cities
 }
@@ -142,15 +142,15 @@ fn construct_candidates(
     let mut candidates: Path = vec![]; // always start from city.id 0
 
     for city_id in unvisited_cities.iter() {
-        let next_distance = evaluate_fn(&vec![path[k - 1], city_id.clone()]);
+        let next_distance = evaluate_fn(&vec![path[k - 1], *city_id]);
         // simple pruning
         if best_distance > running_cost + next_distance {
-            candidates.push(city_id.clone());
+            candidates.push(*city_id);
         }
     }
 
-    candidates.sort(); // try to keep lexikographic order
-    return candidates;
+    candidates.sort();
+    candidates
 }
 
 fn make_move(path: &mut Path, k: usize, candidate: usize) {

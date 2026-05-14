@@ -97,12 +97,10 @@ impl DistanceMatrix {
         let mut city_table = CityTable::new();
 
         let mut distances = Vec::with_capacity(size);
-        for i in 0..n {
-            let pt1 = &cities[i];
+        for (i, pt1) in cities.iter().enumerate() {
             city_table.insert(i, pt1.clone());
 
-            for j in 0..i {
-                let pt2 = &cities[j];
+            for pt2 in cities.iter().take(i) {
                 distances.push(pt1.distance(pt2));
             }
         }
@@ -114,6 +112,10 @@ impl DistanceMatrix {
 
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 
     pub fn distances(&self) -> &[f32] {

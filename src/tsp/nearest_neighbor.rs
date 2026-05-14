@@ -6,7 +6,7 @@ use super::route::Route;
 use super::{Solution, SolverOptions};
 
 pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
-    let search_tree = kdtree::from_cities(&cities);
+    let search_tree = kdtree::from_cities(cities);
     let n_nearest = options.n_nearest;
 
     let cities_table: HashMap<usize, KDPoint> = cities.iter().map(|c| (c.id, c.clone())).collect();
@@ -47,6 +47,5 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     }
 
     send_progress(ProgressMessage::Done);
-    let tour = Solution::new(&path, cities);
-    tour
+    Solution::new(&path, cities)
 }

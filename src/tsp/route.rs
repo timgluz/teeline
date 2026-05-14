@@ -31,6 +31,10 @@ impl Route {
         self.route.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.route.is_empty()
+    }
+
     pub fn route(&self) -> &[usize] {
         self.route.as_slice()
     }
@@ -95,7 +99,7 @@ fn random_pair(n_items: usize) -> (usize, usize) {
     }
 }
 
-fn swap_cities(route: &mut Vec<usize>, from: usize, to: usize) {
+fn swap_cities(route: &mut [usize], from: usize, to: usize) {
     if to >= route.len() {
         panic!("to can not be same or bigger than route size");
     }

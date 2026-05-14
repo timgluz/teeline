@@ -13,10 +13,10 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
 
     let mut epoch = 0;
     let mut n_stale = 0;
-    let mut best_distance = total_distance(cities, &best_route.route());
+    let mut best_distance = total_distance(cities, best_route.route());
     loop {
         let candidate = current_route.random_successor();
-        let candidate_distance = total_distance(&cities, candidate.route());
+        let candidate_distance = total_distance(cities, candidate.route());
 
         if candidate_distance < best_distance {
             best_route = candidate;

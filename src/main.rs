@@ -154,7 +154,7 @@ fn print_solution(tour: &Solution, is_optimized: bool) {
     for city_id in tour.route().iter() {
         print!("{} ", city_id);
     }
-    print!("\n");
+    println!();
 }
 
 fn read_tsp_data_from_file(file_path: &Path) -> tsplib::TspLibData {
