@@ -63,24 +63,22 @@ pub fn from_cities(cities: &[KDPoint]) -> DistanceMatrix {
 
 #[derive(Debug, Clone)]
 pub struct DistanceMatrix {
-    first_id: usize, // TODO: remove - the first city id, default 0
-    n: usize,        // how many cities
-    size: usize,     // how many distances under diagonal
+    n: usize,    // how many cities
+    size: usize, // how many distances under diagonal
     items: Vec<f32>,
     cities: CityTable,
     city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
 }
 
 impl DistanceMatrix {
-    pub fn new(first_id: usize, n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
+    pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
         let city_idx: HashMap<usize, usize> =
-            cities.iter().map(|(k, c)| (c.id, k.clone())).collect();
+            cities.iter().map(|(k, c)| (c.id, *k)).collect();
 
         assert!(n == city_idx.len(), "city_idx size differs from n cities");
         DistanceMatrix {
-            first_id,              // TODO: remove
-            n,                     // how many cities
-            size: distances.len(), // how many distances under diagonal
+            n,
+            size: distances.len(),
             items: distances,
             cities,
             city_idx,
@@ -111,7 +109,7 @@ impl DistanceMatrix {
 
         distances.shrink_to_fit();
 
-        Ok(DistanceMatrix::new(0, n, distances, city_table))
+        Ok(DistanceMatrix::new(n, distances, city_table))
     }
 
     pub fn len(&self) -> usize {
@@ -167,11 +165,10 @@ impl DistanceMatrix {
 
     /// returns list of distances from city N, where 0 distance from the city;
     pub fn distances_from(&self, city_id: usize) -> Vec<f32> {
-        let pos: usize = self
+        let pos: usize = *self
             .city_idx
             .get(&city_id)
-            .expect("Unknown city id")
-            .clone();
+            .expect("Unknown city id");
 
         self.distances_from_index(pos)
     }
@@ -182,7 +179,7 @@ impl DistanceMatrix {
             return 0.0;
         }
 
-        let last_city_id = path.last().unwrap().clone();
+        let last_city_id = *path.last().unwrap();
         let mut total = self.distance_between(last_city_id, path[0]).unwrap();
 
         for i in 1..tour_length {
@@ -197,11 +194,11 @@ impl DistanceMatrix {
     }
 
     pub fn pos2city_id(&self, pos: &usize) -> Option<usize> {
-        self.cities.get(pos).map(|c| c.id.clone())
+        self.cities.get(pos).map(|c| c.id)
     }
 
     pub fn city_id2pos(&self, city_id: &usize) -> Option<usize> {
-        self.city_idx.get(city_id).map(|i| i.clone())
+        self.city_idx.get(city_id).copied()
     }
 
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
@@ -214,7 +211,7 @@ impl DistanceMatrix {
 
                 // the NearestResult takes care of ordering the results
                 if let Some(pt) = self.cities.get(&city_id) {
-                    search_result.add(pt.clone(), distance.clone());
+                    search_result.add(pt.clone(), *distance);
                 }
             }
         } else {
