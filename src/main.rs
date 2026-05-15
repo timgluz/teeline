@@ -92,6 +92,13 @@ fn main() {
                 .action(ArgAction::SetTrue)
                 .required(false),
         )
+        .arg(
+            Arg::new("optimal_tour")
+                .long("optimal-tour")
+                .value_name("FILE_PATH")
+                .help("Path to a .opt.tour file; overlays optimal route on visualization and prints gap to stderr")
+                .required(false),
+        )
         .get_matches();
 
     let solver_type =
@@ -133,6 +140,32 @@ fn main() {
 
     // eframe (winit) requires the event loop on the main thread,
     // so the solver runs in a background thread and the window stays on main.
+    // MUST construct ProgressPlot first — new() calls init_channels() which
+    // sets up the global mpsc channel before any send_progress calls.
+    let progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
+
+    let opt_tour = args
+        .get_one::<String>("optimal_tour")
+        .and_then(|p| match teeline::tsp::opt_tour::read_from_file(Path::new(p.as_str())) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                eprintln!("--optimal-tour: {e}");
+                None
+            }
+        });
+
+    if let Some(ref ot) = opt_tour {
+        if ot.dimension == tsp_data.len() {
+            progress::send_progress(progress::ProgressMessage::OptimalTour(ot.route.clone()));
+        } else {
+            eprintln!(
+                "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
+                ot.dimension,
+                tsp_data.len()
+            );
+        }
+    }
+
     let cities_for_solver = cities.clone();
     let distances_for_solver = distances.clone();
     let span = tracing::info_span!("solver", algorithm = ?solver_type);
@@ -141,12 +174,16 @@ fn main() {
         let tour = solve(solver_type, &cities_for_solver, &distances_for_solver, &options.clone());
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
+        tour
     });
 
-    let progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
     progress_display.run(show_progress);
 
-    solver_handle.join().expect("Solver thread failed");
+    let tour = solver_handle.join().expect("Solver thread failed");
+
+    if let Some(ot) = opt_tour {
+        print_optimal_comparison(&tour, &distances, tsp_data.len(), &ot);
+    }
 }
 
 fn solve(
@@ -175,6 +212,39 @@ fn print_solution(tour: &Solution, is_optimized: bool) {
         print!("{} ", city_id);
     }
     println!();
+}
+
+fn print_optimal_comparison(
+    solver_tour: &Solution,
+    distances: &distance_matrix::DistanceMatrix,
+    n_cities: usize,
+    opt_tour: &teeline::tsp::opt_tour::OptTour,
+) {
+    if opt_tour.dimension != n_cities {
+        eprintln!(
+            "--optimal-tour: dimension mismatch ({} vs {}); skipping comparison",
+            opt_tour.dimension,
+            n_cities
+        );
+        return;
+    }
+
+    let optimal_cost = distances.tour_length(&opt_tour.route);
+    let solver_cost = solver_tour.total;
+    let gap_pct = if optimal_cost > 0.0 {
+        (solver_cost - optimal_cost) / optimal_cost * 100.0
+    } else {
+        0.0
+    };
+
+    eprintln!("--- Comparison ---");
+    eprintln!("Optimal  : {:.5}  (from {})", optimal_cost, opt_tour.name);
+    eprintln!("Solver   : {:.5}", solver_cost);
+    if gap_pct.abs() < 0.001 {
+        eprintln!("Gap      : 0.00 % (matches optimal)");
+    } else {
+        eprintln!("Gap      : {:+.2} %", gap_pct);
+    }
 }
 
 fn read_tsp_data_from_file(file_path: &Path) -> tsplib::TspLibData {

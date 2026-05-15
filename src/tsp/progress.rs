@@ -24,6 +24,7 @@ const WHITE:              Color32 = Color32::from_rgb(255, 255, 255);
 const CITY_COLOR:         Color32 = Color32::from_rgb(30,  30,  30);   // near-black nodes
 const CURRENT_CITY_COLOR: Color32 = Color32::from_rgb(220, 30,  30);   // red — active city
 const BEST_EDGE_COLOR:    Color32 = Color32::from_rgb(34,  139, 34);   // green — best route
+const OPTIMAL_EDGE_COLOR: Color32 = Color32::from_rgb(50,  205, 50);   // lime — known-optimal route
 const CURRENT_EDGE_COLOR: Color32 = Color32::from_rgb(30,  100, 220);  // blue — exploring route
 const ACTIVE_EDGE_COLOR:  Color32 = Color32::from_rgb(255, 140, 0);    // orange — current step
 const STATUS_COLOR:       Color32 = Color32::from_rgb(220, 30,  30);   // red — status text
@@ -73,6 +74,7 @@ pub enum ProgressMessage {
     EpochUpdate(usize),
     Done,
     Restart,
+    OptimalTour(Vec<usize>),
 }
 
 struct NodeData {
@@ -84,6 +86,7 @@ pub struct ProgressPlot {
     city_table: HashMap<usize, KDPoint>,
     nodes: Vec<NodeData>,
     best_edges: Vec<EdgeData>,    // shown in green after Done
+    optimal_edges: Vec<EdgeData>, // lime green — known-optimal tour overlay
     current_edges: Vec<EdgeData>, // shown in blue while solving
     current_city_id: Option<usize>,
     prev_city_id: Option<usize>,
@@ -103,6 +106,7 @@ impl ProgressPlot {
             city_table: HashMap::new(),
             nodes: Vec::new(),
             best_edges: Vec::new(),
+            optimal_edges: Vec::new(),
             current_edges: Vec::new(),
             current_city_id: None,
             prev_city_id: None,
@@ -181,6 +185,10 @@ impl ProgressPlot {
                 self.current_city_id = Some(*id);
                 self.status = "Solving...".to_string();
             }
+            ProgressMessage::OptimalTour(city_ids) => {
+                let route = Route::new(city_ids.as_slice());
+                self.optimal_edges = self.build_route_edges(&route);
+            }
             _ => {}
         }
     }
@@ -239,11 +247,15 @@ impl eframe::App for ProgressPlot {
             .show(ctx, |ui| {
                 let painter = ui.painter();
 
-                // While solving: current exploring route in blue.
-                // After Done: best route in green (replaces live view).
+                // Layer 0: optimal tour (lime green, thin) — always visible as reference
+                for (from, to) in &self.optimal_edges {
+                    painter.line_segment([*from, *to], Stroke::new(1.5, OPTIMAL_EDGE_COLOR));
+                }
+
+                // Layer 1: solver route
                 if self.is_solved {
                     for (from, to) in &self.best_edges {
-                        painter.line_segment([*from, *to], Stroke::new(2.5, BEST_EDGE_COLOR));
+                        painter.line_segment([*from, *to], Stroke::new(4.0, BEST_EDGE_COLOR));
                     }
                 } else {
                     for (from, to) in &self.current_edges {
@@ -251,7 +263,7 @@ impl eframe::App for ProgressPlot {
                     }
                 }
 
-                // Orange edge from previous city to current city (B&B active step)
+                // Layer 2: active step edge (B&B orange)
                 if let (Some(prev_id), Some(curr_id)) = (self.prev_city_id, self.current_city_id) {
                     let prev_pos = self.nodes.iter().find(|n| n.city_id == prev_id).map(|n| n.pos);
                     let curr_pos = self.nodes.iter().find(|n| n.city_id == curr_id).map(|n| n.pos);
@@ -260,7 +272,7 @@ impl eframe::App for ProgressPlot {
                     }
                 }
 
-                // Layer 4: city nodes (black; current city = red)
+                // Layer 3: city nodes (black; current city = red)
                 for node in &self.nodes {
                     let color = if self.current_city_id == Some(node.city_id) {
                         CURRENT_CITY_COLOR
@@ -281,6 +293,7 @@ impl eframe::App for ProgressPlot {
                     );
                 }
 
+                // Status line (top-left)
                 let margin = self.viewport_dimensions.margin as f32;
                 painter.text(
                     Pos2::new(margin, margin / 2.0),
@@ -289,6 +302,9 @@ impl eframe::App for ProgressPlot {
                     FontId::proportional(FONT_SIZE),
                     STATUS_COLOR,
                 );
+
+                // Legend (bottom-left); painter is already &Painter — do NOT add &
+                draw_legend(painter, &self.viewport_dimensions, !self.optimal_edges.is_empty());
             });
 
         // Poll at ~60fps while solver runs; avoids burning a full CPU core.
@@ -356,6 +372,38 @@ fn cities_bounding_box(cities: &[KDPoint]) -> RectCoords {
     }
 
     [x_min as f64, y_min as f64, x_max as f64, y_max as f64]
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn draw_legend(painter: &egui::Painter, vp: &ViewportDimensions, show_optimal: bool) {
+    let x0 = vp.margin as f32;
+    let y0 = vp.height as f32 - vp.margin as f32 - 80.0;
+    let line_len = 24.0_f32;
+    let row_h = 20.0_f32;
+    let label_x = x0 + line_len + 6.0;
+
+    let mut entries: Vec<(Color32, &str)> = Vec::new();
+    if show_optimal {
+        entries.push((OPTIMAL_EDGE_COLOR, "Optimal tour"));
+    }
+    entries.push((BEST_EDGE_COLOR, "Solver best"));
+    entries.push((CURRENT_EDGE_COLOR, "Solver current"));
+    entries.push((ACTIVE_EDGE_COLOR, "Active edge"));
+
+    for (i, (color, label)) in entries.iter().enumerate() {
+        #[allow(clippy::cast_precision_loss)]
+        let y = y0 + i as f32 * row_h;
+        let p0 = Pos2::new(x0, y);
+        let p1 = Pos2::new(x0 + line_len, y);
+        painter.line_segment([p0, p1], Stroke::new(2.5, *color));
+        painter.text(
+            Pos2::new(label_x, y - FONT_SIZE / 2.0),
+            Align2::LEFT_TOP,
+            *label,
+            FontId::proportional(FONT_SIZE - 2.0),
+            *color,
+        );
+    }
 }
 
 // converts EUC2D space into GUI coords [0..self.height, 0..self.width]
