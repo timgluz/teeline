@@ -11,8 +11,8 @@ use super::{Solution, SolverOptions};
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
-    let evaluator = build_evaluator(cities);
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
+    let evaluator = build_evaluator(distances);
 
     let population_size = cities.len();
     let population = TspPopulation::from_cities(cities, population_size, &evaluator);
@@ -24,7 +24,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         best_candidate.fitness(),
     ));
     send_progress(ProgressMessage::Done);
-    Solution::new(best_candidate.genotype(), cities)
+    Solution::new(best_candidate.genotype(), cities, distances)
 }
 
 fn solve_ga(
@@ -88,8 +88,8 @@ fn solve_ga(
     current_population.best().clone()
 }
 
-fn build_evaluator(cities: &[KDPoint]) -> FitnessFn {
-    let dm = Rc::new(DistanceMatrix::from_cities(cities).unwrap());
+fn build_evaluator(distances: &DistanceMatrix) -> FitnessFn {
+    let dm = Rc::new(distances.clone());
 
     Rc::new(move |path: &[usize]| {
         let tour_length = dm.tour_length(path);

@@ -1,9 +1,10 @@
+use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
-use super::{total_distance, Solution, SolverOptions};
+use super::{Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     tracing::info!(
         epochs = options.epochs,
         platoo_epochs = options.platoo_epochs,
@@ -19,14 +20,14 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     // Baseline from the shuffled state — sequential ordering would be
     // an artificially low bar that random successors can never beat.
     let mut best_route = current_route.clone();
-    let mut best_distance = total_distance(cities, best_route.route());
+    let mut best_distance = distances.tour_length(best_route.route());
 
     let mut epoch = 0;
     let mut n_stale = 0;
     let mut found_improvement = false;
     loop {
         let candidate = current_route.random_successor();
-        let candidate_distance = total_distance(cities, candidate.route());
+        let candidate_distance = distances.tour_length(candidate.route());
 
         if candidate_distance < best_distance {
             current_route = candidate.clone(); // follow the gradient
@@ -69,13 +70,13 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     }
 
     send_progress(ProgressMessage::Done);
-    Solution::new(best_route.route(), cities)
+    Solution::new(best_route.route(), cities, distances)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::kdtree;
+    use crate::tsp::{distance_matrix, kdtree};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -97,7 +98,8 @@ mod tests {
     #[test]
     fn test_solve_visits_all_cities() {
         let cities = tsp5_cities();
-        let tour = solve(&cities, &fast_options());
+        let dm = distance_matrix::from_cities(&cities);
+        let tour = solve(&cities, &dm, &fast_options());
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -107,7 +109,8 @@ mod tests {
     #[test]
     fn test_solve_tour_length_is_positive_and_finite() {
         let cities = tsp5_cities();
-        let tour = solve(&cities, &fast_options());
+        let dm = distance_matrix::from_cities(&cities);
+        let tour = solve(&cities, &dm, &fast_options());
 
         assert!(tour.total > 0.0, "tour length should be positive");
         assert!(tour.total.is_finite(), "tour length should be finite");
@@ -116,11 +119,11 @@ mod tests {
     #[test]
     fn test_solve_terminates_within_epoch_limit() {
         let cities = tsp5_cities();
+        let dm = distance_matrix::from_cities(&cities);
         let mut opts = SolverOptions::default();
         opts.epochs = 100;
         opts.platoo_epochs = 50;
-        let tour = solve(&cities, &opts);
-        // the test itself verifies termination by returning
+        let tour = solve(&cities, &dm, &opts);
         assert_eq!(tour.route().len(), cities.len());
     }
 }

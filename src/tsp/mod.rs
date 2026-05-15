@@ -12,6 +12,7 @@ pub mod tabu_search;
 pub mod tsplib;
 pub mod two_opt;
 
+use crate::tsp::distance_matrix::DistanceMatrix;
 use crate::tsp::kdtree::KDPoint;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -76,8 +77,8 @@ impl FromStr for Solvers {
 
 #[derive(Clone, Debug)]
 pub struct SolverOptions {
-    pub epochs: usize,        // how many iteration to run
-    pub platoo_epochs: usize, // how many iterations to do on the platoo
+    pub epochs: usize,
+    pub platoo_epochs: usize,
     pub verbose: bool,
     pub n_nearest: usize,
     pub mutation_probability: f32,
@@ -85,7 +86,7 @@ pub struct SolverOptions {
     pub cooling_rate: f32,
     pub max_temperature: f32,
     pub min_temperature: f32,
-    pub show_progress: bool, // should we show and print progress
+    pub show_progress: bool,
 }
 
 impl Default for SolverOptions {
@@ -108,49 +109,31 @@ impl Default for SolverOptions {
 // -- solution implementation
 pub type CityTable = HashMap<usize, KDPoint>;
 
-pub fn total_distance(cities: &[KDPoint], route: &[usize]) -> f32 {
-    let mut total = 0.0;
-    let last_idx = route.len() - 1;
-
-    let cities_table = city_table_from_vec(cities);
-    for i in 0..last_idx {
-        let distance = cities_table[&route[i]].distance(&cities_table[&route[i + 1]]);
-        total += distance
-    }
-
-    total += cities_table[&route[last_idx]].distance(&cities_table[&route[0]]);
-
-    total
-}
-
 pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
-    let table: CityTable = cities.iter().map(|c| (c.id, c.clone())).collect();
-
-    table
+    cities.iter().map(|c| (c.id, c.clone())).collect()
 }
 
 pub struct Solution {
     pub total: f32,
     route: Vec<usize>,
     cities: Vec<KDPoint>,
-    cities_idx: HashMap<usize, usize>, // it maps city.id to internal vector_id
+    cities_idx: HashMap<usize, usize>,
 }
 
 impl Solution {
-    pub fn new(route: &[usize], cities: &[kdtree::KDPoint]) -> Self {
-        let idx: HashMap<usize, usize> =
-            cities.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
+    pub fn new(route: &[usize], cities: &[kdtree::KDPoint], distances: &DistanceMatrix) -> Self {
+        let cities_idx = cities
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.id, i))
+            .collect();
 
-        let mut solution = Solution {
-            total: 0.0,
+        Solution {
+            total: distances.tour_length(route),
             route: route.to_vec(),
             cities: cities.to_vec(),
-            cities_idx: idx,
-        };
-
-        solution.update_total();
-
-        solution
+            cities_idx,
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -176,19 +159,14 @@ impl Solution {
             None
         }
     }
-
-    pub fn update_total(&mut self) {
-        self.total = total_distance(self.cities(), self.route());
-    }
 }
 
 #[derive(Debug, Clone)]
 pub struct NearestResult {
     pub target: KDPoint,
-    pub point: KDPoint, // the best result, may be the exact match
-    pub distance: f32,  // best distance
-    pub n: usize,       // how many nearest items to keep
-    // we expect that we look only small number of items
+    pub point: KDPoint,
+    pub distance: f32,
+    pub n: usize,
     results: Vec<NearestResultItem>,
 }
 
@@ -215,9 +193,7 @@ impl NearestResult {
             self.point = pt.clone();
         }
 
-        // we only keep the best results
         if new_distance < self.farthest_distance() {
-            // if stack is full, then remove the weakest result
             if self.results.len() >= self.n {
                 self.results.pop();
             }
@@ -271,7 +247,7 @@ mod tests {
     use crate::test::helpers::assert_approx;
 
     #[test]
-    fn test_total_distance_for_tsp_5_1() {
+    fn test_solution_total_for_tsp_5_1() {
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
             vec![0.0, 0.5],
@@ -280,8 +256,16 @@ mod tests {
             vec![1.0, 0.0],
         ]);
 
-        let route = vec![0, 1, 2, 3, 4];
+        let route = vec![
+            cities[0].id,
+            cities[1].id,
+            cities[2].id,
+            cities[3].id,
+            cities[4].id,
+        ];
 
-        assert_approx(4.0, total_distance(&cities, &route));
+        let dm = distance_matrix::from_cities(&cities);
+        let sol = Solution::new(&route, &cities, &dm);
+        assert_approx(4.0, sol.total);
     }
 }
