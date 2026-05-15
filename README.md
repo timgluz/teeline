@@ -263,6 +263,35 @@ Resources:
 - [Genetic algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Genetic_algorithm)
 - *AIMA*, Section 4.1.4 — Genetic Algorithms
 
+#### Particle Swarm Optimisation (`particle_swarm`, `pso`)
+
+Swarm metaheuristic: each particle is a candidate tour that moves through the search space pulled toward its own personal best and the global best tour found so far. The velocity is an ordered list of position swaps rather than a continuous vector.
+
+**TSP-specific adaptations** (deviations from the textbook Clerc 2004 algorithm):
+
+| Adaptation | Why |
+|---|---|
+| Velocity cap at `⌈0.35 · n⌉` swaps | Without a cap, steady-state velocity grows to ~5 n swaps, scrambling the tour into noise |
+| Linear inertia decay W: 0.9 → 0.4 | High inertia early for broad exploration; decays like a cooling schedule so late epochs fine-tune around the best region found |
+| Particle 0 seeded with a greedy NN tour | Gives the swarm a good starting neighbourhood; remaining particles are random for diversity |
+
+Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--epochs` | Maximum iterations | 10 000 |
+| `--n_nearest` | Number of particles (floored at 30) | 30 |
+
+```bash
+teeline pso -i ./data/tsplib/berlin52.tsp
+teeline particle_swarm -i ./data/tsplib/berlin52.tsp --epochs=500
+teeline pso -i ./data/tsplib/berlin52.tsp --n_nearest=50
+```
+
+Resources:
+- [Particle swarm optimisation (Wikipedia)](https://en.wikipedia.org/wiki/Particle_swarm_optimization)
+- Kennedy & Eberhart (1995) — *Particle Swarm Optimization*
+- Clerc (2004) — *Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem*
+
 ---
 
 ## Visualising Results

@@ -54,6 +54,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/bin nn
 | `simulated_annealing.rs` | Simulated annealing | `sa` |
 | `tabu_search.rs` | Tabu search | — |
 | `genetic_algorithm.rs` | Genetic algorithm | `ga` |
+| `particle_swarm.rs` | Discrete PSO (velocity-capped, linearly decaying inertia, NN-seeded) | `pso` |
 
 **Tests:**
 - Unit tests live inline in each source file (`#[cfg(test)]`)
