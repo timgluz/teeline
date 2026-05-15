@@ -4,7 +4,7 @@ use std::path::Path;
 use std::str::FromStr;
 use std::thread;
 
-use teeline::tsp::{self, kdtree, progress, tsplib, Solution, SolverOptions, Solvers};
+use teeline::tsp::{self, distance_matrix, kdtree, progress, tsplib, Solution, SolverOptions, Solvers};
 use tracing_subscriber::EnvFilter;
 
 fn main() {
@@ -122,14 +122,23 @@ fn main() {
                    cities = tsp_data.len(), "problem loaded");
 
     let cities = tsp_data.cities().to_vec();
+    let distances = match tsp_data.distance_matrix() {
+        Ok(dm) => dm,
+        Err(e) => {
+            eprintln!("Error building distance matrix: {e}");
+            std::process::exit(1);
+        }
+    };
     let show_progress = options.show_progress;
 
     // eframe (winit) requires the event loop on the main thread,
     // so the solver runs in a background thread and the window stays on main.
+    let cities_for_solver = cities.clone();
+    let distances_for_solver = distances.clone();
     let span = tracing::info_span!("solver", algorithm = ?solver_type);
     let solver_handle = thread::spawn(move || {
         let _enter = span.entered();
-        let tour = solve(solver_type, tsp_data.cities(), &options.clone());
+        let tour = solve(solver_type, &cities_for_solver, &distances_for_solver, &options.clone());
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
     });
@@ -140,16 +149,21 @@ fn main() {
     solver_handle.join().expect("Solver thread failed");
 }
 
-fn solve(algorithm: Solvers, cities: &[kdtree::KDPoint], options: &SolverOptions) -> Solution {
+fn solve(
+    algorithm: Solvers,
+    cities: &[kdtree::KDPoint],
+    distances: &distance_matrix::DistanceMatrix,
+    options: &SolverOptions,
+) -> Solution {
     match algorithm {
-        Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, options),
-        Solvers::BranchBound => tsp::branch_bound::solve(cities, options),
-        Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, options),
-        Solvers::TwoOpt => tsp::two_opt::solve(cities, options),
-        Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, options),
-        Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, options),
-        Solvers::TabuSearch => tsp::tabu_search::solve(cities, options),
-        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, options),
+        Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, distances, options),
+        Solvers::BranchBound => tsp::branch_bound::solve(cities, distances, options),
+        Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, distances, options),
+        Solvers::TwoOpt => tsp::two_opt::solve(cities, distances, options),
+        Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, distances, options),
+        Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, distances, options),
+        Solvers::TabuSearch => tsp::tabu_search::solve(cities, distances, options),
+        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, distances, options),
         _ => panic!("Unspecified solver"),
     }
 }

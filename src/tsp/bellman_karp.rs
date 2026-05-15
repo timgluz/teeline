@@ -21,14 +21,14 @@ type DPTable = Vec<Vec<f32>>;
 
 const UNKNOWN_DISTANCE: f32 = f32::MAX;
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     let n_cities = cities.len();
     let n_others = n_cities - 1; // we start from last city
     let n_powersets = 1 << n_others;
 
     tracing::info!(n_cities, n_subsets = n_powersets, "BHK starting");
 
-    let dists = DistanceMatrix::from_cities(cities).unwrap();
+    let dists = distances;
     let mut opt = vec![vec![UNKNOWN_DISTANCE; n_powersets]; n_others];
 
     tracing::info!("BHK: initialising DP table");
@@ -46,7 +46,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
 
     let selected_set = (1 << n_others) - 1;
     for city_pos in 0..n_others {
-        solve_bhk(&mut opt, &dists, selected_set, city_pos);
+        solve_bhk(&mut opt, dists, selected_set, city_pos);
     }
 
     tracing::info!("BHK: DP complete");
@@ -69,14 +69,14 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
         .fold(f32::MAX, f32::min);
 
     tracing::info!(optimal_distance, "BHK: optimal tour found");
-    let route_vec = read_optimal_route(&opt, &dists, n_cities, optimal_distance);
+    let route_vec = read_optimal_route(&opt, dists, n_cities, optimal_distance);
 
     // send final route to the visualizer
     let route = Route::new(route_vec.as_ref());
     send_progress(ProgressMessage::PathUpdate(route, 0.0));
     send_progress(ProgressMessage::Done);
 
-    Solution::new(&route_vec, cities)
+    Solution::new(&route_vec, cities, distances)
 }
 
 fn solve_bhk(
@@ -95,7 +95,7 @@ fn solve_bhk(
 
     // rest_selected R = S \ t , all other than city_id
     let rest_selected = selected_set & !(1 << city_pos);
-    let n_other = opt.len() - 1; // opt has n_city rows
+    let n_other = opt.len(); // one row per non-start city (positions 0..n_others)
     for i in 0..n_other {
         // if city i is not in rest_selected
         if (rest_selected & (1 << i)) == 0 {
@@ -180,14 +180,12 @@ fn show_table(opt: &DPTable) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::kdtree;
+    use crate::tsp::{distance_matrix, kdtree};
 
     fn default_options() -> SolverOptions {
         SolverOptions::default()
     }
 
-    // tsp_5_1 shape: five cities forming a rectangle with a midpoint on one side
-    // optimal tour visits them in order and has total length 4.0
     fn tsp_5_1_cities() -> Vec<kdtree::KDPoint> {
         kdtree::build_points(&[
             vec![0.0, 0.0],
@@ -201,7 +199,8 @@ mod tests {
     #[test]
     fn test_solve_returns_all_cities() {
         let cities = tsp_5_1_cities();
-        let solution = solve(&cities, &default_options());
+        let dm = distance_matrix::from_cities(&cities);
+        let solution = solve(&cities, &dm, &default_options());
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();
@@ -215,7 +214,8 @@ mod tests {
     #[test]
     fn test_solve_finds_optimal_tour_length() {
         let cities = tsp_5_1_cities();
-        let solution = solve(&cities, &default_options());
+        let dm = distance_matrix::from_cities(&cities);
+        let solution = solve(&cities, &dm, &default_options());
 
         // optimal tour: 0→1→2→3→4→0 = 0.5 + 0.5 + 1.0 + 1.0 + 1.0 = 4.0
         assert!(
@@ -227,13 +227,13 @@ mod tests {
 
     #[test]
     fn test_solve_with_3_cities() {
-        // simple triangle: right angle at origin
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
             vec![3.0, 0.0],
             vec![0.0, 4.0],
         ]);
-        let solution = solve(&cities, &default_options());
+        let dm = distance_matrix::from_cities(&cities);
+        let solution = solve(&cities, &dm, &default_options());
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();

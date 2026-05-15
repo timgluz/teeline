@@ -1,11 +1,12 @@
 use std::collections::VecDeque;
 
+use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
-use super::{total_distance, Solution, SolverOptions};
+use super::{Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     let tabu_capacity = cities.len();
 
     tracing::info!(epochs = options.epochs, tabu_capacity, "tabu search starting");
@@ -18,11 +19,11 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     send_progress(ProgressMessage::PathUpdate(best_route.clone(), 0.0));
 
     let mut u = best_route.clone();
-    let mut best_distance = distance(cities, &u);
+    let mut best_distance = distances.tour_length(u.route());
     let mut done = false;
     let mut epoch = 0;
     while !done {
-        let (local_best, local_distance) = select(cities, &u, &tabu_list);
+        let (local_best, local_distance) = select(distances, &u, &tabu_list);
         if local_distance < best_distance {
             best_route = local_best.clone();
             best_distance = local_distance;
@@ -35,39 +36,33 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
             tracing::info!(epoch, tour_length = local_distance, "tabu: new best");
         }
 
-        // refine tabu list
         tabu_list.add(u.clone());
-        u = local_best; // continue search from local best
+        u = local_best;
 
         epoch += 1;
         done = update_terminate(epoch, options.epochs);
     }
 
     send_progress(ProgressMessage::Done);
-    Solution::new(best_route.route(), cities)
+    Solution::new(best_route.route(), cities, distances)
 }
 
-fn select(cities: &[KDPoint], route: &Route, tabu_list: &TabuList) -> (Route, f32) {
-    let local_best = distance(cities, route);
+fn select(distances: &DistanceMatrix, route: &Route, tabu_list: &TabuList) -> (Route, f32) {
+    let local_best = distances.tour_length(route.route());
 
     let mut candidate = route.random_successor();
-    let mut candidate_distance = distance(cities, &candidate);
+    let mut candidate_distance = distances.tour_length(candidate.route());
 
-    // try to local best
     for _ in 0..route.len() {
         if candidate_distance < local_best && !tabu_list.contains(&candidate) {
             break;
         }
 
         candidate = route.random_successor();
-        candidate_distance = distance(cities, &candidate);
+        candidate_distance = distances.tour_length(candidate.route());
     }
 
     (candidate, candidate_distance)
-}
-
-fn distance(cities: &[KDPoint], route: &Route) -> f32 {
-    total_distance(cities, route.route())
 }
 
 fn update_terminate(epoch: usize, max_epochs: usize) -> bool {
@@ -105,7 +100,7 @@ impl TabuList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::kdtree;
+    use crate::tsp::{distance_matrix, kdtree};
     use crate::tsp::route::Route;
 
     fn tsp5_cities() -> Vec<KDPoint> {
@@ -140,7 +135,7 @@ mod tests {
         let r3 = Route::new(&[2, 1, 0]);
         tabu.add(r1.clone());
         tabu.add(r2.clone());
-        tabu.add(r3.clone()); // r1 (oldest, at back) should be evicted
+        tabu.add(r3.clone());
         assert!(!tabu.contains(&r1), "oldest route should have been evicted");
         assert!(tabu.contains(&r2));
         assert!(tabu.contains(&r3));
@@ -155,9 +150,10 @@ mod tests {
     #[test]
     fn test_solve_visits_all_cities() {
         let cities = tsp5_cities();
+        let dm = distance_matrix::from_cities(&cities);
         let mut options = SolverOptions::default();
         options.epochs = 200;
-        let tour = solve(&cities, &options);
+        let tour = solve(&cities, &dm, &options);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -167,9 +163,10 @@ mod tests {
     #[test]
     fn test_solve_tour_length_is_positive() {
         let cities = tsp5_cities();
+        let dm = distance_matrix::from_cities(&cities);
         let mut options = SolverOptions::default();
         options.epochs = 200;
-        let tour = solve(&cities, &options);
+        let tour = solve(&cities, &dm, &options);
 
         assert!(tour.total > 0.0, "tour length must be positive");
     }

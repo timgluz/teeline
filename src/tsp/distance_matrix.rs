@@ -226,18 +226,13 @@ impl DistanceMatrix {
     fn distances_from_index(&self, pos: usize) -> Vec<f32> {
         let mut distances: Vec<f32> = vec![];
 
-        // all the values from the city row aka with smalled_ids
         for i in 0..pos {
-            let d = self.distance_between(pos, i).unwrap_or(-1.0); //-1 would mean error
-            distances.push(d);
+            distances.push(self.distance_by_pos(pos, i).unwrap_or(-1.0));
         }
 
-        // all the values form the cities with bigger ID
-        // it starts from city , which would return distance 0, which we need for place holder
         let n_cities = self.n;
         for i in pos..n_cities {
-            let d = self.distance_between(i, pos).unwrap_or(-1.0);
-            distances.push(d);
+            distances.push(self.distance_by_pos(i, pos).unwrap_or(-1.0));
         }
 
         distances

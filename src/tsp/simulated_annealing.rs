@@ -1,11 +1,12 @@
 use rand::Rng;
 
+use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
-use super::{total_distance, Solution, SolverOptions};
+use super::{Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     let cooling_rate = options.cooling_rate;
     let mut epoch = 0;
 
@@ -17,7 +18,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     );
 
     let mut best_route = Route::from_cities(cities);
-    let mut best_distance = total_distance(cities, best_route.route());
+    let mut best_distance = distances.tour_length(best_route.route());
 
     send_progress(ProgressMessage::PathUpdate(
         best_route.clone(),
@@ -27,7 +28,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     let mut temperature = options.max_temperature;
     while epoch < options.epochs || temperature > options.min_temperature {
         let candidate = best_route.random_successor();
-        let candidate_distance = total_distance(cities, candidate.route());
+        let candidate_distance = distances.tour_length(candidate.route());
 
         if is_acceptable(temperature, best_distance, candidate_distance) {
             best_route = candidate;
@@ -46,7 +47,7 @@ pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
     }
 
     send_progress(ProgressMessage::Done);
-    Solution::new(best_route.route(), cities)
+    Solution::new(best_route.route(), cities, distances)
 }
 
 fn cooling(temperature: f32, cooling_rate: f32) -> f32 {

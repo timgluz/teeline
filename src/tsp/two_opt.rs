@@ -1,13 +1,13 @@
+use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::{send_progress, ProgressMessage};
 use super::route::Route;
-use super::{city_table_from_vec, Solution, SolverOptions};
+use super::{Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], _options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, _options: &SolverOptions) -> Solution {
     tracing::info!(cities = cities.len(), "2-opt starting");
 
     let n_indices = cities.len() - 1;
-    let cities_table = city_table_from_vec(cities);
     let mut path: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
     send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
@@ -19,11 +19,13 @@ pub fn solve(cities: &[KDPoint], _options: &SolverOptions) -> Solution {
             send_progress(ProgressMessage::CityChange(path[i]));
 
             for j in (i + 2)..n_indices {
-                let current_distance = cities_table[&path[i]].distance(&cities_table[&path[i + 1]])
-                    + cities_table[&path[j]].distance(&cities_table[&path[j + 1]]);
+                let current_distance =
+                    distances.distance_between(path[i], path[i + 1]).expect("two_opt: invalid city pair")
+                    + distances.distance_between(path[j], path[j + 1]).expect("two_opt: invalid city pair");
 
-                let new_distance = cities_table[&path[i]].distance(&cities_table[&path[j]])
-                    + cities_table[&path[i + 1]].distance(&cities_table[&path[j + 1]]);
+                let new_distance =
+                    distances.distance_between(path[i], path[j]).expect("two_opt: invalid city pair")
+                    + distances.distance_between(path[i + 1], path[j + 1]).expect("two_opt: invalid city pair");
 
                 if new_distance < current_distance {
                     swap_2opt(&mut path, i + 1, j);
@@ -37,7 +39,7 @@ pub fn solve(cities: &[KDPoint], _options: &SolverOptions) -> Solution {
     }
 
     send_progress(ProgressMessage::Done);
-    Solution::new(&path, cities)
+    Solution::new(&path, cities, distances)
 }
 
 fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
@@ -55,7 +57,7 @@ fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::kdtree;
+    use crate::tsp::{distance_matrix, kdtree};
 
     #[test]
     fn test_swap_2opt_2middle_elems_in_even_size_list() {
@@ -85,8 +87,9 @@ mod tests {
             vec![1.0, 0.0],
         ]);
 
+        let dm = distance_matrix::from_cities(&cities);
         let default_opts = SolverOptions::default();
-        let tour = solve(&cities, &default_opts);
+        let tour = solve(&cities, &dm, &default_opts);
         assert_eq!(4.0, tour.total);
         assert_eq!(&[0, 1, 2, 3, 4], tour.route());
     }

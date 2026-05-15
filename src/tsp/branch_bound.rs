@@ -14,39 +14,37 @@ type Path = Vec<usize>;
 type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 
 // TODO: add better strategy or constraints for Bounding step
-pub fn solve(cities: &[KDPoint], options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     let mut route = Route::from_cities(cities);
     let n_cities = route.len();
 
     tracing::info!(n_cities, "B&B starting");
 
-    // we will start from city with smallest ID
     route.sort();
     send_progress(ProgressMessage::PathUpdate(route.clone(), 0.0));
 
     let mut open_path: Path = vec![0; n_cities];
     open_path[0] = route.get(0).unwrap();
 
-    // at the beginning all cities the except the first city are unvisited
     let unvisited_cities: UniqSet = route.route().iter().skip(1).copied().collect();
 
-    let fitness_fn = build_evaluator(cities);
+    let fitness_fn = build_evaluator(distances);
     let (best_path, _best_distance) = backtrack(
         &fitness_fn,
         &mut open_path,
         &unvisited_cities,
-        1, // we start backtracking from second city
+        1,
         0.0,
         f32::MAX,
         options,
     );
 
     send_progress(ProgressMessage::Done);
-    Solution::new(&best_path, cities)
+    Solution::new(&best_path, cities, distances)
 }
 
-fn build_evaluator(cities: &[KDPoint]) -> PathEvaluator {
-    let dm = Rc::new(DistanceMatrix::from_cities(cities).expect("Failed to build distance matrix"));
+fn build_evaluator(distances: &DistanceMatrix) -> PathEvaluator {
+    let dm = Rc::new(distances.clone());
 
     Rc::new(move |path: &Path| dm.tour_length(path))
 }
@@ -169,7 +167,7 @@ fn undo_move(path: &mut Path, k: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{bellman_karp, kdtree};
+    use crate::tsp::{bellman_karp, distance_matrix, kdtree};
 
     fn tsp5_cities() -> Vec<kdtree::KDPoint> {
         kdtree::build_points(&[
@@ -184,8 +182,8 @@ mod tests {
     #[test]
     fn test_solve_visits_all_cities() {
         let cities = tsp5_cities();
-        let options = SolverOptions::default();
-        let tour = solve(&cities, &options);
+        let dm = distance_matrix::from_cities(&cities);
+        let tour = solve(&cities, &dm, &SolverOptions::default());
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -195,10 +193,9 @@ mod tests {
     #[test]
     fn test_solve_finds_optimal_tour_on_tsp5() {
         let cities = tsp5_cities();
-        let options = SolverOptions::default();
-        let tour = solve(&cities, &options);
+        let dm = distance_matrix::from_cities(&cities);
+        let tour = solve(&cities, &dm, &SolverOptions::default());
 
-        // optimal tour 0→1→2→3→4→0 = 0.5 + 0.5 + 1.0 + 1.0 + 1.0 = 4.0
         assert!(
             (tour.total - 4.0).abs() < 1e-3,
             "expected optimal tour ~4.0, got {}",
@@ -209,9 +206,9 @@ mod tests {
     #[test]
     fn test_solve_matches_bellman_karp_on_tsp5() {
         let cities = tsp5_cities();
-        let options = SolverOptions::default();
-        let bb_tour = solve(&cities, &options);
-        let bhk_tour = bellman_karp::solve(&cities, &options);
+        let dm = distance_matrix::from_cities(&cities);
+        let bb_tour = solve(&cities, &dm, &SolverOptions::default());
+        let bhk_tour = bellman_karp::solve(&cities, &dm, &SolverOptions::default());
 
         assert!(
             (bb_tour.total - bhk_tour.total).abs() < 1e-3,
