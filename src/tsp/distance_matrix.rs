@@ -209,10 +209,9 @@ impl DistanceMatrix {
         if let Some(city_pos) = self.city_id2pos(&target.id) {
             let distances_from_target = self.distances_from_index(city_pos);
             for (pos, distance) in distances_from_target.iter().enumerate() {
-                let city_id = self.pos2city_id(&pos).unwrap();
-
-                // the NearestResult takes care of ordering the results
-                if let Some(pt) = self.cities.get(&city_id) {
+                // Look up by matrix position, not city_id.  city_id != pos when city IDs
+                // are not 0-based (e.g. 1-indexed TSPLIB files like berlin52.tsp).
+                if let Some(pt) = self.cities.get(&pos) {
                     search_result.add(pt.clone(), *distance);
                 }
             }
@@ -394,5 +393,27 @@ mod tests {
 
         let res5 = dm.nearest(&cities[4], 2);
         assert_eq!(cities[0].id, res5.point.id);
+    }
+
+    // Regression: nearest must work when city IDs are 1-based (as in TSPLIB files like berlin52).
+    // The old code used city_id as a matrix-position key; since city_id != matrix_pos for
+    // 1-indexed cities, it returned the wrong city with distance 0.0, making every "nearest"
+    // the immediately next city in the ID sequence and turning NN into a no-op sorted walk.
+    #[test]
+    fn test_nearest_with_one_indexed_city_ids() {
+        let cities = vec![
+            KDPoint::new_with_id(1, &[0.0, 0.0]),
+            KDPoint::new_with_id(2, &[10.0, 0.0]), // far
+            KDPoint::new_with_id(3, &[0.0, 1.0]),  // closest to city 1
+        ];
+        let dm = from_cities(&cities);
+
+        let res = dm.nearest(&cities[0], 2); // nearest to city 1
+        // city 3 (distance 1.0) must be reported closer than city 2 (distance 10.0)
+        assert_eq!(
+            res.nearest().first().unwrap().point.id,
+            3,
+            "nearest to city 1 should be city 3, not city 2"
+        );
     }
 }

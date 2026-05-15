@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
@@ -10,42 +10,47 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     tracing::info!(n_nearest = options.n_nearest, cities = cities.len(), "NN starting");
 
     let n_nearest = options.n_nearest;
-
     let cities_table: HashMap<usize, KDPoint> = cities.iter().map(|c| (c.id, c.clone())).collect();
-    let mut path: Vec<usize> = cities.iter().map(|c| c.id).collect();
+
+    let mut unvisited: HashSet<usize> = cities.iter().map(|c| c.id).collect();
+    let mut path: Vec<usize> = Vec::with_capacity(cities.len());
+
+    // Start from the first city in the input order.
+    let start_id = cities[0].id;
+    path.push(start_id);
+    unvisited.remove(&start_id);
 
     send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
 
-    for i in 0..(path.len() - 1) {
-        let id1 = path[i];
-        let city1 = cities_table[&id1].clone();
-        send_progress(ProgressMessage::CityChange(id1));
+    while !unvisited.is_empty() {
+        let current_id = *path.last().unwrap();
+        let current_city = &cities_table[&current_id];
 
-        let frontier = distances.nearest(&city1, n_nearest);
+        send_progress(ProgressMessage::CityChange(current_id));
 
-        let id2 = path[i + 1];
-        let current_distance = distances
-            .distance_between(id1, id2)
-            .unwrap_or(f32::MAX);
+        // Find the nearest unvisited city.  Check the n_nearest frontier first (fast path);
+        // fall back to a linear scan over `unvisited` when all frontier cities are already
+        // visited (common late in the tour when n_nearest is small).
+        let frontier = distances.nearest(current_city, n_nearest);
+        let next_id = frontier
+            .nearest()
+            .iter()
+            .find(|item| unvisited.contains(&item.point.id))
+            .map(|item| item.point.id)
+            .unwrap_or_else(|| {
+                *unvisited
+                    .iter()
+                    .min_by(|&&a, &&b| {
+                        let da = distances.distance_between(current_id, a).unwrap_or(f32::MAX);
+                        let db = distances.distance_between(current_id, b).unwrap_or(f32::MAX);
+                        da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+                    })
+                    .expect("unvisited is non-empty")
+            });
 
-        let search_result = frontier.nearest();
-        if search_result.is_empty() {
-            tracing::debug!(city_id = id1, "NN: no nearest found");
-            continue;
-        }
-
-        let closest_item = search_result.first().unwrap();
-        let next_distance = closest_item.distance;
-
-        if next_distance < current_distance {
-            let nearest_city_id = closest_item.point.id;
-            if let Some(nearest_pos) = path.iter().position(|&x| x == nearest_city_id) {
-                tracing::debug!(from = id2, to = nearest_city_id, "NN: swap");
-                path.swap(i + 1, nearest_pos);
-
-                send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
-            }
-        }
+        path.push(next_id);
+        unvisited.remove(&next_id);
+        send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
     }
 
     send_progress(ProgressMessage::Done);
@@ -105,5 +110,34 @@ mod tests {
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
         assert_eq!(visited, vec![0, 1, 2, 3]);
+    }
+
+    // Regression: the old algorithm never tracked visited cities, so it could
+    // revisit already-traversed nodes and degrade into a near-sorted walk.
+    // With 1-indexed city IDs (as in TSPLIB files), the first city's "nearest"
+    // was always city_id+1 due to a position/id mismatch in distance_matrix::nearest,
+    // making every swap a no-op.  This test catches both regressions.
+    #[test]
+    fn test_solve_does_not_produce_sorted_output_on_shuffled_input() {
+        // Cities placed so the greedy NN order is NOT 0→1→2→3→4.
+        // Optimal greedy path from 0: 0 → 4 → 3 → 2 → 1 (or similar clustering).
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],   // 0 – far from 1
+            vec![100.0, 0.0], // 1 – far from 0
+            vec![99.0, 0.0],  // 2 – near 1
+            vec![98.0, 0.0],  // 3 – near 1 and 2
+            vec![1.0, 0.0],   // 4 – near 0
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let options = SolverOptions::default();
+        let tour = solve(&cities, &dm, &options);
+
+        let route = tour.route().to_vec();
+        // The greedy tour must NOT be [0,1,2,3,4] (sorted) — city 4 is much closer to 0.
+        assert_ne!(route, vec![0, 1, 2, 3, 4], "NN produced sorted output (regression)");
+        // All cities must still be visited exactly once.
+        let mut sorted = route.clone();
+        sorted.sort();
+        assert_eq!(sorted, vec![0, 1, 2, 3, 4]);
     }
 }
