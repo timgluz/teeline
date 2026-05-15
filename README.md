@@ -102,8 +102,8 @@ teeline nn -i ./data/tsplib/berlin52.tsp
 # from stdin
 cat ./data/tsplib/berlin52.tsp | teeline nn
 
-# headless / CI — skip the visualisation window
-teeline nn -i ./data/tsplib/berlin52.tsp --disable_progress
+# with the visualization window
+teeline nn -i ./data/tsplib/berlin52.tsp --gui
 ```
 
 Output format:
@@ -267,7 +267,7 @@ Resources:
 
 ## Visualising Results
 
-While solving, Teeline opens a window that shows the current best route updating in real time. Pass `--disable_progress` to suppress it (required in headless / CI environments).
+While solving, Teeline runs headless by default. Pass `--gui` to open a window that shows the current best route updating in real time.
 
 ### Comparing against a known-optimal tour
 

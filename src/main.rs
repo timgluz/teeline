@@ -86,9 +86,9 @@ fn main() {
                 .required(false),
         )
         .arg(
-            Arg::new("disable_progress")
-                .long("disable_progress")
-                .help("Doesnt show any progress or visualization, default false")
+            Arg::new("gui")
+                .long("gui")
+                .help("Open the visualization window while solving")
                 .action(ArgAction::SetTrue)
                 .required(false),
         )
@@ -281,7 +281,7 @@ mod tests {
         Command::new("test")
             .arg(Arg::new("solver").index(1).required(true))
             .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
-            .arg(Arg::new("disable_progress").long("disable_progress").action(ArgAction::SetTrue))
+            .arg(Arg::new("gui").long("gui").action(ArgAction::SetTrue))
             .arg(Arg::new("epochs").long("epochs"))
             .arg(Arg::new("platoo_epochs").long("platoo_epochs"))
             .arg(Arg::new("n_nearest").long("n_nearest"))
@@ -298,7 +298,7 @@ mod tests {
         let opts = solver_options_from_args(&args);
         let defaults = SolverOptions::default();
         assert!(!opts.verbose);
-        assert!(opts.show_progress);
+        assert!(!opts.show_progress);
         assert_eq!(opts.epochs, defaults.epochs);
         assert_eq!(opts.n_nearest, defaults.n_nearest);
     }
@@ -310,9 +310,9 @@ mod tests {
     }
 
     #[test]
-    fn test_solver_options_disable_progress_clears_show_progress() {
-        let args = options_cmd().get_matches_from(["test", "nn", "--disable_progress"]);
-        assert!(!solver_options_from_args(&args).show_progress);
+    fn test_solver_options_gui_flag_enables_progress() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--gui"]);
+        assert!(solver_options_from_args(&args).show_progress);
     }
 
     #[test]
@@ -385,8 +385,8 @@ fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
         options.verbose = true;
     }
 
-    if args.get_flag("disable_progress") {
-        options.show_progress = false;
+    if args.get_flag("gui") {
+        options.show_progress = true;
     }
 
     if let Some(n_epochs_str) = args.get_one::<String>("epochs") {

@@ -64,7 +64,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/bin nn
 
 - The binary is named `bin` (not `teeline`) — set by `[[bin]] name = "bin"` in `Cargo.toml`.
 - `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity — don't use them on datasets larger than ~30 cities.
-- The progress window (Piston) always opens unless `--disable_progress` is passed. In headless/CI environments this will fail; the CI workflow (`cargo test`) avoids running the binary directly.
+- The visualization window is **off by default**. Pass `--gui` to open it. In headless/CI environments never pass `--gui`; the CI workflow (`cargo test`) avoids running the binary directly.
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
 - `convert2tsplib.py` converts raw coordinate lists to TSPLIB format; `download_data.sh` fetches benchmark datasets.
 
