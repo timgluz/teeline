@@ -424,7 +424,7 @@ fn draw_legend(painter: &egui::Painter, vp: &ViewportDimensions, show_optimal: b
 
     let mut entries: Vec<(Color32, &str)> = Vec::new();
     if show_optimal {
-        entries.push((SHARED_EDGE_COLOR, "Shared (optimal ∩ solver)"));
+        entries.push((SHARED_EDGE_COLOR, "Shared (optimal + solver)"));
         entries.push((UNIQUE_OPT_COLOR,  "Optimal only (missed)"));
     }
     entries.push((BEST_EDGE_COLOR, "Solver best"));
