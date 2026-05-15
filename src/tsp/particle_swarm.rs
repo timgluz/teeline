@@ -9,11 +9,40 @@ use super::{Solution, SolverOptions};
 type Swap = (usize, usize);
 type Velocity = Vec<Swap>;
 
-// PSO hyper-parameters (Clerc 2004 recommendations)
-const W: f64 = 0.7;  // inertia weight
-const C1: f64 = 1.5; // cognitive coefficient
-const C2: f64 = 1.5; // social coefficient
+// PSO hyper-parameters
+const W_MAX: f64 = 0.9; // inertia at epoch 0 (exploration)
+const W_MIN: f64 = 0.4; // inertia at final epoch (exploitation)
+const C1: f64 = 1.5;    // cognitive coefficient
+const C2: f64 = 1.5;    // social coefficient
 const DEFAULT_N_PARTICLES: usize = 30;
+// Without a velocity cap, steady-state swap-list length ≈ (C1+C2)*0.5*(n−1)/(1−W) ≈ 5n,
+// which scrambles the tour completely.  Capping at ~n/3 gives directional movement.
+const V_MAX_FACTOR: f64 = 0.35;
+
+/// Greedy nearest-neighbour tour starting from the first city in `city_ids`.
+/// Used to seed particle 0 so the swarm starts from a reasonable neighbourhood.
+fn nn_seed(city_ids: &[usize], distances: &DistanceMatrix) -> Vec<usize> {
+    let n = city_ids.len();
+    let mut unvisited: Vec<usize> = city_ids.to_vec();
+    let mut tour = Vec::with_capacity(n);
+    let mut current = unvisited.swap_remove(0);
+    tour.push(current);
+    while !unvisited.is_empty() {
+        let best_pos = unvisited
+            .iter()
+            .enumerate()
+            .min_by(|(_, &a), (_, &b)| {
+                let da = distances.distance_between(current, a).unwrap_or(f32::MAX);
+                let db = distances.distance_between(current, b).unwrap_or(f32::MAX);
+                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .map(|(i, _)| i)
+            .unwrap();
+        current = unvisited.swap_remove(best_pos);
+        tour.push(current);
+    }
+    tour
+}
 
 /// Greedy swap sequence that converts `from` into `to`.
 ///
@@ -57,19 +86,26 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let n_cities = cities.len();
     // n_nearest is repurposed as n_particles; floor at DEFAULT_N_PARTICLES
     let n_particles = options.n_nearest.max(DEFAULT_N_PARTICLES);
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+    let v_max = ((n_cities as f64 * V_MAX_FACTOR).ceil() as usize).max(1);
 
     let mut rng = rand::rng();
     let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
-    // Initialise: each particle gets a Fisher-Yates shuffled tour
+    // Particle 0 is seeded with a greedy NN tour so gbest starts from a good neighbourhood.
+    // The rest are random Fisher-Yates shuffles to maintain diversity.
     let mut positions: Vec<Vec<usize>> = (0..n_particles)
-        .map(|_| {
-            let mut p = city_ids.clone();
-            for i in (1..n_cities).rev() {
-                let j = rng.random_range(0..=i);
-                p.swap(i, j);
+        .map(|idx| {
+            if idx == 0 {
+                nn_seed(&city_ids, distances)
+            } else {
+                let mut p = city_ids.clone();
+                for i in (1..n_cities).rev() {
+                    let j = rng.random_range(0..=i);
+                    p.swap(i, j);
+                }
+                p
             }
-            p
         })
         .collect();
 
@@ -88,14 +124,21 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
     send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
 
-    for epoch in 0..options.epochs {
+    let epochs = options.epochs;
+    for epoch in 0..epochs {
+        // Linearly decay inertia weight from W_MAX (exploration) to W_MIN (exploitation).
+        // Mirrors simulated annealing's cooling schedule: high randomness early,
+        // fine-tuning near convergence.
+        #[allow(clippy::cast_precision_loss)]
+        let w = W_MAX - (W_MAX - W_MIN) * (epoch as f64 / epochs.max(1) as f64);
+
         for i in 0..n_particles {
             let r1: f64 = rng.random();
             let r2: f64 = rng.random();
 
             // Inertia: keep first round(w * |v|) swaps of current velocity
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-            let inertia_keep = (W * velocities[i].len() as f64).round() as usize;
+            let inertia_keep = (w * velocities[i].len() as f64).round() as usize;
 
             // Cognitive: toward personal best
             let cog_diff = swap_sequence(&positions[i], &pbest[i]);
@@ -107,10 +150,13 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let soc_keep = (C2 * r2 * soc_diff.len() as f64).round() as usize;
 
-            // New velocity = inertia + cognitive + social
+            // New velocity = inertia + cognitive + social, capped at v_max.
+            // The cap is the discrete analogue of v_max in continuous PSO:
+            // without it the swap list grows to ~5n and scrambles the tour.
             let mut new_vel = trim_velocity(&velocities[i], inertia_keep);
             new_vel.extend(trim_velocity(&cog_diff, cog_keep));
             new_vel.extend(trim_velocity(&soc_diff, soc_keep));
+            new_vel.truncate(v_max);
 
             // Update position and velocity
             let new_pos = apply_swaps(&positions[i], &new_vel);
@@ -169,6 +215,23 @@ mod tests {
         assert_eq!(trim_velocity(&v, 2), vec![(0, 1), (1, 2)]);
         assert_eq!(trim_velocity(&v, 0), vec![]);
         assert_eq!(trim_velocity(&v, 10), v);
+    }
+
+    #[test]
+    fn test_nn_seed_visits_all_cities() {
+        let ids = vec![0, 1, 2, 3];
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![1.0, 1.0],
+            vec![0.0, 1.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let tour = nn_seed(&city_ids, &dm);
+        let mut sorted = tour.clone();
+        sorted.sort();
+        assert_eq!(sorted, ids);
     }
 
     #[test]
