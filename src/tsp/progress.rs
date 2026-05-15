@@ -450,6 +450,84 @@ fn draw_legend(painter: &egui::Painter, vp: &ViewportDimensions, show_optimal: b
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsp::kdtree::build_points;
+    use crate::tsp::route::Route;
+
+    #[test]
+    fn test_route_edge_keys_triangle() {
+        let route = Route::new(&[1, 2, 3]);
+        let keys = ProgressPlot::route_edge_keys(&route);
+        // Edges: 1-2, 2-3, 3-1 (closing)
+        assert_eq!(keys.len(), 3);
+        assert!(keys.contains(&(1, 2)));
+        assert!(keys.contains(&(2, 3)));
+        assert!(keys.contains(&(1, 3))); // normalized from (3, 1)
+    }
+
+    #[test]
+    fn test_route_edge_keys_normalizes_direction() {
+        // Route 5 → 2 should produce key (2, 5), not (5, 2)
+        let route = Route::new(&[5, 2]);
+        let keys = ProgressPlot::route_edge_keys(&route);
+        assert!(keys.contains(&(2, 5)));
+        assert!(!keys.contains(&(5, 2)));
+    }
+
+    #[test]
+    fn test_cities_bounding_box_basic() {
+        let cities = build_points(&[
+            vec![0.0, 5.0],
+            vec![10.0, 0.0],
+            vec![3.0, 8.0],
+        ]);
+        let bbox = cities_bounding_box(&cities);
+        assert!((bbox[0] - 0.0).abs() < 0.01);  // x_min
+        assert!((bbox[1] - 0.0).abs() < 0.01);  // y_min
+        assert!((bbox[2] - 10.0).abs() < 0.01); // x_max
+        assert!((bbox[3] - 8.0).abs() < 0.01);  // y_max
+    }
+
+    #[test]
+    fn test_cities_bounding_box_single_city() {
+        let cities = build_points(&[vec![7.0, 3.0]]);
+        let bbox = cities_bounding_box(&cities);
+        assert!((bbox[0] - 7.0).abs() < 0.01);
+        assert!((bbox[2] - 7.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_point_to_viewport_corner() {
+        let window = [0.0, 0.0, 10.0, 10.0];
+        let vp = ViewportDimensions::new(100.0, 100.0, 10.0);
+        // The origin of the city space should map to the margin offset
+        let (vx, vy) = point_to_viewport(0.0, 0.0, &window, &vp);
+        assert!((vx - 10.0).abs() < 0.01);
+        assert!((vy - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_point_to_viewport_far_corner() {
+        let window = [0.0, 0.0, 10.0, 10.0];
+        let vp = ViewportDimensions::new(100.0, 100.0, 10.0);
+        // The far corner of city space maps to width - margin
+        let (vx, vy) = point_to_viewport(10.0, 10.0, &window, &vp);
+        assert!((vx - 90.0).abs() < 0.01);
+        assert!((vy - 90.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_point_to_viewport_centre() {
+        let window = [0.0, 0.0, 10.0, 10.0];
+        let vp = ViewportDimensions::new(100.0, 100.0, 0.0);
+        let (vx, vy) = point_to_viewport(5.0, 5.0, &window, &vp);
+        assert!((vx - 50.0).abs() < 0.01);
+        assert!((vy - 50.0).abs() < 0.01);
+    }
+}
+
 // converts EUC2D space into GUI coords [0..self.height, 0..self.width]
 fn point_to_viewport(
     x: f64,

@@ -181,4 +181,55 @@ EOF";
             "error should mention dimension mismatch, got: {msg}"
         );
     }
+
+    #[test]
+    fn test_parse_tour_eof_terminates_without_minus_one() {
+        let input = "\
+NAME : eof.opt.tour
+TYPE : TOUR
+DIMENSION : 2
+TOUR_SECTION
+1
+2
+EOF";
+        let result = parse_from_str(input).unwrap();
+        assert_eq!(result.dimension, 2);
+        assert_eq!(result.route, vec![1usize, 2]);
+    }
+
+    #[test]
+    fn test_parse_tour_missing_name_defaults_to_unknown() {
+        let input = "\
+TYPE : TOUR
+DIMENSION : 2
+TOUR_SECTION
+1
+2
+-1
+EOF";
+        let result = parse_from_str(input).unwrap();
+        assert_eq!(result.name, "unknown");
+    }
+
+    #[test]
+    fn test_parse_tour_invalid_dimension_returns_error() {
+        let input = "\
+NAME : bad.opt.tour
+TYPE : TOUR
+DIMENSION : NOT_A_NUMBER
+TOUR_SECTION
+1
+2
+-1
+EOF";
+        let result = parse_from_str(input);
+        assert!(result.is_err(), "expected error for non-numeric DIMENSION");
+    }
+
+    #[test]
+    fn test_read_from_file_nonexistent_path_returns_error() {
+        let result = read_from_file(std::path::Path::new("/no/such/file.opt.tour"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("opt_tour: cannot open file"));
+    }
 }
