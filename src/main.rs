@@ -201,6 +201,7 @@ fn solve(
         Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, distances, options),
         Solvers::TabuSearch => tsp::tabu_search::solve(cities, distances, options),
         Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, distances, options),
+        Solvers::ParticleSwarmOptimization => tsp::particle_swarm::solve(cities, distances, options),
         _ => panic!("Unspecified solver"),
     }
 }

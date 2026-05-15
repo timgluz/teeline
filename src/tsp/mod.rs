@@ -10,6 +10,7 @@ pub mod simulated_annealing;
 pub mod stochastic_hill;
 pub mod tabu_search;
 pub mod opt_tour;
+pub mod particle_swarm;
 pub mod tsplib;
 pub mod two_opt;
 
@@ -29,6 +30,7 @@ pub enum Solvers {
     BranchBound,
     NearestNeighbor,
     GeneticAlgorithm,
+    ParticleSwarmOptimization,
     SimulatedAnnealing,
     StochasticHill,
     TabuSearch,
@@ -46,6 +48,8 @@ impl Solvers {
             "nn",
             "genetic_algorithm",
             "ga",
+            "particle_swarm",
+            "pso",
             "simulated_annealing",
             "sa",
             "stochastic_hill",
@@ -65,6 +69,7 @@ impl FromStr for Solvers {
             "branch_bound" => Ok(Solvers::BranchBound),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
+            "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),
