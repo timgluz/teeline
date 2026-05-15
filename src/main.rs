@@ -195,6 +195,7 @@ fn solve(
     match algorithm {
         Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, distances, options),
         Solvers::BranchBound => tsp::branch_bound::solve(cities, distances, options),
+        Solvers::CuckooSearch => tsp::cuckoo_search::solve(cities, distances, options),
         Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, distances, options),
         Solvers::TwoOpt => tsp::two_opt::solve(cities, distances, options),
         Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, distances, options),

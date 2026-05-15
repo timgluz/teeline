@@ -55,6 +55,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/bin nn
 | `tabu_search.rs` | Tabu search | — |
 | `genetic_algorithm.rs` | Genetic algorithm | `ga` |
 | `particle_swarm.rs` | Discrete PSO (velocity-capped, linearly decaying inertia, NN-seeded) | `pso` |
+| `cuckoo_search.rs` | Cuckoo Search via Lévy flights (k random 2-opt reversals, Bernoulli nest abandonment) | `cs` |
 
 **Tests:**
 - Unit tests live inline in each source file (`#[cfg(test)]`)

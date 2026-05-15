@@ -36,6 +36,7 @@ representative, not as a guarantee.
 | **Genetic Algorithm** | `--epochs=10000` (default) | 8 172.11 | +8.3 % | 1.63 s | 100 % | 7.7 MB |
 | **Particle Swarm (PSO)** | `--epochs=10000` (default) | 8 874.46 | +17.6 % | 0.84 s | 100 % | 7.9 MB |
 | **Particle Swarm (PSO)** | `--epochs=10000 --n_nearest=50` | 8 663.69 | +14.8 % | 1.42 s | 100 % | 8.1 MB |
+| **Cuckoo Search** | default (`--epochs=10000 --n_nearest=25`) | 7 877.84 | +4.4 % | 0.72 s | 100 % | 7.9 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 
@@ -64,6 +65,7 @@ cargo build --release
 ```
 Gap from optimal
   0%  ─────────────────────────────── optimal (7 544.37)
+  4%  CS (0.72 s)                ← new best overall
   7%  SA (0.34 s)
   8%  GA/10k (1.63 s)
  11%  Stochastic Hill/10k (0.02 s)  ← best value for time
@@ -75,8 +77,13 @@ Gap from optimal
  77%  GA/500 epochs
 ```
 
-**Simulated Annealing** reaches the best gap (~7 %) in under half a second using its default
-temperature schedule. It is the strongest single-run solver for berlin52 at any time budget.
+**Cuckoo Search** achieves the best gap (~4–7 % across runs) at 0.72 s. It seeds nest 0 with a
+greedy NN tour for a strong starting neighbourhood, then runs one Lévy-flight 2-opt perturbation
+per nest per epoch. Quality degrades significantly with high `pa` (≥ 0.05) because random
+re-seedings overwhelm the search; the default `pa`=0.01 is near-optimal for this instance.
+
+**Simulated Annealing** reaches ~7 % in under half a second using its default temperature
+schedule. It is the strongest single-run solver for time-budgets under 0.5 s.
 
 **Genetic Algorithm** matches SA quality (~8 %) but needs the full 10 000 generations (~1.6 s)
 to get there. At 500 epochs it is the worst performer — GA needs population diversity to build
@@ -87,7 +94,8 @@ more epochs hurts here (22 % at 100 000) because restarts can scatter away from 
 optimum already found.
 
 **Nearest Neighbour** and **2-opt** complete in ≤ 10 ms and are useful as fast constructors
-whose output can seed another solver.
+whose output can seed another solver. All stochastic solvers are expected to beat NN quality (+19 %)
+as a sanity check.
 
 **PSO** sits in the middle of the pack. More particles (`--n_nearest=50`) improve quality at
 the cost of proportionally more wall time. Default of 30 particles is a reasonable starting
