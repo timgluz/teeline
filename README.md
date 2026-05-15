@@ -267,7 +267,36 @@ Resources:
 
 ## Visualising Results
 
-While solving, Teeline opens a Piston window that shows the current best route updating in real time. Pass `--disable_progress` to suppress it (required in headless / CI environments).
+While solving, Teeline opens a window that shows the current best route updating in real time. Pass `--disable_progress` to suppress it (required in headless / CI environments).
+
+### Comparing against a known-optimal tour
+
+Pass `--optimal-tour <FILE>` with a TSPLIB `.opt.tour` file to overlay the optimal route on the visualisation and print a gap comparison to stderr after solving.
+
+```bash
+teeline ga -i data/tsplib/berlin52.tsp \
+    --optimal-tour data/tsplib/berlin52.opt.tour
+```
+
+Example output (stderr):
+
+```
+--- Comparison ---
+Optimal  : 7544.36572  (from BERLIN52.OPT.TOUR)
+Solver   : 7953.25830
+Gap      : +5.42 %
+```
+
+The visualisation window uses colour to show how the solver's best tour compares to the optimal:
+
+| Colour | Meaning |
+|--------|---------|
+| Very dark green (thick) | Edge appears in **both** the optimal tour and the solver's best — correctly found |
+| Light gray | Edge is in the optimal tour but **missed** by the solver |
+| Dark green | Solver's best route |
+| Blue | Current route being explored |
+
+Optimal tour files for the TSPLIB benchmark instances are included in `data/tsplib/` (e.g. `berlin52.opt.tour`).
 
 You can also upload your input file and the solution output to the [Discrete Optimization visualiser](https://discreteoptimization.github.io/vis/tsp/) to inspect tours interactively.
 

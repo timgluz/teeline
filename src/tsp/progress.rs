@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use eframe;
 use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, Stroke};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Arc;
 
@@ -24,7 +24,8 @@ const WHITE:              Color32 = Color32::from_rgb(255, 255, 255);
 const CITY_COLOR:         Color32 = Color32::from_rgb(30,  30,  30);   // near-black nodes
 const CURRENT_CITY_COLOR: Color32 = Color32::from_rgb(220, 30,  30);   // red — active city
 const BEST_EDGE_COLOR:    Color32 = Color32::from_rgb(34,  139, 34);   // green — best route
-const OPTIMAL_EDGE_COLOR: Color32 = Color32::from_rgb(50,  205, 50);   // lime — known-optimal route
+const SHARED_EDGE_COLOR:  Color32 = Color32::from_rgb(0,   100, 0);    // very dark green — shared optimal+solver
+const UNIQUE_OPT_COLOR:   Color32 = Color32::from_rgb(180, 180, 180);  // light gray — optimal only (solver missed)
 const CURRENT_EDGE_COLOR: Color32 = Color32::from_rgb(30,  100, 220);  // blue — exploring route
 const ACTIVE_EDGE_COLOR:  Color32 = Color32::from_rgb(255, 140, 0);    // orange — current step
 const STATUS_COLOR:       Color32 = Color32::from_rgb(220, 30,  30);   // red — status text
@@ -85,9 +86,10 @@ struct NodeData {
 pub struct ProgressPlot {
     city_table: HashMap<usize, KDPoint>,
     nodes: Vec<NodeData>,
-    best_edges: Vec<EdgeData>,    // shown in green after Done
-    optimal_edges: Vec<EdgeData>, // lime green — known-optimal tour overlay
-    current_edges: Vec<EdgeData>, // shown in blue while solving
+    best_edges: Vec<EdgeData>,                          // shown in green after Done
+    best_edge_keys: HashSet<(usize, usize)>,            // normalized city-id pairs for solver's best route
+    optimal_edge_data: Vec<((usize, usize), EdgeData)>, // (normalized city-id pair, screen coords)
+    current_edges: Vec<EdgeData>,                       // shown in blue while solving
     current_city_id: Option<usize>,
     prev_city_id: Option<usize>,
     best_distance: f32,
@@ -106,7 +108,8 @@ impl ProgressPlot {
             city_table: HashMap::new(),
             nodes: Vec::new(),
             best_edges: Vec::new(),
-            optimal_edges: Vec::new(),
+            best_edge_keys: HashSet::new(),
+            optimal_edge_data: Vec::new(),
             current_edges: Vec::new(),
             current_city_id: None,
             prev_city_id: None,
@@ -176,6 +179,7 @@ impl ProgressPlot {
                 if *distance > 0.0 && *distance < self.best_distance {
                     self.best_distance = *distance;
                     self.best_edges = self.current_edges.clone();
+                    self.best_edge_keys = Self::route_edge_keys(route);
                 }
 
                 self.status = format!("Solving... | best: {:.2}", self.best_distance);
@@ -187,7 +191,7 @@ impl ProgressPlot {
             }
             ProgressMessage::OptimalTour(city_ids) => {
                 let route = Route::new(city_ids.as_slice());
-                self.optimal_edges = self.build_route_edges(&route);
+                self.optimal_edge_data = self.build_route_edge_data(&route);
             }
             _ => {}
         }
@@ -208,6 +212,36 @@ impl ProgressPlot {
                 pos: Pos2::new(sx as f32, sy as f32),
             });
         }
+    }
+
+    fn route_edge_keys(route: &Route) -> HashSet<(usize, usize)> {
+        let path = route.route();
+        let n = path.len();
+        (0..n)
+            .map(|i| {
+                let a = path[i];
+                let b = path[(i + 1) % n];
+                (a.min(b), a.max(b))
+            })
+            .collect()
+    }
+
+    fn build_route_edge_data(&self, route: &Route) -> Vec<((usize, usize), EdgeData)> {
+        let path = route.route().to_vec();
+        let n = path.len();
+        let mut data = Vec::new();
+        for i in 0..n {
+            let a = path[i];
+            let b = path[(i + 1) % n];
+            if let (Some(from), Some(to)) = (
+                self.city_table.get(&a).cloned(),
+                self.city_table.get(&b).cloned(),
+            ) {
+                let edge = build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions);
+                data.push(((a.min(b), a.max(b)), edge));
+            }
+        }
+        data
     }
 
     fn build_route_edges(&self, route: &Route) -> Vec<EdgeData> {
@@ -247,9 +281,16 @@ impl eframe::App for ProgressPlot {
             .show(ctx, |ui| {
                 let painter = ui.painter();
 
-                // Layer 0: optimal tour (lime green, thin) — always visible as reference
-                for (from, to) in &self.optimal_edges {
-                    painter.line_segment([*from, *to], Stroke::new(1.5, OPTIMAL_EDGE_COLOR));
+                // Layer 0: optimal tour — shared edges (very dark green, thick) vs. missed (light gray)
+                if !self.optimal_edge_data.is_empty() {
+                    for ((a, b), (from, to)) in &self.optimal_edge_data {
+                        let key = (*a, *b);
+                        if !self.best_edge_keys.is_empty() && self.best_edge_keys.contains(&key) {
+                            painter.line_segment([*from, *to], Stroke::new(6.0, SHARED_EDGE_COLOR));
+                        } else {
+                            painter.line_segment([*from, *to], Stroke::new(1.5, UNIQUE_OPT_COLOR));
+                        }
+                    }
                 }
 
                 // Layer 1: solver route
@@ -304,7 +345,7 @@ impl eframe::App for ProgressPlot {
                 );
 
                 // Legend (bottom-left); painter is already &Painter — do NOT add &
-                draw_legend(painter, &self.viewport_dimensions, !self.optimal_edges.is_empty());
+                draw_legend(painter, &self.viewport_dimensions, !self.optimal_edge_data.is_empty());
             });
 
         // Poll at ~60fps while solver runs; avoids burning a full CPU core.
@@ -377,18 +418,21 @@ fn cities_bounding_box(cities: &[KDPoint]) -> RectCoords {
 #[allow(clippy::cast_possible_truncation)]
 fn draw_legend(painter: &egui::Painter, vp: &ViewportDimensions, show_optimal: bool) {
     let x0 = vp.margin as f32;
-    let y0 = vp.height as f32 - vp.margin as f32 - 80.0;
     let line_len = 24.0_f32;
     let row_h = 20.0_f32;
     let label_x = x0 + line_len + 6.0;
 
     let mut entries: Vec<(Color32, &str)> = Vec::new();
     if show_optimal {
-        entries.push((OPTIMAL_EDGE_COLOR, "Optimal tour"));
+        entries.push((SHARED_EDGE_COLOR, "Shared (optimal + solver)"));
+        entries.push((UNIQUE_OPT_COLOR,  "Optimal only (missed)"));
     }
     entries.push((BEST_EDGE_COLOR, "Solver best"));
     entries.push((CURRENT_EDGE_COLOR, "Solver current"));
     entries.push((ACTIVE_EDGE_COLOR, "Active edge"));
+
+    #[allow(clippy::cast_precision_loss)]
+    let y0 = vp.height as f32 - vp.margin as f32 - entries.len() as f32 * row_h - 4.0;
 
     for (i, (color, label)) in entries.iter().enumerate() {
         #[allow(clippy::cast_precision_loss)]
@@ -403,6 +447,84 @@ fn draw_legend(painter: &egui::Painter, vp: &ViewportDimensions, show_optimal: b
             FontId::proportional(FONT_SIZE - 2.0),
             *color,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tsp::kdtree::build_points;
+    use crate::tsp::route::Route;
+
+    #[test]
+    fn test_route_edge_keys_triangle() {
+        let route = Route::new(&[1, 2, 3]);
+        let keys = ProgressPlot::route_edge_keys(&route);
+        // Edges: 1-2, 2-3, 3-1 (closing)
+        assert_eq!(keys.len(), 3);
+        assert!(keys.contains(&(1, 2)));
+        assert!(keys.contains(&(2, 3)));
+        assert!(keys.contains(&(1, 3))); // normalized from (3, 1)
+    }
+
+    #[test]
+    fn test_route_edge_keys_normalizes_direction() {
+        // Route 5 → 2 should produce key (2, 5), not (5, 2)
+        let route = Route::new(&[5, 2]);
+        let keys = ProgressPlot::route_edge_keys(&route);
+        assert!(keys.contains(&(2, 5)));
+        assert!(!keys.contains(&(5, 2)));
+    }
+
+    #[test]
+    fn test_cities_bounding_box_basic() {
+        let cities = build_points(&[
+            vec![0.0, 5.0],
+            vec![10.0, 0.0],
+            vec![3.0, 8.0],
+        ]);
+        let bbox = cities_bounding_box(&cities);
+        assert!((bbox[0] - 0.0).abs() < 0.01);  // x_min
+        assert!((bbox[1] - 0.0).abs() < 0.01);  // y_min
+        assert!((bbox[2] - 10.0).abs() < 0.01); // x_max
+        assert!((bbox[3] - 8.0).abs() < 0.01);  // y_max
+    }
+
+    #[test]
+    fn test_cities_bounding_box_single_city() {
+        let cities = build_points(&[vec![7.0, 3.0]]);
+        let bbox = cities_bounding_box(&cities);
+        assert!((bbox[0] - 7.0).abs() < 0.01);
+        assert!((bbox[2] - 7.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_point_to_viewport_corner() {
+        let window = [0.0, 0.0, 10.0, 10.0];
+        let vp = ViewportDimensions::new(100.0, 100.0, 10.0);
+        // The origin of the city space should map to the margin offset
+        let (vx, vy) = point_to_viewport(0.0, 0.0, &window, &vp);
+        assert!((vx - 10.0).abs() < 0.01);
+        assert!((vy - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_point_to_viewport_far_corner() {
+        let window = [0.0, 0.0, 10.0, 10.0];
+        let vp = ViewportDimensions::new(100.0, 100.0, 10.0);
+        // The far corner of city space maps to width - margin
+        let (vx, vy) = point_to_viewport(10.0, 10.0, &window, &vp);
+        assert!((vx - 90.0).abs() < 0.01);
+        assert!((vy - 90.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_point_to_viewport_centre() {
+        let window = [0.0, 0.0, 10.0, 10.0];
+        let vp = ViewportDimensions::new(100.0, 100.0, 0.0);
+        let (vx, vy) = point_to_viewport(5.0, 5.0, &window, &vp);
+        assert!((vx - 50.0).abs() < 0.01);
+        assert!((vy - 50.0).abs() < 0.01);
     }
 }
 

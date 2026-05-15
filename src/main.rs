@@ -272,6 +272,112 @@ fn read_tsp_data_from_stdin() -> tsplib::TspLibData {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Minimal clap Command that mirrors the args read by `solver_options_from_args`.
+    fn options_cmd() -> Command {
+        Command::new("test")
+            .arg(Arg::new("solver").index(1).required(true))
+            .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
+            .arg(Arg::new("disable_progress").long("disable_progress").action(ArgAction::SetTrue))
+            .arg(Arg::new("epochs").long("epochs"))
+            .arg(Arg::new("platoo_epochs").long("platoo_epochs"))
+            .arg(Arg::new("n_nearest").long("n_nearest"))
+            .arg(Arg::new("n_elite").long("n_elite"))
+            .arg(Arg::new("mutation_probability").long("mutation_probability"))
+            .arg(Arg::new("cooling_rate").long("cooling_rate"))
+            .arg(Arg::new("min_temperature").long("min_temperature"))
+            .arg(Arg::new("max_temperature").long("max_temperature"))
+    }
+
+    #[test]
+    fn test_solver_options_defaults_preserved_when_no_args() {
+        let args = options_cmd().get_matches_from(["test", "nn"]);
+        let opts = solver_options_from_args(&args);
+        let defaults = SolverOptions::default();
+        assert!(!opts.verbose);
+        assert!(opts.show_progress);
+        assert_eq!(opts.epochs, defaults.epochs);
+        assert_eq!(opts.n_nearest, defaults.n_nearest);
+    }
+
+    #[test]
+    fn test_solver_options_verbose_flag_sets_verbose() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--verbose"]);
+        assert!(solver_options_from_args(&args).verbose);
+    }
+
+    #[test]
+    fn test_solver_options_disable_progress_clears_show_progress() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--disable_progress"]);
+        assert!(!solver_options_from_args(&args).show_progress);
+    }
+
+    #[test]
+    fn test_solver_options_epochs_parsed() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--epochs", "500"]);
+        assert_eq!(solver_options_from_args(&args).epochs, 500);
+    }
+
+    #[test]
+    fn test_solver_options_invalid_epochs_defaults_to_zero() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--epochs", "bad"]);
+        assert_eq!(solver_options_from_args(&args).epochs, 0);
+    }
+
+    #[test]
+    fn test_solver_options_platoo_epochs_parsed() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--platoo_epochs", "200"]);
+        assert_eq!(solver_options_from_args(&args).platoo_epochs, 200);
+    }
+
+    #[test]
+    fn test_solver_options_n_nearest_parsed() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--n_nearest", "5"]);
+        assert_eq!(solver_options_from_args(&args).n_nearest, 5);
+    }
+
+    #[test]
+    fn test_solver_options_n_elite_parsed() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--n_elite", "7"]);
+        assert_eq!(solver_options_from_args(&args).n_elite, 7);
+    }
+
+    #[test]
+    fn test_solver_options_mutation_probability_parsed() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--mutation_probability", "0.05"]);
+        let opts = solver_options_from_args(&args);
+        assert!((opts.mutation_probability - 0.05).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_solver_options_invalid_mutation_probability_defaults_to_zero() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--mutation_probability", "nope"]);
+        assert!((solver_options_from_args(&args).mutation_probability - 0.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_solver_options_cooling_rate_parsed() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--cooling_rate", "0.001"]);
+        let opts = solver_options_from_args(&args);
+        assert!((opts.cooling_rate - 0.001).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_solver_options_temperature_bounds_parsed() {
+        let args = options_cmd().get_matches_from([
+            "test", "nn",
+            "--min_temperature", "0.5",
+            "--max_temperature", "500.0",
+        ]);
+        let opts = solver_options_from_args(&args);
+        assert!((opts.min_temperature - 0.5).abs() < 1e-5);
+        assert!((opts.max_temperature - 500.0).abs() < 1e-3);
+    }
+}
+
 fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
     let mut options = SolverOptions::default();
 
