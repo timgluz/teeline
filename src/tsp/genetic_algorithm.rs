@@ -16,12 +16,12 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
     let population_size = cities.len();
     let population = TspPopulation::from_cities(cities, population_size, &evaluator);
-    let best_candidate = solve_ga(&population, evaluator, options);
+    let best_candidate = solve_ga(&population, evaluator, distances, options);
 
     let best_route = Route::new(best_candidate.genotype());
     send_progress(ProgressMessage::PathUpdate(
         best_route,
-        best_candidate.fitness(),
+        distances.tour_length(best_candidate.genotype()),
     ));
     send_progress(ProgressMessage::Done);
     Solution::new(best_candidate.genotype(), cities, distances)
@@ -30,6 +30,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 fn solve_ga(
     population: &TspPopulation,
     fitness_fn: FitnessFn,
+    distances: &DistanceMatrix,
     options: &SolverOptions,
 ) -> TspGenotype {
     let population_size = population.len();
@@ -77,7 +78,7 @@ fn solve_ga(
         let best_route = Route::new(best_candidate.genotype());
         send_progress(ProgressMessage::PathUpdate(
             best_route,
-            best_candidate.fitness(),
+            distances.tour_length(best_candidate.genotype()),
         ));
 
         tracing::debug!(epoch, fitness = current_population.best().fitness(), "GA: generation");
@@ -295,6 +296,44 @@ impl TspGenotype {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::{distance_matrix, kdtree};
+
+    // Regression test: GA's internal fitness is 1/tour_length (used for selection).
+    // The PathUpdate messages and Solution::total must carry the real tour_length,
+    // not the inverted fitness. If this regresses, solution.total would be ~0.00025
+    // instead of ~4.0 for a unit square.
+    #[test]
+    fn test_solve_returns_real_tour_length_not_inverted_fitness() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+        let distances = distance_matrix::from_cities(&cities);
+        let options = SolverOptions {
+            epochs: 100,
+            ..SolverOptions::default()
+        };
+
+        let solution = solve(&cities, &distances, &options);
+
+        // Real tour for a unit square visits all 4 sides: total >= 4.0.
+        // Inverted fitness would be 1/4.0 = 0.25 — far below this threshold.
+        assert!(
+            solution.total >= 3.9,
+            "GA solution.total = {} looks like inverted fitness; expected >= 4.0",
+            solution.total
+        );
+        // Also verify the stored total matches a fresh computation on the route.
+        let recomputed = distances.tour_length(solution.route());
+        assert!(
+            (solution.total - recomputed).abs() < 0.01,
+            "solution.total ({}) != distances.tour_length ({}) — inconsistent",
+            solution.total,
+            recomputed
+        );
+    }
 
     #[test]
     fn test_ordered_crossover_genes_with_example_from_book() {
