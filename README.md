@@ -331,6 +331,22 @@ You can also upload your input file and the solution output to the [Discrete Opt
 
 ---
 
+## Benchmarks
+
+See [docs/benchmarks.md](docs/benchmarks.md) for a full comparison of all solvers on the berlin52 instance (52 cities, known optimal 7 544.37), including tour quality, wall time, CPU usage, and peak memory — measured with the release binary under a 3-minute timeout.
+
+Quick summary:
+
+| Algorithm | Gap | Wall time |
+|-----------|:---:|----------:|
+| Simulated Annealing (default) | +6.8 % | 0.34 s |
+| Genetic Algorithm (10 000 ep) | +8.3 % | 1.63 s |
+| Stochastic Hill (10 000 ep) | +11.2 % | 0.02 s |
+| PSO (50 particles, 10 000 ep) | +14.8 % | 1.42 s |
+| Nearest Neighbour | +19.0 % | 0.01 s |
+
+---
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
