@@ -144,21 +144,25 @@ fn main() {
     // sets up the global mpsc channel before any send_progress calls.
     let progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
 
-    if let Some(opt_path_str) = args.get_one::<String>("optimal_tour") {
-        let opt_path = Path::new(opt_path_str.as_str());
-        match teeline::tsp::opt_tour::read_from_file(opt_path) {
-            Ok(opt) => {
-                if opt.dimension == tsp_data.len() {
-                    progress::send_progress(progress::ProgressMessage::OptimalTour(opt.route));
-                } else {
-                    eprintln!(
-                        "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
-                        opt.dimension,
-                        tsp_data.len()
-                    );
-                }
+    let opt_tour = args
+        .get_one::<String>("optimal_tour")
+        .and_then(|p| match teeline::tsp::opt_tour::read_from_file(Path::new(p.as_str())) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                eprintln!("--optimal-tour: {e}");
+                None
             }
-            Err(e) => eprintln!("--optimal-tour: {e}"),
+        });
+
+    if let Some(ref ot) = opt_tour {
+        if ot.dimension == tsp_data.len() {
+            progress::send_progress(progress::ProgressMessage::OptimalTour(ot.route.clone()));
+        } else {
+            eprintln!(
+                "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
+                ot.dimension,
+                tsp_data.len()
+            );
         }
     }
 
@@ -177,8 +181,8 @@ fn main() {
 
     let tour = solver_handle.join().expect("Solver thread failed");
 
-    if let Some(opt_path_str) = args.get_one::<String>("optimal_tour") {
-        print_optimal_comparison(&tour, &distances, opt_path_str);
+    if let Some(ot) = opt_tour {
+        print_optimal_comparison(&tour, &distances, tsp_data.len(), &ot);
     }
 }
 
@@ -213,22 +217,14 @@ fn print_solution(tour: &Solution, is_optimized: bool) {
 fn print_optimal_comparison(
     solver_tour: &Solution,
     distances: &distance_matrix::DistanceMatrix,
-    opt_path_str: &str,
+    n_cities: usize,
+    opt_tour: &teeline::tsp::opt_tour::OptTour,
 ) {
-    let opt_path = Path::new(opt_path_str);
-    let opt_tour = match teeline::tsp::opt_tour::read_from_file(opt_path) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("--optimal-tour: {e}");
-            return;
-        }
-    };
-
-    if opt_tour.dimension != distances.len() {
+    if opt_tour.dimension != n_cities {
         eprintln!(
             "--optimal-tour: dimension mismatch ({} vs {}); skipping comparison",
             opt_tour.dimension,
-            distances.len()
+            n_cities
         );
         return;
     }
