@@ -247,15 +247,15 @@ impl eframe::App for ProgressPlot {
             .show(ctx, |ui| {
                 let painter = ui.painter();
 
-                // Layer 0: optimal tour (lime green) — always visible as reference
+                // Layer 0: optimal tour (lime green, thin) — always visible as reference
                 for (from, to) in &self.optimal_edges {
-                    painter.line_segment([*from, *to], Stroke::new(2.0, OPTIMAL_EDGE_COLOR));
+                    painter.line_segment([*from, *to], Stroke::new(1.5, OPTIMAL_EDGE_COLOR));
                 }
 
                 // Layer 1: solver route
                 if self.is_solved {
                     for (from, to) in &self.best_edges {
-                        painter.line_segment([*from, *to], Stroke::new(2.5, BEST_EDGE_COLOR));
+                        painter.line_segment([*from, *to], Stroke::new(4.0, BEST_EDGE_COLOR));
                     }
                 } else {
                     for (from, to) in &self.current_edges {
