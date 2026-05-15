@@ -102,7 +102,7 @@ impl Default for SolverOptions {
             cooling_rate: 0.0001,
             min_temperature: 0.001,
             max_temperature: 1_000.0,
-            show_progress: true,
+            show_progress: false,
         }
     }
 }
