@@ -13,7 +13,8 @@
 use std::path::Path;
 use teeline::tsp::{
     bellman_karp, branch_bound, distance_matrix, genetic_algorithm, kdtree, nearest_neighbor,
-    simulated_annealing, stochastic_hill, tabu_search, two_opt, tsplib, SolverOptions,
+    particle_swarm, simulated_annealing, stochastic_hill, tabu_search, two_opt, tsplib,
+    SolverOptions,
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -145,6 +146,19 @@ fn genetic_algorithm_valid_tour_berlin52() {
     let tour = genetic_algorithm::solve(&cities, &build_dm(&cities), &opts);
 
     assert!(is_valid_tour(tour.route(), &cities), "GA tour is not valid on berlin52");
+}
+
+// ─── particle swarm optimisation ─────────────────────────────────────────────
+
+#[test]
+fn particle_swarm_valid_tour_berlin52() {
+    let cities = load_berlin52();
+    let tour = particle_swarm::solve(&cities, &build_dm(&cities), &stochastic_options(200));
+
+    assert!(
+        is_valid_tour(tour.route(), &cities),
+        "PSO tour is not valid on berlin52"
+    );
 }
 
 // ─── exact solvers (small instance only) ─────────────────────────────────────
