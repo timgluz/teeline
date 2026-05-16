@@ -43,6 +43,45 @@ fn pick_other(rng: &mut impl Rng, n: usize, excluded: &[usize]) -> usize {
     }
 }
 
+/// Global pollination: move `flower` toward `gbest` by a Lévy-scaled fraction of the swap
+/// sequence between them — the permutation analogue of `x + γ·L·(g* − x)` (Yang 2012).
+/// Returns the current flower unchanged if it already equals `gbest`.
+fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl Rng) -> Vec<usize> {
+    let seq = swap_sequence(flower, gbest);
+    if seq.is_empty() {
+        return flower.to_vec();
+    }
+    let levy = levy_step(rng).abs();
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    let n_swaps = ((levy * seq.len() as f64 * 0.5).ceil() as usize).clamp(1, seq.len());
+    apply_swaps(flower, &seq[..n_swaps])
+}
+
+/// Local pollination: apply an ε-scaled fraction of the displacement between two randomly
+/// chosen flowers `j` and `k` to `flower` — the permutation analogue of `x + ε·(x_j − x_k)`.
+/// Returns the current flower unchanged when `n_flowers < 3` or `flowers[j] == flowers[k]`.
+fn local_pollination(
+    flower: &[usize],
+    flowers: &[Vec<usize>],
+    flower_idx: usize,
+    rng: &mut impl Rng,
+) -> Vec<usize> {
+    let n_flowers = flowers.len();
+    if n_flowers < 3 {
+        return flower.to_vec();
+    }
+    let j = pick_other(rng, n_flowers, &[flower_idx]);
+    let k = pick_other(rng, n_flowers, &[flower_idx, j]);
+    let seq = swap_sequence(&flowers[j], &flowers[k]);
+    if seq.is_empty() {
+        return flower.to_vec();
+    }
+    let epsilon: f64 = rng.random();
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    let n_swaps = ((epsilon * seq.len() as f64).ceil() as usize).clamp(1, seq.len());
+    apply_swaps(flower, &seq[..n_swaps])
+}
+
 pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     let n_flowers = options.n_nearest.max(DEFAULT_N_FLOWERS);
     let n_cities = cities.len();
@@ -95,45 +134,9 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     for epoch in 0..options.epochs {
         for i in 0..n_flowers {
             let new_x = if bernoulli(&mut rng, switch_prob) {
-                // --- global pollination ---
-                // swap_sequence toward gbest is the permutation analogue of γ·L·(g* − x_i)
-                let seq = swap_sequence(&flowers[i], &gbest);
-                if seq.is_empty() {
-                    flowers[i].clone()
-                } else {
-                    let levy = levy_step(&mut rng).abs();
-                    #[allow(
-                        clippy::cast_possible_truncation,
-                        clippy::cast_sign_loss,
-                        clippy::cast_precision_loss
-                    )]
-                    let n_swaps =
-                        ((levy * seq.len() as f64 * 0.5).ceil() as usize).clamp(1, seq.len());
-                    apply_swaps(&flowers[i], &seq[..n_swaps])
-                }
+                global_pollination(&flowers[i], &gbest, &mut rng)
             } else {
-                // --- local pollination ---
-                // need at least 3 flowers to pick j ≠ i and k ≠ i, j ≠ k
-                if n_flowers < 3 {
-                    flowers[i].clone()
-                } else {
-                    let j = pick_other(&mut rng, n_flowers, &[i]);
-                    let k = pick_other(&mut rng, n_flowers, &[i, j]);
-                    let seq = swap_sequence(&flowers[j], &flowers[k]);
-                    if seq.is_empty() {
-                        flowers[i].clone()
-                    } else {
-                        let epsilon: f64 = rng.random();
-                        #[allow(
-                            clippy::cast_possible_truncation,
-                            clippy::cast_sign_loss,
-                            clippy::cast_precision_loss
-                        )]
-                        let n_swaps = ((epsilon * seq.len() as f64).ceil() as usize)
-                            .clamp(1, seq.len());
-                        apply_swaps(&flowers[i], &seq[..n_swaps])
-                    }
-                }
+                local_pollination(&flowers[i], &flowers, i, &mut rng)
             };
 
             let new_cost = distances.tour_length(&new_x);
