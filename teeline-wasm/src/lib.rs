@@ -36,12 +36,11 @@ impl Guest for Component {
             ..Default::default()
         };
 
-        let s = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             teeline::tsp::solve(solver_id, &kd_cities, &distances, &opts)
         }))
-        .map_err(|_| format!("solver '{solver}' panicked"))?;
-
-        Ok(Solution {
+        .map_err(|_| format!("solver '{solver}' panicked"))?
+        .map(|s| Solution {
             total: s.total,
             route: s.route().iter().map(|&id| id as u32).collect(),
         })

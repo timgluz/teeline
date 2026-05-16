@@ -208,7 +208,8 @@ fn run_solve(args: &ArgMatches) {
     let span = tracing::info_span!("solver", algorithm = ?solver_type);
     let solver_handle = thread::spawn(move || {
         let _enter = span.entered();
-        let tour = tsp::solve(solver_type, &cities_for_solver, &distances_for_solver, &options);
+        let tour = tsp::solve(solver_type, &cities_for_solver, &distances_for_solver, &options)
+            .expect("solver failed");
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
         tour

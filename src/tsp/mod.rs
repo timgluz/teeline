@@ -162,8 +162,8 @@ pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
     opts: &SolverOptions,
-) -> Solution {
-    match solver {
+) -> Result<Solution, String> {
+    let solution = match solver {
         Solvers::BellmanKarp => bellman_karp::solve(cities, distances, opts),
         Solvers::BranchBound => branch_bound::solve(cities, distances, opts),
         Solvers::CuckooSearch => cuckoo_search::solve(cities, distances, opts),
@@ -175,8 +175,9 @@ pub fn solve(
         Solvers::StochasticHill => stochastic_hill::solve(cities, distances, opts),
         Solvers::TabuSearch => tabu_search::solve(cities, distances, opts),
         Solvers::TwoOpt => two_opt::solve(cities, distances, opts),
-        Solvers::Unspecified => panic!("solver not specified"),
-    }
+        Solvers::Unspecified => return Err("solver not specified".to_string()),
+    };
+    Ok(solution)
 }
 
 // -- solution implementation
