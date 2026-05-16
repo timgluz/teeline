@@ -1,1 +1,5 @@
 node_modules/
+teeline_wasm.js
+teeline_wasm.d.ts
+teeline_wasm.core*.wasm
+interfaces/
