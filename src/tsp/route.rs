@@ -112,6 +112,36 @@ fn swap_cities(route: &mut [usize], from: usize, to: usize) {
     }
 }
 
+/// Greedy swap sequence that transforms `from` into `to`.
+/// Returns `Vec<(pos_i, pos_j)>` of swaps to apply in order.
+/// Both slices must be permutations of the same elements.
+pub fn swap_sequence(from: &[usize], to: &[usize]) -> Vec<(usize, usize)> {
+    let n = from.len();
+    let mut tmp = from.to_vec();
+    let mut seq: Vec<(usize, usize)> = Vec::new();
+    for i in 0..n.saturating_sub(1) {
+        if tmp[i] != to[i] {
+            let j = tmp[i + 1..]
+                .iter()
+                .position(|&x| x == to[i])
+                .map(|p| p + i + 1)
+                .expect("swap_sequence: permutations must share the same elements");
+            seq.push((i, j));
+            tmp.swap(i, j);
+        }
+    }
+    seq
+}
+
+/// Apply an ordered list of `(i, j)` swaps to `position`, returning the result.
+pub fn apply_swaps(position: &[usize], swaps: &[(usize, usize)]) -> Vec<usize> {
+    let mut pos = position.to_vec();
+    for &(i, j) in swaps {
+        pos.swap(i, j);
+    }
+    pos
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -134,6 +164,25 @@ mod tests {
         assert_eq!(2, route.len());
         assert_eq!(Some(0), route.get(0));
         assert_eq!(Some(1), route.get(1));
+    }
+
+    #[test]
+    fn test_swap_sequence_converts_from_to_to() {
+        let from = vec![1, 2, 3, 4];
+        let to = vec![1, 3, 2, 4];
+        assert_eq!(apply_swaps(&from, &swap_sequence(&from, &to)), to);
+    }
+
+    #[test]
+    fn test_swap_sequence_identity_is_empty() {
+        let v = vec![1, 2, 3];
+        assert!(swap_sequence(&v, &v).is_empty());
+    }
+
+    #[test]
+    fn test_apply_swaps_empty_is_identity() {
+        let pos = vec![1, 2, 3];
+        assert_eq!(apply_swaps(&pos, &[]), pos);
     }
 
     #[test]

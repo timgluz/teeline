@@ -37,6 +37,8 @@ representative, not as a guarantee.
 | **Particle Swarm (PSO)** | `--epochs=10000` (default) | 8 874.46 | +17.6 % | 0.84 s | 100 % | 7.9 MB |
 | **Particle Swarm (PSO)** | `--epochs=10000 --n_nearest=50` | 8 663.69 | +14.8 % | 1.42 s | 100 % | 8.1 MB |
 | **Cuckoo Search** | default (`--epochs=10000 --n_nearest=25`) | 7 877.84 | +4.4 % | 0.72 s | 100 % | 7.9 MB |
+| **Flower Pollination (FPA)** | default (`--epochs=10000 --n_nearest=25`) | 8 867.93 | +17.5 % | 0.53 s | 100 % | 7.2 MB |
+| **Flower Pollination (FPA)** | `--epochs=10000 --n_nearest=50` | 8 950.21 | +18.6 % | 1.13 s | 99 % | 7.2 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 
@@ -71,6 +73,8 @@ Gap from optimal
  11%  Stochastic Hill/10k (0.02 s)  ← best value for time
  15%  PSO/50p (1.42 s)
  17%  PSO/default (0.84 s)
+ 18%  FPA/default (0.53 s)
+ 19%  FPA/50 flowers (1.13 s)
  19%  NN (0.01 s)
  23%  Tabu/10k (0.47 s)
  24%  2-opt (0.01 s)
@@ -100,6 +104,13 @@ as a sanity check.
 **PSO** sits in the middle of the pack. More particles (`--n_nearest=50`) improve quality at
 the cost of proportionally more wall time. Default of 30 particles is a reasonable starting
 point.
+
+**Flower Pollination (FPA)** lands mid-table (~17–19 % gap), broadly level with PSO. With the
+default 25 flowers it converges in under 0.6 s; scaling to 50 flowers roughly doubles wall time
+without improving quality on this instance. The greedy acceptance rule (update only if
+`new_cost < current`) means the population converges very quickly — tracing shows only 1–2
+global-best improvements across 10 000 epochs. Adding a Metropolis acceptance or elitism would
+likely push quality closer to SA/CS.
 
 **Tabu Search** underperforms relative to its wall time budget; the current implementation
 does not improve much beyond 1 000 epochs on this instance.
