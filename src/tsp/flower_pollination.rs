@@ -148,7 +148,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
                         Route::new(&gbest),
                         gbest_cost,
                     ));
-                    tracing::debug!(epoch, tour_length = gbest_cost, "FPA: new best");
+                    tracing::info!(epoch, tour_length = gbest_cost, "FPA: new best");
                 }
             }
         }
