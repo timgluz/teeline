@@ -12,9 +12,9 @@
 /// because solution quality depends on runtime epochs.
 use std::path::Path;
 use teeline::tsp::{
-    bellman_karp, branch_bound, distance_matrix, genetic_algorithm, kdtree, nearest_neighbor,
-    particle_swarm, simulated_annealing, stochastic_hill, tabu_search, two_opt, tsplib,
-    SolverOptions,
+    bellman_karp, branch_bound, cuckoo_search, distance_matrix, genetic_algorithm, kdtree,
+    nearest_neighbor, particle_swarm, simulated_annealing, stochastic_hill, tabu_search, two_opt,
+    tsplib, SolverOptions,
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -158,6 +158,20 @@ fn particle_swarm_valid_tour_berlin52() {
     assert!(
         is_valid_tour(tour.route(), &cities),
         "PSO tour is not valid on berlin52"
+    );
+}
+
+// ─── cuckoo search ────────────────────────────────────────────────────────────
+
+#[test]
+fn cuckoo_search_valid_tour_berlin52() {
+    let cities = load_berlin52();
+    let mut opts = stochastic_options(200);
+    opts.mutation_probability = 0.25;
+    let tour = cuckoo_search::solve(&cities, &build_dm(&cities), &opts);
+    assert!(
+        is_valid_tour(tour.route(), &cities),
+        "Cuckoo Search tour is not valid on berlin52"
     );
 }
 

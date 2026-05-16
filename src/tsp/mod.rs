@@ -1,5 +1,6 @@
 pub mod bellman_karp;
 pub mod branch_bound;
+pub mod cuckoo_search;
 pub mod distance_matrix;
 pub mod genetic_algorithm;
 pub mod kdtree;
@@ -28,6 +29,7 @@ use std::str::FromStr;
 pub enum Solvers {
     BellmanKarp,
     BranchBound,
+    CuckooSearch,
     NearestNeighbor,
     GeneticAlgorithm,
     ParticleSwarmOptimization,
@@ -44,6 +46,8 @@ impl Solvers {
             "bellman_karp",
             "bhk",
             "branch_bound",
+            "cs",
+            "cuckoo_search",
             "nearest_neighbor",
             "nn",
             "genetic_algorithm",
@@ -67,6 +71,7 @@ impl FromStr for Solvers {
         match s {
             "bhk" | "bellman_karp" => Ok(Solvers::BellmanKarp),
             "branch_bound" => Ok(Solvers::BranchBound),
+            "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),

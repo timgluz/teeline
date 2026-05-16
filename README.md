@@ -292,6 +292,36 @@ Resources:
 - Kennedy & Eberhart (1995) — *Particle Swarm Optimization*
 - Clerc (2004) — *Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem*
 
+#### Cuckoo Search (`cuckoo_search`, `cs`)
+
+Nature-inspired metaheuristic: maintains a population of nests (candidate tours). Each epoch it generates a new cuckoo tour via a Lévy-flight step (a sequence of random 2-opt reversals whose count is drawn from a power-law Lévy distribution), then replaces a random worse nest with the cuckoo if it's better. Each nest is independently abandoned with probability `pa` and re-seeded randomly each epoch to maintain diversity.
+
+**TSP-specific adaptations** (deviations from Yang & Deb 2009):
+
+| Adaptation | Why |
+|---|---|
+| Lévy flight → k random 2-opt reversals | Maps continuous Lévy step magnitude to a discrete tour perturbation; preserves permutation validity |
+| k capped at n/2 | Prevents full-tour scrambles from very large Lévy draws |
+| β=1.5 fixed; σ_u≈0.6966 precomputed | Standard Lévy exponent (Mantegna 1994); constant avoids repeated gamma evaluation |
+| Per-nest Bernoulli abandonment | Closer to the original paper than deterministic worst-k; avoids discarding more information per epoch than Lévy moves can recover |
+
+Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--epochs` | Maximum iterations | 10 000 |
+| `--n_nearest` | Number of nests (floored at 25) | 25 |
+| `--mutation_probability` | Per-nest abandonment probability `pa` | 0.001 |
+
+```bash
+teeline cs -i ./data/tsplib/berlin52.tsp
+teeline cuckoo_search -i ./data/tsplib/berlin52.tsp --epochs=500
+teeline cs -i ./data/tsplib/berlin52.tsp --n_nearest=40 --mutation_probability=0.25
+```
+
+Resources:
+- Yang & Deb (2009) — *Cuckoo Search via Lévy Flights*
+- [Cuckoo search (Wikipedia)](https://en.wikipedia.org/wiki/Cuckoo_search)
+
 ---
 
 ## Visualising Results
@@ -339,6 +369,7 @@ Quick summary:
 
 | Algorithm | Gap | Wall time |
 |-----------|:---:|----------:|
+| Cuckoo Search (default) | +4.4 % | 0.72 s |
 | Simulated Annealing (default) | +6.8 % | 0.34 s |
 | Genetic Algorithm (10 000 ep) | +8.3 % | 1.63 s |
 | Stochastic Hill (10 000 ep) | +11.2 % | 0.02 s |
