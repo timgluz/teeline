@@ -2,15 +2,10 @@ use rand::Rng;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
+use super::probability::levy_step;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
-
-// Lévy exponent β=1.5 (Yang & Deb 2009 recommendation for CS).
-// σ_u from Mantegna (1994): (Γ(1+β)·sin(πβ/2) / (Γ((1+β)/2)·β·2^((β-1)/2)))^(1/β)
-// Numerically: (0.8862·0.9816 / (0.8862·1.5·1.2247))^(0.667) ≈ 0.6966
-const BETA: f64 = 1.5;
-const SIGMA_U: f64 = 0.6966;
 const DEFAULT_N_NESTS: usize = 25;
 
 /// Greedy nearest-neighbour tour starting from the first city.
@@ -36,24 +31,6 @@ fn nn_seed(city_ids: &[usize], distances: &DistanceMatrix) -> Vec<usize> {
         tour.push(current);
     }
     tour
-}
-
-fn normal_sample(rng: &mut impl Rng) -> f64 {
-    // Box-Muller transform; guard against ln(0) with MIN_POSITIVE floor.
-    let u1: f64 = rng.random::<f64>().max(f64::MIN_POSITIVE);
-    let u2: f64 = rng.random();
-    (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()
-}
-
-fn levy_step(rng: &mut impl Rng) -> f64 {
-    // Mantegna's algorithm: step = u*σ_u / |v|^(1/β).
-    // Resample v when it's too close to zero to avoid divide-by-zero -> inf.
-    let u = normal_sample(rng) * SIGMA_U;
-    let mut v = normal_sample(rng);
-    while v.abs() < f64::MIN_POSITIVE {
-        v = normal_sample(rng);
-    }
-    u / v.abs().powf(1.0 / BETA)
 }
 
 fn apply_k_random_2opt(tour: &[usize], k: usize, rng: &mut impl Rng) -> Vec<usize> {
@@ -166,24 +143,6 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 mod tests {
     use super::*;
     use crate::tsp::{distance_matrix, kdtree};
-
-    #[test]
-    fn test_normal_sample_is_finite() {
-        let mut rng = rand::rng();
-        for _ in 0..100 {
-            let s = normal_sample(&mut rng);
-            assert!(s.is_finite(), "normal_sample returned non-finite: {s}");
-        }
-    }
-
-    #[test]
-    fn test_levy_step_is_finite() {
-        let mut rng = rand::rng();
-        for _ in 0..10_000 {
-            let s = levy_step(&mut rng);
-            assert!(s.is_finite(), "levy_step produced non-finite: {s}");
-        }
-    }
 
     #[test]
     fn test_apply_k_random_2opt_preserves_cities() {

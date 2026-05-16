@@ -3,7 +3,7 @@ use rand::Rng;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
-use super::route::Route;
+use super::route::{apply_swaps, swap_sequence, Route};
 use super::{Solution, SolverOptions};
 
 type Swap = (usize, usize);
@@ -42,39 +42,6 @@ fn nn_seed(city_ids: &[usize], distances: &DistanceMatrix) -> Vec<usize> {
         tour.push(current);
     }
     tour
-}
-
-/// Greedy swap sequence that converts `from` into `to`.
-///
-/// Iterates positions 0..n-1; the last position auto-aligns, so no
-/// out-of-bounds slice access occurs on valid permutations.
-fn swap_sequence(from: &[usize], to: &[usize]) -> Velocity {
-    let n = from.len();
-    let mut tmp = from.to_vec();
-    let mut seq = Vec::new();
-
-    for i in 0..n.saturating_sub(1) {
-        if tmp[i] != to[i] {
-            // to[i] must exist at some j > i because positions 0..i already match
-            let j = tmp[i + 1..]
-                .iter()
-                .position(|&x| x == to[i])
-                .map(|p| p + i + 1)
-                .expect("swap_sequence: permutations must share the same elements");
-            seq.push((i, j));
-            tmp.swap(i, j);
-        }
-    }
-    seq
-}
-
-/// Apply an ordered list of swaps to a position, returning the new position.
-fn apply_swaps(position: &[usize], velocity: &[Swap]) -> Vec<usize> {
-    let mut pos = position.to_vec();
-    for &(i, j) in velocity {
-        pos.swap(i, j);
-    }
-    pos
 }
 
 /// Scalar-multiply a velocity: keep the first `keep` swaps (clamped to length).
@@ -188,26 +155,6 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 mod tests {
     use super::*;
     use crate::tsp::{distance_matrix, kdtree};
-
-    #[test]
-    fn test_swap_sequence_converts_from_to_to() {
-        let from = vec![1, 2, 3, 4];
-        let to = vec![1, 3, 2, 4];
-        let seq = swap_sequence(&from, &to);
-        assert_eq!(apply_swaps(&from, &seq), to);
-    }
-
-    #[test]
-    fn test_swap_sequence_identity_returns_empty() {
-        let v = vec![1, 2, 3, 4];
-        assert!(swap_sequence(&v, &v).is_empty());
-    }
-
-    #[test]
-    fn test_apply_swaps_empty_velocity_is_identity() {
-        let pos = vec![1, 2, 3];
-        assert_eq!(apply_swaps(&pos, &[]), pos);
-    }
 
     #[test]
     fn test_trim_velocity_truncates_and_clamps() {
