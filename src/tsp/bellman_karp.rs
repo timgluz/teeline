@@ -11,7 +11,7 @@
 ///
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -40,7 +40,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             .unwrap_or(UNKNOWN_DISTANCE);
 
         if let Some(city_id) = dists.pos2city_id(&i) {
-            send_progress(ProgressMessage::CityChange(city_id));
+            options.send_progress(ProgressMessage::CityChange(city_id));
         }
     }
 
@@ -73,8 +73,8 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
     // send final route to the visualizer
     let route = Route::new(route_vec.as_ref());
-    send_progress(ProgressMessage::PathUpdate(route, 0.0));
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::PathUpdate(route, 0.0));
+    options.send_progress(ProgressMessage::Done);
 
     Solution::new(&route_vec, cities, distances)
 }

@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -21,7 +21,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     tracing::info!(n_cities, "B&B starting");
 
     route.sort();
-    send_progress(ProgressMessage::PathUpdate(route.clone(), 0.0));
+    options.send_progress(ProgressMessage::PathUpdate(route.clone(), 0.0));
 
     let mut open_path: Path = vec![0; n_cities];
     open_path[0] = route.get(0).unwrap();
@@ -39,7 +39,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         options,
     );
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(&best_path, cities, distances)
 }
 
@@ -84,7 +84,7 @@ fn backtrack(
     );
 
     for candidate in candidates.iter() {
-        make_move(path, k, *candidate);
+        make_move(path, k, *candidate, options);
 
         let visited_path: Vec<usize> = path
             .to_vec()
@@ -92,7 +92,7 @@ fn backtrack(
             .filter(|&&x| x != UNVISITED_NODE)
             .copied()
             .collect();
-        send_progress(ProgressMessage::PathUpdate(
+        options.send_progress(ProgressMessage::PathUpdate(
             Route::new(&visited_path),
             best_distance,
         ));
@@ -152,9 +152,9 @@ fn construct_candidates(
     candidates
 }
 
-fn make_move(path: &mut Path, k: usize, candidate: usize) {
+fn make_move(path: &mut Path, k: usize, candidate: usize, options: &SolverOptions) {
     path[k] = candidate;
-    send_progress(ProgressMessage::CityChange(candidate));
+    options.send_progress(ProgressMessage::CityChange(candidate));
 }
 
 fn undo_move(path: &mut Path, k: usize) {

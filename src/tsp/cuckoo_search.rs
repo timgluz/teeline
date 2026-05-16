@@ -2,7 +2,7 @@ use rand::Rng;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -105,7 +105,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut best: Vec<usize> = nests[best_idx].clone();
     let mut best_cost: f32 = costs[best_idx];
 
-    send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+    options.send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
 
     for epoch in 0..options.epochs {
         // 1. Each nest generates one cuckoo via Lévy flight (Yang & Deb 2009: n cuckoos/epoch).
@@ -128,7 +128,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
                 if new_cost < best_cost {
                     best = nests[target_idx].clone();
                     best_cost = new_cost;
-                    send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+                    options.send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
                 }
             }
         }
@@ -150,15 +150,15 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
                 if cost < best_cost {
                     best = nests[idx].clone();
                     best_cost = cost;
-                    send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+                    options.send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
                 }
             }
         }
 
-        send_progress(ProgressMessage::EpochUpdate(epoch));
+        options.send_progress(ProgressMessage::EpochUpdate(epoch));
     }
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(&best, cities, distances)
 }
 

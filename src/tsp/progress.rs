@@ -1,20 +1,12 @@
 use std::sync::mpsc;
-use std::sync::Mutex;
-use std::sync::LazyLock;
 
 use eframe;
 use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, Stroke};
 
 use std::collections::{HashMap, HashSet};
-use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Arc;
 
 use super::route::Route;
 use super::KDPoint;
-
-pub type PublishChannel = Sender<ProgressMessage>;
-pub type ReceiverChannel = Receiver<ProgressMessage>;
-pub type PublisherFn = Arc<dyn Fn(ProgressMessage)>;
 
 type RectCoords = [f64; 4];
 type Point2D = (f64, f64);
@@ -31,42 +23,6 @@ const ACTIVE_EDGE_COLOR:  Color32 = Color32::from_rgb(255, 140, 0);    // orange
 const STATUS_COLOR:       Color32 = Color32::from_rgb(220, 30,  30);   // red — status text
 const FONT_SIZE: f32 = 16.0;
 
-static PUBLISH_CHANNEL: LazyLock<Mutex<Option<PublishChannel>>> =
-    LazyLock::new(|| Mutex::new(None));
-static RECEIVER_CHANNEL: LazyLock<Mutex<Option<ReceiverChannel>>> =
-    LazyLock::new(|| Mutex::new(None));
-
-fn init_channels() {
-    let (out_ch, in_ch) = mpsc::channel();
-    let mut mtx = PUBLISH_CHANNEL.lock().unwrap();
-    *mtx = Some(out_ch);
-
-    let mut inmtx = RECEIVER_CHANNEL.lock().unwrap();
-    *inmtx = Some(in_ch);
-}
-
-pub fn get_publisher() -> Option<PublishChannel> {
-    match PUBLISH_CHANNEL.lock() {
-        Ok(mtx) => mtx.clone(),
-        Err(_) => None,
-    }
-}
-
-pub fn send_progress(msg: ProgressMessage) {
-    let publish_ch = PUBLISH_CHANNEL.lock().unwrap();
-    if publish_ch.is_some() {
-        publish_ch
-            .clone()
-            .unwrap()
-            .send(msg)
-            .expect("Failed to publish message");
-    }
-}
-
-fn try_retrieve_message() -> Option<ProgressMessage> {
-    let ch = RECEIVER_CHANNEL.lock().unwrap();
-    ch.as_ref().and_then(|x| x.try_recv().ok())
-}
 
 #[derive(Debug, Clone)]
 pub enum ProgressMessage {
@@ -84,6 +40,7 @@ struct NodeData {
 }
 
 pub struct ProgressPlot {
+    rx: mpsc::Receiver<ProgressMessage>,
     city_table: HashMap<usize, KDPoint>,
     nodes: Vec<NodeData>,
     best_edges: Vec<EdgeData>,                          // shown in green after Done
@@ -100,11 +57,12 @@ pub struct ProgressPlot {
 }
 
 impl ProgressPlot {
-    pub fn new(cities: &[KDPoint], width: f64, height: f64, margin: f64) -> Self {
-        // Initialise channels here so they are ready before the solver thread starts.
-        init_channels();
-
+    pub fn new_with_channel(cities: &[KDPoint], width: f64, height: f64, margin: f64)
+        -> (Self, mpsc::Sender<ProgressMessage>)
+    {
+        let (tx, rx) = mpsc::channel();
         let mut plot = ProgressPlot {
+            rx,
             city_table: HashMap::new(),
             nodes: Vec::new(),
             best_edges: Vec::new(),
@@ -119,25 +77,12 @@ impl ProgressPlot {
             cities_bounding_box: cities_bounding_box(cities),
             status: "Preparing...".to_string(),
         };
-
         plot.add_cities(cities);
         plot.add_nodes();
-        plot
+        (plot, tx)
     }
 
-    pub fn run(self, show_progress: bool) {
-        if !show_progress {
-            // Drain messages so the solver's channel send never blocks, then exit.
-            loop {
-                match try_retrieve_message() {
-                    Some(ProgressMessage::Done) => break,
-                    None => std::thread::sleep(std::time::Duration::from_millis(5)),
-                    _ => {}
-                }
-            }
-            return;
-        }
-
+    pub fn run(self) {
         let options = eframe::NativeOptions {
             viewport: egui::ViewportBuilder::default()
                 .with_inner_size([
@@ -272,7 +217,7 @@ impl ProgressPlot {
 
 impl eframe::App for ProgressPlot {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        while let Some(msg) = try_retrieve_message() {
+        while let Ok(msg) = self.rx.try_recv() {
             self.handle_message(&msg);
         }
 
@@ -525,6 +470,13 @@ mod tests {
         let (vx, vy) = point_to_viewport(5.0, 5.0, &window, &vp);
         assert!((vx - 50.0).abs() < 0.01);
         assert!((vy - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_new_with_channel_creates_working_channel() {
+        let cities = build_points(&[vec![0.0, 0.0], vec![10.0, 5.0]]);
+        let (_plot, tx) = ProgressPlot::new_with_channel(&cities, 100.0, 100.0, 10.0);
+        assert!(tx.send(ProgressMessage::EpochUpdate(1)).is_ok());
     }
 }
 

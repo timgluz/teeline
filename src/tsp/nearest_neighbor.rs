@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -20,13 +20,13 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     path.push(start_id);
     unvisited.remove(&start_id);
 
-    send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
+    options.send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
 
     while !unvisited.is_empty() {
         let current_id = *path.last().unwrap();
         let current_city = &cities_table[&current_id];
 
-        send_progress(ProgressMessage::CityChange(current_id));
+        options.send_progress(ProgressMessage::CityChange(current_id));
 
         // Find the nearest unvisited city.  Check the n_nearest frontier first (fast path);
         // fall back to a linear scan over `unvisited` when all frontier cities are already
@@ -50,10 +50,10 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
         path.push(next_id);
         unvisited.remove(&next_id);
-        send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
+        options.send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
     }
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(&path, cities, distances)
 }
 

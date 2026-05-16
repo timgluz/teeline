@@ -1,22 +1,22 @@
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, _options: &SolverOptions) -> Solution {
+pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     tracing::info!(cities = cities.len(), "2-opt starting");
 
     let n_indices = cities.len() - 1;
     let mut path: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
-    send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
+    options.send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
 
     let mut improved = true;
     while improved {
         improved = false;
         for i in 0..(n_indices - 2) {
-            send_progress(ProgressMessage::CityChange(path[i]));
+            options.send_progress(ProgressMessage::CityChange(path[i]));
 
             for j in (i + 2)..n_indices {
                 let current_distance =
@@ -31,14 +31,14 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, _options: &SolverOp
                     swap_2opt(&mut path, i + 1, j);
                     improved = true;
 
-                    send_progress(ProgressMessage::PathUpdate(Route::new(&path), new_distance));
+                    options.send_progress(ProgressMessage::PathUpdate(Route::new(&path), new_distance));
                     tracing::debug!(i, j, tour_length = new_distance, "2-opt: improvement");
                 }
             }
         }
     }
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(&path, cities, distances)
 }
 
