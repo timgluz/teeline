@@ -1,6 +1,6 @@
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -15,7 +15,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
     //mix up the cities to avoid getting stuck due bad initial state
     current_route.shuffle();
-    send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
+    options.send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
 
     // Baseline from the shuffled state — sequential ordering would be
     // an artificially low bar that random successors can never beat.
@@ -37,7 +37,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
             n_stale = 0;
 
-            send_progress(ProgressMessage::PathUpdate(
+            options.send_progress(ProgressMessage::PathUpdate(
                 best_route.clone(),
                 best_distance,
             ));
@@ -56,7 +56,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             current_route.shuffle();
             n_stale = 0;
 
-            send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
+            options.send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
         }
 
         // check if we should finish the search
@@ -69,7 +69,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         tracing::warn!(epochs = options.epochs, tour_length = best_distance, "hill: no improvement found");
     }
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(best_route.route(), cities, distances)
 }
 

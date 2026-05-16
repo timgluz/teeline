@@ -2,7 +2,7 @@ use rand::Rng;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -122,7 +122,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut gbest: Vec<usize> = pbest[best_idx].clone();
     let mut gbest_cost: f32 = pbest_cost[best_idx];
 
-    send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+    options.send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
 
     let epochs = options.epochs;
     for epoch in 0..epochs {
@@ -173,14 +173,14 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             if cost < gbest_cost {
                 gbest = positions[i].clone();
                 gbest_cost = cost;
-                send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+                options.send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
             }
         }
 
-        send_progress(ProgressMessage::EpochUpdate(epoch));
+        options.send_progress(ProgressMessage::EpochUpdate(epoch));
     }
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(&gbest, cities, distances)
 }
 

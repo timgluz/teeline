@@ -19,6 +19,7 @@ use crate::tsp::distance_matrix::DistanceMatrix;
 use crate::tsp::kdtree::KDPoint;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::sync::mpsc;
 
 pub const VERSION: &str = "0.6.1";
 pub const AUTHOR: &str = "Timo Sulg <timo@sulg.dev>";
@@ -86,7 +87,7 @@ impl FromStr for Solvers {
 
 // -- SolverOptions
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SolverOptions {
     pub epochs: usize,
     pub platoo_epochs: usize,
@@ -97,7 +98,24 @@ pub struct SolverOptions {
     pub cooling_rate: f32,
     pub max_temperature: f32,
     pub min_temperature: f32,
-    pub show_progress: bool,
+    pub progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
+}
+
+impl std::fmt::Debug for SolverOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SolverOptions")
+            .field("epochs", &self.epochs)
+            .field("platoo_epochs", &self.platoo_epochs)
+            .field("verbose", &self.verbose)
+            .field("n_nearest", &self.n_nearest)
+            .field("mutation_probability", &self.mutation_probability)
+            .field("n_elite", &self.n_elite)
+            .field("cooling_rate", &self.cooling_rate)
+            .field("max_temperature", &self.max_temperature)
+            .field("min_temperature", &self.min_temperature)
+            .field("progress_tx", &self.progress_tx.is_some())
+            .finish()
+    }
 }
 
 impl Default for SolverOptions {
@@ -112,7 +130,15 @@ impl Default for SolverOptions {
             cooling_rate: 0.0001,
             min_temperature: 0.001,
             max_temperature: 1_000.0,
-            show_progress: false,
+            progress_tx: None,
+        }
+    }
+}
+
+impl SolverOptions {
+    pub fn send_progress(&self, msg: progress::ProgressMessage) {
+        if let Some(ref tx) = self.progress_tx {
+            let _ = tx.send(msg);
         }
     }
 }
@@ -256,6 +282,25 @@ impl PartialEq for NearestResultItem {
 mod tests {
     use super::*;
     use crate::test::helpers::assert_approx;
+
+    #[test]
+    fn test_send_progress_with_none_is_noop() {
+        let options = SolverOptions::default();
+        options.send_progress(progress::ProgressMessage::Done);
+    }
+
+    #[test]
+    fn test_send_progress_with_channel_delivers_message() {
+        use std::sync::mpsc;
+        let (tx, rx) = mpsc::channel();
+        let mut options = SolverOptions::default();
+        options.progress_tx = Some(tx);
+        options.send_progress(progress::ProgressMessage::EpochUpdate(99));
+        match rx.recv().unwrap() {
+            progress::ProgressMessage::EpochUpdate(n) => assert_eq!(n, 99),
+            other => panic!("unexpected message: {:?}", other),
+        }
+    }
 
     #[test]
     fn test_solution_total_for_tsp_5_1() {

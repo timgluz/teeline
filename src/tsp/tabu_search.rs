@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -16,7 +16,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut best_route = Route::from_cities(cities);
     tabu_list.add(best_route.clone());
 
-    send_progress(ProgressMessage::PathUpdate(best_route.clone(), 0.0));
+    options.send_progress(ProgressMessage::PathUpdate(best_route.clone(), 0.0));
 
     let mut u = best_route.clone();
     let mut best_distance = distances.tour_length(u.route());
@@ -28,7 +28,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             best_route = local_best.clone();
             best_distance = local_distance;
 
-            send_progress(ProgressMessage::PathUpdate(
+            options.send_progress(ProgressMessage::PathUpdate(
                 best_route.clone(),
                 best_distance,
             ));
@@ -43,7 +43,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         done = update_terminate(epoch, options.epochs);
     }
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(best_route.route(), cities, distances)
 }
 

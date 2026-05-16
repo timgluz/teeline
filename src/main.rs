@@ -105,7 +105,7 @@ fn main() {
         Solvers::from_str(args.get_one::<String>("solver").map(|s| s.as_str()).unwrap_or("unspecified"))
             .expect("Unknown solver");
 
-    let options = solver_options_from_args(&args);
+    let mut options = solver_options_from_args(&args);
 
     let default_level = if options.verbose { "debug" } else { "info" };
     tracing_subscriber::fmt()
@@ -136,13 +136,17 @@ fn main() {
             std::process::exit(1);
         }
     };
-    let show_progress = options.show_progress;
-
-    // eframe (winit) requires the event loop on the main thread,
-    // so the solver runs in a background thread and the window stays on main.
-    // MUST construct ProgressPlot first — new() calls init_channels() which
-    // sets up the global mpsc channel before any send_progress calls.
-    let progress_display = progress::ProgressPlot::new(&cities, 1024.0, 1024.0, 50.0);
+    // Build the progress display only when --gui is requested.
+    // eframe (winit) requires the event loop on the main thread;
+    // the solver runs in a background thread.
+    let maybe_display: Option<progress::ProgressPlot>;
+    if args.get_flag("gui") {
+        let (display, tx) = progress::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
+        options.progress_tx = Some(tx);
+        maybe_display = Some(display);
+    } else {
+        maybe_display = None;
+    }
 
     let opt_tour = args
         .get_one::<String>("optimal_tour")
@@ -154,15 +158,18 @@ fn main() {
             }
         });
 
+    // Send the optimal tour overlay only when the GUI is active.
     if let Some(ref ot) = opt_tour {
-        if ot.dimension == tsp_data.len() {
-            progress::send_progress(progress::ProgressMessage::OptimalTour(ot.route.clone()));
-        } else {
-            eprintln!(
-                "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
-                ot.dimension,
-                tsp_data.len()
-            );
+        if let Some(ref tx) = options.progress_tx {
+            if ot.dimension == tsp_data.len() {
+                let _ = tx.send(progress::ProgressMessage::OptimalTour(ot.route.clone()));
+            } else {
+                eprintln!(
+                    "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
+                    ot.dimension,
+                    tsp_data.len()
+                );
+            }
         }
     }
 
@@ -177,7 +184,9 @@ fn main() {
         tour
     });
 
-    progress_display.run(show_progress);
+    if let Some(display) = maybe_display {
+        display.run();
+    }
 
     let tour = solver_handle.join().expect("Solver thread failed");
 
@@ -300,7 +309,7 @@ mod tests {
         let opts = solver_options_from_args(&args);
         let defaults = SolverOptions::default();
         assert!(!opts.verbose);
-        assert!(!opts.show_progress);
+        assert!(opts.progress_tx.is_none());
         assert_eq!(opts.epochs, defaults.epochs);
         assert_eq!(opts.n_nearest, defaults.n_nearest);
     }
@@ -309,12 +318,6 @@ mod tests {
     fn test_solver_options_verbose_flag_sets_verbose() {
         let args = options_cmd().get_matches_from(["test", "nn", "--verbose"]);
         assert!(solver_options_from_args(&args).verbose);
-    }
-
-    #[test]
-    fn test_solver_options_gui_flag_enables_progress() {
-        let args = options_cmd().get_matches_from(["test", "nn", "--gui"]);
-        assert!(solver_options_from_args(&args).show_progress);
     }
 
     #[test]
@@ -385,10 +388,6 @@ fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
 
     if args.get_flag("verbose") {
         options.verbose = true;
-    }
-
-    if args.get_flag("gui") {
-        options.show_progress = true;
     }
 
     if let Some(n_epochs_str) = args.get_one::<String>("epochs") {

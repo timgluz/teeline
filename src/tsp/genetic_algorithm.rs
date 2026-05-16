@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::{random_position_pair, Route};
 use super::{Solution, SolverOptions};
 
@@ -19,11 +19,11 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let best_candidate = solve_ga(&population, evaluator, distances, options);
 
     let best_route = Route::new(best_candidate.genotype());
-    send_progress(ProgressMessage::PathUpdate(
+    options.send_progress(ProgressMessage::PathUpdate(
         best_route,
         distances.tour_length(best_candidate.genotype()),
     ));
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(best_candidate.genotype(), cities, distances)
 }
 
@@ -76,7 +76,7 @@ fn solve_ga(
 
         let best_candidate = current_population.best().clone();
         let best_route = Route::new(best_candidate.genotype());
-        send_progress(ProgressMessage::PathUpdate(
+        options.send_progress(ProgressMessage::PathUpdate(
             best_route,
             distances.tour_length(best_candidate.genotype()),
         ));

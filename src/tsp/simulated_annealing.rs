@@ -2,7 +2,7 @@ use rand::Rng;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::progress::{send_progress, ProgressMessage};
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
@@ -20,7 +20,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut best_route = Route::from_cities(cities);
     let mut best_distance = distances.tour_length(best_route.route());
 
-    send_progress(ProgressMessage::PathUpdate(
+    options.send_progress(ProgressMessage::PathUpdate(
         best_route.clone(),
         best_distance,
     ));
@@ -34,7 +34,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             best_route = candidate;
             best_distance = candidate_distance;
 
-            send_progress(ProgressMessage::PathUpdate(
+            options.send_progress(ProgressMessage::PathUpdate(
                 best_route.clone(),
                 best_distance,
             ));
@@ -46,7 +46,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         epoch += 1;
     }
 
-    send_progress(ProgressMessage::Done);
+    options.send_progress(ProgressMessage::Done);
     Solution::new(best_route.route(), cities, distances)
 }
 
