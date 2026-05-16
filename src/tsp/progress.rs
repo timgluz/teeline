@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::route::Route;
 use super::KDPoint;
+pub use super::messages::ProgressMessage;
 
 type RectCoords = [f64; 4];
 type Point2D = (f64, f64);
@@ -23,16 +24,6 @@ const ACTIVE_EDGE_COLOR:  Color32 = Color32::from_rgb(255, 140, 0);    // orange
 const STATUS_COLOR:       Color32 = Color32::from_rgb(220, 30,  30);   // red — status text
 const FONT_SIZE: f32 = 16.0;
 
-
-#[derive(Debug, Clone)]
-pub enum ProgressMessage {
-    CityChange(usize),
-    PathUpdate(Route, f32),
-    EpochUpdate(usize),
-    Done,
-    Restart,
-    OptimalTour(Vec<usize>),
-}
 
 struct NodeData {
     city_id: usize,

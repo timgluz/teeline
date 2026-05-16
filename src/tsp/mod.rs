@@ -6,7 +6,9 @@ pub mod flower_pollination;
 pub mod distance_matrix;
 pub mod genetic_algorithm;
 pub mod kdtree;
+pub mod messages;
 pub mod nearest_neighbor;
+#[cfg(feature = "gui")]
 pub mod progress;
 pub mod route;
 pub mod simulated_annealing;
@@ -105,7 +107,7 @@ pub struct SolverOptions {
     pub cooling_rate: f32,
     pub max_temperature: f32,
     pub min_temperature: f32,
-    pub progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
+    pub progress_tx: Option<mpsc::Sender<messages::ProgressMessage>>,
 }
 
 impl std::fmt::Debug for SolverOptions {
@@ -143,7 +145,7 @@ impl Default for SolverOptions {
 }
 
 impl SolverOptions {
-    pub fn send_progress(&self, msg: progress::ProgressMessage) {
+    pub fn send_progress(&self, msg: messages::ProgressMessage) {
         if let Some(ref tx) = self.progress_tx {
             let _ = tx.send(msg);
         }
@@ -293,7 +295,7 @@ mod tests {
     #[test]
     fn test_send_progress_with_none_is_noop() {
         let options = SolverOptions::default();
-        options.send_progress(progress::ProgressMessage::Done);
+        options.send_progress(messages::ProgressMessage::Done);
     }
 
     #[test]
@@ -302,9 +304,9 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         let mut options = SolverOptions::default();
         options.progress_tx = Some(tx);
-        options.send_progress(progress::ProgressMessage::EpochUpdate(99));
+        options.send_progress(messages::ProgressMessage::EpochUpdate(99));
         match rx.recv().unwrap() {
-            progress::ProgressMessage::EpochUpdate(n) => assert_eq!(n, 99),
+            messages::ProgressMessage::EpochUpdate(n) => assert_eq!(n, 99),
             other => panic!("unexpected message: {:?}", other),
         }
     }
