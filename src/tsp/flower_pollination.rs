@@ -2,7 +2,7 @@ use rand::Rng;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::probability::{bernoulli, levy_step};
+use super::probability::{bernoulli, levy_step, sample_with_exclude};
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
 use super::{Solution, SolverOptions};
@@ -33,16 +33,6 @@ fn nn_seed(city_ids: &[usize], distances: &DistanceMatrix) -> Vec<usize> {
     tour
 }
 
-/// Pick a random index in `0..n` that is not in `excluded`.
-fn pick_other(rng: &mut impl Rng, n: usize, excluded: &[usize]) -> usize {
-    loop {
-        let idx = rng.random_range(0..n);
-        if !excluded.contains(&idx) {
-            return idx;
-        }
-    }
-}
-
 /// Global pollination: move `flower` toward `gbest` by a Lévy-scaled fraction of the swap
 /// sequence between them — the permutation analogue of `x + γ·L·(g* − x)` (Yang 2012).
 /// Returns the current flower unchanged if it already equals `gbest`.
@@ -70,8 +60,8 @@ fn local_pollination(
     if n_flowers < 3 {
         return flower.to_vec();
     }
-    let j = pick_other(rng, n_flowers, &[flower_idx]);
-    let k = pick_other(rng, n_flowers, &[flower_idx, j]);
+    let j = sample_with_exclude(rng, n_flowers, &[flower_idx]);
+    let k = sample_with_exclude(rng, n_flowers, &[flower_idx, j]);
     let seq = swap_sequence(&flowers[j], &flowers[k]);
     if seq.is_empty() {
         return flower.to_vec();

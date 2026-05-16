@@ -42,6 +42,16 @@ pub fn bernoulli(rng: &mut impl Rng, p: f64) -> bool {
     rng.random::<f64>() < p
 }
 
+/// Sample a random index in `0..n` that is not in `excluded`. Panics if no valid index exists.
+pub fn sample_with_exclude(rng: &mut impl Rng, n: usize, excluded: &[usize]) -> usize {
+    loop {
+        let idx = rng.random_range(0..n);
+        if !excluded.contains(&idx) {
+            return idx;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
