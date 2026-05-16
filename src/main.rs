@@ -1,6 +1,6 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
@@ -8,14 +8,12 @@ use teeline::tsp::{self, distance_matrix, kdtree, progress, tsplib, Solution, So
 use tracing_subscriber::EnvFilter;
 
 fn main() {
-    let args = Command::new("Teeline")
-        .version(tsp::VERSION)
-        .author(tsp::AUTHOR)
-        .about("Solver for Traveling Salesman problem")
+    let solve_cmd = Command::new("solve")
+        .about("Solve a TSP instance")
         .arg(
             Arg::new("solver")
                 .index(1)
-                .help("specify an algorithm to use")
+                .help("algorithm to use")
                 .value_parser(Solvers::variants())
                 .required(true)
                 .value_name("SOLVER_NAME")
@@ -24,49 +22,49 @@ fn main() {
         .arg(
             Arg::new("epochs")
                 .long("epochs")
-                .help("specify how many maximum iterations before stopping, 0 is forever")
+                .help("maximum iterations before stopping, 0 is forever")
                 .required(false),
         )
         .arg(
             Arg::new("platoo_epochs")
                 .long("platoo_epochs")
-                .help("specify how many steps until stop searching on platoo")
+                .help("steps until stop searching on plateau")
                 .required(false),
         )
         .arg(
             Arg::new("n_nearest")
                 .long("n_nearest")
-                .help("specify how many nearest neighbors to look for")
+                .help("nearest neighbours to look for")
                 .required(false),
         )
         .arg(
             Arg::new("n_elite")
                 .long("n_elite")
-                .help("specify how many strongest individuals to pass directly to next gen")
+                .help("strongest individuals to pass directly to next generation")
                 .required(false),
         )
         .arg(
             Arg::new("mutation_probability")
                 .long("mutation_probability")
-                .help("specify mutation_probability that swaps 2 cities on new individual")
+                .help("probability of swapping two cities on a new individual")
                 .required(false),
         )
         .arg(
             Arg::new("cooling_rate")
                 .long("cooling_rate")
-                .help("specify cooling rate")
+                .help("cooling rate for simulated annealing")
                 .required(false),
         )
         .arg(
             Arg::new("min_temperature")
                 .long("min_temperature")
-                .help("specify minimum temperature")
+                .help("minimum temperature")
                 .required(false),
         )
         .arg(
             Arg::new("max_temperature")
                 .long("max_temperature")
-                .help("specify the maximum temperature")
+                .help("maximum temperature")
                 .required(false),
         )
         .arg(
@@ -74,21 +72,21 @@ fn main() {
                 .long("input")
                 .short('i')
                 .value_name("FILE_PATH")
-                .help("filepath to input file, must be in TSPLIB format")
+                .help("path to TSPLIB input file (reads stdin if omitted)")
                 .required(false),
         )
         .arg(
             Arg::new("verbose")
                 .long("verbose")
                 .short('v')
-                .help("allows solver to print out debug lines")
+                .help("print debug lines")
                 .action(ArgAction::SetTrue)
                 .required(false),
         )
         .arg(
             Arg::new("gui")
                 .long("gui")
-                .help("Open the visualization window while solving")
+                .help("open the visualization window while solving")
                 .action(ArgAction::SetTrue)
                 .required(false),
         )
@@ -96,16 +94,51 @@ fn main() {
             Arg::new("optimal_tour")
                 .long("optimal-tour")
                 .value_name("FILE_PATH")
-                .help("Path to a .opt.tour file; overlays optimal route on visualization and prints gap to stderr")
+                .help("path to a .opt.tour file; overlays optimal route on visualization and prints gap")
                 .required(false),
+        );
+
+    let convert_cmd = Command::new("convert")
+        .about("Convert a DiscOpt coordinate file (or directory) to TSPLIB format")
+        .arg(
+            Arg::new("input")
+                .long("input")
+                .short('i')
+                .value_name("PATH")
+                .help("input file or directory")
+                .required(true),
         )
+        .arg(
+            Arg::new("output")
+                .long("output")
+                .short('o')
+                .value_name("PATH")
+                .help("output file or directory (default: ./data/discopt/)")
+                .required(false),
+        );
+
+    let cli = Command::new("Teeline")
+        .version(tsp::VERSION)
+        .author(tsp::AUTHOR)
+        .about("Traveling Salesman Problem solver")
+        .subcommand_required(true)
+        .subcommand(solve_cmd)
+        .subcommand(convert_cmd)
         .get_matches();
 
+    match cli.subcommand() {
+        Some(("solve", args)) => run_solve(args),
+        Some(("convert", args)) => run_convert(args),
+        _ => unreachable!("clap ensures a subcommand is always present"),
+    }
+}
+
+fn run_solve(args: &ArgMatches) {
     let solver_type =
         Solvers::from_str(args.get_one::<String>("solver").map(|s| s.as_str()).unwrap_or("unspecified"))
             .expect("Unknown solver");
 
-    let mut options = solver_options_from_args(&args);
+    let mut options = solver_options_from_args(args);
 
     let default_level = if options.verbose { "debug" } else { "info" };
     tracing_subscriber::fmt()
@@ -136,9 +169,7 @@ fn main() {
             std::process::exit(1);
         }
     };
-    // Build the progress display only when --gui is requested.
-    // eframe (winit) requires the event loop on the main thread;
-    // the solver runs in a background thread.
+
     let maybe_display: Option<progress::ProgressPlot>;
     if args.get_flag("gui") {
         let (display, tx) = progress::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
@@ -158,7 +189,6 @@ fn main() {
             }
         });
 
-    // Send the optimal tour overlay only when the GUI is active.
     if let Some(ref ot) = opt_tour {
         if let Some(ref tx) = options.progress_tx {
             if ot.dimension == tsp_data.len() {
@@ -192,6 +222,37 @@ fn main() {
 
     if let Some(ot) = opt_tour {
         print_optimal_comparison(&tour, &distances, tsp_data.len(), &ot);
+    }
+}
+
+fn run_convert(args: &ArgMatches) {
+    let input = PathBuf::from(args.get_one::<String>("input").unwrap());
+    let output = PathBuf::from(
+        args.get_one::<String>("output")
+            .map(|s| s.as_str())
+            .unwrap_or("./data/discopt"),
+    );
+
+    if input.is_dir() {
+        let (ok, errors) = tsp::convert::convert_dir(&input, &output);
+        for (path, err) in &errors {
+            eprintln!("error: {}: {}", path.display(), err);
+        }
+        println!("converted {ok}/{} files", ok + errors.len());
+        if !errors.is_empty() {
+            std::process::exit(1);
+        }
+    } else {
+        let out_path = if output.is_dir() || output.extension().is_none() {
+            let stem = input.file_stem().unwrap_or_default();
+            output.join(stem).with_extension("tsp")
+        } else {
+            output
+        };
+        if let Err(e) = tsp::convert::convert_file(&input, &out_path) {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
     }
 }
 

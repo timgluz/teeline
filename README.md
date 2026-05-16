@@ -42,6 +42,8 @@ cargo test
 
 # check the CLI help
 ./target/release/bin --help
+./target/release/bin solve --help
+./target/release/bin convert --help
 ```
 
 ### Install locally (optional)
@@ -83,10 +85,14 @@ gunzip data/tsplib/*.gz
 
 ### Converting your own coordinates
 
-To convert a plain list of coordinates to TSPLIB format use the included helper:
+Teeline includes a native `convert` subcommand that converts DiscOpt-format coordinate files (first line is the city count and is ignored; remaining lines are `x y` float pairs) to TSPLIB EUC_2D format:
 
 ```bash
-python3 convert2tsplib.py
+# single file → produces data/discopt/tsp_51_1.tsp
+teeline convert -i ./data/raw/tsp_51_1 -o ./data/discopt/
+
+# whole directory at once
+teeline convert -i ./data/raw/ -o ./data/discopt/
 ```
 
 ---
@@ -97,13 +103,13 @@ Teeline reads city data from a file or stdin and prints the tour cost followed b
 
 ```bash
 # from a file
-teeline nn -i ./data/tsplib/berlin52.tsp
+teeline solve nn -i ./data/tsplib/berlin52.tsp
 
 # from stdin
-cat ./data/tsplib/berlin52.tsp | teeline nn
+cat ./data/tsplib/berlin52.tsp | teeline solve nn
 
 # with the visualization window
-teeline nn -i ./data/tsplib/berlin52.tsp --gui
+teeline solve nn -i ./data/tsplib/berlin52.tsp --gui
 ```
 
 Output format:
@@ -128,8 +134,8 @@ Exact algorithms always find the optimal solution but have exponential or factor
 Dynamic programming algorithm that solves TSP in O(2ⁿ · n²) time.
 
 ```bash
-teeline bhk -i ./data/discopt/tsp_5_1.tsp
-teeline bellman_karp -i ./data/discopt/tsp_5_1.tsp --verbose
+teeline solve bhk -i ./data/discopt/tsp_5_1.tsp
+teeline solve bellman_karp -i ./data/discopt/tsp_5_1.tsp --verbose
 ```
 
 Resources:
@@ -141,8 +147,8 @@ Resources:
 Systematic enumeration of candidate solutions; prunes branches that cannot improve on the best solution found so far.
 
 ```bash
-teeline branch_bound -i ./data/discopt/tsp_5_1.tsp
-teeline branch_bound -i ./data/discopt/tsp_5_1.tsp --verbose
+teeline solve branch_bound -i ./data/discopt/tsp_5_1.tsp
+teeline solve branch_bound -i ./data/discopt/tsp_5_1.tsp --verbose
 ```
 
 Resources:
@@ -160,8 +166,8 @@ Approximate (heuristic) algorithms trade optimality guarantees for speed, making
 Greedy construction: from the current city, always move to the closest unvisited city. Uses a KD-tree for fast lookups.
 
 ```bash
-teeline nn -i ./data/tsplib/berlin52.tsp
-teeline nn -i ./data/tsplib/berlin52.tsp --verbose
+teeline solve nn -i ./data/tsplib/berlin52.tsp
+teeline solve nn -i ./data/tsplib/berlin52.tsp --verbose
 ```
 
 Resources:
@@ -173,8 +179,8 @@ Resources:
 Local search: repeatedly reverse sub-segments of the tour to remove crossings until no improving swap exists.
 
 ```bash
-teeline 2opt -i ./data/tsplib/berlin52.tsp
-teeline two_opt -i ./data/tsplib/berlin52.tsp --verbose
+teeline solve 2opt -i ./data/tsplib/berlin52.tsp
+teeline solve two_opt -i ./data/tsplib/berlin52.tsp --verbose
 ```
 
 Resources:
@@ -192,9 +198,9 @@ Options:
 | `--platoo_epochs` | Steps without improvement before restart | — |
 
 ```bash
-teeline stochastic_hill -i ./data/tsplib/berlin52.tsp
-teeline stochastic_hill -i ./data/tsplib/berlin52.tsp --epochs=1000
-teeline stochastic_hill -i ./data/tsplib/berlin52.tsp --platoo_epochs=50
+teeline solve stochastic_hill -i ./data/tsplib/berlin52.tsp
+teeline solve stochastic_hill -i ./data/tsplib/berlin52.tsp --epochs=1000
+teeline solve stochastic_hill -i ./data/tsplib/berlin52.tsp --platoo_epochs=50
 ```
 
 Resources:
@@ -214,9 +220,9 @@ Options:
 | `--epochs` | Maximum iterations | — |
 
 ```bash
-teeline sa -i ./data/tsplib/berlin52.tsp
-teeline sa -i ./data/tsplib/berlin52.tsp --verbose
-teeline sa -i ./data/tsplib/berlin52.tsp --cooling_rate=0.003 --max_temperature=500.0
+teeline solve sa -i ./data/tsplib/berlin52.tsp
+teeline solve sa -i ./data/tsplib/berlin52.tsp --verbose
+teeline solve sa -i ./data/tsplib/berlin52.tsp --cooling_rate=0.003 --max_temperature=500.0
 ```
 
 Resources:
@@ -233,8 +239,8 @@ Options:
 | `--epochs` | Maximum iterations | — |
 
 ```bash
-teeline tabu_search -i ./data/tsplib/berlin52.tsp
-teeline tabu_search -i ./data/tsplib/berlin52.tsp --epochs=500
+teeline solve tabu_search -i ./data/tsplib/berlin52.tsp
+teeline solve tabu_search -i ./data/tsplib/berlin52.tsp --epochs=500
 ```
 
 Resources:
@@ -253,10 +259,10 @@ Options:
 | `--n_elite` | Individuals passed unchanged to next generation | 3 |
 
 ```bash
-teeline ga -i ./data/tsplib/berlin52.tsp
-teeline ga -i ./data/tsplib/berlin52.tsp --verbose
-teeline ga -i ./data/tsplib/berlin52.tsp --epochs=500 --mutation_probability=0.2
-teeline ga -i ./data/tsplib/berlin52.tsp --n_elite=7
+teeline solve ga -i ./data/tsplib/berlin52.tsp
+teeline solve ga -i ./data/tsplib/berlin52.tsp --verbose
+teeline solve ga -i ./data/tsplib/berlin52.tsp --epochs=500 --mutation_probability=0.2
+teeline solve ga -i ./data/tsplib/berlin52.tsp --n_elite=7
 ```
 
 Resources:
@@ -282,9 +288,9 @@ Options:
 | `--n_nearest` | Number of particles (floored at 30) | 30 |
 
 ```bash
-teeline pso -i ./data/tsplib/berlin52.tsp
-teeline particle_swarm -i ./data/tsplib/berlin52.tsp --epochs=500
-teeline pso -i ./data/tsplib/berlin52.tsp --n_nearest=50
+teeline solve pso -i ./data/tsplib/berlin52.tsp
+teeline solve particle_swarm -i ./data/tsplib/berlin52.tsp --epochs=500
+teeline solve pso -i ./data/tsplib/berlin52.tsp --n_nearest=50
 ```
 
 Resources:
@@ -313,14 +319,43 @@ Options:
 | `--mutation_probability` | Per-nest abandonment probability `pa` | 0.001 |
 
 ```bash
-teeline cs -i ./data/tsplib/berlin52.tsp
-teeline cuckoo_search -i ./data/tsplib/berlin52.tsp --epochs=500
-teeline cs -i ./data/tsplib/berlin52.tsp --n_nearest=40 --mutation_probability=0.25
+teeline solve cs -i ./data/tsplib/berlin52.tsp
+teeline solve cuckoo_search -i ./data/tsplib/berlin52.tsp --epochs=500
+teeline solve cs -i ./data/tsplib/berlin52.tsp --n_nearest=40 --mutation_probability=0.25
 ```
 
 Resources:
 - Yang & Deb (2009) — *Cuckoo Search via Lévy Flights*
 - [Cuckoo search (Wikipedia)](https://en.wikipedia.org/wiki/Cuckoo_search)
+
+#### Flower Pollination Algorithm (`flower_pollination`, `fpa`)
+
+Nature-inspired metaheuristic: each flower is a candidate tour. Each epoch it applies either *global pollination* (Lévy-flight-scaled movement toward the global best tour) or *local pollination* (ε-scaled displacement from two randomly chosen flowers). The switch probability controls the balance between exploitation and exploration.
+
+**TSP-specific adaptations** (deviations from Yang 2012):
+
+| Adaptation | Why |
+|---|---|
+| Global pollination → Lévy-scaled prefix of the swap sequence toward gbest | Permutation analogue of `x + γ·L·(g* − x)`; preserves tour validity |
+| Local pollination → ε-scaled prefix of the swap diff between two random flowers | Permutation analogue of `x + ε·(x_j − x_k)` |
+| switch_prob floored at 0.8 when `mutation_probability < 0.01` | Prevents degeneration to 99.9 % local-only search under default CLI options |
+
+Options:
+| Flag | Description | Default |
+|---|---|---|
+| `--epochs` | Maximum iterations | 10 000 |
+| `--n_nearest` | Number of flowers (floored at 25) | 25 |
+| `--mutation_probability` | Switch probability (global vs local pollination) | 0.8 |
+
+```bash
+teeline solve fpa -i ./data/tsplib/berlin52.tsp
+teeline solve flower_pollination -i ./data/tsplib/berlin52.tsp --epochs=500
+teeline solve fpa -i ./data/tsplib/berlin52.tsp --n_nearest=50 --mutation_probability=0.8
+```
+
+Resources:
+- Yang (2012) — *Flower Pollination Algorithm for Global Optimization*
+- [Flower pollination algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Flower_pollination_algorithm)
 
 ---
 
@@ -333,7 +368,7 @@ While solving, Teeline runs headless by default. Pass `--gui` to open a window t
 Pass `--optimal-tour <FILE>` with a TSPLIB `.opt.tour` file to overlay the optimal route on the visualisation and print a gap comparison to stderr after solving.
 
 ```bash
-teeline ga -i data/tsplib/berlin52.tsp \
+teeline solve ga -i data/tsplib/berlin52.tsp \
     --optimal-tour data/tsplib/berlin52.opt.tour
 ```
 
@@ -374,6 +409,7 @@ Quick summary:
 | Genetic Algorithm (10 000 ep) | +8.3 % | 1.63 s |
 | Stochastic Hill (10 000 ep) | +11.2 % | 0.02 s |
 | PSO (50 particles, 10 000 ep) | +14.8 % | 1.42 s |
+| Flower Pollination (default) | +17.5 % | 0.53 s |
 | Nearest Neighbour | +19.0 % | 0.01 s |
 
 ---

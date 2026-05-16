@@ -20,9 +20,15 @@ cargo test
 cargo test test_coords_from_text_only_ints
 
 # Run (debug binary is named 'bin')
-cat ./data/tsplib/berlin52.tsp | ./target/debug/bin nn
-./target/debug/bin -i ./data/tsplib/berlin52.tsp two_opt
+cat ./data/tsplib/berlin52.tsp | ./target/debug/bin solve nn
+./target/debug/bin solve two_opt -i ./data/tsplib/berlin52.tsp
 ./target/debug/bin --help
+./target/debug/bin solve --help
+./target/debug/bin convert --help
+
+# Convert DiscOpt files to TSPLIB format
+./target/debug/bin convert -i ./data/raw/tsp_51_1 -o ./data/discopt/
+./target/debug/bin convert -i ./data/raw/ -o ./data/discopt/
 ```
 
 ## Architecture
@@ -56,6 +62,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/bin nn
 | `genetic_algorithm.rs` | Genetic algorithm | `ga` |
 | `particle_swarm.rs` | Discrete PSO (velocity-capped, linearly decaying inertia, NN-seeded) | `pso` |
 | `cuckoo_search.rs` | Cuckoo Search via Lévy flights (k random 2-opt reversals, Bernoulli nest abandonment) | `cs` |
+| `flower_pollination.rs` | Flower Pollination Algorithm (global Lévy-flight toward gbest; local ε-scaled cross-pollination) | `fpa` |
 
 **Tests:**
 - Unit tests live inline in each source file (`#[cfg(test)]`)
@@ -68,7 +75,8 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/bin nn
 - `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity — don't use them on datasets larger than ~30 cities.
 - The visualization window is **off by default**. Pass `--gui` to open it. In headless/CI environments never pass `--gui`; the CI workflow (`cargo test`) avoids running the binary directly.
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
-- `convert2tsplib.py` converts raw coordinate lists to TSPLIB format; `download_data.sh` fetches benchmark datasets.
+- `bin convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
+- `download_data.sh` fetches benchmark datasets.
 
 ## GitKB
 

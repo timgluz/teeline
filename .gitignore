@@ -6,3 +6,5 @@
 .kb/store/
 .kb/workspace/
 .kb/workspaces/
+.claude/plans
+docs/superpowers/
