@@ -359,6 +359,23 @@ Resources:
 
 ---
 
+## WebAssembly
+
+All solvers are also available as a [WebAssembly Component Model](https://component-model.bytecodealliance.org/) library — no HTTP server required. The component exposes a single typed `solve` function callable from Go, Python, JavaScript, Rust, and any WIT-compatible runtime including [Spin](https://spinframework.io/).
+
+```bash
+# build the component
+cargo component build --manifest-path teeline-wasm/Cargo.toml --release
+
+# call it from Node.js (after jco transpile)
+import { solve } from './teeline-wasm/js-bindings/teeline_wasm.js';
+const result = solve('sa', cities, options);
+```
+
+See **[docs/wasm.md](docs/wasm.md)** for the full interface reference, build instructions, and working examples in JavaScript, Python, Go, and Rust.
+
+---
+
 ## Visualising Results
 
 While solving, Teeline runs headless by default. Pass `--gui` to open a window that shows the current best route updating in real time.
@@ -425,7 +442,7 @@ In short:
 3. Add tests — unit tests go inline with the source file; integration tests go in `tests/`.
 4. Open a pull request and wait for a code review.
 
-When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, registered in the `Solvers` enum in `src/tsp/mod.rs` and the `solve` match arm in `src/main.rs`.
+When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, then register it in three places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, and the `tsp::solve` dispatch match arm. The WASM surface picks it up automatically.
 
 ---
 
