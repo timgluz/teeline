@@ -2,7 +2,7 @@ use rand::Rng;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::probability::{bernoulli, levy_step, sample_with_exclude};
+use super::probability::{bernoulli, levy_step, sample_without_replacement};
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
 use super::{Solution, SolverOptions};
@@ -60,8 +60,8 @@ fn local_pollination(
     if n_flowers < 3 {
         return flower.to_vec();
     }
-    let j = sample_with_exclude(rng, n_flowers, &[flower_idx]);
-    let k = sample_with_exclude(rng, n_flowers, &[flower_idx, j]);
+    let j = sample_without_replacement(rng, n_flowers, &[flower_idx]);
+    let k = sample_without_replacement(rng, n_flowers, &[flower_idx, j]);
     let seq = swap_sequence(&flowers[j], &flowers[k]);
     if seq.is_empty() {
         return flower.to_vec();
