@@ -13,6 +13,8 @@ impl Guest for Component {
         cities: Vec<City>,
         options: SolveOptions,
     ) -> Result<Solution, String> {
+        let solver_id = teeline::tsp::find_solver(&solver)?;
+
         let kd_cities: Vec<KDPoint> = cities
             .iter()
             .map(|c| KDPoint::new_with_id(c.id as usize, &[c.x, c.y]))
@@ -34,11 +36,12 @@ impl Guest for Component {
             ..Default::default()
         };
 
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            teeline::tsp::solve_by_name(&solver, &kd_cities, &distances, &opts)
+        let s = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            teeline::tsp::solve(solver_id, &kd_cities, &distances, &opts)
         }))
-        .map_err(|_| format!("solver '{solver}' panicked"))?
-        .map(|s| Solution {
+        .map_err(|_| format!("solver '{solver}' panicked"))?;
+
+        Ok(Solution {
             total: s.total,
             route: s.route().iter().map(|&id| id as u32).collect(),
         })

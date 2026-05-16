@@ -31,7 +31,7 @@ pub const AUTHOR: &str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Solvers {
     BellmanKarp,
     BranchBound,
@@ -152,16 +152,18 @@ impl SolverOptions {
     }
 }
 
-pub fn solve_by_name(
-    solver: &str,
+pub fn find_solver(name: &str) -> Result<Solvers, String> {
+    name.parse::<Solvers>()
+        .map_err(|_| format!("unknown solver: {name}"))
+}
+
+pub fn solve(
+    solver: Solvers,
     cities: &[KDPoint],
     distances: &DistanceMatrix,
     opts: &SolverOptions,
-) -> Result<Solution, String> {
-    let algorithm = solver
-        .parse::<Solvers>()
-        .map_err(|_| format!("unknown solver: {solver}"))?;
-    let solution = match algorithm {
+) -> Solution {
+    match solver {
         Solvers::BellmanKarp => bellman_karp::solve(cities, distances, opts),
         Solvers::BranchBound => branch_bound::solve(cities, distances, opts),
         Solvers::CuckooSearch => cuckoo_search::solve(cities, distances, opts),
@@ -173,9 +175,8 @@ pub fn solve_by_name(
         Solvers::StochasticHill => stochastic_hill::solve(cities, distances, opts),
         Solvers::TabuSearch => tabu_search::solve(cities, distances, opts),
         Solvers::TwoOpt => two_opt::solve(cities, distances, opts),
-        Solvers::Unspecified => return Err("solver not specified".to_string()),
-    };
-    Ok(solution)
+        Solvers::Unspecified => panic!("solver not specified"),
+    }
 }
 
 // -- solution implementation

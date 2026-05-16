@@ -203,14 +203,12 @@ fn run_solve(args: &ArgMatches) {
         }
     }
 
-    let solver_name = args.get_one::<String>("solver").cloned().unwrap_or_default();
     let cities_for_solver = cities.clone();
     let distances_for_solver = distances.clone();
     let span = tracing::info_span!("solver", algorithm = ?solver_type);
     let solver_handle = thread::spawn(move || {
         let _enter = span.entered();
-        let tour = tsp::solve_by_name(&solver_name, &cities_for_solver, &distances_for_solver, &options)
-            .expect("solver failed");
+        let tour = tsp::solve(solver_type, &cities_for_solver, &distances_for_solver, &options);
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
         tour
