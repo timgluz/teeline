@@ -1,5 +1,6 @@
 pub mod bellman_karp;
 pub mod branch_bound;
+pub mod convert;
 pub mod cuckoo_search;
 pub mod flower_pollination;
 pub mod distance_matrix;
