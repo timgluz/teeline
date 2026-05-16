@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
+use super::probability::probability;
 use super::progress::ProgressMessage;
 use super::route::{random_position_pair, Route};
 use super::{Solution, SolverOptions};
@@ -156,12 +157,6 @@ fn ordered_crossover_genes(
     }
 
     (gene1, gene2)
-}
-
-// returns true with given probability
-fn probability(p: f32) -> bool {
-    let mut rng = rand::rng();
-    p > rng.random::<f32>()
 }
 
 #[derive(Debug, Clone)]
