@@ -1,6 +1,7 @@
 pub mod bellman_karp;
 pub mod branch_bound;
 pub mod cuckoo_search;
+pub mod flower_pollination;
 pub mod distance_matrix;
 pub mod genetic_algorithm;
 pub mod kdtree;
@@ -12,6 +13,7 @@ pub mod stochastic_hill;
 pub mod tabu_search;
 pub mod opt_tour;
 pub mod particle_swarm;
+pub mod probability;
 pub mod tsplib;
 pub mod two_opt;
 
@@ -31,6 +33,7 @@ pub enum Solvers {
     BellmanKarp,
     BranchBound,
     CuckooSearch,
+    FlowerPollination,
     NearestNeighbor,
     GeneticAlgorithm,
     ParticleSwarmOptimization,
@@ -49,6 +52,8 @@ impl Solvers {
             "branch_bound",
             "cs",
             "cuckoo_search",
+            "fpa",
+            "flower_pollination",
             "nearest_neighbor",
             "nn",
             "genetic_algorithm",
@@ -73,6 +78,7 @@ impl FromStr for Solvers {
             "bhk" | "bellman_karp" => Ok(Solvers::BellmanKarp),
             "branch_bound" => Ok(Solvers::BranchBound),
             "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
+            "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),

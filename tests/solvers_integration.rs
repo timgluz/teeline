@@ -12,9 +12,9 @@
 /// because solution quality depends on runtime epochs.
 use std::path::Path;
 use teeline::tsp::{
-    bellman_karp, branch_bound, cuckoo_search, distance_matrix, genetic_algorithm, kdtree,
-    nearest_neighbor, particle_swarm, simulated_annealing, stochastic_hill, tabu_search, two_opt,
-    tsplib, SolverOptions,
+    bellman_karp, branch_bound, cuckoo_search, distance_matrix, flower_pollination,
+    genetic_algorithm, kdtree, nearest_neighbor, particle_swarm, simulated_annealing,
+    stochastic_hill, tabu_search, two_opt, tsplib, SolverOptions,
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -295,4 +295,25 @@ fn bellman_karp_optimal_gr17() {
         "BHK should find optimal ~2085 on gr17, got {}",
         tour.total
     );
+}
+
+// ─── flower pollination algorithm ────────────────────────────────────────────
+
+#[test]
+fn flower_pollination_valid_tour_berlin52() {
+    let cities = load_berlin52();
+    let mut opts = stochastic_options(200);
+    opts.mutation_probability = 0.8;
+    let tour = flower_pollination::solve(&cities, &build_dm(&cities), &opts);
+    assert!(is_valid_tour(tour.route(), &cities), "FPA tour invalid on berlin52");
+}
+
+#[test]
+fn flower_pollination_tour_is_finite_and_positive() {
+    let cities = load_berlin52();
+    let mut opts = stochastic_options(200);
+    opts.mutation_probability = 0.8;
+    let tour = flower_pollination::solve(&cities, &build_dm(&cities), &opts);
+    assert!(tour.total > 0.0);
+    assert!(tour.total.is_finite());
 }
