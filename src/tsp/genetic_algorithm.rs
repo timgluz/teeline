@@ -6,7 +6,7 @@ use std::rc::Rc;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::probability::probability;
-use super::messages::ProgressMessage;
+use super::progress::ProgressMessage;
 use super::route::{random_position_pair, Route};
 use super::{Solution, SolverOptions};
 

@@ -11,7 +11,7 @@
 ///
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::messages::ProgressMessage;
+use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{Solution, SolverOptions};
 
