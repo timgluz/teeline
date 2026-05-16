@@ -8,6 +8,8 @@ pub mod genetic_algorithm;
 pub mod kdtree;
 pub mod nearest_neighbor;
 pub mod progress;
+#[cfg(feature = "gui")]
+pub mod progress_eframe;
 pub mod route;
 pub mod simulated_annealing;
 pub mod stochastic_hill;

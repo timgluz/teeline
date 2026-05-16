@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
-use teeline::tsp::{self, distance_matrix, progress, tsplib, Solution, SolverOptions, Solvers};
+use teeline::tsp::{self, distance_matrix, progress, progress_eframe, tsplib, Solution, SolverOptions, Solvers};
 use tracing_subscriber::EnvFilter;
 
 fn main() {
@@ -170,9 +170,9 @@ fn run_solve(args: &ArgMatches) {
         }
     };
 
-    let maybe_display: Option<progress::ProgressPlot>;
+    let maybe_display: Option<progress_eframe::ProgressPlot>;
     if args.get_flag("gui") {
-        let (display, tx) = progress::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
+        let (display, tx) = progress_eframe::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
         options.progress_tx = Some(tx);
         maybe_display = Some(display);
     } else {
