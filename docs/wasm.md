@@ -87,10 +87,17 @@ wasm-tools component wit target/wasm32-wasip1/debug/teeline_wasm.wasm
 
 ## JavaScript / Node.js
 
-Use [`jco`](https://github.com/bytecodealliance/jco) to transpile the component to a native ES module:
+Use [`jco`](https://github.com/bytecodealliance/jco) to transpile the component to a native ES module.
+JS bindings are not checked in — generate them before use:
 
 ```bash
+# Install tools (one-time)
 npm install -g @bytecodealliance/jco
+
+# Build the component first (if not already built)
+cargo component build --manifest-path teeline-wasm/Cargo.toml --release
+
+# Generate JS bindings
 jco transpile target/wasm32-wasip1/release/teeline_wasm.wasm \
     -o teeline-wasm/js-bindings/
 cd teeline-wasm/js-bindings && npm install @bytecodealliance/preview2-shim
@@ -127,7 +134,7 @@ console.log(`route: ${result.route.join(' → ')}`);
 
 > **Note:** jco maps WIT kebab-case field names to camelCase — `platoo-epochs` becomes `platooEpochs`, `cooling-rate` becomes `coolingRate`, etc.
 
-Pre-transpiled JS bindings are included in `teeline-wasm/js-bindings/` for convenience but should be regenerated when the component is rebuilt.
+A `smoke.mjs` test is included in `teeline-wasm/js-bindings/` — run it after transpiling to verify the component works.
 
 ---
 
