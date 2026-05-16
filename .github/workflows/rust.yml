@@ -16,8 +16,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Install cargo-component
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-component
+    - name: Add wasm32-wasip2 target
+      run: rustup target add wasm32-wasip2
     - name: Build
       run: cargo build --verbose
+    - name: Build WASM component
+      run: cargo component build --manifest-path teeline-wasm/Cargo.toml
     - name: Run tests
       run: cargo test --verbose
     - name: Clippy
