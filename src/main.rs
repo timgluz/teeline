@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
-use teeline::tsp::{self, distance_matrix, kdtree, progress, tsplib, Solution, SolverOptions, Solvers};
+use teeline::tsp::{self, distance_matrix, progress, tsplib, Solution, SolverOptions, Solvers};
 use tracing_subscriber::EnvFilter;
 
 fn main() {
@@ -203,12 +203,14 @@ fn run_solve(args: &ArgMatches) {
         }
     }
 
+    let solver_name = args.get_one::<String>("solver").cloned().unwrap_or_default();
     let cities_for_solver = cities.clone();
     let distances_for_solver = distances.clone();
     let span = tracing::info_span!("solver", algorithm = ?solver_type);
     let solver_handle = thread::spawn(move || {
         let _enter = span.entered();
-        let tour = solve(solver_type, &cities_for_solver, &distances_for_solver, &options.clone());
+        let tour = tsp::solve_by_name(&solver_name, &cities_for_solver, &distances_for_solver, &options)
+            .expect("solver failed");
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
         tour
@@ -256,27 +258,6 @@ fn run_convert(args: &ArgMatches) {
     }
 }
 
-fn solve(
-    algorithm: Solvers,
-    cities: &[kdtree::KDPoint],
-    distances: &distance_matrix::DistanceMatrix,
-    options: &SolverOptions,
-) -> Solution {
-    match algorithm {
-        Solvers::BellmanKarp => tsp::bellman_karp::solve(cities, distances, options),
-        Solvers::BranchBound => tsp::branch_bound::solve(cities, distances, options),
-        Solvers::CuckooSearch => tsp::cuckoo_search::solve(cities, distances, options),
-        Solvers::FlowerPollination => tsp::flower_pollination::solve(cities, distances, options),
-        Solvers::NearestNeighbor => tsp::nearest_neighbor::solve(cities, distances, options),
-        Solvers::TwoOpt => tsp::two_opt::solve(cities, distances, options),
-        Solvers::StochasticHill => tsp::stochastic_hill::solve(cities, distances, options),
-        Solvers::SimulatedAnnealing => tsp::simulated_annealing::solve(cities, distances, options),
-        Solvers::TabuSearch => tsp::tabu_search::solve(cities, distances, options),
-        Solvers::GeneticAlgorithm => tsp::genetic_algorithm::solve(cities, distances, options),
-        Solvers::ParticleSwarmOptimization => tsp::particle_swarm::solve(cities, distances, options),
-        _ => panic!("Unspecified solver"),
-    }
-}
 
 fn print_solution(tour: &Solution, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };

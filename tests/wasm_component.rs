@@ -28,7 +28,7 @@ fn make_engine() -> Engine {
 }
 
 fn load_component(engine: &Engine) -> Component {
-    let path = "target/wasm32-wasip2/debug/teeline_wasm.wasm";
+    let path = "target/wasm32-wasip1/debug/teeline_wasm.wasm";
     Component::from_file(engine, path).expect(
         "WASM component not found — run: cargo component build --manifest-path teeline-wasm/Cargo.toml",
     )
@@ -127,6 +127,14 @@ fn test_tabu_search() {
 #[test]
 fn test_stochastic_hill() {
     run_solver("stochastic_hill")
+}
+#[test]
+fn test_bellman_karp() {
+    run_solver("bhk")
+}
+#[test]
+fn test_branch_bound() {
+    run_solver("branch_bound")
 }
 
 #[test]

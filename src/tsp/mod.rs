@@ -152,6 +152,32 @@ impl SolverOptions {
     }
 }
 
+pub fn solve_by_name(
+    solver: &str,
+    cities: &[KDPoint],
+    distances: &DistanceMatrix,
+    opts: &SolverOptions,
+) -> Result<Solution, String> {
+    let algorithm = solver
+        .parse::<Solvers>()
+        .map_err(|_| format!("unknown solver: {solver}"))?;
+    let solution = match algorithm {
+        Solvers::BellmanKarp => bellman_karp::solve(cities, distances, opts),
+        Solvers::BranchBound => branch_bound::solve(cities, distances, opts),
+        Solvers::CuckooSearch => cuckoo_search::solve(cities, distances, opts),
+        Solvers::FlowerPollination => flower_pollination::solve(cities, distances, opts),
+        Solvers::NearestNeighbor => nearest_neighbor::solve(cities, distances, opts),
+        Solvers::GeneticAlgorithm => genetic_algorithm::solve(cities, distances, opts),
+        Solvers::ParticleSwarmOptimization => particle_swarm::solve(cities, distances, opts),
+        Solvers::SimulatedAnnealing => simulated_annealing::solve(cities, distances, opts),
+        Solvers::StochasticHill => stochastic_hill::solve(cities, distances, opts),
+        Solvers::TabuSearch => tabu_search::solve(cities, distances, opts),
+        Solvers::TwoOpt => two_opt::solve(cities, distances, opts),
+        Solvers::Unspecified => return Err("solver not specified".to_string()),
+    };
+    Ok(solution)
+}
+
 // -- solution implementation
 pub type CityTable = HashMap<usize, KDPoint>;
 

@@ -3,7 +3,7 @@ mod bindings;
 
 use bindings::teeline::solver::types::{City, Solution, SolveOptions};
 use bindings::Guest;
-use teeline::tsp::{self, distance_matrix::DistanceMatrix, kdtree::KDPoint, SolverOptions};
+use teeline::tsp::{distance_matrix::DistanceMatrix, kdtree::KDPoint, SolverOptions};
 
 struct Component;
 
@@ -34,52 +34,11 @@ impl Guest for Component {
             ..Default::default()
         };
 
-        // First check for unknown solver before attempting to run
-        let solver_fn: Box<dyn FnOnce() -> teeline::tsp::Solution + Send> =
-            match solver.as_str() {
-                "sa" | "simulated_annealing" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::simulated_annealing::solve(&c, &d, &o))
-                }
-                "2opt" | "two_opt" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::two_opt::solve(&c, &d, &o))
-                }
-                "nn" | "nearest_neighbor" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::nearest_neighbor::solve(&c, &d, &o))
-                }
-                "ga" | "genetic_algorithm" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::genetic_algorithm::solve(&c, &d, &o))
-                }
-                "pso" | "particle_swarm" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::particle_swarm::solve(&c, &d, &o))
-                }
-                "cs" | "cuckoo_search" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::cuckoo_search::solve(&c, &d, &o))
-                }
-                "fpa" | "flower_pollination" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::flower_pollination::solve(&c, &d, &o))
-                }
-                "tabu_search" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::tabu_search::solve(&c, &d, &o))
-                }
-                "stochastic_hill" => {
-                    let (c, d, o) = (kd_cities.clone(), distances.clone(), opts.clone());
-                    Box::new(move || tsp::stochastic_hill::solve(&c, &d, &o))
-                }
-                unknown => return Err(format!("unknown solver: {unknown}")),
-            };
-
-        let s = std::panic::catch_unwind(std::panic::AssertUnwindSafe(solver_fn))
-            .map_err(|_| format!("solver '{solver}' panicked"))?;
-
-        Ok(Solution {
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            teeline::tsp::solve_by_name(&solver, &kd_cities, &distances, &opts)
+        }))
+        .map_err(|_| format!("solver '{solver}' panicked"))?
+        .map(|s| Solution {
             total: s.total,
             route: s.route().iter().map(|&id| id as u32).collect(),
         })
