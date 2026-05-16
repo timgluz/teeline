@@ -8,6 +8,8 @@ pub mod genetic_algorithm;
 pub mod kdtree;
 pub mod nearest_neighbor;
 pub mod progress;
+#[cfg(feature = "gui")]
+pub mod progress_eframe;
 pub mod route;
 pub mod simulated_annealing;
 pub mod stochastic_hill;
@@ -29,7 +31,7 @@ pub const AUTHOR: &str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Solvers {
     BellmanKarp,
     BranchBound,
@@ -148,6 +150,34 @@ impl SolverOptions {
             let _ = tx.send(msg);
         }
     }
+}
+
+pub fn find_solver(name: &str) -> Result<Solvers, String> {
+    name.parse::<Solvers>()
+        .map_err(|_| format!("unknown solver: {name}"))
+}
+
+pub fn solve(
+    solver: Solvers,
+    cities: &[KDPoint],
+    distances: &DistanceMatrix,
+    opts: &SolverOptions,
+) -> Result<Solution, String> {
+    let solution = match solver {
+        Solvers::BellmanKarp => bellman_karp::solve(cities, distances, opts),
+        Solvers::BranchBound => branch_bound::solve(cities, distances, opts),
+        Solvers::CuckooSearch => cuckoo_search::solve(cities, distances, opts),
+        Solvers::FlowerPollination => flower_pollination::solve(cities, distances, opts),
+        Solvers::NearestNeighbor => nearest_neighbor::solve(cities, distances, opts),
+        Solvers::GeneticAlgorithm => genetic_algorithm::solve(cities, distances, opts),
+        Solvers::ParticleSwarmOptimization => particle_swarm::solve(cities, distances, opts),
+        Solvers::SimulatedAnnealing => simulated_annealing::solve(cities, distances, opts),
+        Solvers::StochasticHill => stochastic_hill::solve(cities, distances, opts),
+        Solvers::TabuSearch => tabu_search::solve(cities, distances, opts),
+        Solvers::TwoOpt => two_opt::solve(cities, distances, opts),
+        Solvers::Unspecified => return Err("solver not specified".to_string()),
+    };
+    Ok(solution)
 }
 
 // -- solution implementation

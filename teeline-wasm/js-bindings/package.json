@@ -1,0 +1,17 @@
+{
+  "name": "js-bindings",
+  "version": "1.0.0",
+  "description": "",
+  "main": "teeline_wasm.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "types": "./teeline_wasm.d.ts",
+  "dependencies": {
+    "@bytecodealliance/preview2-shim": "^0.17.9"
+  }
+}
