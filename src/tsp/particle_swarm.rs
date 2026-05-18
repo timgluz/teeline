@@ -31,7 +31,7 @@ fn nn_seed(city_ids: &[usize], distances: &DistanceMatrix) -> Vec<usize> {
         let best_pos = unvisited
             .iter()
             .enumerate()
-            .min_by(|(_, &a), (_, &b)| {
+            .min_by(|&(_, &a), &(_, &b)| {
                 let da = distances.distance_between(current, a).unwrap_or(f32::MAX);
                 let db = distances.distance_between(current, b).unwrap_or(f32::MAX);
                 da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)

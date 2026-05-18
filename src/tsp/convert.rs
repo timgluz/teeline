@@ -55,10 +55,10 @@ pub fn convert_file(input: &Path, output: &Path) -> Result<(), String> {
         .to_string_lossy()
         .into_owned();
 
-    if let Some(parent) = output.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
+    if let Some(parent) = output.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
 
     let mut f = fs::File::create(output).map_err(|e| e.to_string())?;

@@ -7,7 +7,7 @@ resolver = "2"
 name = "teeline"
 version = "0.3.0"
 authors = ["Timo Sulg <timgluz@gmail.com>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "teeline"
