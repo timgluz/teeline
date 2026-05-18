@@ -18,6 +18,7 @@ pub mod opt_tour;
 pub mod particle_swarm;
 pub mod probability;
 pub mod tsplib;
+pub mod three_opt;
 pub mod two_opt;
 
 use crate::tsp::distance_matrix::DistanceMatrix;
@@ -43,6 +44,7 @@ pub enum Solvers {
     SimulatedAnnealing,
     StochasticHill,
     TabuSearch,
+    ThreeOpt,
     TwoOpt,
     Unspecified,
 }
@@ -67,6 +69,8 @@ impl Solvers {
             "sa",
             "stochastic_hill",
             "tabu_search",
+            "three_opt",
+            "3opt",
             "two_opt",
             "2opt",
         ]
@@ -88,6 +92,7 @@ impl FromStr for Solvers {
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),
+            "3opt" | "three_opt" => Ok(Solvers::ThreeOpt),
             "2opt" | "two_opt" => Ok(Solvers::TwoOpt),
             _ => Err("unknown solver"),
         }
@@ -174,6 +179,7 @@ pub fn solve(
         Solvers::SimulatedAnnealing => simulated_annealing::solve(cities, distances, opts),
         Solvers::StochasticHill => stochastic_hill::solve(cities, distances, opts),
         Solvers::TabuSearch => tabu_search::solve(cities, distances, opts),
+        Solvers::ThreeOpt => three_opt::solve(cities, distances, opts),
         Solvers::TwoOpt => two_opt::solve(cities, distances, opts),
         Solvers::Unspecified => return Err("solver not specified".to_string()),
     };
