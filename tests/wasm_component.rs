@@ -1,6 +1,6 @@
 use wasmtime::component::{Component, Linker};
 use wasmtime::{Config, Engine, Store};
-use wasmtime_wasi::{WasiCtxBuilder, WasiView};
+use wasmtime_wasi::{WasiCtxBuilder, WasiCtxView, WasiView};
 
 wasmtime::component::bindgen!({
     world: "solver",
@@ -13,11 +13,11 @@ struct HostState {
 }
 
 impl WasiView for HostState {
-    fn table(&mut self) -> &mut wasmtime_wasi::ResourceTable {
-        &mut self.table
-    }
-    fn ctx(&mut self) -> &mut wasmtime_wasi::WasiCtx {
-        &mut self.wasi
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.wasi,
+            table: &mut self.table,
+        }
     }
 }
 
@@ -82,7 +82,7 @@ fn run_solver(solver_name: &str) {
     let engine = make_engine();
     let component = load_component(&engine);
     let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::add_to_linker_sync(&mut linker).unwrap();
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
     let mut store = make_store(&engine);
     let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
     let result = instance
@@ -142,7 +142,7 @@ fn unknown_solver_returns_err() {
     let engine = make_engine();
     let component = load_component(&engine);
     let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::add_to_linker_sync(&mut linker).unwrap();
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
     let mut store = make_store(&engine);
     let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
     let result = instance
