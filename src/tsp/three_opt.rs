@@ -31,89 +31,8 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut improved = true;
     while improved {
         improved = false;
-        let mut best_move: Option<(usize, usize, usize, u8)> = None;
-        let mut best_savings = 0.0_f32;
-
-        for i in 0..n - 2 {
-            send_city(options, path[i]);
-
-            let a = path[i];
-            let b = path[i + 1];
-            // Hoist edge (A,B) — invariant for all j, k given i.
-            let d_ab = d(distances, a, b);
-
-            for j in i + 1..n - 1 {
-                let c = path[j];
-                let dt = path[j + 1];
-                // Hoist (i,j)-invariant distances: 4 lookups saved per k iteration.
-                let d_c_dt = d(distances, c, dt);
-                let d_ac   = d(distances, a, c);
-                let d_b_dt = d(distances, b, dt);
-                let d_a_dt = d(distances, a, dt);
-
-                for k in j + 1..n {
-                    // Skip the degenerate triple where i==0, k==n-1: the wrap-around
-                    // edge makes F==A, causing the formula to measure A→A.
-                    if i == 0 && k == n - 1 {
-                        continue;
-                    }
-
-                    let e = path[k];
-                    let f = path[(k + 1) % n];
-
-                    // Per-k distances, each shared by multiple cases below.
-                    let d_ef   = d(distances, e, f);
-                    let d_ce   = d(distances, c, e);
-                    let d_dt_f = d(distances, dt, f);
-                    let d_be   = d(distances, b, e);
-                    let d_cf   = d(distances, c, f);
-                    let d_bf   = d(distances, b, f);
-                    let d_ae   = d(distances, a, e);
-
-                    let orig = d_ab + d_c_dt + d_ef;
-
-                    // All 7 non-identity reconnection costs.
-                    // Cases and their new edge sets (A=path[i], B=path[i+1],
-                    // C=path[j], D=path[j+1], E=path[k], F=path[(k+1)%n]):
-                    //
-                    // | # | middle           | new edges              |
-                    // |---|------------------|------------------------|
-                    // | 1 | rev(s1)+s2       | (A,C)+(B,D)+(E,F)      |
-                    // | 2 | s1+rev(s2)       | (A,B)+(C,E)+(D,F)      |
-                    // | 3 | rev(s1)+rev(s2)  | (A,C)+(B,E)+(D,F)      |
-                    // | 4 | s2+s1            | (A,D)+(E,B)+(C,F)      |
-                    // | 5 | s2+rev(s1)       | (A,D)+(E,C)+(B,F)      |
-                    // | 6 | rev(s2)+s1       | (A,E)+(D,B)+(C,F)      |
-                    // | 7 | rev(s2)+rev(s1)  | (A,E)+(D,C)+(B,F)      |
-                    let costs = [
-                        d_ac + d_b_dt + d_ef,   // 1
-                        d_ab + d_ce   + d_dt_f, // 2
-                        d_ac + d_be   + d_dt_f, // 3
-                        d_a_dt + d_be + d_cf,   // 4
-                        d_a_dt + d_ce + d_bf,   // 5
-                        d_ae + d_b_dt + d_cf,   // 6
-                        d_ae + d_c_dt + d_bf,   // 7
-                    ];
-
-                    let maybe_best = costs
-                        .iter()
-                        .enumerate()
-                        .filter(|&(_, &cost)| cost < orig)
-                        .min_by(|&(_, x), &(_, y)| x.partial_cmp(y).unwrap());
-
-                    if let Some((ci, &new_cost)) = maybe_best {
-                        let savings = orig - new_cost;
-                        if savings > best_savings {
-                            best_savings = savings;
-                            best_move = Some((i, j, k, (ci + 1) as u8));
-                        }
-                    }
-                }
-            }
-        }
-
-        if let Some((i, j, k, case)) = best_move {
-            tracing::debug!(i, j, k, case, best_savings, "3-opt: best improvement");
+        if let Some((i, j, k, case)) = find_best_move(&path, distances) {
+            tracing::debug!(i, j, k, case, "3-opt: best improvement");
             apply_3opt(&mut path, i, j, k, case);
             send_path(options, &path);
             improved = true;
@@ -122,6 +41,98 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
     options.send_progress(ProgressMessage::Done);
     Solution::new(&path, cities, distances)
+}
+
+/// Scans all C(n,3) triples and returns the coordinates of the globally best
+/// improving 3-opt move `(i, j, k, case)`, or `None` if the tour is already
+/// locally optimal.
+///
+/// Pure: no side effects, no progress messages.
+fn find_best_move(
+    path: &[usize],
+    distances: &DistanceMatrix,
+) -> Option<(usize, usize, usize, u8)> {
+    let n = path.len();
+    let mut best_move: Option<(usize, usize, usize, u8)> = None;
+    let mut best_savings = 0.0_f32;
+
+    for i in 0..n - 2 {
+        let a = path[i];
+        let b = path[i + 1];
+        // Hoist edge (A,B) — invariant for all j, k given i.
+        let d_ab = d(distances, a, b);
+
+        for j in i + 1..n - 1 {
+            let c = path[j];
+            let dt = path[j + 1];
+            // Hoist (i,j)-invariant distances: 4 lookups saved per k iteration.
+            let d_c_dt = d(distances, c, dt);
+            let d_ac   = d(distances, a, c);
+            let d_b_dt = d(distances, b, dt);
+            let d_a_dt = d(distances, a, dt);
+
+            for k in j + 1..n {
+                // Skip the degenerate triple where i==0, k==n-1: the wrap-around
+                // edge makes F==A, causing the formula to measure A→A.
+                if i == 0 && k == n - 1 {
+                    continue;
+                }
+
+                let e = path[k];
+                let f = path[(k + 1) % n];
+
+                // Per-k distances, each shared by multiple cases below.
+                let d_ef   = d(distances, e, f);
+                let d_ce   = d(distances, c, e);
+                let d_dt_f = d(distances, dt, f);
+                let d_be   = d(distances, b, e);
+                let d_cf   = d(distances, c, f);
+                let d_bf   = d(distances, b, f);
+                let d_ae   = d(distances, a, e);
+
+                let orig = d_ab + d_c_dt + d_ef;
+
+                // All 7 non-identity reconnection costs.
+                // Cases and their new edge sets (A=path[i], B=path[i+1],
+                // C=path[j], D=path[j+1], E=path[k], F=path[(k+1)%n]):
+                //
+                // | # | middle           | new edges              |
+                // |---|------------------|------------------------|
+                // | 1 | rev(s1)+s2       | (A,C)+(B,D)+(E,F)      |
+                // | 2 | s1+rev(s2)       | (A,B)+(C,E)+(D,F)      |
+                // | 3 | rev(s1)+rev(s2)  | (A,C)+(B,E)+(D,F)      |
+                // | 4 | s2+s1            | (A,D)+(E,B)+(C,F)      |
+                // | 5 | s2+rev(s1)       | (A,D)+(E,C)+(B,F)      |
+                // | 6 | rev(s2)+s1       | (A,E)+(D,B)+(C,F)      |
+                // | 7 | rev(s2)+rev(s1)  | (A,E)+(D,C)+(B,F)      |
+                let costs = [
+                    d_ac + d_b_dt + d_ef,   // 1
+                    d_ab + d_ce   + d_dt_f, // 2
+                    d_ac + d_be   + d_dt_f, // 3
+                    d_a_dt + d_be + d_cf,   // 4
+                    d_a_dt + d_ce + d_bf,   // 5
+                    d_ae + d_b_dt + d_cf,   // 6
+                    d_ae + d_c_dt + d_bf,   // 7
+                ];
+
+                let maybe_best = costs
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, &cost)| cost < orig)
+                    .min_by(|&(_, x), &(_, y)| x.partial_cmp(y).unwrap());
+
+                if let Some((ci, &new_cost)) = maybe_best {
+                    let savings = orig - new_cost;
+                    if savings > best_savings {
+                        best_savings = savings;
+                        best_move = Some((i, j, k, (ci + 1) as u8));
+                    }
+                }
+            }
+        }
+    }
+
+    best_move
 }
 
 /// Applies case `case` (1–7) to `path` in place.
@@ -170,12 +181,6 @@ fn d(dm: &DistanceMatrix, a: usize, b: usize) -> f32 {
 fn send_path(options: &SolverOptions, path: &[usize]) {
     if options.progress_tx.is_some() {
         options.send_progress(ProgressMessage::PathUpdate(Route::new(path), 0.0));
-    }
-}
-
-fn send_city(options: &SolverOptions, city: usize) {
-    if options.progress_tx.is_some() {
-        options.send_progress(ProgressMessage::CityChange(city));
     }
 }
 
@@ -286,6 +291,47 @@ mod tests {
         let mut path = vec![0usize, 1, 2, 3, 4, 5];
         apply_3opt(&mut path, 0, 2, 4, 7);
         assert_eq!(path, vec![0, 4, 3, 2, 1, 5]);
+    }
+
+    // --- find_best_move unit tests ---
+
+    /// Optimal 4-city square tour should have no improving 3-opt move.
+    #[test]
+    fn find_best_move_returns_none_on_optimal() {
+        let cities = square_cities();
+        let dm = build_dm(&cities);
+        // NN produces the optimal tour for the square.
+        let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        assert_eq!(find_best_move(&path, &dm), None);
+    }
+
+    /// A deliberately bad 5-city tour (with crossings) must have an improving move,
+    /// and applying it must strictly lower the tour cost.
+    #[test]
+    fn find_best_move_finds_improvement() {
+        let cities = pts(&[
+            (0.0, 0.0),
+            (0.0, 0.5),
+            (0.0, 1.0),
+            (1.0, 1.0),
+            (1.0, 0.0),
+        ]);
+        let dm = build_dm(&cities);
+        // Crossed tour: 0→2→4→1→3 (cost ≈ 6.06, well above optimal 4.0).
+        let bad_path = vec![0usize, 2, 4, 1, 3];
+        let orig_cost: f32 = dm.tour_length(&bad_path);
+
+        let result = find_best_move(&bad_path, &dm);
+        assert!(result.is_some(), "expected an improving move on the crossed tour");
+
+        let (i, j, k, case) = result.unwrap();
+        let mut improved_path = bad_path.clone();
+        apply_3opt(&mut improved_path, i, j, k, case);
+        let new_cost = dm.tour_length(&improved_path);
+        assert!(
+            new_cost < orig_cost,
+            "applying the move should reduce cost ({new_cost:.4} < {orig_cost:.4})"
+        );
     }
 
     // --- solver-level tests ---
