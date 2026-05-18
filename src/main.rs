@@ -189,17 +189,17 @@ fn run_solve(args: &ArgMatches) {
             }
         });
 
-    if let Some(ref ot) = opt_tour {
-        if let Some(ref tx) = options.progress_tx {
-            if ot.dimension == tsp_data.len() {
-                let _ = tx.send(progress::ProgressMessage::OptimalTour(ot.route.clone()));
-            } else {
-                eprintln!(
-                    "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
-                    ot.dimension,
-                    tsp_data.len()
-                );
-            }
+    if let Some(ref ot) = opt_tour
+        && let Some(ref tx) = options.progress_tx
+    {
+        if ot.dimension == tsp_data.len() {
+            let _ = tx.send(progress::ProgressMessage::OptimalTour(ot.route.clone()));
+        } else {
+            eprintln!(
+                "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
+                ot.dimension,
+                tsp_data.len()
+            );
         }
     }
 

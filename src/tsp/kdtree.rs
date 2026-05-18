@@ -136,8 +136,7 @@ impl KDTree {
 
         self.walk(|n| pts.borrow_mut().push(n.coords().to_vec()));
 
-        let res = pts.borrow().to_vec();
-        res
+        pts.borrow().to_vec()
     }
 }
 
@@ -219,12 +218,12 @@ impl KDNode {
 
         // check distance from split line
         let split_dist = self.point.split_distance(target_point, self.level_coord());
-        if nearest_result.closest_distance() > split_dist {
-            if let Some(branch) = futher_branch {
-                let further_result = branch.nearest(target_point, nearest_result.clone());
-                let pt_distance = further_result.closest_distance();
-                nearest_result.add(further_result.point, pt_distance);
-            }
+        if nearest_result.closest_distance() > split_dist
+            && let Some(branch) = futher_branch
+        {
+            let further_result = branch.nearest(target_point, nearest_result.clone());
+            let pt_distance = further_result.closest_distance();
+            nearest_result.add(further_result.point, pt_distance);
         }
 
         nearest_result
