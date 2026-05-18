@@ -2,16 +2,16 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{Solution, SolverOptions};
+use super::{nearest_neighbor, Solution, SolverOptions};
 
 /// 3-opt local search.
 ///
-/// For each triple of edges (i,j,k) consider all 8 reconnection cases.
-/// Apply the best-improving case for that triple (lowest cost among the 7
-/// non-identity reconnections), then restart the search.  Continues until
-/// no improving triple is found.
+/// Starts from a nearest-neighbor seed. Each pass scans all O(n³) triples and
+/// applies the globally best improving move (best-improvement-per-pass), then
+/// repeats until no triple yields an improvement.
 ///
-/// Complexity: O(n³) per pass.
+/// Complexity: O(n³) per pass. The number of passes is bounded by the number
+/// of distinct improving moves, which is small on a NN-seeded tour.
 pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
     let n = cities.len();
     if n < 4 {
@@ -19,84 +19,109 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         return Solution::new(&path, cities, distances);
     }
 
-    let mut path: Vec<usize> = cities.iter().map(|c| c.id).collect();
-    options.send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
+    // Seed with a nearest-neighbor tour. Progress messages from the NN phase
+    // are suppressed so the caller only sees 3-opt updates.
+    let seed_opts = SolverOptions { progress_tx: None, ..options.clone() };
+    let mut path: Vec<usize> = nearest_neighbor::solve(cities, distances, &seed_opts)
+        .route()
+        .to_vec();
+
+    send_path(options, &path);
 
     let mut improved = true;
     while improved {
         improved = false;
-        'search: for i in 0..n - 2 {
-            options.send_progress(ProgressMessage::CityChange(path[i]));
+        let mut best_move: Option<(usize, usize, usize, u8)> = None;
+        let mut best_savings = 0.0_f32;
+
+        for i in 0..n - 2 {
+            send_city(options, path[i]);
+
+            let a = path[i];
+            let b = path[i + 1];
+            // Hoist edge (A,B) — invariant for all j, k given i.
+            let d_ab = d(distances, a, b);
+
             for j in i + 1..n - 1 {
+                let c = path[j];
+                let dt = path[j + 1];
+                // Hoist (i,j)-invariant distances: 4 lookups saved per k iteration.
+                let d_c_dt = d(distances, c, dt);
+                let d_ac   = d(distances, a, c);
+                let d_b_dt = d(distances, b, dt);
+                let d_a_dt = d(distances, a, dt);
+
                 for k in j + 1..n {
-                    let a = path[i];
-                    let b = path[i + 1];
-                    let c = path[j];
-                    let dt = path[j + 1];
+                    // Skip the degenerate triple where i==0, k==n-1: the wrap-around
+                    // edge makes F==A, causing the formula to measure A→A.
+                    if i == 0 && k == n - 1 {
+                        continue;
+                    }
+
                     let e = path[k];
                     let f = path[(k + 1) % n];
 
-                    let orig = d(distances, a, b) + d(distances, c, dt) + d(distances, e, f);
+                    // Per-k distances, each shared by multiple cases below.
+                    let d_ef   = d(distances, e, f);
+                    let d_ce   = d(distances, c, e);
+                    let d_dt_f = d(distances, dt, f);
+                    let d_be   = d(distances, b, e);
+                    let d_cf   = d(distances, c, f);
+                    let d_bf   = d(distances, b, f);
+                    let d_ae   = d(distances, a, e);
 
-                    // best-improvement per triple: pick the lowest-cost valid case
-                    if let Some(case) = best_improving_case(distances, a, b, c, dt, e, f, orig) {
-                        apply_3opt(&mut path, i, j, k, case);
-                        tracing::debug!(i, j, k, case, "3-opt: improvement");
-                        options.send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
-                        improved = true;
-                        break 'search;
+                    let orig = d_ab + d_c_dt + d_ef;
+
+                    // All 7 non-identity reconnection costs.
+                    // Cases and their new edge sets (A=path[i], B=path[i+1],
+                    // C=path[j], D=path[j+1], E=path[k], F=path[(k+1)%n]):
+                    //
+                    // | # | middle           | new edges              |
+                    // |---|------------------|------------------------|
+                    // | 1 | rev(s1)+s2       | (A,C)+(B,D)+(E,F)      |
+                    // | 2 | s1+rev(s2)       | (A,B)+(C,E)+(D,F)      |
+                    // | 3 | rev(s1)+rev(s2)  | (A,C)+(B,E)+(D,F)      |
+                    // | 4 | s2+s1            | (A,D)+(E,B)+(C,F)      |
+                    // | 5 | s2+rev(s1)       | (A,D)+(E,C)+(B,F)      |
+                    // | 6 | rev(s2)+s1       | (A,E)+(D,B)+(C,F)      |
+                    // | 7 | rev(s2)+rev(s1)  | (A,E)+(D,C)+(B,F)      |
+                    let costs = [
+                        d_ac + d_b_dt + d_ef,   // 1
+                        d_ab + d_ce   + d_dt_f, // 2
+                        d_ac + d_be   + d_dt_f, // 3
+                        d_a_dt + d_be + d_cf,   // 4
+                        d_a_dt + d_ce + d_bf,   // 5
+                        d_ae + d_b_dt + d_cf,   // 6
+                        d_ae + d_c_dt + d_bf,   // 7
+                    ];
+
+                    let maybe_best = costs
+                        .iter()
+                        .enumerate()
+                        .filter(|&(_, &cost)| cost < orig)
+                        .min_by(|&(_, x), &(_, y)| x.partial_cmp(y).unwrap());
+
+                    if let Some((ci, &new_cost)) = maybe_best {
+                        let savings = orig - new_cost;
+                        if savings > best_savings {
+                            best_savings = savings;
+                            best_move = Some((i, j, k, (ci + 1) as u8));
+                        }
                     }
                 }
             }
+        }
+
+        if let Some((i, j, k, case)) = best_move {
+            tracing::debug!(i, j, k, case, best_savings, "3-opt: best improvement");
+            apply_3opt(&mut path, i, j, k, case);
+            send_path(options, &path);
+            improved = true;
         }
     }
 
     options.send_progress(ProgressMessage::Done);
     Solution::new(&path, cities, distances)
-}
-
-/// Returns the case index (1–7) of the best reconnection that strictly
-/// improves `orig`, or `None` if no improvement exists.
-///
-/// Cases and their new edge sets (A=path[i], B=path[i+1], C=path[j],
-/// DT=path[j+1], E=path[k], F=path[(k+1)%n]):
-///
-/// | # | middle          | new edges               | type  |
-/// |---|-----------------|-------------------------|-------|
-/// | 1 | rev(s1) + s2    | (A,C)+(B,D)+(E,F)       | 2-opt |
-/// | 2 | s1 + rev(s2)    | (A,B)+(C,E)+(D,F)       | 2-opt |
-/// | 3 | rev(s1)+rev(s2) | (A,C)+(B,E)+(D,F)       | 2-opt |
-/// | 4 | s2 + s1         | (A,D)+(E,B)+(C,F)       | 3-opt |
-/// | 5 | s2 + rev(s1)    | (A,D)+(E,C)+(B,F)       | 3-opt |
-/// | 6 | rev(s2) + s1    | (A,E)+(D,B)+(C,F)       | 3-opt |
-/// | 7 | rev(s2)+rev(s1) | (A,E)+(D,C)+(B,F)       | 3-opt |
-#[allow(clippy::too_many_arguments)]
-fn best_improving_case(
-    dm: &DistanceMatrix,
-    a: usize,
-    b: usize,
-    c: usize,
-    dt: usize,
-    e: usize,
-    f: usize,
-    orig: f32,
-) -> Option<u8> {
-    let cases = [
-        d(dm, a, c) + d(dm, b, dt) + d(dm, e, f), // 1
-        d(dm, a, b) + d(dm, c, e) + d(dm, dt, f), // 2
-        d(dm, a, c) + d(dm, b, e) + d(dm, dt, f), // 3
-        d(dm, a, dt) + d(dm, e, b) + d(dm, c, f), // 4
-        d(dm, a, dt) + d(dm, e, c) + d(dm, b, f), // 5
-        d(dm, a, e) + d(dm, dt, b) + d(dm, c, f), // 6
-        d(dm, a, e) + d(dm, dt, c) + d(dm, b, f), // 7
-    ];
-
-    cases
-        .iter()
-        .enumerate()
-        .filter(|&(_, cost)| *cost < orig)
-        .min_by(|&(_, x), &(_, y)| x.partial_cmp(y).unwrap())
-        .map(|(i, _)| (i + 1) as u8)
 }
 
 /// Applies case `case` (1–7) to `path` in place.
@@ -140,6 +165,18 @@ fn apply_3opt(path: &mut [usize], i: usize, j: usize, k: usize, case: u8) {
 #[inline]
 fn d(dm: &DistanceMatrix, a: usize, b: usize) -> f32 {
     dm.distance_between(a, b).expect("three_opt: invalid city pair")
+}
+
+fn send_path(options: &SolverOptions, path: &[usize]) {
+    if options.progress_tx.is_some() {
+        options.send_progress(ProgressMessage::PathUpdate(Route::new(path), 0.0));
+    }
+}
+
+fn send_city(options: &SolverOptions, city: usize) {
+    if options.progress_tx.is_some() {
+        options.send_progress(ProgressMessage::CityChange(city));
+    }
 }
 
 // ---------------------------------------------------------------------------
