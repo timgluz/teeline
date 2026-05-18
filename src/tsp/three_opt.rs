@@ -191,7 +191,7 @@ fn apply_3opt(path: &mut [usize], i: usize, j: usize, k: usize, case: u8) {
             };
             path[i + 1..=k].copy_from_slice(&new_mid);
         }
-        _ => {}
+        _ => unreachable!("apply_3opt: case must be 1–7, got {case}"),
     }
 }
 
