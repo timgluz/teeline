@@ -91,29 +91,11 @@ fn find_best_move(
                 let d_ae   = d(distances, a, e);
 
                 let orig = d_ab + d_c_dt + d_ef;
-
-                // All 7 non-identity reconnection costs.
-                // Cases and their new edge sets (A=path[i], B=path[i+1],
-                // C=path[j], D=path[j+1], E=path[k], F=path[(k+1)%n]):
-                //
-                // | # | middle           | new edges              |
-                // |---|------------------|------------------------|
-                // | 1 | rev(s1)+s2       | (A,C)+(B,D)+(E,F)      |
-                // | 2 | s1+rev(s2)       | (A,B)+(C,E)+(D,F)      |
-                // | 3 | rev(s1)+rev(s2)  | (A,C)+(B,E)+(D,F)      |
-                // | 4 | s2+s1            | (A,D)+(E,B)+(C,F)      |
-                // | 5 | s2+rev(s1)       | (A,D)+(E,C)+(B,F)      |
-                // | 6 | rev(s2)+s1       | (A,E)+(D,B)+(C,F)      |
-                // | 7 | rev(s2)+rev(s1)  | (A,E)+(D,C)+(B,F)      |
-                let costs = [
-                    d_ac + d_b_dt + d_ef,   // 1
-                    d_ab + d_ce   + d_dt_f, // 2
-                    d_ac + d_be   + d_dt_f, // 3
-                    d_a_dt + d_be + d_cf,   // 4
-                    d_a_dt + d_ce + d_bf,   // 5
-                    d_ae + d_b_dt + d_cf,   // 6
-                    d_ae + d_c_dt + d_bf,   // 7
-                ];
+                let te = TripleEdges {
+                    d_ab, d_c_dt, d_ac, d_b_dt, d_a_dt,
+                    d_ef, d_ce, d_dt_f, d_be, d_cf, d_bf, d_ae,
+                };
+                let costs = reconnection_costs(&te);
 
                 let maybe_best = costs
                     .iter()
@@ -133,6 +115,46 @@ fn find_best_move(
     }
 
     best_move
+}
+
+/// Pre-computed distances for one (i, j, k) triple, grouped by the loop level
+/// at which they are computed and hoisted.
+struct TripleEdges {
+    // i-level
+    d_ab: f32,
+    // j-level
+    d_c_dt: f32, d_ac: f32, d_b_dt: f32, d_a_dt: f32,
+    // k-level
+    d_ef: f32, d_ce: f32, d_dt_f: f32, d_be: f32, d_cf: f32, d_bf: f32, d_ae: f32,
+}
+
+/// Returns the 7 non-identity reconnection costs for a triple.
+///
+/// Index 0 = case 1, …, index 6 = case 7. The original three-edge cost
+/// (`d_ab + d_c_dt + d_ef`) is not included; the caller compares against it.
+///
+/// New edge sets (A=path[i], B=path[i+1], C=path[j], D=path[j+1],
+///               E=path[k], F=path[(k+1)%n]):
+///
+/// | idx | case | middle          | new edges             |
+/// |-----|------|-----------------|-----------------------|
+/// |  0  |  1   | rev(s1)+s2      | (A,C)+(B,D)+(E,F)     |
+/// |  1  |  2   | s1+rev(s2)      | (A,B)+(C,E)+(D,F)     |
+/// |  2  |  3   | rev(s1)+rev(s2) | (A,C)+(B,E)+(D,F)     |
+/// |  3  |  4   | s2+s1           | (A,D)+(E,B)+(C,F)     |
+/// |  4  |  5   | s2+rev(s1)      | (A,D)+(E,C)+(B,F)     |
+/// |  5  |  6   | rev(s2)+s1      | (A,E)+(D,B)+(C,F)     |
+/// |  6  |  7   | rev(s2)+rev(s1) | (A,E)+(D,C)+(B,F)     |
+fn reconnection_costs(e: &TripleEdges) -> [f32; 7] {
+    [
+        e.d_ac  + e.d_b_dt + e.d_ef,   // 1
+        e.d_ab  + e.d_ce   + e.d_dt_f, // 2
+        e.d_ac  + e.d_be   + e.d_dt_f, // 3
+        e.d_a_dt + e.d_be  + e.d_cf,   // 4
+        e.d_a_dt + e.d_ce  + e.d_bf,   // 5
+        e.d_ae  + e.d_b_dt + e.d_cf,   // 6
+        e.d_ae  + e.d_c_dt + e.d_bf,   // 7
+    ]
 }
 
 /// Applies case `case` (1–7) to `path` in place.
@@ -332,6 +354,61 @@ mod tests {
             new_cost < orig_cost,
             "applying the move should reduce cost ({new_cost:.4} < {orig_cost:.4})"
         );
+    }
+
+    // --- reconnection_costs unit tests — one per case ---
+    //
+    // Fixed distances: d_ab=1, d_c_dt=2, d_ac=3, d_b_dt=4, d_a_dt=5,
+    //                  d_ef=6, d_ce=7, d_dt_f=8, d_be=9, d_cf=10, d_bf=11, d_ae=12
+    // orig = d_ab + d_c_dt + d_ef = 1 + 2 + 6 = 9  (all cases exceed it here)
+
+    fn sample_edges() -> TripleEdges {
+        TripleEdges {
+            d_ab: 1.0, d_c_dt: 2.0, d_ac: 3.0, d_b_dt: 4.0, d_a_dt: 5.0,
+            d_ef: 6.0, d_ce: 7.0, d_dt_f: 8.0, d_be: 9.0, d_cf: 10.0, d_bf: 11.0, d_ae: 12.0,
+        }
+    }
+
+    #[test]
+    fn reconnection_costs_case1() {
+        // (A,C)+(B,D)+(E,F) = d_ac + d_b_dt + d_ef = 3+4+6 = 13
+        assert_eq!(reconnection_costs(&sample_edges())[0], 13.0);
+    }
+
+    #[test]
+    fn reconnection_costs_case2() {
+        // (A,B)+(C,E)+(D,F) = d_ab + d_ce + d_dt_f = 1+7+8 = 16
+        assert_eq!(reconnection_costs(&sample_edges())[1], 16.0);
+    }
+
+    #[test]
+    fn reconnection_costs_case3() {
+        // (A,C)+(B,E)+(D,F) = d_ac + d_be + d_dt_f = 3+9+8 = 20
+        assert_eq!(reconnection_costs(&sample_edges())[2], 20.0);
+    }
+
+    #[test]
+    fn reconnection_costs_case4() {
+        // (A,D)+(E,B)+(C,F) = d_a_dt + d_be + d_cf = 5+9+10 = 24
+        assert_eq!(reconnection_costs(&sample_edges())[3], 24.0);
+    }
+
+    #[test]
+    fn reconnection_costs_case5() {
+        // (A,D)+(E,C)+(B,F) = d_a_dt + d_ce + d_bf = 5+7+11 = 23
+        assert_eq!(reconnection_costs(&sample_edges())[4], 23.0);
+    }
+
+    #[test]
+    fn reconnection_costs_case6() {
+        // (A,E)+(D,B)+(C,F) = d_ae + d_b_dt + d_cf = 12+4+10 = 26
+        assert_eq!(reconnection_costs(&sample_edges())[5], 26.0);
+    }
+
+    #[test]
+    fn reconnection_costs_case7() {
+        // (A,E)+(D,C)+(B,F) = d_ae + d_c_dt + d_bf = 12+2+11 = 25
+        assert_eq!(reconnection_costs(&sample_edges())[6], 25.0);
     }
 
     // --- solver-level tests ---
