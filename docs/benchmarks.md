@@ -26,6 +26,7 @@ representative, not as a guarantee.
 |-----------|--------------|----------:|:----------------:|----------:|:---:|--------:|
 | **Nearest Neighbour** | default | 8 980.92 | +19.0 % | 0.01 s | 50 % | 7.6 MB |
 | **2-opt** | default | 9 368.32 | +24.2 % | 0.01 s | 63 % | 7.4 MB |
+| **3-opt** | default | 7 742.65 | +2.6 % | 0.3 s | 55 % | 7.4 MB |
 | **Stochastic Hill** | `--epochs=10000` | 8 385.20 | +11.2 % | 0.02 s | 88 % | 7.6 MB |
 | **Stochastic Hill** | `--epochs=100000` | 9 255.82 | +22.7 % | 0.18 s | 98 % | 7.4 MB |
 | **Simulated Annealing** | default | 8 059.29 | +6.8 % | 0.34 s | 99 % | 8.1 MB |
@@ -67,7 +68,8 @@ cargo build --release
 ```
 Gap from optimal
   0%  ─────────────────────────────── optimal (7 544.37)
-  4%  CS (0.72 s)                ← new best overall
+  3%  3-opt (0.3 s)              ← best overall
+  4%  CS (0.72 s)
   7%  SA (0.34 s)
   8%  GA/10k (1.63 s)
  11%  Stochastic Hill/10k (0.02 s)  ← best value for time
@@ -81,10 +83,15 @@ Gap from optimal
  77%  GA/500 epochs
 ```
 
-**Cuckoo Search** achieves the best gap (~4–7 % across runs) at 0.72 s. It seeds nest 0 with a
-greedy NN tour for a strong starting neighbourhood, then runs one Lévy-flight 2-opt perturbation
-per nest per epoch. Quality degrades significantly with high `pa` (≥ 0.05) because random
-re-seedings overwhelm the search; the default `pa`=0.01 is near-optimal for this instance.
+**3-opt** is the strongest solver on this instance: deterministic 2.6 % gap in ~0.3 s. It seeds
+from a nearest-neighbor tour and applies best-improvement-per-pass (scan all C(n,3) triples, take
+the globally best improving move, restart). The result is reproducible across runs because the NN
+seed and the greedy improvement strategy are both deterministic.
+
+**Cuckoo Search** is the best stochastic option (~4–7 % across runs) at 0.72 s. It seeds nest 0
+with a greedy NN tour for a strong starting neighbourhood, then runs one Lévy-flight 2-opt
+perturbation per nest per epoch. Quality degrades significantly with high `pa` (≥ 0.05) because
+random re-seedings overwhelm the search; the default `pa`=0.01 is near-optimal for this instance.
 
 **Simulated Annealing** reaches ~7 % in under half a second using its default temperature
 schedule. It is the strongest single-run solver for time-budgets under 0.5 s.
