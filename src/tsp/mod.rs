@@ -1,4 +1,5 @@
 pub mod bellman_karp;
+pub mod pipeline;
 pub mod branch_bound;
 pub mod convert;
 pub mod cuckoo_search;
@@ -73,7 +74,25 @@ impl Solvers {
             "3opt",
             "two_opt",
             "2opt",
+            "classic",
+            "fast",
+            "thorough",
         ]
+    }
+
+    pub fn auto_expand_with_nn(&self) -> bool {
+        matches!(
+            self,
+            Solvers::TwoOpt
+                | Solvers::ThreeOpt
+                | Solvers::SimulatedAnnealing
+                | Solvers::StochasticHill
+                | Solvers::TabuSearch
+                | Solvers::GeneticAlgorithm
+                | Solvers::ParticleSwarmOptimization
+                | Solvers::CuckooSearch
+                | Solvers::FlowerPollination
+        )
     }
 }
 
@@ -113,6 +132,7 @@ pub struct SolverOptions {
     pub max_temperature: f32,
     pub min_temperature: f32,
     pub progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
+    pub initial_tour: Option<Vec<usize>>,
 }
 
 impl std::fmt::Debug for SolverOptions {
@@ -128,6 +148,7 @@ impl std::fmt::Debug for SolverOptions {
             .field("max_temperature", &self.max_temperature)
             .field("min_temperature", &self.min_temperature)
             .field("progress_tx", &self.progress_tx.is_some())
+            .field("initial_tour", &self.initial_tour.is_some())
             .finish()
     }
 }
@@ -145,6 +166,7 @@ impl Default for SolverOptions {
             min_temperature: 0.001,
             max_temperature: 1_000.0,
             progress_tx: None,
+            initial_tour: None,
         }
     }
 }
@@ -155,6 +177,26 @@ impl SolverOptions {
             let _ = tx.send(msg);
         }
     }
+
+    pub fn for_internal_seed(&self) -> SolverOptions {
+        SolverOptions {
+            progress_tx: None,
+            initial_tour: None,
+            ..self.clone()
+        }
+    }
+}
+
+pub fn validate_tour(tour: &[usize], cities: &[KDPoint]) -> Result<(), String> {
+    if tour.len() != cities.len() {
+        return Err(format!("tour length {} != cities length {}", tour.len(), cities.len()));
+    }
+    let city_ids: std::collections::HashSet<usize> = cities.iter().map(|c| c.id).collect();
+    let tour_ids: std::collections::HashSet<usize> = tour.iter().copied().collect();
+    if tour_ids != city_ids {
+        return Err("tour contains invalid or duplicate city IDs".to_string());
+    }
+    Ok(())
 }
 
 pub fn find_solver(name: &str) -> Result<Solvers, String> {
@@ -343,6 +385,66 @@ mod tests {
             progress::ProgressMessage::EpochUpdate(n) => assert_eq!(n, 99),
             other => panic!("unexpected message: {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_solver_options_initial_tour_defaults_to_none() {
+        assert!(SolverOptions::default().initial_tour.is_none());
+    }
+
+    #[test]
+    fn test_validate_tour_accepts_valid_tour() {
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let tour: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        assert!(validate_tour(&tour, &cities).is_ok());
+    }
+
+    #[test]
+    fn test_validate_tour_rejects_wrong_length() {
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let short_tour = vec![cities[0].id, cities[1].id];
+        assert!(validate_tour(&short_tour, &cities).is_err());
+    }
+
+    #[test]
+    fn test_validate_tour_rejects_invalid_ids() {
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let bad_tour = vec![cities[0].id, cities[0].id, cities[1].id]; // duplicate
+        assert!(validate_tour(&bad_tour, &cities).is_err());
+    }
+
+    #[test]
+    fn test_auto_expand_true_for_local_search() {
+        assert!(Solvers::TwoOpt.auto_expand_with_nn());
+        assert!(Solvers::SimulatedAnnealing.auto_expand_with_nn());
+        assert!(Solvers::ThreeOpt.auto_expand_with_nn());
+        assert!(Solvers::GeneticAlgorithm.auto_expand_with_nn());
+        assert!(Solvers::ParticleSwarmOptimization.auto_expand_with_nn());
+        assert!(Solvers::CuckooSearch.auto_expand_with_nn());
+        assert!(Solvers::FlowerPollination.auto_expand_with_nn());
+        assert!(Solvers::StochasticHill.auto_expand_with_nn());
+        assert!(Solvers::TabuSearch.auto_expand_with_nn());
+    }
+
+    #[test]
+    fn test_auto_expand_false_for_constructors() {
+        assert!(!Solvers::NearestNeighbor.auto_expand_with_nn());
+        assert!(!Solvers::BellmanKarp.auto_expand_with_nn());
+        assert!(!Solvers::BranchBound.auto_expand_with_nn());
+        assert!(!Solvers::Unspecified.auto_expand_with_nn());
+    }
+
+    #[test]
+    fn test_for_internal_seed_clears_initial_tour_and_progress() {
+        use std::sync::mpsc;
+        let (tx, _rx) = mpsc::channel();
+        let mut opts = SolverOptions::default();
+        opts.initial_tour = Some(vec![1, 2, 3]);
+        opts.progress_tx = Some(tx);
+        let inner = opts.for_internal_seed();
+        assert!(inner.initial_tour.is_none());
+        assert!(inner.progress_tx.is_none());
+        assert_eq!(inner.epochs, opts.epochs); // other fields preserved
     }
 
     #[test]
