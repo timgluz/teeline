@@ -29,8 +29,10 @@ representative, not as a guarantee.
 | **3-opt** | default | 7 742.65 | +2.6 % | 0.3 s | 55 % | 7.4 MB |
 | **Stochastic Hill** | `--epochs=10000` | 8 385.20 | +11.2 % | 0.02 s | 88 % | 7.6 MB |
 | **Stochastic Hill** | `--epochs=100000` | 9 255.82 | +22.7 % | 0.18 s | 98 % | 7.4 MB |
-| **Simulated Annealing** | default | 8 059.29 | +6.8 % | 0.34 s | 99 % | 8.1 MB |
-| **Simulated Annealing** | `--epochs=100000` | 8 275.12 | +9.7 % | 0.31 s | 99 % | 8.0 MB |
+| **Simulated Annealing** | `--no-seed` (sequential start) | 8 059.29 | +6.8 % | 0.34 s | 99 % | 8.1 MB |
+| **Simulated Annealing** | default (random shuffle start) | *to be measured* | *~5–6 %* | ~0.34 s | 99 % | 8.1 MB |
+| **Simulated Annealing** | `pipeline --steps=nn,sa` (NN start) | *worse than --no-seed* | *> +6.8 %* | ~0.35 s | 99 % | 8.1 MB |
+| **Simulated Annealing** | `--epochs=100000 --no-seed` | 8 275.12 | +9.7 % | 0.31 s | 99 % | 8.0 MB |
 | **Tabu Search** | `--epochs=1000` | 9 337.22 | +23.8 % | 0.04 s | 95 % | 7.6 MB |
 | **Tabu Search** | `--epochs=10000` | 9 270.00 | +22.9 % | 0.47 s | 99 % | 7.6 MB |
 | **Genetic Algorithm** | `--epochs=500` | 13 294.30 | +76.2 % | 0.08 s | 98 % | 7.6 MB |
@@ -93,8 +95,15 @@ with a greedy NN tour for a strong starting neighbourhood, then runs one Lévy-f
 perturbation per nest per epoch. Quality degrades significantly with high `pa` (≥ 0.05) because
 random re-seedings overwhelm the search; the default `pa`=0.01 is near-optimal for this instance.
 
-**Simulated Annealing** reaches ~7 % in under half a second using its default temperature
-schedule. It is the strongest single-run solver for time-budgets under 0.5 s.
+**Simulated Annealing** reaches ~5–7 % in under half a second. The default auto-expansion uses
+`pipeline(shuffle, sa)` — a random starting tour rather than greedy NN. SA's temperature schedule
+is calibrated for a cold start: the high-temperature phase budgets exploration energy to escape a
+bad initial state. Seeding from the NN tour, which already sits in a tight local neighbourhood,
+constrains early exploration without matching the quality benefit it provides to deterministic
+hill-climbers (2-opt, 3-opt). A random shuffle start lets SA explore more broadly and typically
+matches or beats the sequential-start quality. Use `--no-seed` to start from input city order;
+use `teeline pipeline --steps=nn,2opt,sa` (or the `classic` preset) to warm-start SA from a
+2-opt-refined tour, which *does* improve quality because 2-opt has already cleaned up edge crossings.
 
 **Genetic Algorithm** matches SA quality (~8 %) but needs the full 10 000 generations (~1.6 s)
 to get there. At 500 epochs it is the worst performer — GA needs population diversity to build

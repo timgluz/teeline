@@ -14,7 +14,9 @@ fn main() {
     let tuning = tuning_args();
 
     let solve_cmd = Command::new("solve")
-        .about("Solve a TSP instance (local-search solvers auto-expand to pipeline(nn, solver))")
+        .about("Solve a TSP instance. Deterministic solvers (2opt, 3opt, tabu) auto-expand to \
+                pipeline(nn, solver); stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill) \
+                auto-expand to pipeline(shuffle, solver).")
         .arg(
             Arg::new("solver")
                 .index(1)
@@ -27,7 +29,7 @@ fn main() {
         .arg(
             Arg::new("no_seed")
                 .long("no-seed")
-                .help("disable automatic NN warm-start; run solver from scratch")
+                .help("disable automatic warm-start; run solver from input city order")
                 .action(ArgAction::SetTrue)
                 .required(false),
         )
@@ -169,8 +171,14 @@ fn run_solve(args: &ArgMatches) {
 
     let solver = Solvers::from_str(solver_name).expect("unknown solver — clap should have caught this");
 
-    if !no_seed && solver.auto_expand_with_nn() {
-        run_as_pipeline(&[Solvers::NearestNeighbor, solver], args);
+    if !no_seed {
+        if solver.auto_expand_with_nn() {
+            run_as_pipeline(&[Solvers::NearestNeighbor, solver], args);
+        } else if solver.auto_expand_with_shuffle() {
+            run_as_pipeline(&[Solvers::RandomShuffle, solver], args);
+        } else {
+            run_as_pipeline(&[solver], args);
+        }
     } else {
         run_as_pipeline(&[solver], args);
     }

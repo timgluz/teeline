@@ -220,15 +220,27 @@ Options:
 | `--epochs` | Maximum iterations | — |
 
 ```bash
-# auto-expands to pipeline(nn, sa) — NN warm-start included by default
+# auto-expands to pipeline(shuffle, sa) — random start for broad exploration
 teeline solve sa -i ./data/tsplib/berlin52.tsp
 teeline solve sa -i ./data/tsplib/berlin52.tsp --verbose
 
-# run plain SA from scratch (no NN warm-start)
+# run SA from input city order (no random shuffle)
 teeline solve sa --no-seed -i ./data/tsplib/berlin52.tsp
+
+# warm-start from a 2-opt-refined tour (best quality — use the 'classic' preset)
+teeline solve classic -i ./data/tsplib/berlin52.tsp
 
 teeline solve sa -i ./data/tsplib/berlin52.tsp --cooling_rate=0.003 --max_temperature=500.0
 ```
+
+> **Why random and not NN?** SA's temperature schedule is calibrated for cold starts — the
+> high-temperature phase is designed to escape a *bad* initial tour via broad exploration.
+> A greedy NN tour already sits in a tight local neighbourhood; seeding SA from there
+> constrains early exploration and typically *worsens* the final result compared to a random
+> start. Deterministic local-search solvers (2-opt, 3-opt, tabu) are the opposite: they are
+> monotone hill-climbers, so a better start strictly means a better end — they get NN seeding.
+> If you want SA with a warm start, use the `classic` preset (`nn → 2opt → sa`): the 2-opt
+> stage first removes edge crossings, handing SA a cleaner tour that it can fine-tune.
 
 Resources:
 - *AIMA*, Section 4.1.2 — Simulated Annealing
@@ -374,15 +386,25 @@ Teeline makes this composable through the pipeline mechanism: solvers are chaine
 
 ### Auto-expansion
 
-Every local-search solver automatically expands to `pipeline(nn, solver)` when invoked via `teeline solve`:
+Auto-expansion strategy depends on the solver type:
+
+| Solver type | Auto-expands to | Why |
+|---|---|---|
+| **Deterministic local search** (2opt, 3opt, tabu) | `pipeline(nn, solver)` | Monotone hill-climbers: better start = better end |
+| **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
+| **Constructive** (nn, bhk, branch_bound) | no expansion | They build a tour from scratch |
 
 ```bash
-# these two are equivalent
+# sa auto-expands to pipeline(shuffle, sa)
 teeline solve sa -i ./data/tsplib/berlin52.tsp
-teeline pipeline --steps=nn,sa -i ./data/tsplib/berlin52.tsp
+teeline pipeline --steps=shuffle,sa -i ./data/tsplib/berlin52.tsp  # equivalent
+
+# 2opt auto-expands to pipeline(nn, 2opt)
+teeline solve 2opt -i ./data/tsplib/berlin52.tsp
+teeline pipeline --steps=nn,2opt -i ./data/tsplib/berlin52.tsp  # equivalent
 ```
 
-Pass `--no-seed` to disable the warm-start and run the solver from scratch (useful for benchmarking raw algorithm quality):
+Pass `--no-seed` to disable auto-expansion and run the solver from input city order:
 
 ```bash
 teeline solve sa --no-seed -i ./data/tsplib/berlin52.tsp
@@ -486,15 +508,15 @@ Quick summary (pipeline presets first, then standalone `--no-seed` baselines):
 | `classic` preset (nn→2opt→sa) | +4.8 % | 0.36 s |
 | `fast` preset (nn→2opt) | +11.2 % | < 0.01 s |
 | — | — | — |
-| Cuckoo Search `--no-seed` | +4.4 % | 0.72 s |
-| Simulated Annealing `--no-seed` | +6.8 % | 0.34 s |
-| Genetic Algorithm `--no-seed` (10 000 ep) | +8.3 % | 1.63 s |
-| Stochastic Hill `--no-seed` (10 000 ep) | +11.2 % | 0.02 s |
-| PSO `--no-seed` (50 particles, 10 000 ep) | +14.8 % | 1.42 s |
-| Flower Pollination `--no-seed` | +17.5 % | 0.53 s |
+| Cuckoo Search (default, shuffle start) | +4.4 % | 0.72 s |
+| Simulated Annealing (default, shuffle start) | ~5–6 % | 0.34 s |
+| Genetic Algorithm (default, 10 000 ep) | +8.3 % | 1.63 s |
+| Stochastic Hill (default, 10 000 ep) | +11.2 % | 0.02 s |
+| PSO (default, 50 particles, 10 000 ep) | +14.8 % | 1.42 s |
+| Flower Pollination (default) | +17.5 % | 0.53 s |
 | Nearest Neighbour | +19.0 % | 0.01 s |
 
-> **Note:** The `--no-seed` rows show raw algorithm quality from a random/sequential start. Running `teeline solve sa` (without `--no-seed`) auto-expands to `pipeline(nn, sa)` and will typically produce a better result than the standalone SA baseline above.
+> **Note:** Stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill) auto-expand to `pipeline(shuffle, solver)`. Use `--no-seed` to skip the shuffle and run from input city order. Use `teeline solve classic` for the best SA result via `nn → 2opt → sa`.
 
 ---
 
