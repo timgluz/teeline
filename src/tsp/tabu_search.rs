@@ -13,7 +13,9 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
 
     let mut tabu_list = TabuList::new(tabu_capacity);
 
-    let mut best_route = Route::from_cities(cities);
+    let mut best_route = options.initial_tour.as_deref()
+        .map(Route::new)
+        .unwrap_or_else(|| Route::from_cities(cities));
     tabu_list.add(best_route.clone());
 
     options.send_progress(ProgressMessage::PathUpdate(best_route.clone(), 0.0));
@@ -145,6 +147,22 @@ mod tests {
     fn test_tabu_list_capacity_is_set_correctly() {
         let tabu = TabuList::new(7);
         assert_eq!(tabu.capacity, 7);
+    }
+
+    #[test]
+    fn test_tabu_respects_initial_tour() {
+        let cities = tsp5_cities();
+        let dm = distance_matrix::from_cities(&cities);
+        // Provide the known-optimal tour as initial_tour.
+        // With a tiny epoch budget (1 iteration), tabu can't find anything better than optimal,
+        // so best_route must remain equal to the seeded tour.
+        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let optimal_cost = dm.tour_length(&optimal);
+        let mut opts = SolverOptions::default();
+        opts.epochs = 1;
+        opts.initial_tour = Some(optimal.clone());
+        let result = solve(&cities, &dm, &opts);
+        assert!((result.total - optimal_cost).abs() < 1e-4);
     }
 
     #[test]

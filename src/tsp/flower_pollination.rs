@@ -9,29 +9,6 @@ use super::{Solution, SolverOptions};
 
 const DEFAULT_N_FLOWERS: usize = 25;
 
-/// Greedy nearest-neighbour tour starting from the first city.
-fn nn_seed(city_ids: &[usize], distances: &DistanceMatrix) -> Vec<usize> {
-    let n = city_ids.len();
-    let mut unvisited: Vec<usize> = city_ids.to_vec();
-    let mut tour = Vec::with_capacity(n);
-    let mut current = unvisited.swap_remove(0);
-    tour.push(current);
-    while !unvisited.is_empty() {
-        let best_pos = unvisited
-            .iter()
-            .enumerate()
-            .min_by(|&(_, &a), &(_, &b)| {
-                let da = distances.distance_between(current, a).unwrap_or(f32::MAX);
-                let db = distances.distance_between(current, b).unwrap_or(f32::MAX);
-                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .map(|(i, _)| i)
-            .unwrap();
-        current = unvisited.swap_remove(best_pos);
-        tour.push(current);
-    }
-    tour
-}
 
 /// Global pollination: move `flower` toward `gbest` by a Lévy-scaled fraction of the swap
 /// sequence between them — the permutation analogue of `x + γ·L·(g* − x)` (Yang 2012).
@@ -93,11 +70,17 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut rng = rand::rng();
     let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
-    // Flower 0 seeded with greedy NN for a warm start; rest are random shuffles.
     let mut flowers: Vec<Vec<usize>> = (0..n_flowers)
         .map(|idx| {
             if idx == 0 {
-                nn_seed(&city_ids, distances)
+                options.initial_tour.clone().unwrap_or_else(|| {
+                    let mut t = city_ids.clone();
+                    for i in (1..n_cities).rev() {
+                        let j = rng.random_range(0..=i);
+                        t.swap(i, j);
+                    }
+                    t
+                })
             } else {
                 let mut t = city_ids.clone();
                 for i in (1..n_cities).rev() {
@@ -158,6 +141,32 @@ mod tests {
     use super::*;
     use crate::tsp::{distance_matrix, kdtree};
 
+    #[test]
+    fn test_fpa_respects_initial_tour() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let optimal_cost = dm.tour_length(&optimal);
+        let opts = SolverOptions {
+            epochs: 0,
+            initial_tour: Some(optimal.clone()),
+            ..SolverOptions::default()
+        };
+        let result = solve(&cities, &dm, &opts);
+        assert!((result.total - optimal_cost).abs() < 1e-4);
+        let mut visited = result.route().to_vec();
+        visited.sort();
+        let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        expected.sort();
+        assert_eq!(visited, expected);
+    }
+
     fn four_city_setup() -> (Vec<KDPoint>, DistanceMatrix) {
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
@@ -167,16 +176,6 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         (cities, dm)
-    }
-
-    #[test]
-    fn test_nn_seed_visits_all_cities() {
-        let (cities, dm) = four_city_setup();
-        let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let tour = nn_seed(&city_ids, &dm);
-        let mut sorted = tour.clone();
-        sorted.sort();
-        assert_eq!(sorted, city_ids);
     }
 
     #[test]

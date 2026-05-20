@@ -18,7 +18,9 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         "SA starting"
     );
 
-    let mut best_route = Route::from_cities(cities);
+    let mut best_route = options.initial_tour.as_deref()
+        .map(Route::new)
+        .unwrap_or_else(|| Route::from_cities(cities));
     let mut best_distance = distances.tour_length(best_route.route());
 
     options.send_progress(ProgressMessage::PathUpdate(
@@ -71,6 +73,27 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_sa_respects_initial_tour() {
+        use crate::tsp::{distance_matrix, kdtree};
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0], vec![0.0, 0.5], vec![0.0, 1.0],
+            vec![1.0, 1.0], vec![1.0, 0.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        // Provide optimal tour; run 0 epochs so SA can't change it
+        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let mut opts = SolverOptions {
+            epochs: 0,
+            min_temperature: 1_000_000.0, // ensures loop exits immediately
+            max_temperature: 0.0,
+            ..SolverOptions::default()
+        };
+        opts.initial_tour = Some(optimal.clone());
+        let result = solve(&cities, &dm, &opts);
+        assert_eq!(result.route(), optimal.as_slice());
+    }
 
     #[test]
     fn test_is_acceptable_always_accepts_improvement() {

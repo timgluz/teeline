@@ -4,99 +4,46 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
-use teeline::tsp::{self, distance_matrix, progress, progress_eframe, tsplib, Solution, SolverOptions, Solvers};
+use teeline::tsp::{
+    self, distance_matrix, pipeline, progress, progress_eframe, tsplib,
+    Solution, SolverOptions, Solvers,
+};
 use tracing_subscriber::EnvFilter;
 
 fn main() {
+    let tuning = tuning_args();
+
     let solve_cmd = Command::new("solve")
-        .about("Solve a TSP instance")
+        .about("Solve a TSP instance (local-search solvers auto-expand to pipeline(nn, solver))")
         .arg(
             Arg::new("solver")
                 .index(1)
-                .help("algorithm to use")
+                .help("algorithm to use, or preset: classic, fast, thorough")
                 .value_parser(Solvers::variants())
                 .required(true)
                 .value_name("SOLVER_NAME")
                 .ignore_case(true),
         )
         .arg(
-            Arg::new("epochs")
-                .long("epochs")
-                .help("maximum iterations before stopping, 0 is forever")
-                .required(false),
-        )
-        .arg(
-            Arg::new("platoo_epochs")
-                .long("platoo_epochs")
-                .help("steps until stop searching on plateau")
-                .required(false),
-        )
-        .arg(
-            Arg::new("n_nearest")
-                .long("n_nearest")
-                .help("nearest neighbours to look for")
-                .required(false),
-        )
-        .arg(
-            Arg::new("n_elite")
-                .long("n_elite")
-                .help("strongest individuals to pass directly to next generation")
-                .required(false),
-        )
-        .arg(
-            Arg::new("mutation_probability")
-                .long("mutation_probability")
-                .help("probability of swapping two cities on a new individual")
-                .required(false),
-        )
-        .arg(
-            Arg::new("cooling_rate")
-                .long("cooling_rate")
-                .help("cooling rate for simulated annealing")
-                .required(false),
-        )
-        .arg(
-            Arg::new("min_temperature")
-                .long("min_temperature")
-                .help("minimum temperature")
-                .required(false),
-        )
-        .arg(
-            Arg::new("max_temperature")
-                .long("max_temperature")
-                .help("maximum temperature")
-                .required(false),
-        )
-        .arg(
-            Arg::new("input")
-                .long("input")
-                .short('i')
-                .value_name("FILE_PATH")
-                .help("path to TSPLIB input file (reads stdin if omitted)")
-                .required(false),
-        )
-        .arg(
-            Arg::new("verbose")
-                .long("verbose")
-                .short('v')
-                .help("print debug lines")
+            Arg::new("no_seed")
+                .long("no-seed")
+                .help("disable automatic NN warm-start; run solver from scratch")
                 .action(ArgAction::SetTrue)
                 .required(false),
         )
+        .args(tuning.clone());
+
+    let pipeline_cmd = Command::new("pipeline")
+        .about("Chain multiple solvers; each stage warm-starts from the previous result")
         .arg(
-            Arg::new("gui")
-                .long("gui")
-                .help("open the visualization window while solving")
-                .action(ArgAction::SetTrue)
-                .required(false),
+            Arg::new("steps")
+                .long("steps")
+                .value_delimiter(',')
+                .value_name("SOLVERS")
+                .help("comma-separated solver names to chain (e.g. nn,2opt,sa)")
+                .required(true),
         )
-        .arg(
-            Arg::new("optimal_tour")
-                .long("optimal-tour")
-                .value_name("FILE_PATH")
-                .help("path to a .opt.tour file; overlays optimal route on visualization and prints gap")
-                .required(false),
-        );
+        .args(tuning);
 
     let convert_cmd = Command::new("convert")
         .about("Convert a DiscOpt coordinate file (or directory) to TSPLIB format")
@@ -123,37 +70,158 @@ fn main() {
         .about("Traveling Salesman Problem solver")
         .subcommand_required(true)
         .subcommand(solve_cmd)
+        .subcommand(pipeline_cmd)
         .subcommand(convert_cmd)
         .get_matches();
 
     match cli.subcommand() {
         Some(("solve", args)) => run_solve(args),
+        Some(("pipeline", args)) => run_pipeline(args),
         Some(("convert", args)) => run_convert(args),
         _ => unreachable!("clap ensures a subcommand is always present"),
     }
 }
 
-fn run_solve(args: &ArgMatches) {
-    let solver_type =
-        Solvers::from_str(args.get_one::<String>("solver").map(|s| s.as_str()).unwrap_or("unspecified"))
-            .expect("Unknown solver");
+fn tuning_args() -> Vec<Arg> {
+    vec![
+        Arg::new("epochs")
+            .long("epochs")
+            .help("maximum iterations before stopping, 0 is forever")
+            .required(false),
+        Arg::new("platoo_epochs")
+            .long("platoo_epochs")
+            .help("steps until stop searching on plateau")
+            .required(false),
+        Arg::new("n_nearest")
+            .long("n_nearest")
+            .help("nearest neighbours to look for")
+            .required(false),
+        Arg::new("n_elite")
+            .long("n_elite")
+            .help("strongest individuals to pass directly to next generation")
+            .required(false),
+        Arg::new("mutation_probability")
+            .long("mutation_probability")
+            .help("probability of swapping two cities on a new individual")
+            .required(false),
+        Arg::new("cooling_rate")
+            .long("cooling_rate")
+            .help("cooling rate for simulated annealing")
+            .required(false),
+        Arg::new("min_temperature")
+            .long("min_temperature")
+            .help("minimum temperature")
+            .required(false),
+        Arg::new("max_temperature")
+            .long("max_temperature")
+            .help("maximum temperature")
+            .required(false),
+        Arg::new("input")
+            .long("input")
+            .short('i')
+            .value_name("FILE_PATH")
+            .help("path to TSPLIB input file (reads stdin if omitted)")
+            .required(false),
+        Arg::new("verbose")
+            .long("verbose")
+            .short('v')
+            .help("print debug lines")
+            .action(ArgAction::SetTrue)
+            .required(false),
+        Arg::new("gui")
+            .long("gui")
+            .help("open the visualization window while solving")
+            .action(ArgAction::SetTrue)
+            .required(false),
+        Arg::new("optimal_tour")
+            .long("optimal-tour")
+            .value_name("FILE_PATH")
+            .help("path to .opt.tour file; overlays optimal route and prints gap")
+            .required(false),
+    ]
+}
 
+fn resolve_preset(name: &str) -> Option<Vec<Solvers>> {
+    match name {
+        "classic" => Some(vec![
+            Solvers::NearestNeighbor,
+            Solvers::TwoOpt,
+            Solvers::SimulatedAnnealing,
+        ]),
+        "fast" => Some(vec![Solvers::NearestNeighbor, Solvers::TwoOpt]),
+        "thorough" => Some(vec![
+            Solvers::NearestNeighbor,
+            Solvers::ThreeOpt,
+            Solvers::SimulatedAnnealing,
+        ]),
+        _ => None,
+    }
+}
+
+fn run_solve(args: &ArgMatches) {
+    let solver_name = args.get_one::<String>("solver").unwrap().as_str();
+    let no_seed = args.get_flag("no_seed");
+
+    if let Some(steps) = resolve_preset(solver_name) {
+        run_as_pipeline(&steps, args);
+        return;
+    }
+
+    let solver = Solvers::from_str(solver_name).expect("unknown solver — clap should have caught this");
+
+    if !no_seed && solver.auto_expand_with_nn() {
+        run_as_pipeline(&[Solvers::NearestNeighbor, solver], args);
+    } else {
+        run_as_pipeline(&[solver], args);
+    }
+}
+
+fn run_pipeline(args: &ArgMatches) {
+    let step_names: Vec<String> = args
+        .get_many::<String>("steps")
+        .unwrap_or_default()
+        .cloned()
+        .collect();
+
+    if step_names.is_empty() {
+        eprintln!("error: --steps requires at least one solver");
+        std::process::exit(1);
+    }
+
+    let mut steps = Vec::with_capacity(step_names.len());
+    for (i, name) in step_names.iter().enumerate() {
+        match Solvers::from_str(name.as_str()) {
+            Ok(s) => steps.push(s),
+            Err(_) => {
+                eprintln!("error: unknown solver at --steps position {i}: '{name}'");
+                std::process::exit(1);
+            }
+        }
+    }
+
+    run_as_pipeline(&steps, args);
+}
+
+fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
     let mut options = solver_options_from_args(args);
 
     let default_level = if options.verbose { "debug" } else { "info" };
-    tracing_subscriber::fmt()
+    let _ = tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env()
                 .add_directive(format!("teeline={default_level}").parse().unwrap()),
         )
         .with_writer(std::io::stderr)
-        .init();
+        .try_init();
 
-    tracing::info!(algorithm = ?solver_type, "solver selected");
+    for (i, &s) in steps.iter().enumerate() {
+        if i > 0 && s == Solvers::NearestNeighbor {
+            eprintln!("warning: nn at pipeline stage {i} discards the warm-start seed");
+        }
+    }
 
     let tsp_data = if let Some(input_file_path) = args.get_one::<String>("input") {
-        let file_path = Path::new(input_file_path.as_str());
-        read_tsp_data_from_file(file_path)
+        read_tsp_data_from_file(Path::new(input_file_path.as_str()))
     } else {
         read_tsp_data_from_stdin()
     };
@@ -172,7 +240,8 @@ fn run_solve(args: &ArgMatches) {
 
     let maybe_display: Option<progress_eframe::ProgressPlot>;
     if args.get_flag("gui") {
-        let (display, tx) = progress_eframe::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
+        let (display, tx) =
+            progress_eframe::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
         options.progress_tx = Some(tx);
         maybe_display = Some(display);
     } else {
@@ -205,10 +274,11 @@ fn run_solve(args: &ArgMatches) {
 
     let cities_for_solver = cities.clone();
     let distances_for_solver = distances.clone();
-    let span = tracing::info_span!("solver", algorithm = ?solver_type);
+    let steps_owned = steps.to_vec();
+    let span = tracing::info_span!("solver", steps = ?steps_owned);
     let solver_handle = thread::spawn(move || {
         let _enter = span.entered();
-        let tour = tsp::solve(solver_type, &cities_for_solver, &distances_for_solver, &options)
+        let tour = pipeline::solve(&steps_owned, &cities_for_solver, &distances_for_solver, &options)
             .expect("solver failed");
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
@@ -257,7 +327,6 @@ fn run_convert(args: &ArgMatches) {
     }
 }
 
-
 fn print_solution(tour: &Solution, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };
     println!("{:.5} {}", tour.total, optimization_flag);
@@ -276,8 +345,7 @@ fn print_optimal_comparison(
     if opt_tour.dimension != n_cities {
         eprintln!(
             "--optimal-tour: dimension mismatch ({} vs {}); skipping comparison",
-            opt_tour.dimension,
-            n_cities
+            opt_tour.dimension, n_cities
         );
         return;
     }
@@ -333,16 +401,8 @@ mod tests {
     fn options_cmd() -> Command {
         Command::new("test")
             .arg(Arg::new("solver").index(1).required(true))
-            .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
-            .arg(Arg::new("gui").long("gui").action(ArgAction::SetTrue))
-            .arg(Arg::new("epochs").long("epochs"))
-            .arg(Arg::new("platoo_epochs").long("platoo_epochs"))
-            .arg(Arg::new("n_nearest").long("n_nearest"))
-            .arg(Arg::new("n_elite").long("n_elite"))
-            .arg(Arg::new("mutation_probability").long("mutation_probability"))
-            .arg(Arg::new("cooling_rate").long("cooling_rate"))
-            .arg(Arg::new("min_temperature").long("min_temperature"))
-            .arg(Arg::new("max_temperature").long("max_temperature"))
+            .arg(Arg::new("no_seed").long("no-seed").action(ArgAction::SetTrue))
+            .args(tuning_args())
     }
 
     #[test]
@@ -422,6 +482,31 @@ mod tests {
         let opts = solver_options_from_args(&args);
         assert!((opts.min_temperature - 0.5).abs() < 1e-5);
         assert!((opts.max_temperature - 500.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_resolve_preset_classic_returns_three_steps() {
+        let steps = resolve_preset("classic").unwrap();
+        assert_eq!(steps, vec![Solvers::NearestNeighbor, Solvers::TwoOpt, Solvers::SimulatedAnnealing]);
+    }
+
+    #[test]
+    fn test_resolve_preset_fast_returns_two_steps() {
+        let steps = resolve_preset("fast").unwrap();
+        assert_eq!(steps, vec![Solvers::NearestNeighbor, Solvers::TwoOpt]);
+    }
+
+    #[test]
+    fn test_resolve_preset_thorough_returns_three_steps() {
+        let steps = resolve_preset("thorough").unwrap();
+        assert_eq!(steps, vec![Solvers::NearestNeighbor, Solvers::ThreeOpt, Solvers::SimulatedAnnealing]);
+    }
+
+    #[test]
+    fn test_resolve_preset_unknown_returns_none() {
+        assert!(resolve_preset("nn").is_none());
+        assert!(resolve_preset("sa").is_none());
+        assert!(resolve_preset("bogus").is_none());
     }
 }
 

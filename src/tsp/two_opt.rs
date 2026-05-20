@@ -8,7 +8,8 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     tracing::info!(cities = cities.len(), "2-opt starting");
 
     let n_indices = cities.len() - 1;
-    let mut path: Vec<usize> = cities.iter().map(|c| c.id).collect();
+    let mut path: Vec<usize> = options.initial_tour.clone()
+        .unwrap_or_else(|| cities.iter().map(|c| c.id).collect());
 
     options.send_progress(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
 
@@ -75,6 +76,25 @@ mod tests {
         swap_2opt(&mut path, 1, 1);
 
         assert_eq!(vec![1, 2, 3, 4], path);
+    }
+
+    #[test]
+    fn test_two_opt_respects_initial_tour() {
+        // TSP5: optimal tour [0,1,2,3,4] with cost 4.0
+        // Provide optimal as initial_tour → 2-opt can't improve → result == initial_tour
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let mut opts = SolverOptions::default();
+        opts.initial_tour = Some(optimal.clone());
+        let result = solve(&cities, &dm, &opts);
+        assert_eq!(result.route(), optimal.as_slice());
     }
 
     #[test]

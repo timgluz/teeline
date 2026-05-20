@@ -14,11 +14,11 @@ pub fn solve(
     let mut last_solution: Option<Solution> = None;
 
     for (i, &solver) in steps.iter().enumerate() {
-        if let Some(ref t) = seed {
-            if let Err(e) = validate_tour(t, cities) {
-                tracing::warn!("pipeline stage {i}: invalid seed ({e}); using default seeding");
-                seed = None;
-            }
+        if let Some(ref t) = seed
+            && let Err(e) = validate_tour(t, cities)
+        {
+            tracing::warn!("pipeline stage {i}: invalid seed ({e}); using default seeding");
+            seed = None;
         }
 
         let mut stage_opts = options.clone();
