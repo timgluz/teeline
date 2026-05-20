@@ -178,12 +178,13 @@ impl TspPopulation {
 
     pub fn from_cities(cities: &[KDPoint], n: usize, fitness_fn: &FitnessFn) -> TspPopulation {
         let mut population = TspPopulation::with_capacity(n);
-        let initial_route = Route::from_cities(cities);
+        let base = Route::from_cities(cities);
 
         for _ in 0..n {
-            let random_route = initial_route.random_successor();
-            let fitness = fitness_fn(random_route.route());
-            population.add(TspGenotype::new(fitness, random_route.route()));
+            let mut r = base.clone();
+            r.shuffle();
+            let fitness = fitness_fn(r.route());
+            population.add(TspGenotype::new(fitness, r.route()));
         }
 
         population
@@ -196,19 +197,25 @@ impl TspPopulation {
         seed: &[usize],
     ) -> TspPopulation {
         let mut population = TspPopulation::with_capacity(n);
-        let n_seeded = (n / 10).max(1);
+        let n_seeded = (n / 5).max(1);
 
         population.add(TspGenotype::new(fitness_fn(seed), seed));
 
-        let seed_route = Route::new(seed);
         for _ in 1..n_seeded {
-            let mutant = seed_route.random_successor();
-            population.add(TspGenotype::new(fitness_fn(mutant.route()), mutant.route()));
+            let mut mutant = TspGenotype::new(0.0, seed);
+            let n_mutations = rand::rng().random_range(2..=4);
+            for _ in 0..n_mutations {
+                mutant.mutate();
+            }
+            let fitness = fitness_fn(mutant.genotype());
+            mutant.set_fitness(fitness);
+            population.add(mutant);
         }
 
         let base = Route::from_cities(cities);
         for _ in n_seeded..n {
-            let r = base.random_successor();
+            let mut r = base.clone();
+            r.shuffle();
             population.add(TspGenotype::new(fitness_fn(r.route()), r.route()));
         }
 
@@ -387,6 +394,102 @@ mod tests {
             "solution.total ({}) != distances.tour_length ({}) — inconsistent",
             solution.total,
             recomputed
+        );
+    }
+
+    fn make_evaluator(dm: distance_matrix::DistanceMatrix) -> FitnessFn {
+        let dm_rc = std::rc::Rc::new(dm);
+        std::rc::Rc::new(move |path: &[usize]| {
+            let tl = dm_rc.tour_length(path);
+            if tl == 0.0 { 0.0 } else { 1.0 / tl }
+        })
+    }
+
+    // n_seeded must be n/5, not n/10. Verify by checking that individuals[1..n/5]
+    // all exist and are distinct from each other AND from the exact seed.
+    // With old code (n_seeded = n/10), for n=20 that's 2 — indices 2 and 3
+    // come from the random portion and are random_successor of sequential, not seed.
+    // With new code (n_seeded = n/5), indices 1..4 are seeded variants.
+    #[test]
+    fn test_seeded_population_n5_fraction() {
+        // n=20: n/5=4, n/10=2 — enough to distinguish.
+        // Use a reversed seed so seeded variants start at city 19, not 0.
+        let n = 20usize;
+        let cities = kdtree::build_points(
+            &(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>(),
+        );
+        let dm = distance_matrix::from_cities(&cities);
+        // Reversed seed maximally differs from the sequential base used for random portion.
+        let seed: Vec<usize> = (0..n).rev().collect();
+        let evaluator = make_evaluator(dm);
+
+        // Run 100 trials; collect ALL individuals across them.
+        // Count how many have genotype[0] == 19 (only possible if derived from reversed seed,
+        // since the random_successor base starts at 0).
+        // With n/10=2 seeded: 2 seeds per trial × 100 = 200 seed-derived individuals max.
+        // With n/5=4 seeded: 4 × 100 = 400 seed-derived individuals.
+        // Random-portion individuals start at 0, not 19 → not counted.
+        let trials = 100usize;
+        let mut seed_derived_count = 0usize;
+        for _ in 0..trials {
+            let pop = TspPopulation::from_cities_seeded(&cities, n, &evaluator, &seed);
+            for ind in pop.individuals() {
+                // Only seed-derived individuals start at 19 (from reversed seed).
+                if ind.genotype()[0] == n - 1 {
+                    seed_derived_count += 1;
+                }
+            }
+        }
+        let avg_seed_derived = seed_derived_count as f32 / trials as f32;
+        // With n/5=4 seeded, at least the exact seed (1 per trial) always starts at 19.
+        // Mutants MAY or may not start at 19 (RSM can move it). So minimum is 1.0.
+        // Old code (n/10=2) also has exact seed: 1.0 minimum.
+        // What DIFFERS: with n/5=4, about 3 mutants exist; with n/10=2, about 1 mutant.
+        // A mutant derived from reversed seed keeps genotype[0]==19 only if RSM doesn't
+        // touch position 0. P(position 0 untouched) = (n-2)/n ≈ 0.9 per mutation.
+        // With 3 mutants (n/5): expected additional contribution ≈ 3 × 0.9 = 2.7/trial.
+        // With 1 mutant (n/10): expected additional contribution ≈ 1 × 0.9 = 0.9/trial.
+        // Expected avg with n/5: ≈ 3.7; with n/10: ≈ 1.9. Threshold: 2.5 distinguishes.
+        assert!(
+            avg_seed_derived >= 2.5,
+            "expected avg ≥ 2.5 seed-derived individuals per trial (n/5 fraction), got {:.2}",
+            avg_seed_derived
+        );
+    }
+
+    // Random portion of the unseeded population must be well-shuffled,
+    // not near-sequential (1-swap from city insertion order).
+    // Tests that from_cities produces distinct individuals — the mean
+    // pairwise Kendall distance across the population must exceed 0.3.
+    #[test]
+    fn test_from_cities_produces_diverse_population() {
+        let n = 20usize;
+        let cities = kdtree::build_points(
+            &(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>(),
+        );
+        let dm = distance_matrix::from_cities(&cities);
+        let evaluator = make_evaluator(dm);
+
+        let pop = TspPopulation::from_cities(&cities, n, &evaluator);
+
+        // Count pairs that are NOT identical (a weak but reliable diversity signal).
+        // With random_successor() all are 1-swap of sequential — likely very similar to each other.
+        // With shuffle() individuals are independent random permutations.
+        let individuals = pop.individuals();
+        let mut n_distinct_pairs = 0usize;
+        let total_pairs = individuals.len() * (individuals.len() - 1) / 2;
+        for i in 0..individuals.len() {
+            for j in (i + 1)..individuals.len() {
+                if individuals[i].genotype() != individuals[j].genotype() {
+                    n_distinct_pairs += 1;
+                }
+            }
+        }
+        // ALL pairs should be distinct — random_successor can repeat, shuffle never does.
+        assert_eq!(
+            n_distinct_pairs, total_pairs,
+            "population has duplicate individuals; expected all {} pairs to be distinct, only {} were",
+            total_pairs, n_distinct_pairs
         );
     }
 
