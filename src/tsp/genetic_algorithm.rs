@@ -16,7 +16,10 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let evaluator = build_evaluator(distances);
 
     let population_size = cities.len();
-    let population = TspPopulation::from_cities(cities, population_size, &evaluator);
+    let population = match options.initial_tour.as_deref() {
+        Some(t) => TspPopulation::from_cities_seeded(cities, population_size, &evaluator, t),
+        None => TspPopulation::from_cities(cities, population_size, &evaluator),
+    };
     let best_candidate = solve_ga(&population, evaluator, distances, options);
 
     let best_route = Route::new(best_candidate.genotype());
@@ -186,6 +189,32 @@ impl TspPopulation {
         population
     }
 
+    pub fn from_cities_seeded(
+        cities: &[KDPoint],
+        n: usize,
+        fitness_fn: &FitnessFn,
+        seed: &[usize],
+    ) -> TspPopulation {
+        let mut population = TspPopulation::with_capacity(n);
+        let n_seeded = (n / 10).max(1);
+
+        population.add(TspGenotype::new(fitness_fn(seed), seed));
+
+        let seed_route = Route::new(seed);
+        for _ in 1..n_seeded {
+            let mutant = seed_route.random_successor();
+            population.add(TspGenotype::new(fitness_fn(mutant.route()), mutant.route()));
+        }
+
+        let base = Route::from_cities(cities);
+        for _ in n_seeded..n {
+            let r = base.random_successor();
+            population.add(TspGenotype::new(fitness_fn(r.route()), r.route()));
+        }
+
+        population
+    }
+
     pub fn add(&mut self, individual: TspGenotype) {
         if self.n > self.individuals.len() {
             self.individuals.push(individual);
@@ -292,6 +321,37 @@ impl TspGenotype {
 mod tests {
     use super::*;
     use crate::tsp::{distance_matrix, kdtree};
+
+    fn tsp5_cities() -> Vec<KDPoint> {
+        kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ])
+    }
+
+    #[test]
+    fn test_ga_respects_initial_tour() {
+        // from_cities_seeded must place the exact seed as the first individual.
+        // This test calls from_cities_seeded which doesn't exist yet (RED: compile failure).
+        // After implementation it verifies individuals()[0] == seed.
+        let cities = tsp5_cities();
+        let dm = distance_matrix::from_cities(&cities);
+        let seed: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let dm_rc = std::rc::Rc::new(dm);
+        let evaluator: FitnessFn = std::rc::Rc::new(move |path: &[usize]| {
+            let tl = dm_rc.tour_length(path);
+            if tl == 0.0 { 0.0 } else { 1.0 / tl }
+        });
+        let pop = TspPopulation::from_cities_seeded(&cities, cities.len(), &evaluator, &seed);
+        assert_eq!(
+            pop.individuals()[0].genotype(),
+            seed.as_slice(),
+            "first individual must be the exact seeded tour"
+        );
+    }
 
     // Regression test: GA's internal fitness is 1/tour_length (used for selection).
     // The PathUpdate messages and Solution::total must carry the real tour_length,

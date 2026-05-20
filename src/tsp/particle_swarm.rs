@@ -19,30 +19,6 @@ const DEFAULT_N_PARTICLES: usize = 30;
 // which scrambles the tour completely.  Capping at ~n/3 gives directional movement.
 const V_MAX_FACTOR: f64 = 0.35;
 
-/// Greedy nearest-neighbour tour starting from the first city in `city_ids`.
-/// Used to seed particle 0 so the swarm starts from a reasonable neighbourhood.
-fn nn_seed(city_ids: &[usize], distances: &DistanceMatrix) -> Vec<usize> {
-    let n = city_ids.len();
-    let mut unvisited: Vec<usize> = city_ids.to_vec();
-    let mut tour = Vec::with_capacity(n);
-    let mut current = unvisited.swap_remove(0);
-    tour.push(current);
-    while !unvisited.is_empty() {
-        let best_pos = unvisited
-            .iter()
-            .enumerate()
-            .min_by(|&(_, &a), &(_, &b)| {
-                let da = distances.distance_between(current, a).unwrap_or(f32::MAX);
-                let db = distances.distance_between(current, b).unwrap_or(f32::MAX);
-                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .map(|(i, _)| i)
-            .unwrap();
-        current = unvisited.swap_remove(best_pos);
-        tour.push(current);
-    }
-    tour
-}
 
 /// Scalar-multiply a velocity: keep the first `keep` swaps (clamped to length).
 fn trim_velocity(v: &[Swap], keep: usize) -> Velocity {
@@ -59,12 +35,17 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut rng = rand::rng();
     let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
-    // Particle 0 is seeded with a greedy NN tour so gbest starts from a good neighbourhood.
-    // The rest are random Fisher-Yates shuffles to maintain diversity.
     let mut positions: Vec<Vec<usize>> = (0..n_particles)
         .map(|idx| {
             if idx == 0 {
-                nn_seed(&city_ids, distances)
+                options.initial_tour.clone().unwrap_or_else(|| {
+                    let mut p = city_ids.clone();
+                    for i in (1..n_cities).rev() {
+                        let j = rng.random_range(0..=i);
+                        p.swap(i, j);
+                    }
+                    p
+                })
             } else {
                 let mut p = city_ids.clone();
                 for i in (1..n_cities).rev() {
@@ -157,28 +138,38 @@ mod tests {
     use crate::tsp::{distance_matrix, kdtree};
 
     #[test]
+    fn test_pso_respects_initial_tour() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let optimal_cost = dm.tour_length(&optimal);
+        let opts = SolverOptions {
+            epochs: 0,
+            initial_tour: Some(optimal.clone()),
+            ..SolverOptions::default()
+        };
+        let result = solve(&cities, &dm, &opts);
+        // With epochs=0 and initial_tour seeded as particle 0, gbest must equal optimal.
+        assert!((result.total - optimal_cost).abs() < 1e-4);
+        let mut visited = result.route().to_vec();
+        visited.sort();
+        let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        expected.sort();
+        assert_eq!(visited, expected);
+    }
+
+    #[test]
     fn test_trim_velocity_truncates_and_clamps() {
         let v: Velocity = vec![(0, 1), (1, 2), (2, 3)];
         assert_eq!(trim_velocity(&v, 2), vec![(0, 1), (1, 2)]);
         assert_eq!(trim_velocity(&v, 0), vec![]);
         assert_eq!(trim_velocity(&v, 10), v);
-    }
-
-    #[test]
-    fn test_nn_seed_visits_all_cities() {
-        let ids = vec![0, 1, 2, 3];
-        let cities = kdtree::build_points(&[
-            vec![0.0, 0.0],
-            vec![1.0, 0.0],
-            vec![1.0, 1.0],
-            vec![0.0, 1.0],
-        ]);
-        let dm = distance_matrix::from_cities(&cities);
-        let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let tour = nn_seed(&city_ids, &dm);
-        let mut sorted = tour.clone();
-        sorted.sort();
-        assert_eq!(sorted, ids);
     }
 
     #[test]

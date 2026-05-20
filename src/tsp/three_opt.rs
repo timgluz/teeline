@@ -2,7 +2,7 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{nearest_neighbor, Solution, SolverOptions};
+use super::{Solution, SolverOptions};
 
 /// 3-opt local search.
 ///
@@ -19,12 +19,8 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         return Solution::new(&path, cities, distances);
     }
 
-    // Seed with a nearest-neighbor tour. Progress messages from the NN phase
-    // are suppressed so the caller only sees 3-opt updates.
-    let seed_opts = SolverOptions { progress_tx: None, ..options.clone() };
-    let mut path: Vec<usize> = nearest_neighbor::solve(cities, distances, &seed_opts)
-        .route()
-        .to_vec();
+    let mut path: Vec<usize> = options.initial_tour.clone()
+        .unwrap_or_else(|| cities.iter().map(|c| c.id).collect());
 
     send_path(options, &path);
 
@@ -231,6 +227,25 @@ mod tests {
     fn pts(coords: &[(f32, f32)]) -> Vec<kdtree::KDPoint> {
         let vecs: Vec<Vec<f32>> = coords.iter().map(|&(x, y)| vec![x, y]).collect();
         kdtree::build_points(&vecs)
+    }
+
+    #[test]
+    fn test_three_opt_respects_initial_tour() {
+        // TSP5: optimal tour [0,1,2,3,4] with cost 4.0
+        // Provide optimal as initial_tour → 3-opt can't improve → result == initial_tour
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+        let dm = build_dm(&cities);
+        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let mut opts = SolverOptions::default();
+        opts.initial_tour = Some(optimal.clone());
+        let result = solve(&cities, &dm, &opts);
+        assert_eq!(result.route(), optimal.as_slice());
     }
 
     fn is_valid_tour(route: &[usize], cities: &[kdtree::KDPoint]) -> bool {

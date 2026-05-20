@@ -220,10 +220,27 @@ Options:
 | `--epochs` | Maximum iterations | — |
 
 ```bash
+# auto-expands to pipeline(shuffle, sa) — random start for broad exploration
 teeline solve sa -i ./data/tsplib/berlin52.tsp
 teeline solve sa -i ./data/tsplib/berlin52.tsp --verbose
+
+# run SA from input city order (no random shuffle)
+teeline solve sa --no-seed -i ./data/tsplib/berlin52.tsp
+
+# warm-start from a 2-opt-refined tour (best quality — use the 'classic' preset)
+teeline solve classic -i ./data/tsplib/berlin52.tsp
+
 teeline solve sa -i ./data/tsplib/berlin52.tsp --cooling_rate=0.003 --max_temperature=500.0
 ```
+
+> **Why random and not NN?** SA's temperature schedule is calibrated for cold starts — the
+> high-temperature phase is designed to escape a *bad* initial tour via broad exploration.
+> A greedy NN tour already sits in a tight local neighbourhood; seeding SA from there
+> constrains early exploration and typically *worsens* the final result compared to a random
+> start. Deterministic local-search solvers (2-opt, 3-opt, tabu) are the opposite: they are
+> monotone hill-climbers, so a better start strictly means a better end — they get NN seeding.
+> If you want SA with a warm start, use the `classic` preset (`nn → 2opt → sa`): the 2-opt
+> stage first removes edge crossings, handing SA a cleaner tour that it can fine-tune.
 
 Resources:
 - *AIMA*, Section 4.1.2 — Simulated Annealing
@@ -279,7 +296,7 @@ Swarm metaheuristic: each particle is a candidate tour that moves through the se
 |---|---|
 | Velocity cap at `⌈0.35 · n⌉` swaps | Without a cap, steady-state velocity grows to ~5 n swaps, scrambling the tour into noise |
 | Linear inertia decay W: 0.9 → 0.4 | High inertia early for broad exploration; decays like a cooling schedule so late epochs fine-tune around the best region found |
-| Particle 0 seeded with a greedy NN tour | Gives the swarm a good starting neighbourhood; remaining particles are random for diversity |
+| All particles initialised randomly | Seeding happens externally via the pipeline (see [Pipeline](#pipeline)); PSO itself stays a pure algorithm |
 
 Options:
 | Flag | Description | Default |
@@ -310,6 +327,7 @@ Nature-inspired metaheuristic: maintains a population of nests (candidate tours)
 | k capped at n/2 | Prevents full-tour scrambles from very large Lévy draws |
 | β=1.5 fixed; σ_u≈0.6966 precomputed | Standard Lévy exponent (Mantegna 1994); constant avoids repeated gamma evaluation |
 | Per-nest Bernoulli abandonment | Closer to the original paper than deterministic worst-k; avoids discarding more information per epoch than Lévy moves can recover |
+| All nests initialised randomly | Seeding happens externally via the pipeline (see [Pipeline](#pipeline)); CS itself stays a pure algorithm |
 
 Options:
 | Flag | Description | Default |
@@ -339,6 +357,7 @@ Nature-inspired metaheuristic: each flower is a candidate tour. Each epoch it ap
 | Global pollination → Lévy-scaled prefix of the swap sequence toward gbest | Permutation analogue of `x + γ·L·(g* − x)`; preserves tour validity |
 | Local pollination → ε-scaled prefix of the swap diff between two random flowers | Permutation analogue of `x + ε·(x_j − x_k)` |
 | switch_prob floored at 0.8 when `mutation_probability < 0.01` | Prevents degeneration to 99.9 % local-only search under default CLI options |
+| All flowers initialised randomly | Seeding happens externally via the pipeline (see [Pipeline](#pipeline)); FPA itself stays a pure algorithm |
 
 Options:
 | Flag | Description | Default |
@@ -356,6 +375,71 @@ teeline solve fpa -i ./data/tsplib/berlin52.tsp --n_nearest=50 --mutation_probab
 Resources:
 - Yang (2012) — *Flower Pollination Algorithm for Global Optimization*
 - [Flower pollination algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Flower_pollination_algorithm)
+
+---
+
+## Pipeline
+
+Local search algorithms (2-opt, 3-opt, SA, hill climbing, tabu, GA, PSO, CS, FPA) improve an existing tour; they do not construct one from scratch. Starting from a random or sequential tour wastes the early epochs escaping a bad initial state. **Warm-starting from a greedy Nearest Neighbour tour** gives the solver a much better region to refine, typically reducing the optimality gap by several percentage points at no extra tuning cost.
+
+Teeline makes this composable through the pipeline mechanism: solvers are chained in sequence, each stage receiving the best tour from the previous stage as its starting point.
+
+### Auto-expansion
+
+Auto-expansion strategy depends on the solver type:
+
+| Solver type | Auto-expands to | Why |
+|---|---|---|
+| **Deterministic local search** (2opt, 3opt, tabu) | `pipeline(nn, solver)` | Monotone hill-climbers: better start = better end |
+| **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
+| **Constructive** (nn, bhk, branch_bound) | no expansion | They build a tour from scratch |
+
+```bash
+# sa auto-expands to pipeline(shuffle, sa)
+teeline solve sa -i ./data/tsplib/berlin52.tsp
+teeline pipeline --steps=shuffle,sa -i ./data/tsplib/berlin52.tsp  # equivalent
+
+# 2opt auto-expands to pipeline(nn, 2opt)
+teeline solve 2opt -i ./data/tsplib/berlin52.tsp
+teeline pipeline --steps=nn,2opt -i ./data/tsplib/berlin52.tsp  # equivalent
+```
+
+Pass `--no-seed` to disable auto-expansion and run the solver from input city order:
+
+```bash
+teeline solve sa --no-seed -i ./data/tsplib/berlin52.tsp
+```
+
+### Named presets
+
+Three presets bundle commonly useful chains:
+
+| Preset | Expands to | Character |
+|--------|-----------|-----------|
+| `fast` | nn → 2-opt | Deterministic, sub-second, good quality |
+| `classic` | nn → 2-opt → SA | Balanced quality and speed |
+| `thorough` | nn → 3-opt → SA | Best quality, slower |
+
+```bash
+teeline solve fast      -i ./data/tsplib/berlin52.tsp
+teeline solve classic   -i ./data/tsplib/berlin52.tsp
+teeline solve thorough  -i ./data/tsplib/berlin52.tsp
+```
+
+### Custom pipelines
+
+The `pipeline` subcommand accepts any comma-separated sequence of solver names:
+
+```bash
+# nn → 2-opt → tabu search
+teeline pipeline --steps=nn,2opt,tabu_search -i ./data/tsplib/berlin52.tsp
+
+# pass tuning flags — they apply to all stages that use them
+teeline pipeline --steps=nn,sa --epochs=5000 --cooling_rate=0.005 \
+    -i ./data/tsplib/berlin52.tsp
+```
+
+Constructive solvers (`nn`, `bhk`, `branch_bound`) ignore `initial_tour` and are best placed first. A warning is printed if `nn` appears at a non-first position, as it would discard the warm-start seed.
 
 ---
 
@@ -417,17 +501,22 @@ You can also upload your input file and the solution output to the [Discrete Opt
 
 See [docs/benchmarks.md](docs/benchmarks.md) for a full comparison of all solvers on the berlin52 instance (52 cities, known optimal 7 544.37), including tour quality, wall time, CPU usage, and peak memory — measured with the release binary under a 3-minute timeout.
 
-Quick summary:
+Quick summary (pipeline presets first, then standalone `--no-seed` baselines):
 
 | Algorithm | Gap | Wall time |
 |-----------|:---:|----------:|
-| Cuckoo Search (default) | +4.4 % | 0.72 s |
-| Simulated Annealing (default) | +6.8 % | 0.34 s |
-| Genetic Algorithm (10 000 ep) | +8.3 % | 1.63 s |
-| Stochastic Hill (10 000 ep) | +11.2 % | 0.02 s |
-| PSO (50 particles, 10 000 ep) | +14.8 % | 1.42 s |
+| `classic` preset (nn→2opt→sa) | +4.8 % | 0.36 s |
+| `fast` preset (nn→2opt) | +11.2 % | < 0.01 s |
+| — | — | — |
+| Cuckoo Search (default, shuffle start) | +4.4 % | 0.72 s |
+| Simulated Annealing (default, shuffle start) | ~5–6 % | 0.34 s |
+| Genetic Algorithm (default, 10 000 ep) | +8.3 % | 1.63 s |
+| Stochastic Hill (default, 10 000 ep) | +11.2 % | 0.02 s |
+| PSO (default, 50 particles, 10 000 ep) | +14.8 % | 1.42 s |
 | Flower Pollination (default) | +17.5 % | 0.53 s |
 | Nearest Neighbour | +19.0 % | 0.01 s |
+
+> **Note:** Stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill) auto-expand to `pipeline(shuffle, solver)`. Use `--no-seed` to skip the shuffle and run from input city order. Use `teeline solve classic` for the best SA result via `nn → 2opt → sa`.
 
 ---
 

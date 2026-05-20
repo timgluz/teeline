@@ -11,10 +11,14 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         "hill climbing starting"
     );
 
-    let mut current_route = Route::from_cities(cities);
-
-    //mix up the cities to avoid getting stuck due bad initial state
-    current_route.shuffle();
+    let mut current_route = match options.initial_tour.as_deref() {
+        Some(t) => Route::new(t),
+        None => {
+            let mut r = Route::from_cities(cities);
+            r.shuffle();
+            r
+        }
+    };
     options.send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
 
     // Baseline from the shuffled state — sequential ordering would be
@@ -93,6 +97,25 @@ mod tests {
         opts.epochs = 500;
         opts.platoo_epochs = 100;
         opts
+    }
+
+    #[test]
+    fn test_hill_respects_initial_tour_skips_shuffle() {
+        // When seeded, hill climbing should NOT shuffle the tour.
+        // Verify by providing the known-optimal tour and checking
+        // the solver doesn't produce something worse than sequential
+        // (if it shuffled, average quality would degrade).
+        let cities = tsp5_cities();
+        let dm = distance_matrix::from_cities(&cities);
+        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let optimal_cost = dm.tour_length(&optimal);
+        let mut opts = SolverOptions::default();
+        opts.epochs = 1;
+        opts.platoo_epochs = 1;
+        opts.initial_tour = Some(optimal.clone());
+        let result = solve(&cities, &dm, &opts);
+        // Seeded from optimal: result should equal optimal (1 epoch can't improve on optimal)
+        assert!((result.total - optimal_cost).abs() < 1e-4);
     }
 
     #[test]
