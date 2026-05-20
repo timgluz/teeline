@@ -35,8 +35,8 @@ representative, not as a guarantee.
 | **Simulated Annealing** | `--epochs=100000 --no-seed` | 8 275.12 | +9.7 % | 0.31 s | 99 % | 8.0 MB |
 | **Tabu Search** | `--epochs=1000` | 9 337.22 | +23.8 % | 0.04 s | 95 % | 7.6 MB |
 | **Tabu Search** | `--epochs=10000` | 9 270.00 | +22.9 % | 0.47 s | 99 % | 7.6 MB |
-| **Genetic Algorithm** | `--epochs=500` | 13 294.30 | +76.2 % | 0.08 s | 98 % | 7.6 MB |
-| **Genetic Algorithm** | `--epochs=10000` (default) | 8 172.11 | +8.3 % | 1.63 s | 100 % | 7.7 MB |
+| **Genetic Algorithm** | `--epochs=500` | 13 121.13 | +73.9 % | 0.21 s | 99 % | 7.9 MB |
+| **Genetic Algorithm** | `--epochs=10000` (default) | 8 112.46 | +7.5 % | 3.17 s | 99 % | 7.8 MB |
 | **Particle Swarm (PSO)** | `--epochs=10000` (default) | 8 874.46 | +17.6 % | 0.84 s | 100 % | 7.9 MB |
 | **Particle Swarm (PSO)** | `--epochs=10000 --n_nearest=50` | 8 663.69 | +14.8 % | 1.42 s | 100 % | 8.1 MB |
 | **Cuckoo Search** | default (`--epochs=10000 --n_nearest=25`) | 7 877.84 | +4.4 % | 0.72 s | 100 % | 7.9 MB |
@@ -73,7 +73,7 @@ Gap from optimal
   3%  3-opt (0.3 s)              ← best overall
   4%  CS (0.72 s)
   7%  SA (0.34 s)
-  8%  GA/10k (1.63 s)
+  8%  GA/10k (3.2 s)  ← high variance; see note
  11%  Stochastic Hill/10k (0.02 s)  ← best value for time
  15%  PSO/50p (1.42 s)
  17%  PSO/default (0.84 s)
@@ -105,9 +105,15 @@ matches or beats the sequential-start quality. Use `--no-seed` to start from inp
 use `teeline pipeline --steps=nn,2opt,sa` (or the `classic` preset) to warm-start SA from a
 2-opt-refined tour, which *does* improve quality because 2-opt has already cleaned up edge crossings.
 
-**Genetic Algorithm** matches SA quality (~8 %) but needs the full 10 000 generations (~1.6 s)
-to get there. At 500 epochs it is the worst performer — GA needs population diversity to build
-good crossover material, which takes many generations.
+**Genetic Algorithm** is the highest-variance solver. Over ten runs on berlin52 at 10 000 epochs,
+the gap ranged from **+1 % to +20 %** (typical ~8–13 %). Rarely it gets very lucky with early
+crossovers and converges near-optimal; more often it lands around +9–12 %. PR #79 improved
+population seeding (n/5 seeded fraction instead of n/10; 2–4 RSM mutations per seeded variant;
+Fisher-Yates shuffle for the random portion instead of a single 2-opt reversal), which widened
+the quality ceiling without reducing the typical floor. Wall time increased from ~1.6 s to ~3.2 s
+per run; profiling points to the more diverse population producing more varied crossover paths
+through the fitness landscape. At 500 epochs it remains the worst performer — GA needs many
+generations to build good crossover material regardless of seeding quality.
 
 **Stochastic Hill** at 10 000 epochs is the best "instant" solver: 11 % gap in 20 ms. Oddly,
 more epochs hurts here (22 % at 100 000) because restarts can scatter away from a good local
