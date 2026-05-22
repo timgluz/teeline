@@ -37,8 +37,11 @@ cargo build --release
 ### Quick test
 
 ```bash
-# run the test suite
+# run the unit and integration test suite
 cargo test
+
+# run end-to-end CLI tests (requires the debug binary to be built first)
+./tests/bats/bin/bats tests/e2e/
 
 # check the CLI help
 ./target/release/bin --help
@@ -528,7 +531,7 @@ In short:
 
 1. Open a GitHub issue to discuss the change before writing code.
 2. Implement the feature or fix on a dedicated branch.
-3. Add tests — unit tests go inline with the source file; integration tests go in `tests/`.
+3. Add tests — unit tests go inline with the source file; library integration tests go in `tests/`; CLI end-to-end tests go in `tests/e2e/` as BATS scripts.
 4. Open a pull request and wait for a code review.
 
 When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, then register it in three places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, and the `tsp::solve` dispatch match arm. The WASM surface picks it up automatically.

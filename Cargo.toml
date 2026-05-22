@@ -26,6 +26,8 @@ gui = ["dep:eframe"]
 clap = "4.6.1"
 rand = "0.9"
 regex = "1.12.3"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 eframe = { version = "0.33", features = ["x11", "wayland"], optional = true }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

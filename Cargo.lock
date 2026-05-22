@@ -3779,6 +3779,8 @@ dependencies = [
  "eframe",
  "rand 0.9.4",
  "regex",
+ "serde",
+ "toml",
  "tracing",
  "tracing-subscriber",
  "wasmtime",

@@ -1,0 +1,6 @@
+[[stage]]
+solver = "nn"
+
+[[stage]]
+solver = "2opt"
+epochs = 100
