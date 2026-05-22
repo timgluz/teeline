@@ -1,0 +1,30 @@
+# thorough-tuned.toml — nn → 3opt → sa, with aggressive schedules per stage
+#
+# 3-opt is a stronger local search than 2-opt and produces a tighter starting
+# point for SA. SA therefore starts at an even lower temperature and can afford
+# a slower cooling rate to explore more thoroughly around the 3-opt solution.
+#
+# This config takes longer than classic-tuned but typically finds a better tour
+# on instances with 50–300 cities.
+#
+# Usage:
+#   ./target/debug/bin pipeline --config=configs/thorough-tuned.toml \
+#       -i data/tsplib/berlin52.tsp
+
+[global]
+epochs        = 20000
+platoo_epochs = 1000
+
+[[stage]]
+solver = "nn"
+
+[[stage]]
+solver = "3opt"
+epochs = 5000   # 3-opt is expensive; keep passes bounded
+
+[[stage]]
+solver = "sa"
+max_temperature = 100.0   # very low start: 3-opt left little room for gross improvement
+min_temperature = 0.0001
+cooling_rate    = 0.0002  # slow cooling: take time to explore the tight basin
+epochs          = 20000

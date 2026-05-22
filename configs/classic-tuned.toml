@@ -1,0 +1,28 @@
+# classic-tuned.toml — nn → 2opt → sa, with SA tuned for post-2opt warm-start
+#
+# After 2-opt the tour is already in a good basin. SA can use a much lower
+# starting temperature (200 instead of 1000) and still escape local optima
+# without wasting time cooling down from a high-temperature phase that serves
+# no purpose.
+#
+# Usage:
+#   ./target/debug/bin pipeline --config=configs/classic-tuned.toml \
+#       -i data/tsplib/berlin52.tsp
+
+[global]
+epochs       = 10000
+platoo_epochs = 500
+
+[[stage]]
+solver = "nn"
+
+[[stage]]
+solver = "2opt"
+epochs = 2000
+
+[[stage]]
+solver = "sa"
+max_temperature = 200.0   # lower start: 2-opt already cleaned up most crossings
+min_temperature = 0.001
+cooling_rate    = 0.0005  # faster cooling: already near a local optimum
+epochs          = 10000

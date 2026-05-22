@@ -1,14 +1,67 @@
-use clap::{Arg, ArgAction, ArgMatches, Command};
+mod config;
 
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
+use config::{apply_global, load_pipeline_config, OptionsProvider};
 use teeline::tsp::{
-    self, distance_matrix, pipeline, progress, progress_eframe, tsplib,
+    self, distance_matrix, pipeline, pipeline::PipelineStage, progress, progress_eframe, tsplib,
     Solution, SolverOptions, Solvers,
 };
 use tracing_subscriber::EnvFilter;
+
+// ---------------------------------------------------------------------------
+// CliArgsProvider — applies CLI tuning flags to a base SolverOptions.
+// Absent flags leave the base values intact, so CLI naturally overrides
+// whatever was set by the [global] TOML section.
+// ---------------------------------------------------------------------------
+
+struct CliArgsProvider<'a>(&'a ArgMatches);
+
+impl OptionsProvider for CliArgsProvider<'_> {
+    fn provide(&self, mut base: SolverOptions) -> Result<SolverOptions, String> {
+        let args = self.0;
+        if args.get_flag("verbose") {
+            base.verbose = true;
+        }
+        if let Some(v) = args.get_one::<String>("epochs") {
+            base.epochs = usize::from_str(v).unwrap_or(0);
+        }
+        if let Some(v) = args.get_one::<String>("platoo_epochs") {
+            base.platoo_epochs = usize::from_str(v).unwrap_or(0);
+        }
+        if let Some(v) = args.get_one::<String>("n_nearest") {
+            base.n_nearest = usize::from_str(v).unwrap_or(0);
+        }
+        if let Some(v) = args.get_one::<String>("n_elite") {
+            base.n_elite = usize::from_str(v).unwrap_or(0);
+        }
+        if let Some(v) = args.get_one::<String>("mutation_probability") {
+            base.mutation_probability = f32::from_str(v).unwrap_or(0.0);
+        }
+        if let Some(v) = args.get_one::<String>("cooling_rate") {
+            base.cooling_rate = f32::from_str(v).unwrap_or(0.0);
+        }
+        if let Some(v) = args.get_one::<String>("min_temperature") {
+            base.min_temperature = f32::from_str(v).unwrap_or(0.0);
+        }
+        if let Some(v) = args.get_one::<String>("max_temperature") {
+            base.max_temperature = f32::from_str(v).unwrap_or(0.0);
+        }
+        Ok(base)
+    }
+}
+
+// Convenience wrapper for paths that don't use a config file.
+fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
+    CliArgsProvider(args).provide(SolverOptions::default()).unwrap()
+}
+
+// ---------------------------------------------------------------------------
+// CLI definition
+// ---------------------------------------------------------------------------
 
 fn main() {
     let tuning = tuning_args();
@@ -36,14 +89,22 @@ fn main() {
         .args(tuning.clone());
 
     let pipeline_cmd = Command::new("pipeline")
-        .about("Chain multiple solvers; each stage warm-starts from the previous result")
+        .about("Chain multiple solvers; each stage warm-starts from the previous result. \
+                Provide either --steps or --config (mutually exclusive).")
         .arg(
             Arg::new("steps")
                 .long("steps")
                 .value_delimiter(',')
                 .value_name("SOLVERS")
                 .help("comma-separated solver names to chain (e.g. nn,2opt,sa)")
-                .required(true),
+                .required(false),
+        )
+        .arg(
+            Arg::new("config")
+                .long("config")
+                .value_name("PATH")
+                .help("path to a TOML config file with per-stage option overrides")
+                .required(false),
         )
         .args(tuning);
 
@@ -143,6 +204,10 @@ fn tuning_args() -> Vec<Arg> {
     ]
 }
 
+// ---------------------------------------------------------------------------
+// Subcommand handlers
+// ---------------------------------------------------------------------------
+
 fn resolve_preset(name: &str) -> Option<Vec<Solvers>> {
     match name {
         "classic" => Some(vec![
@@ -169,7 +234,8 @@ fn run_solve(args: &ArgMatches) {
         return;
     }
 
-    let solver = Solvers::from_str(solver_name).expect("unknown solver — clap should have caught this");
+    let solver =
+        Solvers::from_str(solver_name).expect("unknown solver — clap should have caught this");
 
     if !no_seed {
         if solver.auto_expand_with_nn() {
@@ -185,35 +251,83 @@ fn run_solve(args: &ArgMatches) {
 }
 
 fn run_pipeline(args: &ArgMatches) {
-    let step_names: Vec<String> = args
+    let has_config = args.get_one::<String>("config").is_some();
+    let has_steps = args
         .get_many::<String>("steps")
-        .unwrap_or_default()
-        .cloned()
-        .collect();
+        .map(|m| m.count() > 0)
+        .unwrap_or(false);
 
-    if step_names.is_empty() {
-        eprintln!("error: --steps requires at least one solver");
+    if has_config && has_steps {
+        eprintln!("error: --config and --steps are mutually exclusive — provide one or the other");
+        std::process::exit(1);
+    }
+    if !has_config && !has_steps {
+        eprintln!("error: one of --config <PATH> or --steps <SOLVERS> is required");
         std::process::exit(1);
     }
 
-    let mut steps = Vec::with_capacity(step_names.len());
-    for (i, name) in step_names.iter().enumerate() {
-        match Solvers::from_str(name.as_str()) {
-            Ok(s) => steps.push(s),
-            Err(_) => {
-                eprintln!("error: unknown solver at --steps position {i}: '{name}'");
+    if has_config {
+        let config_path = args.get_one::<String>("config").unwrap();
+        let source = match std::fs::read_to_string(config_path) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("error: cannot read config file '{config_path}': {e}");
                 std::process::exit(1);
             }
-        }
-    }
+        };
 
-    run_as_pipeline(&steps, args);
+        // Merge priority: default → [global] → CLI flags
+        let global_base = match apply_global(&source, SolverOptions::default()) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        };
+        let merged_base = CliArgsProvider(args).provide(global_base).unwrap();
+
+        let (stages, warnings) = match load_pipeline_config(&source, merged_base) {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        };
+
+        run_as_pipeline_stages(&stages, args, warnings);
+    } else {
+        let step_names: Vec<String> = args
+            .get_many::<String>("steps")
+            .unwrap_or_default()
+            .cloned()
+            .collect();
+
+        let mut solvers = Vec::with_capacity(step_names.len());
+        for (i, name) in step_names.iter().enumerate() {
+            match Solvers::from_str(name.as_str()) {
+                Ok(s) => solvers.push(s),
+                Err(_) => {
+                    eprintln!("error: unknown solver at --steps position {i}: '{name}'");
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        run_as_pipeline(&solvers, args);
+    }
 }
 
+// Thin wrapper: builds uniform PipelineStage vec from Solvers slice + CLI options.
 fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
-    let mut options = solver_options_from_args(args);
+    let base = solver_options_from_args(args);
+    let stages: Vec<PipelineStage> =
+        steps.iter().map(|&s| PipelineStage { solver: s, options: base.clone() }).collect();
+    run_as_pipeline_stages(&stages, args, vec![]);
+}
 
-    let default_level = if options.verbose { "debug" } else { "info" };
+fn run_as_pipeline_stages(stages: &[PipelineStage], args: &ArgMatches, warnings: Vec<String>) {
+    let verbose = args.get_flag("verbose");
+    let default_level = if verbose { "debug" } else { "info" };
     let _ = tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env()
@@ -222,8 +336,13 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
         .with_writer(std::io::stderr)
         .try_init();
 
-    for (i, &s) in steps.iter().enumerate() {
-        if i > 0 && s == Solvers::NearestNeighbor {
+    // Emit config warnings now that the subscriber is initialised.
+    for w in &warnings {
+        tracing::warn!("{w}");
+    }
+
+    for (i, stage) in stages.iter().enumerate() {
+        if i > 0 && stage.solver == Solvers::NearestNeighbor {
             eprintln!("warning: nn at pipeline stage {i} discards the warm-start seed");
         }
     }
@@ -247,12 +366,14 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
     };
 
     let maybe_display: Option<progress_eframe::ProgressPlot>;
+    let progress_tx;
     if args.get_flag("gui") {
         let (display, tx) =
             progress_eframe::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
-        options.progress_tx = Some(tx);
+        progress_tx = Some(tx);
         maybe_display = Some(display);
     } else {
+        progress_tx = None;
         maybe_display = None;
     }
 
@@ -267,7 +388,7 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
         });
 
     if let Some(ref ot) = opt_tour
-        && let Some(ref tx) = options.progress_tx
+        && let Some(ref tx) = progress_tx
     {
         if ot.dimension == tsp_data.len() {
             let _ = tx.send(progress::ProgressMessage::OptimalTour(ot.route.clone()));
@@ -282,12 +403,19 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
 
     let cities_for_solver = cities.clone();
     let distances_for_solver = distances.clone();
-    let steps_owned = steps.to_vec();
-    let span = tracing::info_span!("solver", steps = ?steps_owned);
+    let stages_owned = stages.to_vec();
+    let progress_tx_for_solver = progress_tx.clone();
+    let n_stages = stages.len();
+    let span = tracing::info_span!("solver", n_stages);
     let solver_handle = thread::spawn(move || {
         let _enter = span.entered();
-        let tour = pipeline::solve(&steps_owned, &cities_for_solver, &distances_for_solver, &options)
-            .expect("solver failed");
+        let tour = pipeline::solve(
+            &stages_owned,
+            &cities_for_solver,
+            &distances_for_solver,
+            progress_tx_for_solver,
+        )
+        .expect("solver failed");
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
         tour
@@ -334,6 +462,10 @@ fn run_convert(args: &ArgMatches) {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Output helpers
+// ---------------------------------------------------------------------------
 
 fn print_solution(tour: &Solution, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };
@@ -401,6 +533,10 @@ fn read_tsp_data_from_stdin() -> tsplib::TspLibData {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -462,14 +598,16 @@ mod tests {
 
     #[test]
     fn test_solver_options_mutation_probability_parsed() {
-        let args = options_cmd().get_matches_from(["test", "nn", "--mutation_probability", "0.05"]);
+        let args = options_cmd()
+            .get_matches_from(["test", "nn", "--mutation_probability", "0.05"]);
         let opts = solver_options_from_args(&args);
         assert!((opts.mutation_probability - 0.05).abs() < 1e-5);
     }
 
     #[test]
     fn test_solver_options_invalid_mutation_probability_defaults_to_zero() {
-        let args = options_cmd().get_matches_from(["test", "nn", "--mutation_probability", "nope"]);
+        let args = options_cmd()
+            .get_matches_from(["test", "nn", "--mutation_probability", "nope"]);
         assert!((solver_options_from_args(&args).mutation_probability - 0.0).abs() < 1e-5);
     }
 
@@ -483,9 +621,12 @@ mod tests {
     #[test]
     fn test_solver_options_temperature_bounds_parsed() {
         let args = options_cmd().get_matches_from([
-            "test", "nn",
-            "--min_temperature", "0.5",
-            "--max_temperature", "500.0",
+            "test",
+            "nn",
+            "--min_temperature",
+            "0.5",
+            "--max_temperature",
+            "500.0",
         ]);
         let opts = solver_options_from_args(&args);
         assert!((opts.min_temperature - 0.5).abs() < 1e-5);
@@ -493,9 +634,29 @@ mod tests {
     }
 
     #[test]
+    fn test_cli_args_provider_overrides_base() {
+        let args =
+            options_cmd().get_matches_from(["test", "nn", "--epochs", "777"]);
+        let base = SolverOptions { epochs: 100, ..SolverOptions::default() };
+        let opts = CliArgsProvider(&args).provide(base).unwrap();
+        assert_eq!(opts.epochs, 777);
+    }
+
+    #[test]
+    fn test_cli_args_provider_leaves_unset_base_intact() {
+        let args = options_cmd().get_matches_from(["test", "nn"]);
+        let base = SolverOptions { epochs: 42, ..SolverOptions::default() };
+        let opts = CliArgsProvider(&args).provide(base).unwrap();
+        assert_eq!(opts.epochs, 42); // not overridden by CLI
+    }
+
+    #[test]
     fn test_resolve_preset_classic_returns_three_steps() {
         let steps = resolve_preset("classic").unwrap();
-        assert_eq!(steps, vec![Solvers::NearestNeighbor, Solvers::TwoOpt, Solvers::SimulatedAnnealing]);
+        assert_eq!(
+            steps,
+            vec![Solvers::NearestNeighbor, Solvers::TwoOpt, Solvers::SimulatedAnnealing]
+        );
     }
 
     #[test]
@@ -507,7 +668,10 @@ mod tests {
     #[test]
     fn test_resolve_preset_thorough_returns_three_steps() {
         let steps = resolve_preset("thorough").unwrap();
-        assert_eq!(steps, vec![Solvers::NearestNeighbor, Solvers::ThreeOpt, Solvers::SimulatedAnnealing]);
+        assert_eq!(
+            steps,
+            vec![Solvers::NearestNeighbor, Solvers::ThreeOpt, Solvers::SimulatedAnnealing]
+        );
     }
 
     #[test]
@@ -516,46 +680,4 @@ mod tests {
         assert!(resolve_preset("sa").is_none());
         assert!(resolve_preset("bogus").is_none());
     }
-}
-
-fn solver_options_from_args(args: &ArgMatches) -> SolverOptions {
-    let mut options = SolverOptions::default();
-
-    if args.get_flag("verbose") {
-        options.verbose = true;
-    }
-
-    if let Some(n_epochs_str) = args.get_one::<String>("epochs") {
-        options.epochs = usize::from_str(n_epochs_str).unwrap_or(0);
-    }
-
-    if let Some(n_platoo_str) = args.get_one::<String>("platoo_epochs") {
-        options.platoo_epochs = usize::from_str(n_platoo_str).unwrap_or(0);
-    }
-
-    if let Some(n_nearest_str) = args.get_one::<String>("n_nearest") {
-        options.n_nearest = usize::from_str(n_nearest_str).unwrap_or(0);
-    }
-
-    if let Some(n_elite_str) = args.get_one::<String>("n_elite") {
-        options.n_elite = usize::from_str(n_elite_str).unwrap_or(0);
-    }
-
-    if let Some(mutation_prob_str) = args.get_one::<String>("mutation_probability") {
-        options.mutation_probability = f32::from_str(mutation_prob_str).unwrap_or(0.0);
-    }
-
-    if let Some(cooling_rate_str) = args.get_one::<String>("cooling_rate") {
-        options.cooling_rate = f32::from_str(cooling_rate_str).unwrap_or(0.0);
-    }
-
-    if let Some(min_temperature_str) = args.get_one::<String>("min_temperature") {
-        options.min_temperature = f32::from_str(min_temperature_str).unwrap_or(0.0);
-    }
-
-    if let Some(max_temperature_str) = args.get_one::<String>("max_temperature") {
-        options.max_temperature = f32::from_str(max_temperature_str).unwrap_or(0.0);
-    }
-
-    options
 }
