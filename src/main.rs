@@ -1,11 +1,11 @@
-mod config;
-
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
-use config::{apply_global, load_pipeline_config, OptionsProvider};
+use teeline::config::{
+    resolve_config_file, select_pipeline_source, OptionsProvider, PipelineSource,
+};
 use teeline::tsp::{
     self, distance_matrix, pipeline, pipeline::PipelineStage, progress, progress_eframe, tsplib,
     Solution, SolverOptions, Solvers,
@@ -251,69 +251,29 @@ fn run_solve(args: &ArgMatches) {
 }
 
 fn run_pipeline(args: &ArgMatches) {
-    let has_config = args.get_one::<String>("config").is_some();
-    let has_steps = args
+    let config_path: Option<PathBuf> = args.get_one::<String>("config").map(PathBuf::from);
+    let steps_vec: Option<Vec<String>> = args
         .get_many::<String>("steps")
-        .map(|m| m.count() > 0)
-        .unwrap_or(false);
+        .map(|m| m.cloned().collect());
 
-    if has_config && has_steps {
-        eprintln!("error: --config and --steps are mutually exclusive — provide one or the other");
-        std::process::exit(1);
-    }
-    if !has_config && !has_steps {
-        eprintln!("error: one of --config <PATH> or --steps <SOLVERS> is required");
-        std::process::exit(1);
-    }
-
-    if has_config {
-        let config_path = args.get_one::<String>("config").unwrap();
-        let source = match std::fs::read_to_string(config_path) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("error: cannot read config file '{config_path}': {e}");
-                std::process::exit(1);
-            }
-        };
-
-        // Merge priority: default → [global] → CLI flags
-        let global_base = match apply_global(&source, SolverOptions::default()) {
-            Ok(b) => b,
-            Err(e) => {
-                eprintln!("error: {e}");
-                std::process::exit(1);
-            }
-        };
-        let merged_base = CliArgsProvider(args).provide(global_base).unwrap();
-
-        let (stages, warnings) = match load_pipeline_config(&source, merged_base) {
-            Ok(r) => r,
-            Err(e) => {
-                eprintln!("error: {e}");
-                std::process::exit(1);
-            }
-        };
-
-        run_as_pipeline_stages(&stages, args, warnings);
-    } else {
-        let step_names: Vec<String> = args
-            .get_many::<String>("steps")
-            .unwrap_or_default()
-            .cloned()
-            .collect();
-
-        let mut solvers = Vec::with_capacity(step_names.len());
-        for (i, name) in step_names.iter().enumerate() {
-            match Solvers::from_str(name.as_str()) {
-                Ok(s) => solvers.push(s),
-                Err(_) => {
-                    eprintln!("error: unknown solver at --steps position {i}: '{name}'");
+    match select_pipeline_source(config_path.as_deref(), steps_vec.as_deref()) {
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+        Ok(PipelineSource::Config(path)) => {
+            let (stages, warnings) = match resolve_config_file(&path, &CliArgsProvider(args)) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("error: {e}");
                     std::process::exit(1);
                 }
-            }
+            };
+            run_as_pipeline_stages(&stages, args, warnings);
         }
-
-        run_as_pipeline(&solvers, args);
+        Ok(PipelineSource::Steps(solvers)) => {
+            run_as_pipeline(&solvers, args);
+        }
     }
 }
 

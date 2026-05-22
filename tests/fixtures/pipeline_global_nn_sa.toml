@@ -1,0 +1,11 @@
+[global]
+epochs = 50
+
+[[stage]]
+solver = "nn"
+
+[[stage]]
+solver = "sa"
+max_temperature = 200.0
+cooling_rate    = 0.001
+epochs          = 50

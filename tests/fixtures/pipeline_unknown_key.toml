@@ -1,0 +1,3 @@
+[[stage]]
+solver = "nn"
+epoch = 999

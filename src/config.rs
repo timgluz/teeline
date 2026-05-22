@@ -1,7 +1,8 @@
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use teeline::tsp::pipeline::PipelineStage;
-use teeline::tsp::{SolverOptions, Solvers};
+use crate::tsp::pipeline::PipelineStage;
+use crate::tsp::{SolverOptions, Solvers};
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
 /// Each provider takes a base and returns an overridden copy.
@@ -289,6 +290,67 @@ pub fn apply_global(
         }
         None => Ok(base),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline source selection
+// ---------------------------------------------------------------------------
+
+/// Discriminates between the two pipeline input modes.
+#[derive(Debug)]
+pub enum PipelineSource {
+    Config(PathBuf),
+    Steps(Vec<Solvers>),
+}
+
+/// Validates mutual-exclusion and at-least-one rules, decoupled from clap.
+pub fn select_pipeline_source(
+    config: Option<&Path>,
+    steps: Option<&[String]>,
+) -> Result<PipelineSource, String> {
+    match (config, steps) {
+        (Some(_), Some(s)) if !s.is_empty() => Err(
+            "--config and --steps are mutually exclusive — provide one or the other".into(),
+        ),
+        (Some(path), _) => Ok(PipelineSource::Config(path.to_path_buf())),
+        (None, Some(names)) if !names.is_empty() => {
+            let solvers = names
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
+                    Solvers::from_str(name.as_str())
+                        .map_err(|_| format!("unknown solver at --steps position {i}: '{name}'"))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(PipelineSource::Steps(solvers))
+        }
+        _ => Err("one of --config <PATH> or --steps <SOLVERS> is required".into()),
+    }
+}
+
+/// A no-op `OptionsProvider` that leaves the base unchanged.
+/// Used in tests that have no CLI arguments to apply.
+pub struct IdentityProvider;
+
+impl OptionsProvider for IdentityProvider {
+    fn provide(&self, base: SolverOptions) -> Result<SolverOptions, String> {
+        Ok(base)
+    }
+}
+
+/// Reads a pipeline config file and returns fully-resolved stages.
+///
+/// Applies `[global]` first, then `overrides` (e.g. CLI flags), then per-stage keys.
+pub fn resolve_config_file<P: OptionsProvider>(
+    path: &Path,
+    overrides: &P,
+) -> Result<(Vec<PipelineStage>, Vec<String>), String> {
+    let source = std::fs::read_to_string(path)
+        .map_err(|e| format!("cannot read config file '{}': {e}", path.display()))?;
+
+    let global_base = apply_global(&source, SolverOptions::default())?;
+    let merged_base = overrides.provide(global_base)?;
+    load_pipeline_config(&source, merged_base)
 }
 
 // ---------------------------------------------------------------------------
