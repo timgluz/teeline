@@ -573,6 +573,16 @@ pub fn find_solver(name: &str) -> Result<Solvers, String> {
 // Internal dispatcher — used by pipeline and tests
 // ---------------------------------------------------------------------------
 
+/// Public entry point for external crates (e.g. WASM). Runs `solver` against
+/// `problem` with `opts`, no progress channel, no warm-start tour.
+pub fn solve_problem(
+    solver: Solvers,
+    problem: &TspProblem,
+    opts: &AppOptions,
+) -> Result<Solution, String> {
+    solve_with_context(solver, problem, opts, None, None)
+}
+
 pub(crate) fn solve_with_context(
     solver: Solvers,
     problem: &TspProblem,

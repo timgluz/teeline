@@ -3,9 +3,49 @@ mod bindings;
 
 use bindings::teeline::solver::types::{City, Solution, SolveOptions};
 use bindings::Guest;
-use teeline::tsp::{distance_matrix::DistanceMatrix, kdtree::KDPoint, SolverOptions};
+use teeline::tsp::{
+    distance_matrix::DistanceMatrix, kdtree::KDPoint, AppOptions, CSOptions, FPAOptions,
+    GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
+};
 
 struct Component;
+
+fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
+    let heuristic = HeuristicOptions {
+        epochs: o.epochs as usize,
+        platoo_epochs: o.platoo_epochs as usize,
+        n_nearest: o.n_nearest as usize,
+        verbose: false,
+    };
+    match solver {
+        Solvers::SimulatedAnnealing => AppOptions {
+            sa: Some(SAOptions {
+                heuristic,
+                cooling_rate: o.cooling_rate,
+                max_temperature: o.max_temperature,
+                min_temperature: o.min_temperature,
+            }),
+            ..AppOptions::default()
+        },
+        Solvers::GeneticAlgorithm => AppOptions {
+            ga: Some(GAOptions {
+                heuristic,
+                mutation_probability: o.mutation_probability,
+                n_elite: o.n_elite as usize,
+            }),
+            ..AppOptions::default()
+        },
+        Solvers::CuckooSearch => AppOptions {
+            cs: Some(CSOptions { heuristic, mutation_probability: o.mutation_probability }),
+            ..AppOptions::default()
+        },
+        Solvers::FlowerPollination => AppOptions {
+            fpa: Some(FPAOptions { heuristic, mutation_probability: o.mutation_probability }),
+            ..AppOptions::default()
+        },
+        _ => AppOptions { heuristic: Some(heuristic), ..AppOptions::default() },
+    }
+}
 
 impl Guest for Component {
     fn solve(
@@ -23,21 +63,11 @@ impl Guest for Component {
         let distances = DistanceMatrix::from_cities(&kd_cities)
             .map_err(|e| format!("distance matrix: {e}"))?;
 
-        let opts = SolverOptions {
-            epochs: options.epochs as usize,
-            platoo_epochs: options.platoo_epochs as usize,
-            cooling_rate: options.cooling_rate,
-            max_temperature: options.max_temperature,
-            min_temperature: options.min_temperature,
-            mutation_probability: options.mutation_probability,
-            n_elite: options.n_elite as usize,
-            n_nearest: options.n_nearest as usize,
-            progress_tx: None,
-            ..Default::default()
-        };
+        let problem = TspProblem::new(kd_cities, distances);
+        let opts = build_opts(solver_id, &options);
 
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            teeline::tsp::solve(solver_id, &kd_cities, &distances, &opts)
+            teeline::tsp::solve_problem(solver_id, &problem, &opts)
         }))
         .map_err(|_| format!("solver '{solver}' panicked"))?
         .map(|s| Solution {
