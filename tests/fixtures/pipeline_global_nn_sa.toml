@@ -1,11 +1,11 @@
-[global]
-epochs = 50
-
 [[stage]]
 solver = "nn"
 
 [[stage]]
 solver = "sa"
-max_temperature = 200.0
-cooling_rate    = 0.001
+
+[stage.sa]
 epochs          = 50
+cooling_rate    = 0.001
+max_temperature = 200.0
+min_temperature = 0.001

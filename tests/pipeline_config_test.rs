@@ -1,12 +1,27 @@
 use std::path::{Path, PathBuf};
 
 use teeline::config::{resolve_config_file, select_pipeline_source, IdentityProvider};
-use teeline::tsp::{pipeline, tsplib};
+use teeline::tsp::{
+    pipeline::{run_pipeline, PipelineStage},
+    tsplib, Solvers,
+};
 
 const BERLIN52: &str = "tests/fixtures/berlin52.tsp";
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(format!("tests/fixtures/{name}"))
+}
+
+fn berlin52_stages(stage_configs: Vec<(Solvers, teeline::tsp::AppOptions)>) -> Vec<PipelineStage> {
+    let tsp = tsplib::read_from_file(Path::new(BERLIN52)).unwrap();
+    let cities = tsp.cities().to_vec();
+    let distances = tsp.distance_matrix().unwrap();
+    stage_configs
+        .into_iter()
+        .map(|(solver, options)| {
+            PipelineStage::new(solver, options, cities.clone(), distances.clone(), None)
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -16,26 +31,25 @@ fn fixture(name: &str) -> PathBuf {
 #[test]
 fn test_pipeline_config_runs_and_produces_valid_output() {
     let p = fixture("pipeline_nn_2opt.toml");
-    let (stages, _) = resolve_config_file(&p, &IdentityProvider).unwrap();
-    let tsp = tsplib::read_from_file(Path::new(BERLIN52)).unwrap();
-    let cities = tsp.cities().to_vec();
-    let distances = tsp.distance_matrix().unwrap();
-    let solution = pipeline::solve(&stages, &cities, &distances, None).unwrap();
+    let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
+    let stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&stages).unwrap();
     assert!(solution.total > 0.0);
     assert_eq!(solution.route().len(), 52);
 }
 
 #[test]
-fn test_pipeline_config_global_epochs_applied() {
+fn test_pipeline_config_sa_stage_epochs_applied() {
     let p = fixture("pipeline_global_nn_sa.toml");
-    let (stages, _) = resolve_config_file(&p, &IdentityProvider).unwrap();
-    // [global] epochs = 50 should propagate to all stages
-    assert!(stages.iter().all(|s| s.options.epochs == 50));
+    let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
+    // SA stage should have epochs=50 in its [stage.sa] options
+    let sa_stage = stage_configs.iter().find(|(s, _)| *s == Solvers::SimulatedAnnealing);
+    assert!(sa_stage.is_some(), "expected SA stage in fixture");
+    let (_, opts) = sa_stage.unwrap();
+    assert_eq!(opts.sa.as_ref().unwrap().heuristic.epochs, 50);
     // Also verify it runs to completion
-    let tsp = tsplib::read_from_file(Path::new(BERLIN52)).unwrap();
-    let cities = tsp.cities().to_vec();
-    let distances = tsp.distance_matrix().unwrap();
-    let solution = pipeline::solve(&stages, &cities, &distances, None).unwrap();
+    let stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&stages).unwrap();
     assert_eq!(solution.route().len(), 52);
 }
 
@@ -93,4 +107,3 @@ fn test_pipeline_cooling_rate_zero_errors() {
     let err = resolve_config_file(&p, &IdentityProvider).unwrap_err();
     assert!(err.contains("cooling_rate"), "got: {err}");
 }
-
