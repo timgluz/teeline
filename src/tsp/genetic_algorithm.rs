@@ -37,7 +37,7 @@ pub fn solve(
         ));
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::new(best_candidate.genotype(), cities, distances)
+    Solution::from_parts(best_candidate.genotype(), cities, distances)
 }
 
 fn solve_ga(

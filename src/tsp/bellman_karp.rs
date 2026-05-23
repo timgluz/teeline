@@ -83,7 +83,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::new(&route_vec, cities, distances)
+    Solution::from_parts(&route_vec, cities, distances)
 }
 
 fn solve_bhk(

@@ -127,7 +127,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::new(&gbest, cities, distances)
+    Solution::from_parts(&gbest, cities, distances)
 }
 
 #[cfg(test)]

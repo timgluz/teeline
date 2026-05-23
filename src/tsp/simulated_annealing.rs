@@ -58,7 +58,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::new(best_route.route(), cities, distances)
+    Solution::from_parts(best_route.route(), cities, distances)
 }
 
 fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool {

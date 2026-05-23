@@ -9,7 +9,7 @@ use teeline::config::{
 use teeline::tsp::{
     self, distance_matrix,
     pipeline::{run_pipeline, PipelineStage},
-    progress, progress_eframe, tsplib, AppOptions, Solution, Solvers,
+    progress, progress_eframe, tsplib, AppOptions, Solution, Solvers, TspProblem,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -357,7 +357,7 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
     let stages: Vec<PipelineStage> = stage_configs
         .into_iter()
         .map(|(solver, options)| {
-            PipelineStage::new(solver, options, cities.clone(), distances.clone(), progress_tx.clone())
+            PipelineStage::new(solver, options, TspProblem::new(cities.clone(), distances.clone()), progress_tx.clone())
         })
         .collect();
 

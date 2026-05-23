@@ -130,7 +130,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::new(&best, cities, distances)
+    Solution::from_parts(&best, cities, distances)
 }
 
 #[cfg(test)]

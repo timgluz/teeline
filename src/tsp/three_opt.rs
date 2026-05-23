@@ -24,7 +24,7 @@ pub fn solve(
     let n = cities.len();
     if n < 4 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        return Solution::new(&path, cities, distances);
+        return Solution::from_parts(&path, cities, distances);
     }
 
     let mut path: Vec<usize> = initial_tour
@@ -47,7 +47,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::new(&path, cities, distances)
+    Solution::from_parts(&path, cities, distances)
 }
 
 fn find_best_move(

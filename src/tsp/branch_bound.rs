@@ -50,7 +50,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::new(&best_path, cities, distances)
+    Solution::from_parts(&best_path, cities, distances)
 }
 
 fn build_evaluator(distances: &DistanceMatrix) -> PathEvaluator {

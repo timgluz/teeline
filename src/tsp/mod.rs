@@ -575,12 +575,13 @@ pub fn find_solver(name: &str) -> Result<Solvers, String> {
 
 pub(crate) fn solve_with_context(
     solver: Solvers,
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     opts: &AppOptions,
     progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Result<Solution, String> {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let tx = progress_tx.as_ref();
     let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
     let solution = match solver {
@@ -615,6 +616,24 @@ pub(crate) fn solve_with_context(
 }
 
 // ---------------------------------------------------------------------------
+// TspProblem
+// ---------------------------------------------------------------------------
+
+/// The TSP problem instance: city layout + precomputed distance matrix.
+/// Always created together from a TSPLIB file and passed as a unit.
+#[derive(Clone)]
+pub struct TspProblem {
+    pub cities: Vec<KDPoint>,
+    pub distances: DistanceMatrix,
+}
+
+impl TspProblem {
+    pub fn new(cities: Vec<KDPoint>, distances: DistanceMatrix) -> Self {
+        TspProblem { cities, distances }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Solution
 // ---------------------------------------------------------------------------
 
@@ -632,7 +651,26 @@ pub struct Solution {
 }
 
 impl Solution {
-    pub fn new(route: &[usize], cities: &[kdtree::KDPoint], distances: &DistanceMatrix) -> Self {
+    pub fn new(route: &[usize], problem: &TspProblem) -> Self {
+        let cities = &problem.cities;
+        let distances = &problem.distances;
+        let cities_idx = cities
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.id, i))
+            .collect();
+
+        Solution {
+            total: distances.tour_length(route),
+            route: route.to_vec(),
+            cities: cities.to_vec(),
+            cities_idx,
+        }
+    }
+
+    /// Convenience constructor for solver functions that already hold separate `cities`
+    /// and `distances` slices and do not need to construct a full [`TspProblem`].
+    pub(crate) fn from_parts(route: &[usize], cities: &[kdtree::KDPoint], distances: &DistanceMatrix) -> Self {
         let cities_idx = cities
             .iter()
             .enumerate()
@@ -895,7 +933,8 @@ mod tests {
         ];
 
         let dm = distance_matrix::from_cities(&cities);
-        let sol = Solution::new(&route, &cities, &dm);
+        let problem = TspProblem::new(cities, dm);
+        let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
     }
 }

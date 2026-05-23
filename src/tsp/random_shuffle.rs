@@ -24,7 +24,7 @@ pub fn solve(
         let j = rng.random_range(0..=i);
         path.swap(i, j);
     }
-    Solution::new(&path, cities, distances)
+    Solution::from_parts(&path, cities, distances)
 }
 
 #[cfg(test)]

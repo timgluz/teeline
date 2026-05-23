@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use teeline::config::{resolve_config_file, select_pipeline_source, IdentityProvider};
 use teeline::tsp::{
     pipeline::{run_pipeline, PipelineStage},
-    tsplib, Solvers,
+    tsplib, Solvers, TspProblem,
 };
 
 const BERLIN52: &str = "tests/fixtures/berlin52.tsp";
@@ -16,10 +16,11 @@ fn berlin52_stages(stage_configs: Vec<(Solvers, teeline::tsp::AppOptions)>) -> V
     let tsp = tsplib::read_from_file(Path::new(BERLIN52)).unwrap();
     let cities = tsp.cities().to_vec();
     let distances = tsp.distance_matrix().unwrap();
+    let problem = TspProblem::new(cities, distances);
     stage_configs
         .into_iter()
         .map(|(solver, options)| {
-            PipelineStage::new(solver, options, cities.clone(), distances.clone(), None)
+            PipelineStage::new(solver, options, problem.clone(), None)
         })
         .collect()
 }
