@@ -2,7 +2,6 @@ use std::sync::mpsc;
 
 use rand::Rng;
 
-use super::distance_matrix::DistanceMatrix;
 use super::probability::{bernoulli, levy_step, sample_without_replacement};
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
