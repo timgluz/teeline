@@ -11,20 +11,22 @@
 #   ./target/debug/bin pipeline --config=configs/thorough-tuned.toml \
 #       -i data/tsplib/berlin52.tsp
 
-[global]
-epochs        = 20000
-platoo_epochs = 1000
-
 [[stage]]
 solver = "nn"
 
 [[stage]]
 solver = "3opt"
-epochs = 5000   # 3-opt is expensive; keep passes bounded
+
+[stage.heuristic]
+epochs        = 5000   # 3-opt is expensive; keep passes bounded
+platoo_epochs = 1000
 
 [[stage]]
 solver = "sa"
+
+[stage.sa]
 max_temperature = 100.0   # very low start: 3-opt left little room for gross improvement
 min_temperature = 0.0001
 cooling_rate    = 0.0002  # slow cooling: take time to explore the tight basin
 epochs          = 20000
+platoo_epochs   = 1000
