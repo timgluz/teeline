@@ -5,7 +5,7 @@ use crate::tsp::{AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions,
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
 /// Each provider takes a base and returns an overridden copy.
-pub trait OptionsProvider {
+pub trait AppOptionsProvider {
     fn provide(&self, base: AppOptions) -> Result<AppOptions, String>;
 }
 
@@ -14,7 +14,7 @@ pub trait OptionsProvider {
 /// Returns `Err` on unknown keys or mis-typed sub-tables.
 pub struct TomlTableProvider<'a>(pub &'a toml::Table);
 
-impl OptionsProvider for TomlTableProvider<'_> {
+impl AppOptionsProvider for TomlTableProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         for (key, value) in self.0.iter() {
             match key.as_str() {
@@ -152,11 +152,11 @@ pub fn select_pipeline_source(
     }
 }
 
-/// A no-op `OptionsProvider` that leaves the base unchanged.
+/// A no-op `AppOptionsProvider` that leaves the base unchanged.
 /// Used in tests and config-file mode where no CLI overrides apply.
 pub struct IdentityProvider;
 
-impl OptionsProvider for IdentityProvider {
+impl AppOptionsProvider for IdentityProvider {
     fn provide(&self, base: AppOptions) -> Result<AppOptions, String> {
         Ok(base)
     }
@@ -164,7 +164,7 @@ impl OptionsProvider for IdentityProvider {
 
 /// Reads a pipeline config file and returns fully-resolved `(Solvers, AppOptions)` pairs.
 /// The `overrides` provider applies to the base before per-stage TOML keys are merged.
-pub fn resolve_config_file<P: OptionsProvider>(
+pub fn resolve_config_file<P: AppOptionsProvider>(
     path: &Path,
     overrides: &P,
 ) -> Result<Vec<(Solvers, AppOptions)>, String> {

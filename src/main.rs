@@ -4,7 +4,7 @@ use std::str::FromStr;
 use std::thread;
 
 use teeline::config::{
-    resolve_config_file, select_pipeline_source, IdentityProvider, OptionsProvider, PipelineSource,
+    resolve_config_file, select_pipeline_source, IdentityProvider, AppOptionsProvider, PipelineSource,
 };
 use teeline::tsp::{
     self, distance_matrix,
@@ -29,7 +29,7 @@ impl<'a> CliArgsProvider<'a> {
     }
 }
 
-impl OptionsProvider for CliArgsProvider<'_> {
+impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         use teeline::tsp::{CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions};
         match self.solver {
