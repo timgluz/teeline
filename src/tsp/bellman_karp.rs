@@ -25,6 +25,7 @@ pub fn solve(
     problem: &TspProblem,
     opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -199,7 +200,7 @@ mod tests {
     #[test]
     fn test_solve_returns_all_cities() {
         let problem = tsp_5_1_problem();
-        let solution = solve(&problem, &HeuristicOptions::default(), None);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();
@@ -213,7 +214,7 @@ mod tests {
     #[test]
     fn test_solve_finds_optimal_tour_length() {
         let problem = tsp_5_1_problem();
-        let solution = solve(&problem, &HeuristicOptions::default(), None);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
 
         assert!(
             (solution.total - 4.0).abs() < 1e-3,
@@ -231,7 +232,7 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
-        let solution = solve(&problem, &HeuristicOptions::default(), None);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();

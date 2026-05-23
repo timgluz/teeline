@@ -354,7 +354,7 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
         }
     }
 
-    let mut stages: Vec<PipelineStage> = stage_configs
+    let stages: Vec<PipelineStage> = stage_configs
         .into_iter()
         .map(|(solver, options)| {
             PipelineStage::new(solver, options, TspProblem::new(cities.clone(), distances.clone()), progress_tx.clone())
@@ -365,7 +365,7 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
     let span = tracing::info_span!("solver", n_stages);
     let solver_handle = thread::spawn(move || {
         let _enter = span.entered();
-        let tour = run_pipeline(&mut stages).expect("solver failed");
+        let tour = run_pipeline(&stages).expect("solver failed");
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
         tour

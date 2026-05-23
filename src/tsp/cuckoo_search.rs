@@ -28,6 +28,7 @@ pub fn solve(
     problem: &TspProblem,
     opts: &CSOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -41,7 +42,7 @@ pub fn solve(
     let mut nests: Vec<Vec<usize>> = (0..n_nests)
         .map(|idx| {
             if idx == 0 {
-                problem.initial_tour.as_deref().map(|t| t.to_vec()).unwrap_or_else(|| {
+                init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
                     let mut t = city_ids.clone();
                     for i in (1..n_cities).rev() {
                         let j = rng.random_range(0..=i);
@@ -152,8 +153,8 @@ mod tests {
             heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
             ..CSOptions::default()
         };
-        let problem = TspProblem { cities: cities.clone(), distances: dm, initial_tour: Some(optimal) };
-        let result = solve(&problem, &opts, None);
+        let problem = TspProblem::new(cities.clone(), dm);
+        let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();
@@ -194,7 +195,7 @@ mod tests {
             mutation_probability: 0.25,
         };
         let problem = TspProblem::new(cities.clone(), distances);
-        let sol = solve(&problem, &opts, None);
+        let sol = solve(&problem, &opts, None, None);
         let mut visited = sol.route().to_vec();
         visited.sort();
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();

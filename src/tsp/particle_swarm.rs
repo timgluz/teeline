@@ -24,6 +24,7 @@ pub fn solve(
     problem: &TspProblem,
     opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -38,7 +39,7 @@ pub fn solve(
     let mut positions: Vec<Vec<usize>> = (0..n_particles)
         .map(|idx| {
             if idx == 0 {
-                problem.initial_tour.as_deref().map(|t| t.to_vec()).unwrap_or_else(|| {
+                init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
                     let mut p = city_ids.clone();
                     for i in (1..n_cities).rev() {
                         let j = rng.random_range(0..=i);
@@ -146,8 +147,8 @@ mod tests {
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
         let opts = HeuristicOptions { epochs: 0, ..HeuristicOptions::default() };
-        let problem = TspProblem { cities: cities.clone(), distances: dm, initial_tour: Some(optimal) };
-        let result = solve(&problem, &opts, None);
+        let problem = TspProblem::new(cities.clone(), dm);
+        let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();
@@ -175,7 +176,7 @@ mod tests {
         let distances = distance_matrix::from_cities(&cities);
         let opts = HeuristicOptions { epochs: 20, n_nearest: 5, ..HeuristicOptions::default() };
         let problem = TspProblem::new(cities.clone(), distances);
-        let sol = solve(&problem, &opts, None);
+        let sol = solve(&problem, &opts, None, None);
         assert_eq!(sol.route().len(), cities.len());
         assert!(sol.total > 0.0);
     }

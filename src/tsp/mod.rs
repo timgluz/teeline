@@ -578,35 +578,24 @@ pub(crate) fn solve_with_context(
     problem: &TspProblem,
     opts: &AppOptions,
     progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
+    init_tour: Option<&[usize]>,
 ) -> Result<Solution, String> {
     let tx = progress_tx.as_ref();
     let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
     let solution = match solver {
-        Solvers::BellmanKarp               => bellman_karp::solve(problem, &h, tx),
-        Solvers::BranchBound               => branch_bound::solve(problem, &h, tx),
-        Solvers::CuckooSearch              => {
-            let cs = opts.cs.as_ref().cloned().unwrap_or_default();
-            cuckoo_search::solve(problem, &cs, tx)
-        }
-        Solvers::FlowerPollination         => {
-            let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
-            flower_pollination::solve(problem, &fpa, tx)
-        }
-        Solvers::NearestNeighbor           => nearest_neighbor::solve(problem, &h, tx),
-        Solvers::GeneticAlgorithm          => {
-            let ga = opts.ga.as_ref().cloned().unwrap_or_default();
-            genetic_algorithm::solve(problem, &ga, tx)
-        }
-        Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx),
-        Solvers::RandomShuffle             => random_shuffle::solve(problem, &h, tx),
-        Solvers::SimulatedAnnealing        => {
-            let sa = opts.sa.as_ref().cloned().unwrap_or_default();
-            simulated_annealing::solve(problem, &sa, tx)
-        }
-        Solvers::StochasticHill            => stochastic_hill::solve(problem, &h, tx),
-        Solvers::TabuSearch                => tabu_search::solve(problem, &h, tx),
-        Solvers::ThreeOpt                  => three_opt::solve(problem, &h, tx),
-        Solvers::TwoOpt                    => two_opt::solve(problem, &h, tx),
+        Solvers::BellmanKarp               => bellman_karp::solve(problem, &h, tx, init_tour),
+        Solvers::BranchBound               => branch_bound::solve(problem, &h, tx, init_tour),
+        Solvers::CuckooSearch              => { let cs = opts.cs.as_ref().cloned().unwrap_or_default(); cuckoo_search::solve(problem, &cs, tx, init_tour) }
+        Solvers::FlowerPollination         => { let fpa = opts.fpa.as_ref().cloned().unwrap_or_default(); flower_pollination::solve(problem, &fpa, tx, init_tour) }
+        Solvers::NearestNeighbor           => nearest_neighbor::solve(problem, &h, tx, init_tour),
+        Solvers::GeneticAlgorithm          => { let ga = opts.ga.as_ref().cloned().unwrap_or_default(); genetic_algorithm::solve(problem, &ga, tx, init_tour) }
+        Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
+        Solvers::RandomShuffle             => random_shuffle::solve(problem, &h, tx, init_tour),
+        Solvers::SimulatedAnnealing        => { let sa = opts.sa.as_ref().cloned().unwrap_or_default(); simulated_annealing::solve(problem, &sa, tx, init_tour) }
+        Solvers::StochasticHill            => stochastic_hill::solve(problem, &h, tx, init_tour),
+        Solvers::TabuSearch                => tabu_search::solve(problem, &h, tx, init_tour),
+        Solvers::ThreeOpt                  => three_opt::solve(problem, &h, tx, init_tour),
+        Solvers::TwoOpt                    => two_opt::solve(problem, &h, tx, init_tour),
         Solvers::Unspecified               => return Err("solver not specified".to_string()),
     };
     Ok(solution)
@@ -622,12 +611,11 @@ pub(crate) fn solve_with_context(
 pub struct TspProblem {
     pub cities: Vec<KDPoint>,
     pub distances: DistanceMatrix,
-    pub initial_tour: Option<Vec<usize>>,
 }
 
 impl TspProblem {
     pub fn new(cities: Vec<KDPoint>, distances: DistanceMatrix) -> Self {
-        TspProblem { cities, distances, initial_tour: None }
+        TspProblem { cities, distances }
     }
 }
 

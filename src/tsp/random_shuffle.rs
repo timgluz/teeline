@@ -13,6 +13,7 @@ pub fn solve(
     problem: &TspProblem,
     _opts: &HeuristicOptions,
     _progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -46,7 +47,7 @@ mod tests {
     fn test_random_shuffle_produces_valid_tour() {
         let problem = five_city_problem();
         let n = problem.cities.len();
-        let result = solve(&problem, &HeuristicOptions::default(), None);
+        let result = solve(&problem, &HeuristicOptions::default(), None, None);
 
         assert_eq!(result.len(), n);
         let mut visited = result.route().to_vec();
@@ -59,7 +60,7 @@ mod tests {
     #[test]
     fn test_random_shuffle_tour_length_is_positive() {
         let problem = five_city_problem();
-        let result = solve(&problem, &HeuristicOptions::default(), None);
+        let result = solve(&problem, &HeuristicOptions::default(), None, None);
         assert!(result.total > 0.0);
     }
 }

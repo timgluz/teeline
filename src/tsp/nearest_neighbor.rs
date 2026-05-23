@@ -9,6 +9,7 @@ pub fn solve(
     problem: &TspProblem,
     opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -86,7 +87,7 @@ mod tests {
     #[test]
     fn test_solve_visits_all_cities() {
         let problem = tsp5_problem();
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -96,7 +97,7 @@ mod tests {
     #[test]
     fn test_solve_tour_length_is_positive_and_finite() {
         let problem = tsp5_problem();
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
         assert!(tour.total > 0.0, "tour length should be positive, got {}", tour.total);
         assert!(tour.total.is_finite(), "tour length should be finite");
@@ -112,7 +113,7 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -130,7 +131,7 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let route = tour.route().to_vec();
         assert_ne!(route, vec![0, 1, 2, 3, 4], "NN produced sorted output (regression)");

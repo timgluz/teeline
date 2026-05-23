@@ -17,6 +17,7 @@ pub fn solve(
     problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -26,7 +27,7 @@ pub fn solve(
         return Solution::from_parts(&path, cities, distances);
     }
 
-    let mut path: Vec<usize> = problem.initial_tour.as_deref()
+    let mut path: Vec<usize> = init_tour
         .map(|t| t.to_vec())
         .unwrap_or_else(|| cities.iter().map(|c| c.id).collect());
 
@@ -215,8 +216,8 @@ mod tests {
         ]);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let dm = build_dm(&cities);
-        let problem = TspProblem { cities, distances: dm, initial_tour: Some(optimal.clone()) };
-        let result = solve(&problem, &HeuristicOptions::default(), None);
+        let problem = TspProblem::new(cities, dm);
+        let result = solve(&problem, &HeuristicOptions::default(), None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -357,7 +358,7 @@ mod tests {
     fn solve_square_finds_optimal() {
         let cities = square_cities();
         let problem = make_problem(cities.clone());
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!((tour.total - 4.0).abs() < 1e-4, "expected 4.0, got {}", tour.total);
     }
@@ -366,7 +367,7 @@ mod tests {
     fn solve_degenerate_triangle_is_valid() {
         let cities = pts(&[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]);
         let problem = make_problem(cities.clone());
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!(tour.total > 0.0);
     }
@@ -375,7 +376,7 @@ mod tests {
     fn solve_two_cities_is_valid() {
         let cities = pts(&[(0.0, 0.0), (1.0, 0.0)]);
         let problem = make_problem(cities.clone());
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
         assert!(is_valid_tour(tour.route(), &cities));
     }
 
@@ -389,7 +390,7 @@ mod tests {
             (1.0, 0.0),
         ]);
         let problem = make_problem(cities.clone());
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!((tour.total - 4.0).abs() < 1e-4, "expected 4.0, got {}", tour.total);
     }

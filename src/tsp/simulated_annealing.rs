@@ -11,6 +11,7 @@ pub fn solve(
     problem: &TspProblem,
     opts: &SAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -24,7 +25,7 @@ pub fn solve(
         "SA starting"
     );
 
-    let mut best_route = problem.initial_tour.as_deref()
+    let mut best_route = init_tour
         .map(Route::new)
         .unwrap_or_else(|| Route::from_cities(cities));
     let mut best_distance = distances.tour_length(best_route.route());
@@ -94,8 +95,8 @@ mod tests {
             max_temperature: 0.0,
             ..SAOptions::default()
         };
-        let problem = TspProblem { cities, distances: dm, initial_tour: Some(optimal.clone()) };
-        let result = solve(&problem, &opts, None);
+        let problem = TspProblem::new(cities, dm);
+        let result = solve(&problem, &opts, None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 

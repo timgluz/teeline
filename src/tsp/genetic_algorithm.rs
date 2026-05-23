@@ -17,13 +17,14 @@ pub fn solve(
     problem: &TspProblem,
     opts: &GAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
     let evaluator = build_evaluator(distances);
 
     let population_size = cities.len();
-    let population = match problem.initial_tour.as_deref() {
+    let population = match init_tour {
         Some(t) => TspPopulation::from_cities_seeded(cities, population_size, &evaluator, t),
         None => TspPopulation::from_cities(cities, population_size, &evaluator),
     };
@@ -374,7 +375,7 @@ mod tests {
         };
 
         let problem = TspProblem::new(cities, distances.clone());
-        let solution = solve(&problem, &opts, None);
+        let solution = solve(&problem, &opts, None, None);
 
         assert!(
             solution.total >= 3.9,

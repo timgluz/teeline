@@ -8,13 +8,14 @@ pub fn solve(
     problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
     tracing::info!(cities = cities.len(), "2-opt starting");
 
     let n_indices = cities.len() - 1;
-    let mut path: Vec<usize> = problem.initial_tour.as_deref()
+    let mut path: Vec<usize> = init_tour
         .map(|t| t.to_vec())
         .unwrap_or_else(|| cities.iter().map(|c| c.id).collect());
 
@@ -100,8 +101,8 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let problem = TspProblem { cities, distances: dm, initial_tour: Some(optimal.clone()) };
-        let result = solve(&problem, &HeuristicOptions::default(), None);
+        let problem = TspProblem::new(cities, dm);
+        let result = solve(&problem, &HeuristicOptions::default(), None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -117,7 +118,7 @@ mod tests {
 
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
         assert_eq!(4.0, tour.total);
         assert_eq!(&[0, 1, 2, 3, 4], tour.route());
     }

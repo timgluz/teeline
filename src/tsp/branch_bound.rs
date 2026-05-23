@@ -17,6 +17,7 @@ pub fn solve(
     problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -200,7 +201,7 @@ mod tests {
     #[test]
     fn test_solve_visits_all_cities() {
         let problem = tsp5_problem();
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -210,7 +211,7 @@ mod tests {
     #[test]
     fn test_solve_finds_optimal_tour_on_tsp5() {
         let problem = tsp5_problem();
-        let tour = solve(&problem, &HeuristicOptions::default(), None);
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
         assert!(
             (tour.total - 4.0).abs() < 1e-3,
@@ -222,8 +223,8 @@ mod tests {
     #[test]
     fn test_solve_matches_bellman_karp_on_tsp5() {
         let problem = tsp5_problem();
-        let bb_tour = solve(&problem, &HeuristicOptions::default(), None);
-        let bhk_tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None);
+        let bb_tour = solve(&problem, &HeuristicOptions::default(), None, None);
+        let bhk_tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
 
         assert!(
             (bb_tour.total - bhk_tour.total).abs() < 1e-3,
