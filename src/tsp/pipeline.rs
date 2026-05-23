@@ -37,11 +37,10 @@ pub fn run_pipeline(stages: &[PipelineStage]) -> Result<Solution, String> {
     }
     let mut seed: Option<Vec<usize>> = None;
     for stage in stages {
-        if let Some(ref t) = seed {
-            if let Err(e) = validate_tour(t, &stage.problem.cities) {
-                tracing::warn!("pipeline: invalid seed ({e}); using default seeding");
-                seed = None;
-            }
+        if let Some(ref t) = seed
+            && let Err(e) = validate_tour(t, &stage.problem.cities) {
+            tracing::warn!("pipeline: invalid seed ({e}); using default seeding");
+            seed = None;
         }
         tracing::info!(solver = ?stage.solver, "pipeline: stage starting");
         let solution = stage.solve(seed.as_deref())?;

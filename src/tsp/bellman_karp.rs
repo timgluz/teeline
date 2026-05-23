@@ -45,10 +45,9 @@ pub fn solve(
             .distance_by_pos(i, last_pos)
             .unwrap_or(UNKNOWN_DISTANCE);
 
-        if let Some(city_id) = dists.pos2city_id(&i) {
-            if let Some(tx) = progress_tx {
-                let _ = tx.send(ProgressMessage::CityChange(city_id));
-            }
+        if let Some(city_id) = dists.pos2city_id(&i)
+            && let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::CityChange(city_id));
         }
     }
 
