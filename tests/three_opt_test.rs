@@ -4,7 +4,7 @@
 /// Slow tests on berlin52 and att48 are marked #[ignore] and can be run with:
 ///   cargo test --test three_opt_test -- --include-ignored
 use std::path::Path;
-use teeline::tsp::{distance_matrix, kdtree, nearest_neighbor, three_opt, tsplib, SolverOptions};
+use teeline::tsp::{distance_matrix, kdtree, nearest_neighbor, three_opt, tsplib, AppOptions};
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -28,7 +28,7 @@ fn is_valid_tour(route: &[usize], cities: &[kdtree::KDPoint]) -> bool {
 
 fn nn_tour_length(cities: &[kdtree::KDPoint]) -> f32 {
     let dm = build_dm(cities);
-    nearest_neighbor::solve(cities, &dm, &SolverOptions::default()).total
+    nearest_neighbor::solve(cities, &dm, &AppOptions::default(), None, None).total
 }
 
 // ─── fast integration tests (gr17, 17 cities) ────────────────────────────────
@@ -37,7 +37,7 @@ fn nn_tour_length(cities: &[kdtree::KDPoint]) -> f32 {
 fn three_opt_valid_tour_gr17() {
     let cities = load_tsp("gr17.tsp").cities().to_vec();
     let dm = build_dm(&cities);
-    let tour = three_opt::solve(&cities, &dm, &SolverOptions::default());
+    let tour = three_opt::solve(&cities, &dm, &AppOptions::default(), None, None);
     assert!(is_valid_tour(tour.route(), &cities), "gr17 tour is invalid");
 }
 
@@ -45,7 +45,7 @@ fn three_opt_valid_tour_gr17() {
 fn three_opt_improves_on_gr17() {
     let cities = load_tsp("gr17.tsp").cities().to_vec();
     let dm = build_dm(&cities);
-    let three_opt_total = three_opt::solve(&cities, &dm, &SolverOptions::default()).total;
+    let three_opt_total = three_opt::solve(&cities, &dm, &AppOptions::default(), None, None).total;
     let nn_total = nn_tour_length(&cities);
     assert!(
         three_opt_total < nn_total,
@@ -61,7 +61,7 @@ fn three_opt_improves_on_gr17() {
 fn three_opt_valid_tour_berlin52() {
     let cities = load_tsp("berlin52.tsp").cities().to_vec();
     let dm = build_dm(&cities);
-    let tour = three_opt::solve(&cities, &dm, &SolverOptions::default());
+    let tour = three_opt::solve(&cities, &dm, &AppOptions::default(), None, None);
     assert!(is_valid_tour(tour.route(), &cities), "berlin52 tour is invalid");
 }
 
@@ -70,7 +70,7 @@ fn three_opt_valid_tour_berlin52() {
 fn three_opt_improves_on_berlin52() {
     let cities = load_tsp("berlin52.tsp").cities().to_vec();
     let dm = build_dm(&cities);
-    let three_opt_total = three_opt::solve(&cities, &dm, &SolverOptions::default()).total;
+    let three_opt_total = three_opt::solve(&cities, &dm, &AppOptions::default(), None, None).total;
     let nn_total = nn_tour_length(&cities);
     assert!(
         three_opt_total < nn_total,
@@ -83,7 +83,7 @@ fn three_opt_improves_on_berlin52() {
 fn three_opt_valid_tour_att48() {
     let cities = load_tsp("att48.tsp").cities().to_vec();
     let dm = build_dm(&cities);
-    let tour = three_opt::solve(&cities, &dm, &SolverOptions::default());
+    let tour = three_opt::solve(&cities, &dm, &AppOptions::default(), None, None);
     assert!(is_valid_tour(tour.route(), &cities), "att48 tour is invalid");
 }
 
@@ -92,7 +92,7 @@ fn three_opt_valid_tour_att48() {
 fn three_opt_improves_on_att48() {
     let cities = load_tsp("att48.tsp").cities().to_vec();
     let dm = build_dm(&cities);
-    let three_opt_total = three_opt::solve(&cities, &dm, &SolverOptions::default()).total;
+    let three_opt_total = three_opt::solve(&cities, &dm, &AppOptions::default(), None, None).total;
     let nn_total = nn_tour_length(&cities);
     assert!(
         three_opt_total < nn_total,
