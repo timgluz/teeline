@@ -12,10 +12,9 @@
 use std::sync::mpsc;
 
 use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{HeuristicOptions, Solution};
+use super::{HeuristicOptions, Solution, TspProblem};
 
 type FlagSet = u64;
 type DPTable = Vec<Vec<f32>>;
@@ -23,12 +22,12 @@ type DPTable = Vec<Vec<f32>>;
 const UNKNOWN_DISTANCE: f32 = f32::MAX;
 
 pub fn solve(
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    _initial_tour: Option<&[usize]>,
 ) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let n_cities = cities.len();
     let n_others = n_cities - 1;
     let n_powersets = 1 << n_others;
@@ -183,23 +182,24 @@ fn show_table(opt: &DPTable) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
 
-    fn tsp_5_1_cities() -> Vec<kdtree::KDPoint> {
-        kdtree::build_points(&[
+    fn tsp_5_1_problem() -> TspProblem {
+        let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
             vec![0.0, 0.5],
             vec![0.0, 1.0],
             vec![1.0, 1.0],
             vec![1.0, 0.0],
-        ])
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        TspProblem::new(cities, dm)
     }
 
     #[test]
     fn test_solve_returns_all_cities() {
-        let cities = tsp_5_1_cities();
-        let dm = distance_matrix::from_cities(&cities);
-        let solution = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
+        let problem = tsp_5_1_problem();
+        let solution = solve(&problem, &HeuristicOptions::default(), None);
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();
@@ -212,9 +212,8 @@ mod tests {
 
     #[test]
     fn test_solve_finds_optimal_tour_length() {
-        let cities = tsp_5_1_cities();
-        let dm = distance_matrix::from_cities(&cities);
-        let solution = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
+        let problem = tsp_5_1_problem();
+        let solution = solve(&problem, &HeuristicOptions::default(), None);
 
         assert!(
             (solution.total - 4.0).abs() < 1e-3,
@@ -231,7 +230,8 @@ mod tests {
             vec![0.0, 4.0],
         ]);
         let dm = distance_matrix::from_cities(&cities);
-        let solution = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
+        let problem = TspProblem::new(cities, dm);
+        let solution = solve(&problem, &HeuristicOptions::default(), None);
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();

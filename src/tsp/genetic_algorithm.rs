@@ -9,21 +9,21 @@ use super::kdtree::KDPoint;
 use super::probability::probability;
 use super::progress::ProgressMessage;
 use super::route::{random_position_pair, Route};
-use super::{GAOptions, Solution};
+use super::{GAOptions, Solution, TspProblem};
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
 pub fn solve(
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     opts: &GAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    initial_tour: Option<&[usize]>,
 ) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let evaluator = build_evaluator(distances);
 
     let population_size = cities.len();
-    let population = match initial_tour {
+    let population = match problem.initial_tour.as_deref() {
         Some(t) => TspPopulation::from_cities_seeded(cities, population_size, &evaluator, t),
         None => TspPopulation::from_cities(cities, population_size, &evaluator),
     };
@@ -329,7 +329,7 @@ impl TspGenotype {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, GAOptions, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, GAOptions, HeuristicOptions, TspProblem};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -373,7 +373,8 @@ mod tests {
             ..GAOptions::default()
         };
 
-        let solution = solve(&cities, &distances, &opts, None, None);
+        let problem = TspProblem::new(cities, distances.clone());
+        let solution = solve(&problem, &opts, None);
 
         assert!(
             solution.total >= 3.9,

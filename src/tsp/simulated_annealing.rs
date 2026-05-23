@@ -2,20 +2,18 @@ use std::sync::mpsc;
 
 use rand::Rng;
 
-use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::probability::{cooling, metropolis};
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{SAOptions, Solution};
+use super::{SAOptions, Solution, TspProblem};
 
 pub fn solve(
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     opts: &SAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    initial_tour: Option<&[usize]>,
 ) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let cooling_rate = opts.cooling_rate;
     let mut epoch = 0;
 
@@ -26,7 +24,7 @@ pub fn solve(
         "SA starting"
     );
 
-    let mut best_route = initial_tour
+    let mut best_route = problem.initial_tour.as_deref()
         .map(Route::new)
         .unwrap_or_else(|| Route::from_cities(cities));
     let mut best_distance = distances.tour_length(best_route.route());
@@ -80,7 +78,7 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, SAOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, SAOptions, TspProblem};
 
     #[test]
     fn test_sa_respects_initial_tour() {
@@ -96,7 +94,8 @@ mod tests {
             max_temperature: 0.0,
             ..SAOptions::default()
         };
-        let result = solve(&cities, &dm, &opts, None, Some(&optimal));
+        let problem = TspProblem { cities, distances: dm, initial_tour: Some(optimal.clone()) };
+        let result = solve(&problem, &opts, None);
         assert_eq!(result.route(), optimal.as_slice());
     }
 

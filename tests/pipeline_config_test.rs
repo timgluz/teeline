@@ -14,9 +14,7 @@ fn fixture(name: &str) -> PathBuf {
 
 fn berlin52_stages(stage_configs: Vec<(Solvers, teeline::tsp::AppOptions)>) -> Vec<PipelineStage> {
     let tsp = tsplib::read_from_file(Path::new(BERLIN52)).unwrap();
-    let cities = tsp.cities().to_vec();
-    let distances = tsp.distance_matrix().unwrap();
-    let problem = TspProblem::new(cities, distances);
+    let problem = TspProblem::new(tsp.cities().to_vec(), tsp.distance_matrix().unwrap());
     stage_configs
         .into_iter()
         .map(|(solver, options)| {
@@ -33,8 +31,8 @@ fn berlin52_stages(stage_configs: Vec<(Solvers, teeline::tsp::AppOptions)>) -> V
 fn test_pipeline_config_runs_and_produces_valid_output() {
     let p = fixture("pipeline_nn_2opt.toml");
     let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
-    let stages = berlin52_stages(stage_configs);
-    let solution = run_pipeline(&stages).unwrap();
+    let mut stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&mut stages).unwrap();
     assert!(solution.total > 0.0);
     assert_eq!(solution.route().len(), 52);
 }
@@ -49,8 +47,8 @@ fn test_pipeline_config_sa_stage_epochs_applied() {
     let (_, opts) = sa_stage.unwrap();
     assert_eq!(opts.sa.as_ref().unwrap().heuristic.epochs, 50);
     // Also verify it runs to completion
-    let stages = berlin52_stages(stage_configs);
-    let solution = run_pipeline(&stages).unwrap();
+    let mut stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&mut stages).unwrap();
     assert_eq!(solution.route().len(), 52);
 }
 

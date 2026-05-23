@@ -3,10 +3,9 @@ use std::rc::Rc;
 use std::sync::mpsc;
 
 use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{HeuristicOptions, Solution};
+use super::{HeuristicOptions, Solution, TspProblem};
 
 const UNVISITED_NODE: usize = 0;
 
@@ -15,12 +14,12 @@ type Path = Vec<usize>;
 type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 
 pub fn solve(
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    _initial_tour: Option<&[usize]>,
 ) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let mut route = Route::from_cities(cities);
     let n_cities = route.len();
 
@@ -184,23 +183,24 @@ fn undo_move(path: &mut Path, k: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{bellman_karp, distance_matrix, kdtree, HeuristicOptions};
+    use crate::tsp::{bellman_karp, distance_matrix, kdtree, HeuristicOptions, TspProblem};
 
-    fn tsp5_cities() -> Vec<kdtree::KDPoint> {
-        kdtree::build_points(&[
+    fn tsp5_problem() -> TspProblem {
+        let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
             vec![0.0, 0.5],
             vec![0.0, 1.0],
             vec![1.0, 1.0],
             vec![1.0, 0.0],
-        ])
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        TspProblem::new(cities, dm)
     }
 
     #[test]
     fn test_solve_visits_all_cities() {
-        let cities = tsp5_cities();
-        let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
+        let problem = tsp5_problem();
+        let tour = solve(&problem, &HeuristicOptions::default(), None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -209,9 +209,8 @@ mod tests {
 
     #[test]
     fn test_solve_finds_optimal_tour_on_tsp5() {
-        let cities = tsp5_cities();
-        let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
+        let problem = tsp5_problem();
+        let tour = solve(&problem, &HeuristicOptions::default(), None);
 
         assert!(
             (tour.total - 4.0).abs() < 1e-3,
@@ -222,10 +221,9 @@ mod tests {
 
     #[test]
     fn test_solve_matches_bellman_karp_on_tsp5() {
-        let cities = tsp5_cities();
-        let dm = distance_matrix::from_cities(&cities);
-        let bb_tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
-        let bhk_tour = bellman_karp::solve(&cities, &dm, &HeuristicOptions::default(), None, None);
+        let problem = tsp5_problem();
+        let bb_tour = solve(&problem, &HeuristicOptions::default(), None);
+        let bhk_tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None);
 
         assert!(
             (bb_tour.total - bhk_tour.total).abs() < 1e-3,

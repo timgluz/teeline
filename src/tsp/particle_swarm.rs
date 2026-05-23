@@ -1,11 +1,9 @@
 use rand::Rng;
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
-use super::{HeuristicOptions, Solution};
+use super::{HeuristicOptions, Solution, TspProblem};
 
 type Swap = (usize, usize);
 type Velocity = Vec<Swap>;
@@ -23,12 +21,12 @@ fn trim_velocity(v: &[Swap], keep: usize) -> Velocity {
 }
 
 pub fn solve(
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    initial_tour: Option<&[usize]>,
 ) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let n_cities = cities.len();
     let n_particles = opts.n_nearest.max(DEFAULT_N_PARTICLES);
     #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
@@ -40,7 +38,7 @@ pub fn solve(
     let mut positions: Vec<Vec<usize>> = (0..n_particles)
         .map(|idx| {
             if idx == 0 {
-                initial_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
+                problem.initial_tour.as_deref().map(|t| t.to_vec()).unwrap_or_else(|| {
                     let mut p = city_ids.clone();
                     for i in (1..n_cities).rev() {
                         let j = rng.random_range(0..=i);
@@ -133,7 +131,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
 
     #[test]
     fn test_pso_respects_initial_tour() {
@@ -148,7 +146,8 @@ mod tests {
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
         let opts = HeuristicOptions { epochs: 0, ..HeuristicOptions::default() };
-        let result = solve(&cities, &dm, &opts, None, Some(&optimal));
+        let problem = TspProblem { cities: cities.clone(), distances: dm, initial_tour: Some(optimal) };
+        let result = solve(&problem, &opts, None);
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();
@@ -175,7 +174,8 @@ mod tests {
         ]);
         let distances = distance_matrix::from_cities(&cities);
         let opts = HeuristicOptions { epochs: 20, n_nearest: 5, ..HeuristicOptions::default() };
-        let sol = solve(&cities, &distances, &opts, None, None);
+        let problem = TspProblem::new(cities.clone(), distances);
+        let sol = solve(&problem, &opts, None);
         assert_eq!(sol.route().len(), cities.len());
         assert!(sol.total > 0.0);
     }

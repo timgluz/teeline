@@ -1,10 +1,9 @@
 use std::sync::mpsc;
 
 use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{HeuristicOptions, Solution};
+use super::{HeuristicOptions, Solution, TspProblem};
 
 /// 3-opt local search.
 ///
@@ -15,19 +14,19 @@ use super::{HeuristicOptions, Solution};
 /// Complexity: O(n³) per pass. The number of passes is bounded by the number
 /// of distinct improving moves, which is small on a NN-seeded tour.
 pub fn solve(
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    initial_tour: Option<&[usize]>,
 ) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let n = cities.len();
     if n < 4 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
         return Solution::from_parts(&path, cities, distances);
     }
 
-    let mut path: Vec<usize> = initial_tour
+    let mut path: Vec<usize> = problem.initial_tour.as_deref()
         .map(|t| t.to_vec())
         .unwrap_or_else(|| cities.iter().map(|c| c.id).collect());
 
@@ -180,10 +179,15 @@ fn send_path(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
 
     fn build_dm(cities: &[kdtree::KDPoint]) -> DistanceMatrix {
         distance_matrix::from_cities(cities)
+    }
+
+    fn make_problem(cities: Vec<kdtree::KDPoint>) -> TspProblem {
+        let dm = build_dm(&cities);
+        TspProblem::new(cities, dm)
     }
 
     fn square_cities() -> Vec<kdtree::KDPoint> {
@@ -209,9 +213,10 @@ mod tests {
             vec![1.0, 1.0],
             vec![1.0, 0.0],
         ]);
-        let dm = build_dm(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let result = solve(&cities, &dm, &HeuristicOptions::default(), None,Some(&optimal));
+        let dm = build_dm(&cities);
+        let problem = TspProblem { cities, distances: dm, initial_tour: Some(optimal.clone()) };
+        let result = solve(&problem, &HeuristicOptions::default(), None);
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -351,8 +356,8 @@ mod tests {
     #[test]
     fn solve_square_finds_optimal() {
         let cities = square_cities();
-        let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
+        let problem = make_problem(cities.clone());
+        let tour = solve(&problem, &HeuristicOptions::default(), None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!((tour.total - 4.0).abs() < 1e-4, "expected 4.0, got {}", tour.total);
     }
@@ -360,8 +365,8 @@ mod tests {
     #[test]
     fn solve_degenerate_triangle_is_valid() {
         let cities = pts(&[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]);
-        let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
+        let problem = make_problem(cities.clone());
+        let tour = solve(&problem, &HeuristicOptions::default(), None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!(tour.total > 0.0);
     }
@@ -369,8 +374,8 @@ mod tests {
     #[test]
     fn solve_two_cities_is_valid() {
         let cities = pts(&[(0.0, 0.0), (1.0, 0.0)]);
-        let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
+        let problem = make_problem(cities.clone());
+        let tour = solve(&problem, &HeuristicOptions::default(), None);
         assert!(is_valid_tour(tour.route(), &cities));
     }
 
@@ -383,8 +388,8 @@ mod tests {
             (1.0, 1.0),
             (1.0, 0.0),
         ]);
-        let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
+        let problem = make_problem(cities.clone());
+        let tour = solve(&problem, &HeuristicOptions::default(), None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!((tour.total - 4.0).abs() < 1e-4, "expected 4.0, got {}", tour.total);
     }

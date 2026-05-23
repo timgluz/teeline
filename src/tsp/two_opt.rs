@@ -1,22 +1,20 @@
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{HeuristicOptions, Solution};
+use super::{HeuristicOptions, Solution, TspProblem};
 
 pub fn solve(
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
+    problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    initial_tour: Option<&[usize]>,
 ) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     tracing::info!(cities = cities.len(), "2-opt starting");
 
     let n_indices = cities.len() - 1;
-    let mut path: Vec<usize> = initial_tour
+    let mut path: Vec<usize> = problem.initial_tour.as_deref()
         .map(|t| t.to_vec())
         .unwrap_or_else(|| cities.iter().map(|c| c.id).collect());
 
@@ -75,7 +73,7 @@ fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
 
     #[test]
     fn test_swap_2opt_2middle_elems_in_even_size_list() {
@@ -102,7 +100,8 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let result = solve(&cities, &dm, &HeuristicOptions::default(), None,Some(&optimal));
+        let problem = TspProblem { cities, distances: dm, initial_tour: Some(optimal.clone()) };
+        let result = solve(&problem, &HeuristicOptions::default(), None);
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -117,7 +116,8 @@ mod tests {
         ]);
 
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
+        let problem = TspProblem::new(cities, dm);
+        let tour = solve(&problem, &HeuristicOptions::default(), None);
         assert_eq!(4.0, tour.total);
         assert_eq!(&[0, 1, 2, 3, 4], tour.route());
     }
