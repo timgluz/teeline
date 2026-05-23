@@ -50,6 +50,11 @@ pub fn solve(
     Solution::from_parts(&path, cities, distances)
 }
 
+/// Scans all C(n,3) triples and returns the coordinates of the globally best
+/// improving 3-opt move `(i, j, k, case)`, or `None` if the tour is already
+/// locally optimal.
+///
+/// Pure: no side effects, no progress messages.
 fn find_best_move(
     path: &[usize],
     distances: &DistanceMatrix,
@@ -61,17 +66,21 @@ fn find_best_move(
     for i in 0..n - 2 {
         let a = path[i];
         let b = path[i + 1];
+        // Hoist edge (A,B) — invariant for all j, k given i.
         let d_ab = d(distances, a, b);
 
         for j in i + 1..n - 1 {
             let c = path[j];
             let dt = path[j + 1];
+            // Hoist (i,j)-invariant distances: 4 lookups saved per k iteration.
             let d_c_dt = d(distances, c, dt);
             let d_ac   = d(distances, a, c);
             let d_b_dt = d(distances, b, dt);
             let d_a_dt = d(distances, a, dt);
 
             for k in j + 1..n {
+                // Skip the degenerate triple where i==0, k==n-1: the wrap-around
+                // edge makes F==A, causing the formula to measure A→A.
                 if i == 0 && k == n - 1 {
                     continue;
                 }
@@ -114,24 +123,50 @@ fn find_best_move(
     best_move
 }
 
+/// Pre-computed distances for one (i, j, k) triple, grouped by the loop level
+/// at which they are computed and hoisted.
 struct TripleEdges {
+    // i-level
     d_ab: f32,
+    // j-level
     d_c_dt: f32, d_ac: f32, d_b_dt: f32, d_a_dt: f32,
+    // k-level
     d_ef: f32, d_ce: f32, d_dt_f: f32, d_be: f32, d_cf: f32, d_bf: f32, d_ae: f32,
 }
 
+/// Returns the 7 non-identity reconnection costs for a triple.
+///
+/// Index 0 = case 1, …, index 6 = case 7. The original three-edge cost
+/// (`d_ab + d_c_dt + d_ef`) is not included; the caller compares against it.
+///
+/// New edge sets (A=path[i], B=path[i+1], C=path[j], D=path[j+1],
+///               E=path[k], F=path[(k+1)%n]):
+///
+/// | idx | case | middle          | new edges             |
+/// |-----|------|-----------------|-----------------------|
+/// |  0  |  1   | rev(s1)+s2      | (A,C)+(B,D)+(E,F)     |
+/// |  1  |  2   | s1+rev(s2)      | (A,B)+(C,E)+(D,F)     |
+/// |  2  |  3   | rev(s1)+rev(s2) | (A,C)+(B,E)+(D,F)     |
+/// |  3  |  4   | s2+s1           | (A,D)+(E,B)+(C,F)     |
+/// |  4  |  5   | s2+rev(s1)      | (A,D)+(E,C)+(B,F)     |
+/// |  5  |  6   | rev(s2)+s1      | (A,E)+(D,B)+(C,F)     |
+/// |  6  |  7   | rev(s2)+rev(s1) | (A,E)+(D,C)+(B,F)     |
 fn reconnection_costs(e: &TripleEdges) -> [f32; 7] {
     [
-        e.d_ac  + e.d_b_dt + e.d_ef,
-        e.d_ab  + e.d_ce   + e.d_dt_f,
-        e.d_ac  + e.d_be   + e.d_dt_f,
-        e.d_a_dt + e.d_be  + e.d_cf,
-        e.d_a_dt + e.d_ce  + e.d_bf,
-        e.d_ae  + e.d_b_dt + e.d_cf,
-        e.d_ae  + e.d_c_dt + e.d_bf,
+        e.d_ac  + e.d_b_dt + e.d_ef,   // 1
+        e.d_ab  + e.d_ce   + e.d_dt_f, // 2
+        e.d_ac  + e.d_be   + e.d_dt_f, // 3
+        e.d_a_dt + e.d_be  + e.d_cf,   // 4
+        e.d_a_dt + e.d_ce  + e.d_bf,   // 5
+        e.d_ae  + e.d_b_dt + e.d_cf,   // 6
+        e.d_ae  + e.d_c_dt + e.d_bf,   // 7
     ]
 }
 
+/// Applies case `case` (1–7) to `path` in place.
+///
+/// Cases 1–3 use segment reversals only (no allocation).
+/// Cases 4–7 swap the two segments (one small Vec allocation per move).
 fn apply_3opt(path: &mut [usize], i: usize, j: usize, k: usize, case: u8) {
     match case {
         1 => path[i + 1..=j].reverse(),
