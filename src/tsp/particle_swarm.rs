@@ -5,7 +5,7 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
-use super::{AppOptions, Solution};
+use super::{HeuristicOptions, Solution};
 
 type Swap = (usize, usize);
 type Velocity = Vec<Swap>;
@@ -25,13 +25,12 @@ fn trim_velocity(v: &[Swap], keep: usize) -> Velocity {
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    opts: &AppOptions,
+    opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Solution {
-    let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
     let n_cities = cities.len();
-    let n_particles = h.n_nearest.max(DEFAULT_N_PARTICLES);
+    let n_particles = opts.n_nearest.max(DEFAULT_N_PARTICLES);
     #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
     let v_max = ((n_cities as f64 * V_MAX_FACTOR).ceil() as usize).max(1);
 
@@ -76,7 +75,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
     }
 
-    let epochs = h.epochs;
+    let epochs = opts.epochs;
     for epoch in 0..epochs {
         #[allow(clippy::cast_precision_loss)]
         let w = W_MAX - (W_MAX - W_MIN) * (epoch as f64 / epochs.max(1) as f64);
@@ -134,7 +133,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
 
     #[test]
     fn test_pso_respects_initial_tour() {
@@ -148,10 +147,7 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = AppOptions {
-            heuristic: Some(HeuristicOptions { epochs: 0, ..HeuristicOptions::default() }),
-            ..AppOptions::default()
-        };
+        let opts = HeuristicOptions { epochs: 0, ..HeuristicOptions::default() };
         let result = solve(&cities, &dm, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
@@ -178,10 +174,7 @@ mod tests {
             vec![0.0, 1.0],
         ]);
         let distances = distance_matrix::from_cities(&cities);
-        let opts = AppOptions {
-            heuristic: Some(HeuristicOptions { epochs: 20, n_nearest: 5, ..HeuristicOptions::default() }),
-            ..AppOptions::default()
-        };
+        let opts = HeuristicOptions { epochs: 20, n_nearest: 5, ..HeuristicOptions::default() };
         let sol = solve(&cities, &distances, &opts, None, None);
         assert_eq!(sol.route().len(), cities.len());
         assert!(sol.total > 0.0);

@@ -5,19 +5,18 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{AppOptions, Solution};
+use super::{HeuristicOptions, Solution};
 
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    opts: &AppOptions,
+    opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _initial_tour: Option<&[usize]>,
 ) -> Solution {
-    let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
-    tracing::info!(n_nearest = h.n_nearest, cities = cities.len(), "NN starting");
+    tracing::info!(n_nearest = opts.n_nearest, cities = cities.len(), "NN starting");
 
-    let n_nearest = h.n_nearest;
+    let n_nearest = opts.n_nearest;
     let cities_table: HashMap<usize, KDPoint> = cities.iter().map(|c| (c.id, c.clone())).collect();
 
     let mut unvisited: HashSet<usize> = cities.iter().map(|c| c.id).collect();
@@ -72,7 +71,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -88,7 +87,7 @@ mod tests {
     fn test_solve_visits_all_cities() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -99,7 +98,7 @@ mod tests {
     fn test_solve_tour_length_is_positive_and_finite() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         assert!(tour.total > 0.0, "tour length should be positive, got {}", tour.total);
         assert!(tour.total.is_finite(), "tour length should be finite");
@@ -114,7 +113,7 @@ mod tests {
             vec![3.0, 0.0],
         ]);
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -131,7 +130,7 @@ mod tests {
             vec![1.0, 0.0],
         ]);
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         let route = tour.route().to_vec();
         assert_ne!(route, vec![0, 1, 2, 3, 4], "NN produced sorted output (regression)");

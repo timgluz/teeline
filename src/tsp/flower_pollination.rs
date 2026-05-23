@@ -7,7 +7,7 @@ use super::kdtree::KDPoint;
 use super::probability::{bernoulli, levy_step, sample_without_replacement};
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
-use super::{AppOptions, Solution};
+use super::{FPAOptions, Solution};
 
 const DEFAULT_N_FLOWERS: usize = 25;
 
@@ -48,25 +48,24 @@ fn local_pollination(
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    opts: &AppOptions,
+    opts: &FPAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Solution {
-    let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
-    let n_flowers = fpa.heuristic.n_nearest.max(DEFAULT_N_FLOWERS);
+    let n_flowers = opts.heuristic.n_nearest.max(DEFAULT_N_FLOWERS);
     let n_cities = cities.len();
     // default mutation_probability 0.001 → 99.9% local, which defeats global search;
     // floor to 0.8 so a bare `bin fpa` run is meaningful without extra flags.
-    let switch_prob = if fpa.mutation_probability < 0.01 {
+    let switch_prob = if opts.mutation_probability < 0.01 {
         0.8_f64
     } else {
-        fpa.mutation_probability as f64
+        opts.mutation_probability as f64
     };
 
     tracing::info!(
         n_flowers,
         switch_prob,
-        epochs = fpa.heuristic.epochs,
+        epochs = opts.heuristic.epochs,
         "FPA starting"
     );
 
@@ -109,7 +108,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
     }
 
-    for epoch in 0..fpa.heuristic.epochs {
+    for epoch in 0..opts.heuristic.epochs {
         for i in 0..n_flowers {
             let new_x = if bernoulli(&mut rng, switch_prob) {
                 global_pollination(&flowers[i], &gbest, &mut rng)
@@ -147,7 +146,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions, FPAOptions, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, FPAOptions, HeuristicOptions};
 
     #[test]
     fn test_fpa_respects_initial_tour() {
@@ -161,12 +160,9 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = AppOptions {
-            fpa: Some(FPAOptions {
-                heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
-                ..FPAOptions::default()
-            }),
-            ..AppOptions::default()
+        let opts = FPAOptions {
+            heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+            ..FPAOptions::default()
         };
         let result = solve(&cities, &dm, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
@@ -191,12 +187,9 @@ mod tests {
     #[test]
     fn test_solve_returns_valid_tour() {
         let (cities, dm) = four_city_setup();
-        let opts = AppOptions {
-            fpa: Some(FPAOptions {
-                heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
-                mutation_probability: 0.8,
-            }),
-            ..AppOptions::default()
+        let opts = FPAOptions {
+            heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
+            mutation_probability: 0.8,
         };
         let sol = solve(&cities, &dm, &opts, None, None);
         let mut visited = sol.route().to_vec();

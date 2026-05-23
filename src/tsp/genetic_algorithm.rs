@@ -9,18 +9,17 @@ use super::kdtree::KDPoint;
 use super::probability::probability;
 use super::progress::ProgressMessage;
 use super::route::{random_position_pair, Route};
-use super::{AppOptions, GAOptions, Solution};
+use super::{GAOptions, Solution};
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    opts: &AppOptions,
+    opts: &GAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Solution {
-    let ga = opts.ga.as_ref().cloned().unwrap_or_default();
     let evaluator = build_evaluator(distances);
 
     let population_size = cities.len();
@@ -28,7 +27,7 @@ pub fn solve(
         Some(t) => TspPopulation::from_cities_seeded(cities, population_size, &evaluator, t),
         None => TspPopulation::from_cities(cities, population_size, &evaluator),
     };
-    let best_candidate = solve_ga(&population, evaluator, distances, &ga, progress_tx);
+    let best_candidate = solve_ga(&population, evaluator, distances, opts, progress_tx);
 
     let best_route = Route::new(best_candidate.genotype());
     if let Some(tx) = progress_tx {
@@ -330,7 +329,7 @@ impl TspGenotype {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions, GAOptions, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, GAOptions, HeuristicOptions};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -369,12 +368,9 @@ mod tests {
             vec![1.0, 0.0],
         ]);
         let distances = distance_matrix::from_cities(&cities);
-        let opts = AppOptions {
-            ga: Some(GAOptions {
-                heuristic: HeuristicOptions { epochs: 100, ..HeuristicOptions::default() },
-                ..GAOptions::default()
-            }),
-            ..AppOptions::default()
+        let opts = GAOptions {
+            heuristic: HeuristicOptions { epochs: 100, ..HeuristicOptions::default() },
+            ..GAOptions::default()
         };
 
         let solution = solve(&cities, &distances, &opts, None, None);

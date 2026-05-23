@@ -6,7 +6,7 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{AppOptions, Solution};
+use super::{HeuristicOptions, Solution};
 
 const UNVISITED_NODE: usize = 0;
 
@@ -17,7 +17,7 @@ type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    _opts: &AppOptions,
+    _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _initial_tour: Option<&[usize]>,
 ) -> Solution {
@@ -184,7 +184,7 @@ fn undo_move(path: &mut Path, k: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{bellman_karp, distance_matrix, kdtree, AppOptions};
+    use crate::tsp::{bellman_karp, distance_matrix, kdtree, HeuristicOptions};
 
     fn tsp5_cities() -> Vec<kdtree::KDPoint> {
         kdtree::build_points(&[
@@ -200,7 +200,7 @@ mod tests {
     fn test_solve_visits_all_cities() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -211,7 +211,7 @@ mod tests {
     fn test_solve_finds_optimal_tour_on_tsp5() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         assert!(
             (tour.total - 4.0).abs() < 1e-3,
@@ -224,8 +224,8 @@ mod tests {
     fn test_solve_matches_bellman_karp_on_tsp5() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let bb_tour = solve(&cities, &dm, &AppOptions::default(), None, None);
-        let bhk_tour = bellman_karp::solve(&cities, &dm, &AppOptions::default(), None, None);
+        let bb_tour = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
+        let bhk_tour = bellman_karp::solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         assert!(
             (bb_tour.total - bhk_tour.total).abs() < 1e-3,

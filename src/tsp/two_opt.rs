@@ -4,12 +4,12 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{AppOptions, Solution};
+use super::{HeuristicOptions, Solution};
 
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    _opts: &AppOptions,
+    _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Solution {
@@ -75,7 +75,7 @@ fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
 
     #[test]
     fn test_swap_2opt_2middle_elems_in_even_size_list() {
@@ -102,7 +102,7 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let result = solve(&cities, &dm, &AppOptions::default(), None, Some(&optimal));
+        let result = solve(&cities, &dm, &HeuristicOptions::default(), None,Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -117,7 +117,7 @@ mod tests {
         ]);
 
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
         assert_eq!(4.0, tour.total);
         assert_eq!(&[0, 1, 2, 3, 4], tour.route());
     }

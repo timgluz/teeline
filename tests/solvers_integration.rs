@@ -15,7 +15,7 @@ use teeline::tsp::{
     bellman_karp, branch_bound, cuckoo_search, distance_matrix, flower_pollination,
     genetic_algorithm, kdtree, nearest_neighbor, particle_swarm, simulated_annealing,
     stochastic_hill, tabu_search, two_opt, tsplib,
-    AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions,
+    CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions,
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -57,14 +57,11 @@ fn is_valid_tour(tour_route: &[usize], cities: &[kdtree::KDPoint]) -> bool {
     visited == expected_ids(cities)
 }
 
-fn stochastic_options(epochs: usize) -> AppOptions {
-    AppOptions {
-        heuristic: Some(HeuristicOptions {
-            epochs,
-            platoo_epochs: epochs / 5,
-            ..HeuristicOptions::default()
-        }),
-        ..AppOptions::default()
+fn stochastic_options(epochs: usize) -> HeuristicOptions {
+    HeuristicOptions {
+        epochs,
+        platoo_epochs: epochs / 5,
+        ..HeuristicOptions::default()
     }
 }
 
@@ -74,7 +71,7 @@ fn stochastic_options(epochs: usize) -> AppOptions {
 fn nearest_neighbor_valid_tour_berlin52() {
     let cities = load_berlin52();
     let tour =
-        nearest_neighbor::solve(&cities, &build_dm(&cities), &AppOptions::default(), None, None);
+        nearest_neighbor::solve(&cities, &build_dm(&cities), &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "NN tour is not valid on berlin52");
 }
@@ -83,7 +80,7 @@ fn nearest_neighbor_valid_tour_berlin52() {
 fn nearest_neighbor_tour_is_finite_and_positive_berlin52() {
     let cities = load_berlin52();
     let tour =
-        nearest_neighbor::solve(&cities, &build_dm(&cities), &AppOptions::default(), None, None);
+        nearest_neighbor::solve(&cities, &build_dm(&cities), &HeuristicOptions::default(), None, None);
 
     assert!(tour.total > 0.0, "NN tour length should be positive");
     assert!(tour.total.is_finite(), "NN tour length should be finite");
@@ -94,7 +91,7 @@ fn nearest_neighbor_tour_is_finite_and_positive_berlin52() {
 #[test]
 fn two_opt_valid_tour_berlin52() {
     let cities = load_berlin52();
-    let tour = two_opt::solve(&cities, &build_dm(&cities), &AppOptions::default(), None, None);
+    let tour = two_opt::solve(&cities, &build_dm(&cities), &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "2-opt tour is not valid on berlin52");
 }
@@ -102,7 +99,7 @@ fn two_opt_valid_tour_berlin52() {
 #[test]
 fn two_opt_tour_within_50pct_of_optimal_berlin52() {
     let cities = load_berlin52();
-    let tour = two_opt::solve(&cities, &build_dm(&cities), &AppOptions::default(), None, None);
+    let tour = two_opt::solve(&cities, &build_dm(&cities), &HeuristicOptions::default(), None, None);
 
     assert!(
         tour.total < 7542.0 * 1.5,
@@ -138,12 +135,9 @@ fn stochastic_hill_valid_tour_berlin52() {
 #[test]
 fn simulated_annealing_valid_tour_berlin52() {
     let cities = load_berlin52();
-    let opts = AppOptions {
-        sa: Some(SAOptions {
-            heuristic: HeuristicOptions { epochs: 2000, ..HeuristicOptions::default() },
-            ..SAOptions::default()
-        }),
-        ..AppOptions::default()
+    let opts = SAOptions {
+        heuristic: HeuristicOptions { epochs: 2000, ..HeuristicOptions::default() },
+        ..SAOptions::default()
     };
     let tour = simulated_annealing::solve(&cities, &build_dm(&cities), &opts, None, None);
 
@@ -155,12 +149,9 @@ fn simulated_annealing_valid_tour_berlin52() {
 #[test]
 fn genetic_algorithm_valid_tour_berlin52() {
     let cities = load_berlin52();
-    let opts = AppOptions {
-        ga: Some(GAOptions {
-            heuristic: HeuristicOptions { epochs: 100, ..HeuristicOptions::default() },
-            ..GAOptions::default()
-        }),
-        ..AppOptions::default()
+    let opts = GAOptions {
+        heuristic: HeuristicOptions { epochs: 100, ..HeuristicOptions::default() },
+        ..GAOptions::default()
     };
     let tour = genetic_algorithm::solve(&cities, &build_dm(&cities), &opts, None, None);
 
@@ -186,13 +177,10 @@ fn particle_swarm_valid_tour_berlin52() {
 #[test]
 fn cuckoo_search_valid_tour_berlin52() {
     let cities = load_berlin52();
-    let opts = AppOptions {
-        cs: Some(CSOptions {
-            heuristic: HeuristicOptions { epochs: 200, ..HeuristicOptions::default() },
-            mutation_probability: 0.25,
-            ..CSOptions::default()
-        }),
-        ..AppOptions::default()
+    let opts = CSOptions {
+        heuristic: HeuristicOptions { epochs: 200, ..HeuristicOptions::default() },
+        mutation_probability: 0.25,
+        ..CSOptions::default()
     };
     let tour = cuckoo_search::solve(&cities, &build_dm(&cities), &opts, None, None);
     assert!(
@@ -206,7 +194,7 @@ fn cuckoo_search_valid_tour_berlin52() {
 #[test]
 fn bellman_karp_optimal_tour_tsp5() {
     let cities = tsp5_cities();
-    let tour = bellman_karp::solve(&cities, &build_dm(&cities), &AppOptions::default(), None, None);
+    let tour = bellman_karp::solve(&cities, &build_dm(&cities), &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "BHK tour is not valid");
     // known optimal: 0→1→2→3→4→0 = 4.0
@@ -220,7 +208,7 @@ fn bellman_karp_optimal_tour_tsp5() {
 #[test]
 fn branch_bound_optimal_tour_tsp5() {
     let cities = tsp5_cities();
-    let tour = branch_bound::solve(&cities, &build_dm(&cities), &AppOptions::default(), None, None);
+    let tour = branch_bound::solve(&cities, &build_dm(&cities), &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "B&B tour is not valid");
     assert!(
@@ -258,7 +246,7 @@ fn nn_valid_tour_gr17() {
     let data = load_tsp("gr17.tsp");
     let cities = data.cities().to_vec();
     let dm = data.distance_matrix().expect("gr17 distance matrix");
-    let tour = nearest_neighbor::solve(&cities, &dm, &AppOptions::default(), None, None);
+    let tour = nearest_neighbor::solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "NN tour is not valid on gr17");
     assert!(tour.total > 0.0);
@@ -269,7 +257,7 @@ fn nn_valid_tour_bays29() {
     let data = load_tsp("bays29.tsp");
     let cities = data.cities().to_vec();
     let dm = data.distance_matrix().expect("bays29 distance matrix");
-    let tour = nearest_neighbor::solve(&cities, &dm, &AppOptions::default(), None, None);
+    let tour = nearest_neighbor::solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "NN tour is not valid on bays29");
     assert!(tour.total > 0.0);
@@ -280,7 +268,7 @@ fn two_opt_valid_tour_gr17() {
     let data = load_tsp("gr17.tsp");
     let cities = data.cities().to_vec();
     let dm = data.distance_matrix().expect("gr17 distance matrix");
-    let tour = two_opt::solve(&cities, &dm, &AppOptions::default(), None, None);
+    let tour = two_opt::solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "2-opt tour is not valid on gr17");
     // optimal is 2085; allow 1.5×
@@ -298,7 +286,7 @@ fn bellman_karp_optimal_ring6_explicit() {
     let data = load_tsp("ring6_explicit.tsp");
     let cities = data.cities().to_vec();
     let dm = data.distance_matrix().expect("ring6 distance matrix");
-    let tour = bellman_karp::solve(&cities, &dm, &AppOptions::default(), None, None);
+    let tour = bellman_karp::solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "BHK tour is not valid on ring6");
     assert!(
@@ -313,7 +301,7 @@ fn bellman_karp_optimal_gr17() {
     let data = load_tsp("gr17.tsp");
     let cities = data.cities().to_vec();
     let dm = data.distance_matrix().expect("gr17 distance matrix");
-    let tour = bellman_karp::solve(&cities, &dm, &AppOptions::default(), None, None);
+    let tour = bellman_karp::solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
     assert!(is_valid_tour(tour.route(), &cities), "BHK tour is not valid on gr17");
     assert!(
@@ -328,13 +316,10 @@ fn bellman_karp_optimal_gr17() {
 #[test]
 fn flower_pollination_valid_tour_berlin52() {
     let cities = load_berlin52();
-    let opts = AppOptions {
-        fpa: Some(FPAOptions {
-            heuristic: HeuristicOptions { epochs: 200, ..HeuristicOptions::default() },
-            mutation_probability: 0.8,
-            ..FPAOptions::default()
-        }),
-        ..AppOptions::default()
+    let opts = FPAOptions {
+        heuristic: HeuristicOptions { epochs: 200, ..HeuristicOptions::default() },
+        mutation_probability: 0.8,
+        ..FPAOptions::default()
     };
     let tour = flower_pollination::solve(&cities, &build_dm(&cities), &opts, None, None);
     assert!(is_valid_tour(tour.route(), &cities), "FPA tour invalid on berlin52");
@@ -343,13 +328,10 @@ fn flower_pollination_valid_tour_berlin52() {
 #[test]
 fn flower_pollination_tour_is_finite_and_positive() {
     let cities = load_berlin52();
-    let opts = AppOptions {
-        fpa: Some(FPAOptions {
-            heuristic: HeuristicOptions { epochs: 200, ..HeuristicOptions::default() },
-            mutation_probability: 0.8,
-            ..FPAOptions::default()
-        }),
-        ..AppOptions::default()
+    let opts = FPAOptions {
+        heuristic: HeuristicOptions { epochs: 200, ..HeuristicOptions::default() },
+        mutation_probability: 0.8,
+        ..FPAOptions::default()
     };
     let tour = flower_pollination::solve(&cities, &build_dm(&cities), &opts, None, None);
     assert!(tour.total > 0.0);

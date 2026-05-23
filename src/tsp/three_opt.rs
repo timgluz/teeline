@@ -4,7 +4,7 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{AppOptions, Solution};
+use super::{HeuristicOptions, Solution};
 
 /// 3-opt local search.
 ///
@@ -17,7 +17,7 @@ use super::{AppOptions, Solution};
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    _opts: &AppOptions,
+    _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Solution {
@@ -180,7 +180,7 @@ fn send_path(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
 
     fn build_dm(cities: &[kdtree::KDPoint]) -> DistanceMatrix {
         distance_matrix::from_cities(cities)
@@ -211,7 +211,7 @@ mod tests {
         ]);
         let dm = build_dm(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let result = solve(&cities, &dm, &AppOptions::default(), None, Some(&optimal));
+        let result = solve(&cities, &dm, &HeuristicOptions::default(), None,Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -352,7 +352,7 @@ mod tests {
     fn solve_square_finds_optimal() {
         let cities = square_cities();
         let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!((tour.total - 4.0).abs() < 1e-4, "expected 4.0, got {}", tour.total);
     }
@@ -361,7 +361,7 @@ mod tests {
     fn solve_degenerate_triangle_is_valid() {
         let cities = pts(&[(0.0, 0.0), (1.0, 0.0), (0.5, 1.0)]);
         let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!(tour.total > 0.0);
     }
@@ -370,7 +370,7 @@ mod tests {
     fn solve_two_cities_is_valid() {
         let cities = pts(&[(0.0, 0.0), (1.0, 0.0)]);
         let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
         assert!(is_valid_tour(tour.route(), &cities));
     }
 
@@ -384,7 +384,7 @@ mod tests {
             (1.0, 0.0),
         ]);
         let dm = build_dm(&cities);
-        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let tour = solve(&cities, &dm, &HeuristicOptions::default(), None,None);
         assert!(is_valid_tour(tour.route(), &cities));
         assert!((tour.total - 4.0).abs() < 1e-4, "expected 4.0, got {}", tour.total);
     }

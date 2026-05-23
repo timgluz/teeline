@@ -7,7 +7,7 @@ use super::kdtree::KDPoint;
 use super::probability::levy_step;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{AppOptions, Solution};
+use super::{CSOptions, Solution};
 
 const DEFAULT_N_NESTS: usize = 25;
 
@@ -29,13 +29,12 @@ fn apply_k_random_2opt(tour: &[usize], k: usize, rng: &mut impl Rng) -> Vec<usiz
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    opts: &AppOptions,
+    opts: &CSOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Solution {
-    let cs = opts.cs.as_ref().cloned().unwrap_or_default();
-    let n_nests = cs.heuristic.n_nearest.max(DEFAULT_N_NESTS);
-    let pa = (cs.mutation_probability as f64).clamp(0.01, 0.99);
+    let n_nests = opts.heuristic.n_nearest.max(DEFAULT_N_NESTS);
+    let pa = (opts.mutation_probability as f64).clamp(0.01, 0.99);
     let n_cities = cities.len();
 
     let mut rng = rand::rng();
@@ -77,7 +76,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
     }
 
-    for epoch in 0..cs.heuristic.epochs {
+    for epoch in 0..opts.heuristic.epochs {
         for cuckoo_idx in 0..n_nests {
             let levy = levy_step(&mut rng).abs();
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
@@ -137,7 +136,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions, CSOptions, HeuristicOptions};
+    use crate::tsp::{distance_matrix, kdtree, CSOptions, HeuristicOptions};
 
     #[test]
     fn test_cs_respects_initial_tour() {
@@ -151,12 +150,9 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = AppOptions {
-            cs: Some(CSOptions {
-                heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
-                ..CSOptions::default()
-            }),
-            ..AppOptions::default()
+        let opts = CSOptions {
+            heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+            ..CSOptions::default()
         };
         let result = solve(&cities, &dm, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
@@ -194,12 +190,9 @@ mod tests {
             vec![0.0, 1.0],
         ]);
         let distances = distance_matrix::from_cities(&cities);
-        let opts = AppOptions {
-            cs: Some(CSOptions {
-                heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
-                mutation_probability: 0.25,
-            }),
-            ..AppOptions::default()
+        let opts = CSOptions {
+            heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
+            mutation_probability: 0.25,
         };
         let sol = solve(&cities, &distances, &opts, None, None);
         let mut visited = sol.route().to_vec();

@@ -5,7 +5,7 @@ use rand::Rng;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
-use super::{AppOptions, Solution};
+use super::{HeuristicOptions, Solution};
 
 /// Returns a uniformly random permutation of the city IDs.
 /// Used as a lightweight first pipeline stage for stochastic solvers that rely on
@@ -14,7 +14,7 @@ use super::{AppOptions, Solution};
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    _opts: &AppOptions,
+    _opts: &HeuristicOptions,
     _progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _initial_tour: Option<&[usize]>,
 ) -> Solution {
@@ -30,7 +30,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions};
 
     fn five_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -46,7 +46,7 @@ mod tests {
     fn test_random_shuffle_produces_valid_tour() {
         let cities = five_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let result = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let result = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
 
         assert_eq!(result.len(), cities.len());
         let mut visited = result.route().to_vec();
@@ -60,7 +60,7 @@ mod tests {
     fn test_random_shuffle_tour_length_is_positive() {
         let cities = five_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let result = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let result = solve(&cities, &dm, &HeuristicOptions::default(), None, None);
         assert!(result.total > 0.0);
     }
 }

@@ -7,23 +7,22 @@ use super::kdtree::KDPoint;
 use super::probability::{cooling, metropolis};
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{AppOptions, Solution};
+use super::{SAOptions, Solution};
 
 pub fn solve(
     cities: &[KDPoint],
     distances: &DistanceMatrix,
-    opts: &AppOptions,
+    opts: &SAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     initial_tour: Option<&[usize]>,
 ) -> Solution {
-    let sa = opts.sa.as_ref().cloned().unwrap_or_default();
-    let cooling_rate = sa.cooling_rate;
+    let cooling_rate = opts.cooling_rate;
     let mut epoch = 0;
 
     tracing::info!(
-        epochs = sa.heuristic.epochs,
-        max_temp = sa.max_temperature,
-        cooling_rate = sa.cooling_rate,
+        epochs = opts.heuristic.epochs,
+        max_temp = opts.max_temperature,
+        cooling_rate = opts.cooling_rate,
         "SA starting"
     );
 
@@ -36,8 +35,8 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
     }
 
-    let mut temperature = sa.max_temperature;
-    while epoch < sa.heuristic.epochs || temperature > sa.min_temperature {
+    let mut temperature = opts.max_temperature;
+    while epoch < opts.heuristic.epochs || temperature > opts.min_temperature {
         let candidate = best_route.random_successor();
         let candidate_distance = distances.tour_length(candidate.route());
 
@@ -81,7 +80,7 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions, HeuristicOptions, SAOptions};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, SAOptions};
 
     #[test]
     fn test_sa_respects_initial_tour() {
@@ -91,13 +90,12 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let sa = SAOptions {
+        let opts = SAOptions {
             heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
             min_temperature: 1_000_000.0,
             max_temperature: 0.0,
             ..SAOptions::default()
         };
-        let opts = AppOptions { sa: Some(sa), ..AppOptions::default() };
         let result = solve(&cities, &dm, &opts, None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
