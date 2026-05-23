@@ -1,34 +1,37 @@
 use rand::Rng;
+use std::sync::mpsc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
-use super::{Solution, SolverOptions};
+use super::{AppOptions, Solution};
 
 type Swap = (usize, usize);
 type Velocity = Vec<Swap>;
 
-// PSO hyper-parameters
-const W_MAX: f64 = 0.9; // inertia at epoch 0 (exploration)
-const W_MIN: f64 = 0.4; // inertia at final epoch (exploitation)
-const C1: f64 = 1.5;    // cognitive coefficient
-const C2: f64 = 1.5;    // social coefficient
+const W_MAX: f64 = 0.9;
+const W_MIN: f64 = 0.4;
+const C1: f64 = 1.5;
+const C2: f64 = 1.5;
 const DEFAULT_N_PARTICLES: usize = 30;
-// Without a velocity cap, steady-state swap-list length ≈ (C1+C2)*0.5*(n−1)/(1−W) ≈ 5n,
-// which scrambles the tour completely.  Capping at ~n/3 gives directional movement.
 const V_MAX_FACTOR: f64 = 0.35;
 
 
-/// Scalar-multiply a velocity: keep the first `keep` swaps (clamped to length).
 fn trim_velocity(v: &[Swap], keep: usize) -> Velocity {
     v.iter().take(keep).copied().collect()
 }
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
+pub fn solve(
+    cities: &[KDPoint],
+    distances: &DistanceMatrix,
+    opts: &AppOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    initial_tour: Option<&[usize]>,
+) -> Solution {
+    let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
     let n_cities = cities.len();
-    // n_nearest is repurposed as n_particles; floor at DEFAULT_N_PARTICLES
-    let n_particles = options.n_nearest.max(DEFAULT_N_PARTICLES);
+    let n_particles = h.n_nearest.max(DEFAULT_N_PARTICLES);
     #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
     let v_max = ((n_cities as f64 * V_MAX_FACTOR).ceil() as usize).max(1);
 
@@ -38,7 +41,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut positions: Vec<Vec<usize>> = (0..n_particles)
         .map(|idx| {
             if idx == 0 {
-                options.initial_tour.clone().unwrap_or_else(|| {
+                initial_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
                     let mut p = city_ids.clone();
                     for i in (1..n_cities).rev() {
                         let j = rng.random_range(0..=i);
@@ -61,7 +64,6 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut pbest: Vec<Vec<usize>> = positions.clone();
     let mut pbest_cost: Vec<f32> = pbest.iter().map(|p| distances.tour_length(p)).collect();
 
-    // Global best
     let (best_idx, _) = pbest_cost
         .iter()
         .enumerate()
@@ -70,13 +72,12 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut gbest: Vec<usize> = pbest[best_idx].clone();
     let mut gbest_cost: f32 = pbest_cost[best_idx];
 
-    options.send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+    }
 
-    let epochs = options.epochs;
+    let epochs = h.epochs;
     for epoch in 0..epochs {
-        // Linearly decay inertia weight from W_MAX (exploration) to W_MIN (exploitation).
-        // Mirrors simulated annealing's cooling schedule: high randomness early,
-        // fine-tuning near convergence.
         #[allow(clippy::cast_precision_loss)]
         let w = W_MAX - (W_MAX - W_MIN) * (epoch as f64 / epochs.max(1) as f64);
 
@@ -84,34 +85,26 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             let r1: f64 = rng.random();
             let r2: f64 = rng.random();
 
-            // Inertia: keep first round(w * |v|) swaps of current velocity
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let inertia_keep = (w * velocities[i].len() as f64).round() as usize;
 
-            // Cognitive: toward personal best
             let cog_diff = swap_sequence(&positions[i], &pbest[i]);
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let cog_keep = (C1 * r1 * cog_diff.len() as f64).round() as usize;
 
-            // Social: toward global best
             let soc_diff = swap_sequence(&positions[i], &gbest);
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let soc_keep = (C2 * r2 * soc_diff.len() as f64).round() as usize;
 
-            // New velocity = inertia + cognitive + social, capped at v_max.
-            // The cap is the discrete analogue of v_max in continuous PSO:
-            // without it the swap list grows to ~5n and scrambles the tour.
             let mut new_vel = trim_velocity(&velocities[i], inertia_keep);
             new_vel.extend(trim_velocity(&cog_diff, cog_keep));
             new_vel.extend(trim_velocity(&soc_diff, soc_keep));
             new_vel.truncate(v_max);
 
-            // Update position and velocity
             let new_pos = apply_swaps(&positions[i], &new_vel);
             positions[i] = new_pos;
             velocities[i] = new_vel;
 
-            // Evaluate and update bests
             let cost = distances.tour_length(&positions[i]);
 
             if cost < pbest_cost[i] {
@@ -121,21 +114,27 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             if cost < gbest_cost {
                 gbest = positions[i].clone();
                 gbest_cost = cost;
-                options.send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+                if let Some(tx) = progress_tx {
+                    let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+                }
             }
         }
 
-        options.send_progress(ProgressMessage::EpochUpdate(epoch));
+        if let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
+        }
     }
 
-    options.send_progress(ProgressMessage::Done);
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::Done);
+    }
     Solution::new(&gbest, cities, distances)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree};
+    use crate::tsp::{distance_matrix, kdtree, AppOptions, HeuristicOptions};
 
     #[test]
     fn test_pso_respects_initial_tour() {
@@ -149,13 +148,11 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = SolverOptions {
-            epochs: 0,
-            initial_tour: Some(optimal.clone()),
-            ..SolverOptions::default()
+        let opts = AppOptions {
+            heuristic: Some(HeuristicOptions { epochs: 0, ..HeuristicOptions::default() }),
+            ..AppOptions::default()
         };
-        let result = solve(&cities, &dm, &opts);
-        // With epochs=0 and initial_tour seeded as particle 0, gbest must equal optimal.
+        let result = solve(&cities, &dm, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();
@@ -181,12 +178,11 @@ mod tests {
             vec![0.0, 1.0],
         ]);
         let distances = distance_matrix::from_cities(&cities);
-        let options = SolverOptions {
-            epochs: 20,
-            n_nearest: 5,
-            ..SolverOptions::default()
+        let opts = AppOptions {
+            heuristic: Some(HeuristicOptions { epochs: 20, n_nearest: 5, ..HeuristicOptions::default() }),
+            ..AppOptions::default()
         };
-        let sol = solve(&cities, &distances, &options);
+        let sol = solve(&cities, &distances, &opts, None, None);
         assert_eq!(sol.route().len(), cities.len());
         assert!(sol.total > 0.0);
     }

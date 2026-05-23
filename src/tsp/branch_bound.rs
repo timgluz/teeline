@@ -1,11 +1,12 @@
 use std::collections::HashSet;
 use std::rc::Rc;
+use std::sync::mpsc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{Solution, SolverOptions};
+use super::{AppOptions, Solution};
 
 const UNVISITED_NODE: usize = 0;
 
@@ -13,15 +14,22 @@ type UniqSet = HashSet<usize>;
 type Path = Vec<usize>;
 type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 
-// TODO: add better strategy or constraints for Bounding step
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
+pub fn solve(
+    cities: &[KDPoint],
+    distances: &DistanceMatrix,
+    _opts: &AppOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    _initial_tour: Option<&[usize]>,
+) -> Solution {
     let mut route = Route::from_cities(cities);
     let n_cities = route.len();
 
     tracing::info!(n_cities, "B&B starting");
 
     route.sort();
-    options.send_progress(ProgressMessage::PathUpdate(route.clone(), 0.0));
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(route.clone(), 0.0));
+    }
 
     let mut open_path: Path = vec![0; n_cities];
     open_path[0] = route.get(0).unwrap();
@@ -36,10 +44,12 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         1,
         0.0,
         f32::MAX,
-        options,
+        progress_tx,
     );
 
-    options.send_progress(ProgressMessage::Done);
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::Done);
+    }
     Solution::new(&best_path, cities, distances)
 }
 
@@ -57,7 +67,7 @@ fn backtrack(
     k: usize,
     running_cost: f32,
     upper_bound: f32,
-    options: &SolverOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
 ) -> (Path, f32) {
     let mut best_path = path.clone();
     let mut best_distance = upper_bound;
@@ -84,7 +94,7 @@ fn backtrack(
     );
 
     for candidate in candidates.iter() {
-        make_move(path, k, *candidate, options);
+        make_move(path, k, *candidate, progress_tx);
 
         let visited_path: Vec<usize> = path
             .to_vec()
@@ -92,10 +102,12 @@ fn backtrack(
             .filter(|&&x| x != UNVISITED_NODE)
             .copied()
             .collect();
-        options.send_progress(ProgressMessage::PathUpdate(
-            Route::new(&visited_path),
-            best_distance,
-        ));
+        if let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::PathUpdate(
+                Route::new(&visited_path),
+                best_distance,
+            ));
+        }
 
         let prev_city = path[k - 1];
         let next_distance = evaluate_fn(&vec![prev_city, *candidate]);
@@ -110,7 +122,7 @@ fn backtrack(
             k + 1,
             running_cost + next_distance,
             best_distance,
-            options,
+            progress_tx,
         );
 
         if sub_dist < best_distance {
@@ -138,11 +150,10 @@ fn construct_candidates(
     best_distance: f32,
     evaluate_fn: &PathEvaluator,
 ) -> Path {
-    let mut candidates: Path = vec![]; // always start from city.id 0
+    let mut candidates: Path = vec![];
 
     for city_id in unvisited_cities.iter() {
         let next_distance = evaluate_fn(&vec![path[k - 1], *city_id]);
-        // simple pruning
         if best_distance > running_cost + next_distance {
             candidates.push(*city_id);
         }
@@ -152,13 +163,19 @@ fn construct_candidates(
     candidates
 }
 
-fn make_move(path: &mut Path, k: usize, candidate: usize, options: &SolverOptions) {
+fn make_move(
+    path: &mut Path,
+    k: usize,
+    candidate: usize,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+) {
     path[k] = candidate;
-    options.send_progress(ProgressMessage::CityChange(candidate));
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::CityChange(candidate));
+    }
 }
 
 fn undo_move(path: &mut Path, k: usize) {
-    // we wouldnt change the first city
     if k > 0 {
         path[k] = UNVISITED_NODE;
     }
@@ -167,7 +184,7 @@ fn undo_move(path: &mut Path, k: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{bellman_karp, distance_matrix, kdtree};
+    use crate::tsp::{bellman_karp, distance_matrix, kdtree, AppOptions};
 
     fn tsp5_cities() -> Vec<kdtree::KDPoint> {
         kdtree::build_points(&[
@@ -183,7 +200,7 @@ mod tests {
     fn test_solve_visits_all_cities() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &SolverOptions::default());
+        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -194,7 +211,7 @@ mod tests {
     fn test_solve_finds_optimal_tour_on_tsp5() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &SolverOptions::default());
+        let tour = solve(&cities, &dm, &AppOptions::default(), None, None);
 
         assert!(
             (tour.total - 4.0).abs() < 1e-3,
@@ -207,8 +224,8 @@ mod tests {
     fn test_solve_matches_bellman_karp_on_tsp5() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let bb_tour = solve(&cities, &dm, &SolverOptions::default());
-        let bhk_tour = bellman_karp::solve(&cities, &dm, &SolverOptions::default());
+        let bb_tour = solve(&cities, &dm, &AppOptions::default(), None, None);
+        let bhk_tour = bellman_karp::solve(&cities, &dm, &AppOptions::default(), None, None);
 
         assert!(
             (bb_tour.total - bhk_tour.total).abs() < 1e-3,

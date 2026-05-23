@@ -2,32 +2,42 @@ use rand::Rng;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
+use std::sync::mpsc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::probability::probability;
 use super::progress::ProgressMessage;
 use super::route::{random_position_pair, Route};
-use super::{Solution, SolverOptions};
+use super::{AppOptions, GAOptions, Solution};
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
+pub fn solve(
+    cities: &[KDPoint],
+    distances: &DistanceMatrix,
+    opts: &AppOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    initial_tour: Option<&[usize]>,
+) -> Solution {
+    let ga = opts.ga.as_ref().cloned().unwrap_or_default();
     let evaluator = build_evaluator(distances);
 
     let population_size = cities.len();
-    let population = match options.initial_tour.as_deref() {
+    let population = match initial_tour {
         Some(t) => TspPopulation::from_cities_seeded(cities, population_size, &evaluator, t),
         None => TspPopulation::from_cities(cities, population_size, &evaluator),
     };
-    let best_candidate = solve_ga(&population, evaluator, distances, options);
+    let best_candidate = solve_ga(&population, evaluator, distances, &ga, progress_tx);
 
     let best_route = Route::new(best_candidate.genotype());
-    options.send_progress(ProgressMessage::PathUpdate(
-        best_route,
-        distances.tour_length(best_candidate.genotype()),
-    ));
-    options.send_progress(ProgressMessage::Done);
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(
+            best_route,
+            distances.tour_length(best_candidate.genotype()),
+        ));
+        let _ = tx.send(ProgressMessage::Done);
+    }
     Solution::new(best_candidate.genotype(), cities, distances)
 }
 
@@ -35,26 +45,26 @@ fn solve_ga(
     population: &TspPopulation,
     fitness_fn: FitnessFn,
     distances: &DistanceMatrix,
-    options: &SolverOptions,
+    ga: &GAOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
 ) -> TspGenotype {
     let population_size = population.len();
-    let mutation_prob = options.mutation_probability;
-    let elite_size = options.n_elite;
+    let mutation_prob = ga.mutation_probability;
+    let elite_size = ga.n_elite;
 
     tracing::info!(
         population_size,
-        elite_size = options.n_elite,
-        mutation_prob = options.mutation_probability,
+        elite_size = ga.n_elite,
+        mutation_prob = ga.mutation_probability,
         "GA starting"
     );
 
     let mut epoch = 0;
     let mut current_population = population.clone();
 
-    while epoch < options.epochs {
+    while epoch < ga.heuristic.epochs {
         let mut new_population = TspPopulation::with_capacity(population_size);
 
-        // pass n-fittest directly into new population
         current_population.sort();
         for elite in current_population.individuals().iter().take(elite_size) {
             new_population.add(elite.clone());
@@ -65,12 +75,8 @@ fn solve_ga(
             let parent2 = current_population.random_selection();
 
             let (mut child1, mut child2) = ordered_crossover(parent1, parent2, &fitness_fn);
-            if probability(mutation_prob) {
-                child1.mutate()
-            };
-            if probability(mutation_prob) {
-                child2.mutate()
-            };
+            if probability(mutation_prob) { child1.mutate() };
+            if probability(mutation_prob) { child2.mutate() };
 
             new_population.add(child1);
             new_population.add(child2);
@@ -80,10 +86,12 @@ fn solve_ga(
 
         let best_candidate = current_population.best().clone();
         let best_route = Route::new(best_candidate.genotype());
-        options.send_progress(ProgressMessage::PathUpdate(
-            best_route,
-            distances.tour_length(best_candidate.genotype()),
-        ));
+        if let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::PathUpdate(
+                best_route,
+                distances.tour_length(best_candidate.genotype()),
+            ));
+        }
 
         tracing::debug!(epoch, fitness = current_population.best().fitness(), "GA: generation");
 
@@ -134,11 +142,9 @@ fn ordered_crossover_genes(
     let range_a: HashSet<usize> = parent1[from..=to].iter().copied().collect();
     let range_b: HashSet<usize> = parent2[from..=to].iter().copied().collect();
 
-    // copy cross-overs from parents
     gene1[from..=to].copy_from_slice(&parent2[from..=to]);
     gene2[from..=to].copy_from_slice(&parent1[from..=to]);
 
-    // copy other values like rolling-shift to -> from
     let mut k = (to + 1) % gene_len;
     let mut j1 = k;
     let mut j2 = k;
@@ -256,8 +262,6 @@ impl TspPopulation {
             .sort_by(|x, y| y.fitness.partial_cmp(&x.fitness).unwrap_or(Ordering::Equal));
     }
 
-    // TODO: test that entropy is good enough
-    // roulette wheel selection
     fn random_selection(&self) -> &TspGenotype {
         let total = self.total_fitness();
         let mut rng = rand::rng();
@@ -312,7 +316,6 @@ impl TspGenotype {
         self.fitness = new_fitness;
     }
 
-    // RSM from the reference paper
     pub fn mutate(&mut self) {
         let (mut from, mut to) = random_position_pair(self.genotype.len());
 
@@ -327,7 +330,7 @@ impl TspGenotype {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree};
+    use crate::tsp::{distance_matrix, kdtree, AppOptions, GAOptions, HeuristicOptions};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -341,9 +344,6 @@ mod tests {
 
     #[test]
     fn test_ga_respects_initial_tour() {
-        // from_cities_seeded must place the exact seed as the first individual.
-        // This test calls from_cities_seeded which doesn't exist yet (RED: compile failure).
-        // After implementation it verifies individuals()[0] == seed.
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
         let seed: Vec<usize> = cities.iter().map(|c| c.id).collect();
@@ -360,10 +360,6 @@ mod tests {
         );
     }
 
-    // Regression test: GA's internal fitness is 1/tour_length (used for selection).
-    // The PathUpdate messages and Solution::total must carry the real tour_length,
-    // not the inverted fitness. If this regresses, solution.total would be ~0.00025
-    // instead of ~4.0 for a unit square.
     #[test]
     fn test_solve_returns_real_tour_length_not_inverted_fitness() {
         let cities = kdtree::build_points(&[
@@ -373,21 +369,21 @@ mod tests {
             vec![1.0, 0.0],
         ]);
         let distances = distance_matrix::from_cities(&cities);
-        let options = SolverOptions {
-            epochs: 100,
-            ..SolverOptions::default()
+        let opts = AppOptions {
+            ga: Some(GAOptions {
+                heuristic: HeuristicOptions { epochs: 100, ..HeuristicOptions::default() },
+                ..GAOptions::default()
+            }),
+            ..AppOptions::default()
         };
 
-        let solution = solve(&cities, &distances, &options);
+        let solution = solve(&cities, &distances, &opts, None, None);
 
-        // Real tour for a unit square visits all 4 sides: total >= 4.0.
-        // Inverted fitness would be 1/4.0 = 0.25 — far below this threshold.
         assert!(
             solution.total >= 3.9,
             "GA solution.total = {} looks like inverted fitness; expected >= 4.0",
             solution.total
         );
-        // Also verify the stored total matches a fresh computation on the route.
         let recomputed = distances.tour_length(solution.route());
         assert!(
             (solution.total - recomputed).abs() < 0.01,
@@ -405,51 +401,27 @@ mod tests {
         })
     }
 
-    // n_seeded must be n/5, not n/10. Verify by checking that individuals[1..n/5]
-    // all exist and are distinct from each other AND from the exact seed.
-    // With old code (n_seeded = n/10), for n=20 that's 2 — indices 2 and 3
-    // come from the random portion and are random_successor of sequential, not seed.
-    // With new code (n_seeded = n/5), indices 1..4 are seeded variants.
     #[test]
     fn test_seeded_population_n5_fraction() {
-        // n=20: n/5=4, n/10=2 — enough to distinguish.
-        // Use a reversed seed so seeded variants start at city 19, not 0.
         let n = 20usize;
         let cities = kdtree::build_points(
             &(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>(),
         );
         let dm = distance_matrix::from_cities(&cities);
-        // Reversed seed maximally differs from the sequential base used for random portion.
         let seed: Vec<usize> = (0..n).rev().collect();
         let evaluator = make_evaluator(dm);
 
-        // Run 100 trials; collect ALL individuals across them.
-        // Count how many have genotype[0] == 19 (only possible if derived from reversed seed,
-        // since the random_successor base starts at 0).
-        // With n/10=2 seeded: 2 seeds per trial × 100 = 200 seed-derived individuals max.
-        // With n/5=4 seeded: 4 × 100 = 400 seed-derived individuals.
-        // Random-portion individuals start at 0, not 19 → not counted.
         let trials = 100usize;
         let mut seed_derived_count = 0usize;
         for _ in 0..trials {
             let pop = TspPopulation::from_cities_seeded(&cities, n, &evaluator, &seed);
             for ind in pop.individuals() {
-                // Only seed-derived individuals start at 19 (from reversed seed).
                 if ind.genotype()[0] == n - 1 {
                     seed_derived_count += 1;
                 }
             }
         }
         let avg_seed_derived = seed_derived_count as f32 / trials as f32;
-        // With n/5=4 seeded, at least the exact seed (1 per trial) always starts at 19.
-        // Mutants MAY or may not start at 19 (RSM can move it). So minimum is 1.0.
-        // Old code (n/10=2) also has exact seed: 1.0 minimum.
-        // What DIFFERS: with n/5=4, about 3 mutants exist; with n/10=2, about 1 mutant.
-        // A mutant derived from reversed seed keeps genotype[0]==19 only if RSM doesn't
-        // touch position 0. P(position 0 untouched) = (n-2)/n ≈ 0.9 per mutation.
-        // With 3 mutants (n/5): expected additional contribution ≈ 3 × 0.9 = 2.7/trial.
-        // With 1 mutant (n/10): expected additional contribution ≈ 1 × 0.9 = 0.9/trial.
-        // Expected avg with n/5: ≈ 3.7; with n/10: ≈ 1.9. Threshold: 2.5 distinguishes.
         assert!(
             avg_seed_derived >= 2.5,
             "expected avg ≥ 2.5 seed-derived individuals per trial (n/5 fraction), got {:.2}",
@@ -457,10 +429,6 @@ mod tests {
         );
     }
 
-    // Random portion of the unseeded population must be well-shuffled,
-    // not near-sequential (1-swap from city insertion order).
-    // Tests that from_cities produces distinct individuals — the mean
-    // pairwise Kendall distance across the population must exceed 0.3.
     #[test]
     fn test_from_cities_produces_diverse_population() {
         let n = 20usize;
@@ -472,9 +440,6 @@ mod tests {
 
         let pop = TspPopulation::from_cities(&cities, n, &evaluator);
 
-        // Count pairs that are NOT identical (a weak but reliable diversity signal).
-        // With random_successor() all are 1-swap of sequential — likely very similar to each other.
-        // With shuffle() individuals are independent random permutations.
         let individuals = pop.individuals();
         let mut n_distinct_pairs = 0usize;
         let total_pairs = individuals.len() * (individuals.len() - 1) / 2;
@@ -485,7 +450,6 @@ mod tests {
                 }
             }
         }
-        // ALL pairs should be distinct — random_successor can repeat, shuffle never does.
         assert_eq!(
             n_distinct_pairs, total_pairs,
             "population has duplicate individuals; expected all {} pairs to be distinct, only {} were",

@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use rand::Rng;
 
 use super::distance_matrix::DistanceMatrix;
@@ -5,14 +7,11 @@ use super::kdtree::KDPoint;
 use super::probability::{bernoulli, levy_step, sample_without_replacement};
 use super::progress::ProgressMessage;
 use super::route::{apply_swaps, swap_sequence, Route};
-use super::{Solution, SolverOptions};
+use super::{AppOptions, Solution};
 
 const DEFAULT_N_FLOWERS: usize = 25;
 
 
-/// Global pollination: move `flower` toward `gbest` by a Lévy-scaled fraction of the swap
-/// sequence between them — the permutation analogue of `x + γ·L·(g* − x)` (Yang 2012).
-/// Returns the current flower unchanged if it already equals `gbest`.
 fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl Rng) -> Vec<usize> {
     let seq = swap_sequence(flower, gbest);
     if seq.is_empty() {
@@ -24,9 +23,6 @@ fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl Rng) -> 
     apply_swaps(flower, &seq[..n_swaps])
 }
 
-/// Local pollination: apply an ε-scaled fraction of the displacement between two randomly
-/// chosen flowers `j` and `k` to `flower` — the permutation analogue of `x + ε·(x_j − x_k)`.
-/// Returns the current flower unchanged when `n_flowers < 3` or `flowers[j] == flowers[k]`.
 fn local_pollination(
     flower: &[usize],
     flowers: &[Vec<usize>],
@@ -49,21 +45,28 @@ fn local_pollination(
     apply_swaps(flower, &seq[..n_swaps])
 }
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
-    let n_flowers = options.n_nearest.max(DEFAULT_N_FLOWERS);
+pub fn solve(
+    cities: &[KDPoint],
+    distances: &DistanceMatrix,
+    opts: &AppOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    initial_tour: Option<&[usize]>,
+) -> Solution {
+    let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
+    let n_flowers = fpa.heuristic.n_nearest.max(DEFAULT_N_FLOWERS);
     let n_cities = cities.len();
     // default mutation_probability 0.001 → 99.9% local, which defeats global search;
     // floor to 0.8 so a bare `bin fpa` run is meaningful without extra flags.
-    let switch_prob = if options.mutation_probability < 0.01 {
+    let switch_prob = if fpa.mutation_probability < 0.01 {
         0.8_f64
     } else {
-        options.mutation_probability as f64
+        fpa.mutation_probability as f64
     };
 
     tracing::info!(
         n_flowers,
         switch_prob,
-        epochs = options.epochs,
+        epochs = fpa.heuristic.epochs,
         "FPA starting"
     );
 
@@ -73,7 +76,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut flowers: Vec<Vec<usize>> = (0..n_flowers)
         .map(|idx| {
             if idx == 0 {
-                options.initial_tour.clone().unwrap_or_else(|| {
+                initial_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
                     let mut t = city_ids.clone();
                     for i in (1..n_cities).rev() {
                         let j = rng.random_range(0..=i);
@@ -102,9 +105,11 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut gbest: Vec<usize> = flowers[best_idx].clone();
     let mut gbest_cost: f32 = costs[best_idx];
 
-    options.send_progress(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+    }
 
-    for epoch in 0..options.epochs {
+    for epoch in 0..fpa.heuristic.epochs {
         for i in 0..n_flowers {
             let new_x = if bernoulli(&mut rng, switch_prob) {
                 global_pollination(&flowers[i], &gbest, &mut rng)
@@ -120,26 +125,29 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
                 if new_cost < gbest_cost {
                     gbest = flowers[i].clone();
                     gbest_cost = new_cost;
-                    options.send_progress(ProgressMessage::PathUpdate(
-                        Route::new(&gbest),
-                        gbest_cost,
-                    ));
+                    if let Some(tx) = progress_tx {
+                        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+                    }
                     tracing::info!(epoch, tour_length = gbest_cost, "FPA: new best");
                 }
             }
         }
 
-        options.send_progress(ProgressMessage::EpochUpdate(epoch));
+        if let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
+        }
     }
 
-    options.send_progress(ProgressMessage::Done);
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::Done);
+    }
     Solution::new(&gbest, cities, distances)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree};
+    use crate::tsp::{distance_matrix, kdtree, AppOptions, FPAOptions, HeuristicOptions};
 
     #[test]
     fn test_fpa_respects_initial_tour() {
@@ -153,12 +161,14 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = SolverOptions {
-            epochs: 0,
-            initial_tour: Some(optimal.clone()),
-            ..SolverOptions::default()
+        let opts = AppOptions {
+            fpa: Some(FPAOptions {
+                heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+                ..FPAOptions::default()
+            }),
+            ..AppOptions::default()
         };
-        let result = solve(&cities, &dm, &opts);
+        let result = solve(&cities, &dm, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();
@@ -167,7 +177,7 @@ mod tests {
         assert_eq!(visited, expected);
     }
 
-    fn four_city_setup() -> (Vec<KDPoint>, DistanceMatrix) {
+    fn four_city_setup() -> (Vec<KDPoint>, super::DistanceMatrix) {
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
             vec![1.0, 0.0],
@@ -181,13 +191,14 @@ mod tests {
     #[test]
     fn test_solve_returns_valid_tour() {
         let (cities, dm) = four_city_setup();
-        let options = SolverOptions {
-            epochs: 30,
-            n_nearest: 5,
-            mutation_probability: 0.8,
-            ..SolverOptions::default()
+        let opts = AppOptions {
+            fpa: Some(FPAOptions {
+                heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
+                mutation_probability: 0.8,
+            }),
+            ..AppOptions::default()
         };
-        let sol = solve(&cities, &dm, &options);
+        let sol = solve(&cities, &dm, &opts, None, None);
         let mut visited = sol.route().to_vec();
         visited.sort();
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
