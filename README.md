@@ -523,6 +523,39 @@ Quick summary (pipeline presets first, then standalone `--no-seed` baselines):
 
 ---
 
+## Development
+
+Common development tasks are standardised in [`Taskfile.yml`](Taskfile.yml). Install [go-task](https://taskfile.dev/installation/):
+
+```bash
+brew install go-task                        # macOS
+go install github.com/go-task/task/v3/cmd/task@latest  # any platform with Go
+```
+
+See all available tasks:
+
+```bash
+task --list
+```
+
+Key workflows:
+
+```bash
+task build               # compile debug binary
+task test                # run unit and integration tests
+task test:e2e            # run BATS end-to-end CLI tests
+task test:all            # unit + e2e
+task lint                # clippy (warnings are errors)
+task fmt                 # auto-format with rustfmt
+task check               # build + test + lint + fmt:check (mirrors CI)
+
+task run -- solve nn -i tests/fixtures/berlin52.tsp   # run solver via cargo run
+task bench:berlin52      # compare all approximate solvers on berlin52 (release build)
+task build:wasm          # build the WebAssembly component
+```
+
+---
+
 ## Contributing
 
 Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow.
