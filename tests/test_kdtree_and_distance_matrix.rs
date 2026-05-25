@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::{distance_matrix, kdtree};
 
@@ -45,6 +46,94 @@ fn test_knn_n_gt_1_matches_oracle() {
             "n={n}: kdtree={kd_ids:?}  oracle={dm_ids:?}"
         );
     }
+}
+
+// ── Issue #97 regression tests ───────────────────────────────────────────────
+
+/// nearest() must not include the query city itself (self-distance 0.0).
+/// Guaranteed by NearestResult::add() since #95 — test documents the contract.
+#[test]
+fn test_nearest_excludes_self() {
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0], // id=0 <- target
+        vec![1.0, 0.0], // id=1
+        vec![2.0, 0.0], // id=2
+    ]);
+    let dm = distance_matrix::from_cities(&cities);
+    let result = dm.nearest(&cities[0], 2);
+    let ids: Vec<usize> = result.nearest().iter().map(|r| r.point.id).collect();
+    assert!(!ids.contains(&0), "self must not appear in nearest results: {ids:?}");
+}
+
+/// distance_by_pos must return Err (not panic) for an out-of-range position.
+/// Bug: old guard `n_items_before > size` passes for pos == n, then panics on
+/// direct index access.
+#[test]
+fn test_distance_by_pos_out_of_range_returns_err() {
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0],
+        vec![1.0, 0.0],
+        vec![2.0, 0.0], // n=3
+    ]);
+    let dm = DistanceMatrix::from_cities(&cities).unwrap();
+    assert!(dm.distance_by_pos(3, 0).is_err(), "pos >= n must be Err");
+    assert!(dm.distance_by_pos(0, 3).is_err(), "pos >= n must be Err");
+}
+
+/// distance_between must return Err for an unknown city ID, not panic.
+#[test]
+fn test_distance_between_unknown_city_returns_err() {
+    let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0]]);
+    let dm = DistanceMatrix::from_cities(&cities).unwrap();
+    assert!(dm.distance_between(99, 0).is_err());
+    assert!(dm.distance_between(0, 99).is_err());
+}
+
+/// nearest() must return an empty result (not panic) for an unknown target city ID.
+#[test]
+fn test_nearest_unknown_target_returns_empty() {
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0],
+        vec![1.0, 0.0],
+        vec![2.0, 0.0],
+    ]);
+    let dm = distance_matrix::from_cities(&cities);
+    let unknown = KDPoint::new_with_id(99, &[0.0, 0.0]);
+    let result = dm.nearest(&unknown, 2);
+    assert_eq!(0, result.nearest().len(), "unknown target → empty result");
+}
+
+/// tour_length must not panic for a path that contains an unknown city ID.
+#[test]
+fn test_tour_length_with_unknown_city_does_not_panic() {
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0],
+        vec![0.0, 0.5],
+        vec![0.0, 1.0],
+        vec![1.0, 1.0],
+        vec![1.0, 0.0],
+    ]);
+    let dm = DistanceMatrix::from_cities(&cities).unwrap();
+    let _ = dm.tour_length(&[0, 99, 1]); // must not panic
+}
+
+/// tour_length_by_pos must return the same result as tour_length for a valid path.
+#[test]
+fn test_tour_length_by_pos_matches_tour_length() {
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0],
+        vec![0.0, 0.5],
+        vec![0.0, 1.0],
+        vec![1.0, 1.0],
+        vec![1.0, 0.0],
+    ]);
+    let dm = DistanceMatrix::from_cities(&cities).unwrap();
+    let city_id_path = vec![0usize, 1, 2, 3, 4];
+    let pos_path = vec![0usize, 1, 2, 3, 4]; // positions == ids for 0-indexed cities
+    assert_eq!(
+        dm.tour_length(&city_id_path),
+        dm.tour_length_by_pos(&pos_path)
+    );
 }
 
 #[test]

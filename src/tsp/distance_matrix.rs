@@ -75,6 +75,14 @@ impl DistanceMatrix {
         let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
 
         assert!(n == city_idx.len(), "city_idx size differs from n cities");
+        assert_eq!(
+            distances.len(),
+            n * (n - 1) / 2,
+            "distances length {} != n*(n-1)/2={} for n={}",
+            distances.len(),
+            n * (n - 1) / 2,
+            n
+        );
         DistanceMatrix {
             n,
             size: distances.len(),
@@ -117,6 +125,14 @@ impl DistanceMatrix {
         self.items.is_empty()
     }
 
+    pub fn num_cities(&self) -> usize {
+        self.n
+    }
+
+    pub fn num_distances(&self) -> usize {
+        self.size
+    }
+
     pub fn distances(&self) -> &[f32] {
         &self.items
     }
@@ -127,18 +143,13 @@ impl DistanceMatrix {
         if pos1 == pos2 {
             return Ok(0.0);
         }
-
-        let from_city = std::cmp::max(pos1, pos2);
-        let to_city = std::cmp::min(pos1, pos2);
-
-        let n_items_before = (from_city - 1) * from_city / 2;
-        if n_items_before > self.size {
-            return Err("city with biggest id is not in distance matrix");
+        if pos1 >= self.n || pos2 >= self.n {
+            return Err("position out of range");
         }
-
-        let distance_idx = n_items_before + to_city;
-
-        Ok(self.items[distance_idx])
+        let from = pos1.max(pos2);
+        let to = pos1.min(pos2);
+        let idx = from * (from - 1) / 2 + to;
+        self.items.get(idx).copied().ok_or("distance index out of range")
     }
 
     /// returns distance between city n and m
@@ -147,21 +158,11 @@ impl DistanceMatrix {
     /// here bigger cityId works like padding, then smaller id acts as index from padding
     pub fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
         if city_id1 == city_id2 {
-            return Ok(0.0); // elements on the diagonal
+            return Ok(0.0);
         }
-
-        // translate city ids to matrix id
-        let pos1 = self
-            .city_idx
-            .get(&city_id1)
-            .expect("city_id1 doesnt exists in index");
-
-        let pos2 = self
-            .city_idx
-            .get(&city_id2)
-            .expect("city_id2 doesnt exists in index");
-
-        self.distance_by_pos(*pos1, *pos2)
+        let pos1 = self.city_idx.get(&city_id1).copied().ok_or("city_id1 not in index")?;
+        let pos2 = self.city_idx.get(&city_id2).copied().ok_or("city_id2 not in index")?;
+        self.distance_by_pos(pos1, pos2)
     }
 
     /// returns list of distances from city N, where 0 distance from the city;
@@ -172,18 +173,28 @@ impl DistanceMatrix {
     }
 
     pub fn tour_length(&self, path: &[usize]) -> f32 {
-        let tour_length = path.len();
-        if tour_length < 2 {
+        if path.len() < 2 {
             return 0.0;
         }
-
-        let last_city_id = *path.last().unwrap();
-        let mut total = self.distance_between(last_city_id, path[0]).unwrap();
-
-        for i in 1..tour_length {
-            total += self.distance_between(path[i], path[i - 1]).unwrap();
+        // Translate city IDs to positions upfront; unknown city ID → return 0.0.
+        let positions: Option<Vec<usize>> = path.iter().map(|&id| self.city_id2pos(id)).collect();
+        match positions {
+            None => 0.0,
+            Some(pos_path) => self.tour_length_by_pos(&pos_path),
         }
+    }
 
+    /// Position-based tour length — no HashMap lookups per edge.
+    /// All positions must be in 0..num_cities().
+    pub fn tour_length_by_pos(&self, path: &[usize]) -> f32 {
+        if path.len() < 2 {
+            return 0.0;
+        }
+        let last = *path.last().unwrap();
+        let mut total = self.distance_by_pos(last, path[0]).unwrap_or(0.0);
+        for w in path.windows(2) {
+            total += self.distance_by_pos(w[0], w[1]).unwrap_or(0.0);
+        }
         total
     }
 
@@ -191,45 +202,45 @@ impl DistanceMatrix {
         &self.city_idx
     }
 
-    pub fn pos2city_id(&self, pos: &usize) -> Option<usize> {
-        self.cities.get(pos).map(|c| c.id)
+    pub fn pos2city_id(&self, pos: usize) -> Option<usize> {
+        self.cities.get(&pos).map(|c| c.id)
     }
 
-    pub fn city_id2pos(&self, city_id: &usize) -> Option<usize> {
-        self.city_idx.get(city_id).copied()
+    pub fn city_id2pos(&self, city_id: usize) -> Option<usize> {
+        self.city_idx.get(&city_id).copied()
     }
 
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
         let mut search_result = NearestResult::new(*target, f32::INFINITY, n);
 
-        if let Some(city_pos) = self.city_id2pos(&target.id) {
-            let distances_from_target = self.distances_from_index(city_pos);
-            for (pos, distance) in distances_from_target.iter().enumerate() {
-                // Look up by matrix position, not city_id.  city_id != pos when city IDs
-                // are not 0-based (e.g. 1-indexed TSPLIB files like berlin52.tsp).
-                if let Some(pt) = self.cities.get(&pos) {
-                    search_result.add(*pt, *distance);
-                }
+        let city_pos = match self.city_id2pos(target.id) {
+            Some(pos) => pos,
+            None => return search_result, // unknown target → empty result, no panic
+        };
+
+        let distances_from_target = self.distances_from_index(city_pos);
+        for (pos, distance) in distances_from_target.iter().enumerate() {
+            if pos == city_pos {
+                continue; // skip self (belt-and-suspenders; add() already gates on pt.id)
             }
-        } else {
-            panic!("DistanceMatrix.nearest with unknow_id");
+            // Look up by matrix position, not city_id.  city_id != pos when city IDs
+            // are not 0-based (e.g. 1-indexed TSPLIB files like berlin52.tsp).
+            if let Some(pt) = self.cities.get(&pos) {
+                search_result.add(*pt, *distance);
+            }
         }
 
         search_result
     }
 
     fn distances_from_index(&self, pos: usize) -> Vec<f32> {
-        let mut distances: Vec<f32> = vec![];
-
+        let mut distances = Vec::with_capacity(self.n);
         for i in 0..pos {
-            distances.push(self.distance_by_pos(pos, i).unwrap_or(-1.0));
+            distances.push(self.distance_by_pos(pos, i).expect("valid position in distances_from_index"));
         }
-
-        let n_cities = self.n;
-        for i in pos..n_cities {
-            distances.push(self.distance_by_pos(i, pos).unwrap_or(-1.0));
+        for i in pos..self.n {
+            distances.push(self.distance_by_pos(i, pos).expect("valid position in distances_from_index"));
         }
-
         distances
     }
 }
