@@ -10,8 +10,9 @@ use teeline::config::{
 use teeline::tsp::{
     self, AppOptions, Solution, Solvers, TspProblem, distance_matrix,
     pipeline::{PipelineStage, run_pipeline},
-    progress, progress_eframe, tsplib,
+    progress, tsplib,
 };
+use teeline_gui::ProgressPlot;
 use tracing_subscriber::EnvFilter;
 
 // ---------------------------------------------------------------------------
@@ -329,11 +330,10 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
         }
     };
 
-    let maybe_display: Option<progress_eframe::ProgressPlot>;
+    let maybe_display: Option<ProgressPlot>;
     let progress_tx;
     if args.get_flag("gui") {
-        let (display, tx) =
-            progress_eframe::ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
+        let (display, tx) = ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
         progress_tx = Some(tx);
         maybe_display = Some(display);
     } else {

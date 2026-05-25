@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "teeline-wasm"]
+members = [".", "teeline-wasm", "teeline-gui"]
 default-members = ["."]
 resolver = "2"
 
@@ -13,22 +13,12 @@ edition = "2024"
 name = "teeline"
 path = "src/lib.rs"
 
-[[bin]]
-name = "bin"
-path = "src/main.rs"
-required-features = ["gui"]
-
-[features]
-default = ["gui"]
-gui = ["dep:eframe"]
-
 [dependencies]
 clap = "4.6.1"
 rand = "0.9"
 regex = "1.12.3"
 serde = { version = "1", features = ["derive"] }
 toml = "0.8"
-eframe = { version = "0.33", features = ["x11", "wayland"], optional = true }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 

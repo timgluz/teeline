@@ -12,8 +12,6 @@ pub mod particle_swarm;
 pub mod pipeline;
 pub mod probability;
 pub mod progress;
-#[cfg(feature = "gui")]
-pub mod progress_eframe;
 pub mod random_shuffle;
 pub mod route;
 pub mod simulated_annealing;
