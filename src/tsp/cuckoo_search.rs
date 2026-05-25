@@ -9,7 +9,6 @@ use super::{CSOptions, Solution, TspProblem};
 
 const DEFAULT_N_NESTS: usize = 25;
 
-
 fn apply_k_random_2opt(tour: &[usize], k: usize, rng: &mut impl Rng) -> Vec<usize> {
     let n = tour.len();
     let mut result = tour.to_vec();
@@ -78,7 +77,11 @@ pub fn solve(
     for epoch in 0..opts.heuristic.epochs {
         for cuckoo_idx in 0..n_nests {
             let levy = levy_step(&mut rng).abs();
-            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
             let k = ((levy * (n_cities as f64 * 0.1)).ceil() as usize).clamp(1, n_cities / 2);
 
             let new_tour = apply_k_random_2opt(&nests[cuckoo_idx], k, &mut rng);
@@ -135,7 +138,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, CSOptions, HeuristicOptions, TspProblem};
+    use crate::tsp::{CSOptions, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     #[test]
     fn test_cs_respects_initial_tour() {
@@ -150,7 +153,10 @@ mod tests {
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
         let opts = CSOptions {
-            heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+            heuristic: HeuristicOptions {
+                epochs: 0,
+                ..HeuristicOptions::default()
+            },
             ..CSOptions::default()
         };
         let problem = TspProblem::new(cities.clone(), dm);
@@ -191,7 +197,11 @@ mod tests {
         ]);
         let distances = distance_matrix::from_cities(&cities);
         let opts = CSOptions {
-            heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
+            heuristic: HeuristicOptions {
+                epochs: 30,
+                n_nearest: 5,
+                ..HeuristicOptions::default()
+            },
             mutation_probability: 0.25,
         };
         let problem = TspProblem::new(cities.clone(), distances);
@@ -200,7 +210,10 @@ mod tests {
         visited.sort();
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
         expected.sort();
-        assert_eq!(visited, expected, "CS tour does not visit all cities exactly once");
+        assert_eq!(
+            visited, expected,
+            "CS tour does not visit all cities exactly once"
+        );
         assert!(sol.total > 0.0);
     }
 }

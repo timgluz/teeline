@@ -310,7 +310,6 @@ impl KDPoint {
         self.coords.get(dimension).copied()
     }
 
-
     pub fn distance(&self, other: &KDPoint) -> f32 {
         let distance: f32 = self
             .coords

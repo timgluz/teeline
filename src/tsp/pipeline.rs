@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
-use super::{validate_tour, AppOptions, Solution, Solvers, TspProblem};
+use super::{AppOptions, Solution, Solvers, TspProblem, validate_tour};
 
 pub struct PipelineStage {
     pub solver: Solvers,
@@ -17,7 +17,12 @@ impl PipelineStage {
         problem: TspProblem,
         progress_tx: Option<mpsc::Sender<ProgressMessage>>,
     ) -> Self {
-        PipelineStage { solver, options, problem, progress_tx }
+        PipelineStage {
+            solver,
+            options,
+            problem,
+            progress_tx,
+        }
     }
 
     pub fn solve(&self, init_tour: Option<&[usize]>) -> Result<Solution, String> {
@@ -38,7 +43,8 @@ pub fn run_pipeline(stages: &[PipelineStage]) -> Result<Solution, String> {
     let mut seed: Option<Vec<usize>> = None;
     for stage in stages {
         if let Some(ref t) = seed
-            && let Err(e) = validate_tour(t, &stage.problem.cities) {
+            && let Err(e) = validate_tour(t, &stage.problem.cities)
+        {
             tracing::warn!("pipeline: invalid seed ({e}); using default seeding");
             seed = None;
         }
@@ -58,7 +64,7 @@ pub fn run_pipeline(stages: &[PipelineStage]) -> Result<Solution, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, AppOptions, Solvers, TspProblem};
+    use crate::tsp::{AppOptions, Solvers, TspProblem, distance_matrix, kdtree};
 
     fn small_cities() -> Vec<kdtree::KDPoint> {
         kdtree::build_points(&[

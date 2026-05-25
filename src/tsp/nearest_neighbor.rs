@@ -13,7 +13,11 @@ pub fn solve(
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
-    tracing::info!(n_nearest = opts.n_nearest, cities = cities.len(), "NN starting");
+    tracing::info!(
+        n_nearest = opts.n_nearest,
+        cities = cities.len(),
+        "NN starting"
+    );
 
     let n_nearest = opts.n_nearest;
     let cities_table: HashMap<usize, _> = cities.iter().map(|c| (c.id, c.clone())).collect();
@@ -47,8 +51,12 @@ pub fn solve(
                 *unvisited
                     .iter()
                     .min_by(|&&a, &&b| {
-                        let da = distances.distance_between(current_id, a).unwrap_or(f32::MAX);
-                        let db = distances.distance_between(current_id, b).unwrap_or(f32::MAX);
+                        let da = distances
+                            .distance_between(current_id, a)
+                            .unwrap_or(f32::MAX);
+                        let db = distances
+                            .distance_between(current_id, b)
+                            .unwrap_or(f32::MAX);
                         da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
                     })
                     .expect("unvisited is non-empty")
@@ -70,7 +78,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn tsp5_problem() -> TspProblem {
         let cities = kdtree::build_points(&[
@@ -99,7 +107,11 @@ mod tests {
         let problem = tsp5_problem();
         let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
-        assert!(tour.total > 0.0, "tour length should be positive, got {}", tour.total);
+        assert!(
+            tour.total > 0.0,
+            "tour length should be positive, got {}",
+            tour.total
+        );
         assert!(tour.total.is_finite(), "tour length should be finite");
     }
 
@@ -134,7 +146,11 @@ mod tests {
         let tour = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let route = tour.route().to_vec();
-        assert_ne!(route, vec![0, 1, 2, 3, 4], "NN produced sorted output (regression)");
+        assert_ne!(
+            route,
+            vec![0, 1, 2, 3, 4],
+            "NN produced sorted output (regression)"
+        );
         let mut sorted = route.clone();
         sorted.sort();
         assert_eq!(sorted, vec![0, 1, 2, 3, 4]);

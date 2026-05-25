@@ -1,0 +1,78 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Compile debug binary
+    cmds:
+      - cargo build
+
+  build:release:
+    desc: Compile optimised binary
+    cmds:
+      - cargo build --release
+
+  build:wasm:
+    desc: Build WASM component (requires cargo-component and wasm32-wasip2 target)
+    cmds:
+      - cargo component build --manifest-path teeline-wasm/Cargo.toml
+
+  test:
+    desc: Run all unit and integration tests
+    cmds:
+      - cargo test
+
+  test:verbose:
+    desc: Run tests with captured output
+    cmds:
+      - cargo test -- --nocapture
+
+  test:e2e:
+    desc: Run BATS end-to-end tests (requires debug binary)
+    deps: [build]
+    cmds:
+      - ./tests/bats/bin/bats tests/e2e/
+
+  test:all:
+    desc: Run unit tests and e2e tests
+    deps: [test, test:e2e]
+
+  lint:
+    desc: Run Clippy (warnings are errors)
+    cmds:
+      - cargo clippy -- -D warnings
+
+  lint:fix:
+    desc: Apply automatic Clippy fixes
+    cmds:
+      - cargo clippy --fix -- -D warnings
+
+  fmt:
+    desc: Format code with rustfmt
+    cmds:
+      - cargo fmt
+
+  fmt:check:
+    desc: Check formatting without modifying files (used in CI)
+    cmds:
+      - cargo fmt -- --check
+
+  check:
+    desc: Run build + test + lint + fmt:check (mirrors CI)
+    deps: [build, test, lint, fmt:check]
+
+  run:
+    desc: Run solver (e.g. task run -- solve nn -i tests/fixtures/berlin52.tsp)
+    cmds:
+      - cargo run -- {{.CLI_ARGS}}
+
+  bench:berlin52:
+    desc: Run approximate solvers on berlin52 and compare tour lengths (optimal 7542)
+    deps: [build:release]
+    cmds:
+      - echo "=== berlin52 (optimal 7542) ==="
+      - for solver in nn 2opt 3opt sa ga tabu pso cs fpa; do printf "%-12s " $solver; ./target/release/bin solve $solver -i tests/fixtures/berlin52.tsp 2>/dev/null | head -1; done
+
+  clean:
+    desc: Remove build artifacts
+    cmds:
+      - cargo clean

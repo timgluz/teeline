@@ -49,7 +49,10 @@ pub fn solve(
             n_stale = 0;
 
             if let Some(tx) = progress_tx {
-                let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
+                let _ = tx.send(ProgressMessage::PathUpdate(
+                    best_route.clone(),
+                    best_distance,
+                ));
             }
 
             tracing::info!(epoch, tour_length = best_distance, "hill: new best");
@@ -60,7 +63,11 @@ pub fn solve(
         epoch += 1;
 
         if n_stale > opts.platoo_epochs && opts.platoo_epochs > 0 {
-            tracing::warn!(epoch, plateau_epochs = opts.platoo_epochs, "hill: plateau, restarting");
+            tracing::warn!(
+                epoch,
+                plateau_epochs = opts.platoo_epochs,
+                "hill: plateau, restarting"
+            );
 
             current_route.shuffle();
             n_stale = 0;
@@ -76,7 +83,11 @@ pub fn solve(
     }
 
     if !found_improvement {
-        tracing::warn!(epochs = opts.epochs, tour_length = best_distance, "hill: no improvement found");
+        tracing::warn!(
+            epochs = opts.epochs,
+            tour_length = best_distance,
+            "hill: no improvement found"
+        );
     }
 
     if let Some(tx) = progress_tx {
@@ -88,7 +99,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, kdtree::KDPoint, HeuristicOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree, kdtree::KDPoint};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -101,7 +112,11 @@ mod tests {
     }
 
     fn fast_opts() -> HeuristicOptions {
-        HeuristicOptions { epochs: 500, platoo_epochs: 100, ..HeuristicOptions::default() }
+        HeuristicOptions {
+            epochs: 500,
+            platoo_epochs: 100,
+            ..HeuristicOptions::default()
+        }
     }
 
     #[test]
@@ -110,7 +125,11 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = HeuristicOptions { epochs: 1, platoo_epochs: 1, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 1,
+            platoo_epochs: 1,
+            ..HeuristicOptions::default()
+        };
         let problem = TspProblem::new(cities, dm);
         let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
@@ -144,7 +163,11 @@ mod tests {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities.clone(), dm);
-        let opts = HeuristicOptions { epochs: 100, platoo_epochs: 50, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 100,
+            platoo_epochs: 50,
+            ..HeuristicOptions::default()
+        };
         let tour = solve(&problem, &opts, None, None);
         assert_eq!(tour.route().len(), cities.len());
     }

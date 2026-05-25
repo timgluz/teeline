@@ -4,12 +4,13 @@ use std::str::FromStr;
 use std::thread;
 
 use teeline::config::{
-    resolve_config_file, select_pipeline_source, IdentityProvider, AppOptionsProvider, PipelineSource,
+    AppOptionsProvider, IdentityProvider, PipelineSource, resolve_config_file,
+    select_pipeline_source,
 };
 use teeline::tsp::{
-    self, distance_matrix,
-    pipeline::{run_pipeline, PipelineStage},
-    progress, progress_eframe, tsplib, AppOptions, Solution, Solvers, TspProblem,
+    self, AppOptions, Solution, Solvers, TspProblem, distance_matrix,
+    pipeline::{PipelineStage, run_pipeline},
+    progress, progress_eframe, tsplib,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -71,9 +72,11 @@ fn main() {
     let tuning = tuning_args();
 
     let solve_cmd = Command::new("solve")
-        .about("Solve a TSP instance. Deterministic solvers (2opt, 3opt, tabu) auto-expand to \
+        .about(
+            "Solve a TSP instance. Deterministic solvers (2opt, 3opt, tabu) auto-expand to \
                 pipeline(nn, solver); stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill) \
-                auto-expand to pipeline(shuffle, solver).")
+                auto-expand to pipeline(shuffle, solver).",
+        )
         .arg(
             Arg::new("solver")
                 .index(1)
@@ -93,8 +96,10 @@ fn main() {
         .args(tuning.clone());
 
     let pipeline_cmd = Command::new("pipeline")
-        .about("Chain multiple solvers; each stage warm-starts from the previous result. \
-                Provide either --steps or --config (mutually exclusive).")
+        .about(
+            "Chain multiple solvers; each stage warm-starts from the previous result. \
+                Provide either --steps or --config (mutually exclusive).",
+        )
         .arg(
             Arg::new("steps")
                 .long("steps")
@@ -282,8 +287,10 @@ fn run_pipeline_cmd(args: &ArgMatches) {
 }
 
 fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
-    let stage_configs: Vec<(Solvers, AppOptions)> =
-        steps.iter().map(|&s| (s, solver_options_from_args(args, s))).collect();
+    let stage_configs: Vec<(Solvers, AppOptions)> = steps
+        .iter()
+        .map(|&s| (s, solver_options_from_args(args, s)))
+        .collect();
     run_as_pipeline_stages(stage_configs, args);
 }
 
@@ -334,15 +341,15 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
         maybe_display = None;
     }
 
-    let opt_tour = args
-        .get_one::<String>("optimal_tour")
-        .and_then(|p| match teeline::tsp::opt_tour::read_from_file(Path::new(p.as_str())) {
+    let opt_tour = args.get_one::<String>("optimal_tour").and_then(|p| {
+        match teeline::tsp::opt_tour::read_from_file(Path::new(p.as_str())) {
             Ok(t) => Some(t),
             Err(e) => {
                 eprintln!("--optimal-tour: {e}");
                 None
             }
-        });
+        }
+    });
 
     if let Some(ref ot) = opt_tour
         && let Some(ref tx) = progress_tx
@@ -361,7 +368,12 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
     let stages: Vec<PipelineStage> = stage_configs
         .into_iter()
         .map(|(solver, options)| {
-            PipelineStage::new(solver, options, TspProblem::new(cities.clone(), distances.clone()), progress_tx.clone())
+            PipelineStage::new(
+                solver,
+                options,
+                TspProblem::new(cities.clone(), distances.clone()),
+                progress_tx.clone(),
+            )
         })
         .collect();
 
@@ -500,7 +512,11 @@ mod tests {
     fn options_cmd() -> Command {
         Command::new("test")
             .arg(Arg::new("solver").index(1).required(true))
-            .arg(Arg::new("no_seed").long("no-seed").action(ArgAction::SetTrue))
+            .arg(
+                Arg::new("no_seed")
+                    .long("no-seed")
+                    .action(ArgAction::SetTrue),
+            )
             .args(tuning_args())
     }
 
@@ -532,8 +548,8 @@ mod tests {
     fn test_solver_options_invalid_epochs_errors() {
         // Invalid parse must now return Err (strict CLI validation).
         let args = options_cmd().get_matches_from(["test", "nn", "--epochs", "bad"]);
-        let result = CliArgsProvider::new(&args, Solvers::NearestNeighbor)
-            .provide(AppOptions::default());
+        let result =
+            CliArgsProvider::new(&args, Solvers::NearestNeighbor).provide(AppOptions::default());
         assert!(result.is_err(), "expected Err for --epochs bad");
     }
 
@@ -568,8 +584,7 @@ mod tests {
 
     #[test]
     fn test_solver_options_mutation_probability_parsed() {
-        let args = options_cmd()
-            .get_matches_from(["test", "ga", "--mutation_probability", "0.05"]);
+        let args = options_cmd().get_matches_from(["test", "ga", "--mutation_probability", "0.05"]);
         let opts = solver_options_from_args(&args, Solvers::GeneticAlgorithm);
         assert!((opts.ga.unwrap_or_default().mutation_probability - 0.05).abs() < 1e-5);
     }
@@ -577,11 +592,13 @@ mod tests {
     #[test]
     fn test_solver_options_invalid_mutation_probability_errors() {
         // Invalid parse must return Err (strict CLI validation).
-        let args = options_cmd()
-            .get_matches_from(["test", "ga", "--mutation_probability", "nope"]);
-        let result = CliArgsProvider::new(&args, Solvers::GeneticAlgorithm)
-            .provide(AppOptions::default());
-        assert!(result.is_err(), "expected Err for --mutation_probability nope");
+        let args = options_cmd().get_matches_from(["test", "ga", "--mutation_probability", "nope"]);
+        let result =
+            CliArgsProvider::new(&args, Solvers::GeneticAlgorithm).provide(AppOptions::default());
+        assert!(
+            result.is_err(),
+            "expected Err for --mutation_probability nope"
+        );
     }
 
     #[test]
@@ -611,7 +628,9 @@ mod tests {
     fn test_cli_args_provider_overrides_base() {
         let args = options_cmd().get_matches_from(["test", "nn", "--epochs", "777"]);
         let base = AppOptions::default();
-        let opts = CliArgsProvider::new(&args, Solvers::NearestNeighbor).provide(base).unwrap();
+        let opts = CliArgsProvider::new(&args, Solvers::NearestNeighbor)
+            .provide(base)
+            .unwrap();
         assert_eq!(opts.heuristic.unwrap_or_default().epochs, 777);
     }
 
@@ -619,7 +638,9 @@ mod tests {
     fn test_cli_args_provider_no_args_uses_defaults() {
         let args = options_cmd().get_matches_from(["test", "nn"]);
         let base = AppOptions::default();
-        let opts = CliArgsProvider::new(&args, Solvers::NearestNeighbor).provide(base).unwrap();
+        let opts = CliArgsProvider::new(&args, Solvers::NearestNeighbor)
+            .provide(base)
+            .unwrap();
         assert_eq!(
             opts.heuristic.unwrap_or_default().epochs,
             HeuristicOptions::default().epochs
@@ -631,7 +652,11 @@ mod tests {
         let steps = resolve_preset("classic").unwrap();
         assert_eq!(
             steps,
-            vec![Solvers::NearestNeighbor, Solvers::TwoOpt, Solvers::SimulatedAnnealing]
+            vec![
+                Solvers::NearestNeighbor,
+                Solvers::TwoOpt,
+                Solvers::SimulatedAnnealing
+            ]
         );
     }
 
@@ -646,7 +671,11 @@ mod tests {
         let steps = resolve_preset("thorough").unwrap();
         assert_eq!(
             steps,
-            vec![Solvers::NearestNeighbor, Solvers::ThreeOpt, Solvers::SimulatedAnnealing]
+            vec![
+                Solvers::NearestNeighbor,
+                Solvers::ThreeOpt,
+                Solvers::SimulatedAnnealing
+            ]
         );
     }
 

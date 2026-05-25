@@ -40,7 +40,10 @@ pub fn solve(
             best_distance = local_distance;
 
             if let Some(tx) = progress_tx {
-                let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
+                let _ = tx.send(ProgressMessage::PathUpdate(
+                    best_route.clone(),
+                    best_distance,
+                ));
             }
 
             tracing::info!(epoch, tour_length = local_distance, "tabu: new best");
@@ -109,8 +112,8 @@ impl TabuList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, kdtree::KDPoint, HeuristicOptions, TspProblem};
     use crate::tsp::route::Route;
+    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree, kdtree::KDPoint};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -162,7 +165,10 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = HeuristicOptions { epochs: 1, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 1,
+            ..HeuristicOptions::default()
+        };
         let problem = TspProblem::new(cities, dm);
         let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
@@ -173,7 +179,10 @@ mod tests {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities.clone(), dm);
-        let opts = HeuristicOptions { epochs: 200, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 200,
+            ..HeuristicOptions::default()
+        };
         let tour = solve(&problem, &opts, None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
@@ -186,7 +195,10 @@ mod tests {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
-        let opts = HeuristicOptions { epochs: 200, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 200,
+            ..HeuristicOptions::default()
+        };
         let tour = solve(&problem, &opts, None, None);
 
         assert!(tour.total > 0.0, "tour length must be positive");

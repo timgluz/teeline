@@ -72,8 +72,7 @@ pub struct DistanceMatrix {
 
 impl DistanceMatrix {
     pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
-        let city_idx: HashMap<usize, usize> =
-            cities.iter().map(|(k, c)| (c.id, *k)).collect();
+        let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
 
         assert!(n == city_idx.len(), "city_idx size differs from n cities");
         DistanceMatrix {
@@ -167,10 +166,7 @@ impl DistanceMatrix {
 
     /// returns list of distances from city N, where 0 distance from the city;
     pub fn distances_from(&self, city_id: usize) -> Vec<f32> {
-        let pos: usize = *self
-            .city_idx
-            .get(&city_id)
-            .expect("Unknown city id");
+        let pos: usize = *self.city_idx.get(&city_id).expect("Unknown city id");
 
         self.distances_from_index(pos)
     }

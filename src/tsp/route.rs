@@ -1,7 +1,7 @@
+use rand::Rng;
 /// Route is ordered list of city ids that our traveling salesperson
 /// is going to visit
 use rand::seq::SliceRandom;
-use rand::Rng;
 
 use super::kdtree::KDPoint;
 

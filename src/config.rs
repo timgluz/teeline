@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use crate::tsp::{AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers};
+use crate::tsp::{
+    AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers,
+};
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
 /// Each provider takes a base and returns an overridden copy.
@@ -36,7 +38,9 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                     base.fpa = Some(FPAOptions::from_toml(t)?);
                 }
                 "heuristic" => {
-                    let t = value.as_table().ok_or("config: `heuristic` must be a table")?;
+                    let t = value
+                        .as_table()
+                        .ok_or("config: `heuristic` must be a table")?;
                     base.heuristic = Some(HeuristicOptions::from_toml(t)?);
                 }
                 other => {
@@ -59,8 +63,8 @@ pub fn load_pipeline_config(
     source: &str,
     base: AppOptions,
 ) -> Result<Vec<(Solvers, AppOptions)>, String> {
-    let root: toml::Table = toml::from_str(source)
-        .map_err(|e| format!("config: TOML parse error: {e}"))?;
+    let root: toml::Table =
+        toml::from_str(source).map_err(|e| format!("config: TOML parse error: {e}"))?;
 
     let stage_array = root
         .get("stage")
@@ -83,25 +87,29 @@ pub fn load_pipeline_config(
             .get("solver")
             .ok_or_else(|| format!("config: [[stage]] entry {i} missing required `solver` field"))?
             .as_str()
-            .ok_or_else(|| {
-                format!("config: [[stage]] entry {i}: `solver` must be a string")
-            })?;
+            .ok_or_else(|| format!("config: [[stage]] entry {i}: `solver` must be a string"))?;
 
-        let solver = Solvers::from_str(solver_name).map_err(|_| {
-            format!("config: [[stage]] entry {i}: unknown solver `{solver_name}`")
-        })?;
+        let solver = Solvers::from_str(solver_name)
+            .map_err(|_| format!("config: [[stage]] entry {i}: unknown solver `{solver_name}`"))?;
 
         let stage_options = TomlTableProvider(table).provide(base.clone())?;
 
         // Hard error if a solver-specific sub-table is present for the wrong solver.
         for (sub, belongs) in [
-            ("sa",        matches!(solver, Solvers::SimulatedAnnealing)),
-            ("ga",        matches!(solver, Solvers::GeneticAlgorithm)),
-            ("cs",        matches!(solver, Solvers::CuckooSearch)),
-            ("fpa",       matches!(solver, Solvers::FlowerPollination)),
-            ("heuristic", !matches!(solver,
-                Solvers::SimulatedAnnealing | Solvers::GeneticAlgorithm |
-                Solvers::CuckooSearch | Solvers::FlowerPollination)),
+            ("sa", matches!(solver, Solvers::SimulatedAnnealing)),
+            ("ga", matches!(solver, Solvers::GeneticAlgorithm)),
+            ("cs", matches!(solver, Solvers::CuckooSearch)),
+            ("fpa", matches!(solver, Solvers::FlowerPollination)),
+            (
+                "heuristic",
+                !matches!(
+                    solver,
+                    Solvers::SimulatedAnnealing
+                        | Solvers::GeneticAlgorithm
+                        | Solvers::CuckooSearch
+                        | Solvers::FlowerPollination
+                ),
+            ),
         ] {
             if table.contains_key(sub) && !belongs {
                 return Err(format!(
@@ -133,9 +141,9 @@ pub fn select_pipeline_source(
     steps: Option<&[String]>,
 ) -> Result<PipelineSource, String> {
     match (config, steps) {
-        (Some(_), Some(s)) if !s.is_empty() => Err(
-            "--config and --steps are mutually exclusive — provide one or the other".into(),
-        ),
+        (Some(_), Some(s)) if !s.is_empty() => {
+            Err("--config and --steps are mutually exclusive — provide one or the other".into())
+        }
         (Some(path), _) => Ok(PipelineSource::Config(path.to_path_buf())),
         (None, Some(names)) if !names.is_empty() => {
             let solvers = names
@@ -189,7 +197,9 @@ mod tests {
     #[test]
     fn test_toml_provider_skips_solver_key() {
         let table: toml::Table = toml::from_str("solver = \"nn\"").unwrap();
-        let opts = TomlTableProvider(&table).provide(AppOptions::default()).unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
         assert!(opts.sa.is_none());
         assert!(opts.heuristic.is_none());
     }
@@ -199,7 +209,9 @@ mod tests {
         let table: toml::Table = toml::from_str(
             "solver = \"sa\"\n[sa]\nepochs = 5000\ncooling_rate = 0.0005\nmax_temperature = 200.0\nmin_temperature = 0.001"
         ).unwrap();
-        let opts = TomlTableProvider(&table).provide(AppOptions::default()).unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
         let sa = opts.sa.unwrap();
         assert_eq!(sa.heuristic.epochs, 5000);
         assert!((sa.cooling_rate - 0.0005).abs() < 1e-6);
@@ -209,14 +221,18 @@ mod tests {
     fn test_toml_provider_heuristic_sub_table_works() {
         let table: toml::Table =
             toml::from_str("solver = \"2opt\"\n[heuristic]\nepochs = 500").unwrap();
-        let opts = TomlTableProvider(&table).provide(AppOptions::default()).unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
         assert_eq!(opts.heuristic.unwrap().epochs, 500);
     }
 
     #[test]
     fn test_toml_provider_unknown_key_errors() {
         let table: toml::Table = toml::from_str("epoch = 9999").unwrap();
-        let err = TomlTableProvider(&table).provide(AppOptions::default()).unwrap_err();
+        let err = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap_err();
         assert!(err.contains("unknown field"), "got: {err}");
         assert!(err.contains("epoch"), "got: {err}");
     }
@@ -224,7 +240,9 @@ mod tests {
     #[test]
     fn test_toml_provider_flat_epochs_errors_as_unknown_key() {
         let table: toml::Table = toml::from_str("solver = \"sa\"\nepochs = 9999").unwrap();
-        let err = TomlTableProvider(&table).provide(AppOptions::default()).unwrap_err();
+        let err = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap_err();
         assert!(err.contains("unknown field"), "got: {err}");
     }
 
@@ -234,7 +252,10 @@ mod tests {
     fn test_load_pipeline_config_empty_stages_errors() {
         let toml = "[global]\nepochs = 100\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
-        assert!(err.contains("[[stage]]") || err.contains("stage"), "got: {err}");
+        assert!(
+            err.contains("[[stage]]") || err.contains("stage"),
+            "got: {err}"
+        );
     }
 
     #[test]
@@ -253,56 +274,49 @@ mod tests {
 
     #[test]
     fn test_load_pipeline_config_cooling_rate_zero_errors() {
-        let toml =
-            "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.0\nmax_temperature = 1000.0\nmin_temperature = 0.001\n";
+        let toml = "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.0\nmax_temperature = 1000.0\nmin_temperature = 0.001\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("cooling_rate"), "got: {err}");
     }
 
     #[test]
     fn test_load_pipeline_config_cooling_rate_ge_one_errors() {
-        let toml =
-            "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 1.5\nmax_temperature = 1000.0\nmin_temperature = 0.001\n";
+        let toml = "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 1.5\nmax_temperature = 1000.0\nmin_temperature = 0.001\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("cooling_rate"), "got: {err}");
     }
 
     #[test]
     fn test_load_pipeline_config_negative_max_temperature_errors() {
-        let toml =
-            "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.001\nmax_temperature = -1.0\nmin_temperature = 0.001\n";
+        let toml = "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.001\nmax_temperature = -1.0\nmin_temperature = 0.001\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("max_temperature"), "got: {err}");
     }
 
     #[test]
     fn test_load_pipeline_config_min_ge_max_temperature_errors() {
-        let toml =
-            "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.001\nmin_temperature = 500.0\nmax_temperature = 100.0\n";
+        let toml = "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.001\nmin_temperature = 500.0\nmax_temperature = 100.0\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("min_temperature"), "got: {err}");
     }
 
     #[test]
     fn test_load_pipeline_config_mutation_probability_out_of_range_errors() {
-        let toml =
-            "[[stage]]\nsolver = \"ga\"\n\n[stage.ga]\nmutation_probability = 1.5\n";
+        let toml = "[[stage]]\nsolver = \"ga\"\n\n[stage.ga]\nmutation_probability = 1.5\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("mutation_probability"), "got: {err}");
     }
 
     #[test]
     fn test_load_pipeline_config_sa_sub_table_on_nn_errors() {
-        let toml =
-            "[[stage]]\nsolver = \"nn\"\n\n[stage.sa]\ncooling_rate = 0.001\nmax_temperature = 100.0\nmin_temperature = 0.001\n";
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.sa]\ncooling_rate = 0.001\nmax_temperature = 100.0\nmin_temperature = 0.001\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("sa"), "got: {err}");
     }
 
     #[test]
     fn test_load_pipeline_config_heuristic_sub_table_on_sa_errors() {
-        let toml =
-            "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.001\nmax_temperature = 100.0\nmin_temperature = 0.001\n\n[stage.heuristic]\nepochs = 5000\n";
+        let toml = "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.001\nmax_temperature = 100.0\nmin_temperature = 0.001\n\n[stage.heuristic]\nepochs = 5000\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("heuristic"), "got: {err}");
     }
@@ -353,8 +367,7 @@ mod tests {
     #[test]
     fn test_load_pipeline_config_sa_uses_from_toml_validation() {
         // validate() is called inside SAOptions::from_toml()
-        let toml =
-            "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.0005\nmax_temperature = 200.0\nmin_temperature = 0.001\n";
+        let toml = "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.0005\nmax_temperature = 200.0\nmin_temperature = 0.001\n";
         let stages = load_pipeline_config(toml, AppOptions::default()).unwrap();
         let sa = stages[0].1.sa.as_ref().unwrap();
         assert!((sa.max_temperature - 200.0).abs() < 0.01);

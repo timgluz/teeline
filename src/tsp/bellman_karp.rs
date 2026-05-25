@@ -46,7 +46,8 @@ pub fn solve(
             .unwrap_or(UNKNOWN_DISTANCE);
 
         if let Some(city_id) = dists.pos2city_id(&i)
-            && let Some(tx) = progress_tx {
+            && let Some(tx) = progress_tx
+        {
             let _ = tx.send(ProgressMessage::CityChange(city_id));
         }
     }
@@ -182,7 +183,7 @@ fn show_table(opt: &DPTable) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn tsp_5_1_problem() -> TspProblem {
         let cities = kdtree::build_points(&[
@@ -224,11 +225,7 @@ mod tests {
 
     #[test]
     fn test_solve_with_3_cities() {
-        let cities = kdtree::build_points(&[
-            vec![0.0, 0.0],
-            vec![3.0, 0.0],
-            vec![0.0, 4.0],
-        ]);
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![3.0, 0.0], vec![0.0, 4.0]]);
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
         let solution = solve(&problem, &HeuristicOptions::default(), None, None);
@@ -237,6 +234,10 @@ mod tests {
         visited.sort();
         assert_eq!(visited, vec![0, 1, 2]);
 
-        assert!((solution.total - 12.0).abs() < 1e-3, "got {}", solution.total);
+        assert!(
+            (solution.total - 12.0).abs() < 1e-3,
+            "got {}",
+            solution.total
+        );
     }
 }

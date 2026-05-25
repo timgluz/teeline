@@ -8,7 +8,7 @@ use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::probability::probability;
 use super::progress::ProgressMessage;
-use super::route::{random_position_pair, Route};
+use super::route::{Route, random_position_pair};
 use super::{GAOptions, Solution, TspProblem};
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
@@ -75,8 +75,12 @@ fn solve_ga(
             let parent2 = current_population.random_selection();
 
             let (mut child1, mut child2) = ordered_crossover(parent1, parent2, &fitness_fn);
-            if probability(mutation_prob) { child1.mutate() };
-            if probability(mutation_prob) { child2.mutate() };
+            if probability(mutation_prob) {
+                child1.mutate()
+            };
+            if probability(mutation_prob) {
+                child2.mutate()
+            };
 
             new_population.add(child1);
             new_population.add(child2);
@@ -93,7 +97,11 @@ fn solve_ga(
             ));
         }
 
-        tracing::debug!(epoch, fitness = current_population.best().fitness(), "GA: generation");
+        tracing::debug!(
+            epoch,
+            fitness = current_population.best().fitness(),
+            "GA: generation"
+        );
 
         epoch += 1;
     }
@@ -330,7 +338,7 @@ impl TspGenotype {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, GAOptions, HeuristicOptions, TspProblem};
+    use crate::tsp::{GAOptions, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -370,7 +378,10 @@ mod tests {
         ]);
         let distances = distance_matrix::from_cities(&cities);
         let opts = GAOptions {
-            heuristic: HeuristicOptions { epochs: 100, ..HeuristicOptions::default() },
+            heuristic: HeuristicOptions {
+                epochs: 100,
+                ..HeuristicOptions::default()
+            },
             ..GAOptions::default()
         };
 
@@ -402,9 +413,7 @@ mod tests {
     #[test]
     fn test_seeded_population_n5_fraction() {
         let n = 20usize;
-        let cities = kdtree::build_points(
-            &(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>(),
-        );
+        let cities = kdtree::build_points(&(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>());
         let dm = distance_matrix::from_cities(&cities);
         let seed: Vec<usize> = (0..n).rev().collect();
         let evaluator = make_evaluator(dm);
@@ -430,9 +439,7 @@ mod tests {
     #[test]
     fn test_from_cities_produces_diverse_population() {
         let n = 20usize;
-        let cities = kdtree::build_points(
-            &(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>(),
-        );
+        let cities = kdtree::build_points(&(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>());
         let dm = distance_matrix::from_cities(&cities);
         let evaluator = make_evaluator(dm);
 

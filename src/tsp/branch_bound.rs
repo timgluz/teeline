@@ -184,7 +184,7 @@ fn undo_move(path: &mut Path, k: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{bellman_karp, distance_matrix, kdtree, HeuristicOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, TspProblem, bellman_karp, distance_matrix, kdtree};
 
     fn tsp5_problem() -> TspProblem {
         let cities = kdtree::build_points(&[

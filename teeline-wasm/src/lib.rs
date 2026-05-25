@@ -1,11 +1,11 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::teeline::solver::types::{City, Solution, SolveOptions};
 use bindings::Guest;
+use bindings::teeline::solver::types::{City, Solution, SolveOptions};
 use teeline::tsp::{
-    distance_matrix::DistanceMatrix, kdtree::KDPoint, AppOptions, CSOptions, FPAOptions,
-    GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
+    AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
+    distance_matrix::DistanceMatrix, kdtree::KDPoint,
 };
 
 struct Component;
@@ -36,23 +36,28 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             ..AppOptions::default()
         },
         Solvers::CuckooSearch => AppOptions {
-            cs: Some(CSOptions { heuristic, mutation_probability: o.mutation_probability }),
+            cs: Some(CSOptions {
+                heuristic,
+                mutation_probability: o.mutation_probability,
+            }),
             ..AppOptions::default()
         },
         Solvers::FlowerPollination => AppOptions {
-            fpa: Some(FPAOptions { heuristic, mutation_probability: o.mutation_probability }),
+            fpa: Some(FPAOptions {
+                heuristic,
+                mutation_probability: o.mutation_probability,
+            }),
             ..AppOptions::default()
         },
-        _ => AppOptions { heuristic: Some(heuristic), ..AppOptions::default() },
+        _ => AppOptions {
+            heuristic: Some(heuristic),
+            ..AppOptions::default()
+        },
     }
 }
 
 impl Guest for Component {
-    fn solve(
-        solver: String,
-        cities: Vec<City>,
-        options: SolveOptions,
-    ) -> Result<Solution, String> {
+    fn solve(solver: String, cities: Vec<City>, options: SolveOptions) -> Result<Solution, String> {
         let solver_id = teeline::tsp::find_solver(&solver)?;
 
         let kd_cities: Vec<KDPoint> = cities
@@ -60,8 +65,8 @@ impl Guest for Component {
             .map(|c| KDPoint::new_with_id(c.id as usize, &[c.x, c.y]))
             .collect();
 
-        let distances = DistanceMatrix::from_cities(&kd_cities)
-            .map_err(|e| format!("distance matrix: {e}"))?;
+        let distances =
+            DistanceMatrix::from_cities(&kd_cities).map_err(|e| format!("distance matrix: {e}"))?;
 
         let problem = TspProblem::new(kd_cities, distances);
         let opts = build_opts(solver_id, &options);
