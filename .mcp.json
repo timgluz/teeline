@@ -3,6 +3,11 @@
     "gitkb": {
       "command": "git-kb",
       "args": ["mcp"]
+    },
+    "qtcreator": {
+      "type": "sse",
+      "url": "http://127.0.0.1:3001/sse",
+      "env": {}
     }
   }
 }
