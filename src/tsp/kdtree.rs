@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use super::NearestResult;
 
 pub type PointMatrix = Vec<Vec<f32>>;
-pub type KDSubTree = Option<Box<KDNode>>;
+pub(crate) type KDSubTree = Option<Box<KDNode>>;
 
 /// builds a collection of KDPoints from PointMatrix,
 /// where id would be the row_id of PointMatri
@@ -79,7 +79,8 @@ pub struct KDTree {
 }
 
 impl KDTree {
-    pub fn new(root: KDNode) -> Self {
+    #[cfg(test)]
+    pub(crate) fn new(root: KDNode) -> Self {
         KDTree {
             root: Some(Box::new(root)),
             size: 1,
@@ -106,7 +107,7 @@ impl KDTree {
     }
 
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let mut acc = NearestResult::new(target.clone(), f32::INFINITY, n);
+        let mut acc = NearestResult::new(*target, f32::INFINITY, n);
         if let Some(root) = &self.root {
             root.nearest(target, &mut acc);
         }
@@ -129,7 +130,7 @@ impl KDTree {
 }
 
 #[derive(Debug)]
-pub struct KDNode {
+pub(crate) struct KDNode {
     point: KDPoint,
     depth: usize,
     left: KDSubTree,
@@ -137,7 +138,8 @@ pub struct KDNode {
 }
 
 impl KDNode {
-    pub fn new(point: KDPoint, depth: usize, left: Option<KDNode>, right: Option<KDNode>) -> Self {
+    #[cfg(test)]
+    pub(crate) fn new(point: KDPoint, depth: usize, left: Option<KDNode>, right: Option<KDNode>) -> Self {
         KDNode {
             point,
             depth,
@@ -146,7 +148,7 @@ impl KDNode {
         }
     }
 
-    pub fn from_subtrees(point: KDPoint, depth: usize, left: KDSubTree, right: KDSubTree) -> Self {
+    pub(crate) fn from_subtrees(point: KDPoint, depth: usize, left: KDSubTree, right: KDSubTree) -> Self {
         KDNode {
             point,
             depth,
@@ -155,7 +157,7 @@ impl KDNode {
         }
     }
 
-    pub fn leaf(point: KDPoint, depth: usize) -> Self {
+    pub(crate) fn leaf(point: KDPoint, depth: usize) -> Self {
         KDNode {
             point,
             depth,
@@ -185,10 +187,8 @@ impl KDNode {
         }
 
         let split_dist = self.point.split_distance(target_point, self.level_coord());
-        if acc.search_radius() > split_dist {
-            if let Some(branch) = further_branch {
-                branch.nearest(target_point, acc);
-            }
+        if acc.search_radius() > split_dist && let Some(branch) = further_branch {
+            branch.nearest(target_point, acc);
         }
     }
 
@@ -200,21 +200,21 @@ impl KDNode {
         self.depth % 2
     }
 
-    pub fn left(&self) -> Option<&KDNode> {
+    pub(crate) fn left(&self) -> Option<&KDNode> {
         self.left.as_deref()
     }
 
-    pub fn right(&self) -> Option<&KDNode> {
+    pub(crate) fn right(&self) -> Option<&KDNode> {
         self.right.as_deref()
     }
 
-    pub fn is_leaf(&self) -> bool {
+    #[cfg(test)]
+    pub(crate) fn is_leaf(&self) -> bool {
         self.left.is_none() && self.right.is_none()
     }
 
-    /// returns the number of levels in the subtree rooted at this node;
-    /// leaves have height 1
-    pub fn height(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn height(&self) -> usize {
         if self.is_leaf() {
             1
         } else {

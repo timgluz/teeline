@@ -80,7 +80,7 @@ impl TspLibData {
                     .cities
                     .iter()
                     .enumerate()
-                    .map(|(i, c)| (i, c.clone()))
+                    .map(|(i, c)| (i, *c))
                     .collect();
                 Ok(DistanceMatrix::new(n, dists.clone(), city_table))
             }

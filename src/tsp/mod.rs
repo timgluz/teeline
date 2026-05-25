@@ -811,7 +811,7 @@ impl TspProblem {
 pub type CityTable = HashMap<usize, KDPoint>;
 
 pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
-    cities.iter().map(|c| (c.id, c.clone())).collect()
+    cities.iter().map(|c| (c.id, *c)).collect()
 }
 
 pub struct Solution {

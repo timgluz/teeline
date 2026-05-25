@@ -20,7 +20,7 @@ pub fn solve(
     );
 
     let n_nearest = opts.n_nearest;
-    let cities_table: HashMap<usize, _> = cities.iter().map(|c| (c.id, c.clone())).collect();
+    let cities_table: HashMap<usize, _> = cities.iter().map(|c| (c.id, *c)).collect();
 
     let mut unvisited: HashSet<usize> = cities.iter().map(|c| c.id).collect();
     let mut path: Vec<usize> = Vec::with_capacity(cities.len());
