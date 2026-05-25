@@ -14,6 +14,7 @@ ApplicationWindow {
     // ── Inline component: WelcomePage ───────────────────────────────────────
     component WelcomePage: Page {
         signal nextRequested()
+        signal pipelineRequested()
 
         background: Rectangle { color: "#1a1a2e" }
 
@@ -154,16 +155,17 @@ ApplicationWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Switch {
-                    text: "Advanced (Pipeline Builder)"
-                    enabled: false
-                    opacity: 0.4
+                    id: advancedSwitch
+                    text: "Pipeline Builder"
+                    enabled: FileLoader.isLoaded
+                    opacity: FileLoader.isLoaded ? 1.0 : 0.4
                 }
                 Item { Layout.fillWidth: true }
                 Button {
                     text: "Next →"
                     enabled: FileLoader.isLoaded
                     highlighted: FileLoader.isLoaded
-                    onClicked: nextRequested()
+                    onClicked: advancedSwitch.checked ? pipelineRequested() : nextRequested()
                 }
             }
         }
@@ -722,6 +724,258 @@ ApplicationWindow {
         }
     }
 
+    // ── Inline component: PipelinePage (issue #107) ─────────────────────────
+    component PipelinePage: Page {
+        signal backRequested()
+
+        background: Rectangle { color: "#1a1a2e" }
+
+        // Each stage: { solver: "nn", name: "Nearest Neighbor", category: "Constructive" }
+        property var stages: []
+
+        function stagesJson() {
+            return JSON.stringify(stages.map(function(s) { return { solver: s.solver } }))
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 0
+            spacing: 0
+
+            // ── Header ────────────────────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                height: 60
+                color: "#13132b"
+                RowLayout {
+                    anchors { fill: parent; leftMargin: 24; rightMargin: 24 }
+                    Text { text: "Pipeline Builder"; font.pixelSize: 20; font.bold: true; color: "#e0e0e0" }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: stages.length + " stage" + (stages.length === 1 ? "" : "s")
+                        color: "#607d8b"; font.pixelSize: 13
+                    }
+                }
+            }
+
+            // ── Stage list ────────────────────────────────────────────────
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentWidth: availableWidth
+                clip: true
+
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 8
+                    Item { height: 8 }
+
+                    // Empty state
+                    ColumnLayout {
+                        visible: stages.length === 0
+                        Layout.fillWidth: true
+                        Layout.topMargin: 60
+                        spacing: 8
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "No stages yet"
+                            font.pixelSize: 18; color: "#555"
+                        }
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Press + to add a solver stage"
+                            font.pixelSize: 13; color: "#444"
+                        }
+                    }
+
+                    // Stage cards
+                    Repeater {
+                        model: stages
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            width: parent ? parent.width - 48 : 400
+                            height: 64
+                            radius: 6
+                            color: "#16213e"
+                            border.color: "#2a3a6a"
+                            border.width: 1
+
+                            RowLayout {
+                                anchors { fill: parent; leftMargin: 16; rightMargin: 8 }
+                                spacing: 12
+
+                                // Stage number badge
+                                Rectangle {
+                                    width: 28; height: 28; radius: 14
+                                    color: "#1e3a5f"
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: (index + 1).toString()
+                                        color: "#4fc3f7"; font.pixelSize: 13; font.bold: true
+                                    }
+                                }
+
+                                // Arrow between stages
+                                Text {
+                                    visible: index > 0
+                                    text: "→"
+                                    color: "#607d8b"; font.pixelSize: 14
+                                    // Note: shown as part of this card for simplicity
+                                }
+
+                                ColumnLayout {
+                                    spacing: 2
+                                    Layout.fillWidth: true
+                                    Text {
+                                        text: modelData.name
+                                        color: "#e0e0e0"; font.pixelSize: 14; font.bold: true
+                                    }
+                                    Text {
+                                        text: modelData.category
+                                        color: "#607d8b"; font.pixelSize: 11
+                                    }
+                                }
+
+                                // Move up
+                                Button {
+                                    text: "↑"
+                                    enabled: index > 0
+                                    flat: true
+                                    onClicked: {
+                                        var arr = stages.slice()
+                                        var tmp = arr[index - 1]
+                                        arr[index - 1] = arr[index]
+                                        arr[index] = tmp
+                                        stages = arr
+                                    }
+                                }
+
+                                // Move down
+                                Button {
+                                    text: "↓"
+                                    enabled: index < stages.length - 1
+                                    flat: true
+                                    onClicked: {
+                                        var arr = stages.slice()
+                                        var tmp = arr[index + 1]
+                                        arr[index + 1] = arr[index]
+                                        arr[index] = tmp
+                                        stages = arr
+                                    }
+                                }
+
+                                // Remove
+                                Button {
+                                    text: "✕"
+                                    flat: true
+                                    onClicked: {
+                                        var arr = stages.slice()
+                                        arr.splice(index, 1)
+                                        stages = arr
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Add stage button
+                    Button {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 8
+                        text: "+ Add Stage"
+                        onClicked: addStagePopup.open()
+                    }
+                }
+            }
+
+            // ── Bottom bar ─────────────────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                height: 56
+                color: "#0d0d1e"
+
+                RowLayout {
+                    anchors { fill: parent; leftMargin: 20; rightMargin: 20 }
+                    spacing: 12
+
+                    Button { text: "← Back"; onClicked: backRequested() }
+
+                    Item { Layout.fillWidth: true }
+
+                    Text {
+                        visible: stages.length < 2
+                        text: "Add at least 2 stages to run"
+                        color: "#607d8b"; font.pixelSize: 12
+                    }
+
+                    Button {
+                        text: "Run Pipeline ▶"
+                        highlighted: true
+                        enabled: stages.length >= 1
+                        onClicked: {
+                            SolverEngine.runPipelineStages(FileLoader.filePath, stagesJson())
+                            stackView.push(vizComp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Add-stage popup ───────────────────────────────────────────────
+        Popup {
+            id: addStagePopup
+            parent: Overlay.overlay
+            anchors.centerIn: parent
+            width: 340
+            height: Math.min(480, solverListView2.contentHeight + 80)
+            modal: true
+            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+            background: Rectangle { color: "#13132b"; radius: 8; border.color: "#2a3a6a"; border.width: 1 }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 8
+
+                Text { text: "Add a stage"; font.pixelSize: 16; font.bold: true; color: "#e0e0e0" }
+
+                ListView {
+                    id: solverListView2
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: solverList
+                    clip: true
+                    spacing: 2
+
+                    delegate: ItemDelegate {
+                        width: solverListView2.width
+                        height: 40
+                        required property var modelData
+
+                        contentItem: ColumnLayout {
+                            spacing: 1
+                            Text { text: modelData.name; color: "#e0e0e0"; font.pixelSize: 13 }
+                            Text { text: modelData.category; color: "#607d8b"; font.pixelSize: 10 }
+                        }
+
+                        background: Rectangle {
+                            color: parent.hovered ? "#1e3a5f" : "transparent"; radius: 4
+                        }
+
+                        onClicked: {
+                            var arr = stages.slice()
+                            arr.push({ solver: modelData.alias, name: modelData.name, category: modelData.category })
+                            stages = arr
+                            addStagePopup.close()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ── Inline component: VisualizationPage (issue #105) ────────────────────
     component VisualizationPage: Page {
         signal backRequested()
@@ -925,7 +1179,15 @@ ApplicationWindow {
 
     Component {
         id: welcomeComp
-        WelcomePage { onNextRequested: stackView.push(solverComp) }
+        WelcomePage {
+            onNextRequested:     stackView.push(solverComp)
+            onPipelineRequested: stackView.push(pipelineComp)
+        }
+    }
+
+    Component {
+        id: pipelineComp
+        PipelinePage { onBackRequested: stackView.pop() }
     }
 
     Component {
