@@ -174,24 +174,36 @@ impl HeuristicOptions {
                 )),
             }
         }
+        h.validate()?;
         Ok(h)
     }
 
-    pub fn from_cli(args: &clap::ArgMatches) -> Self {
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
         let mut h = HeuristicOptions::default();
         if let Some(v) = args.get_one::<String>("epochs") {
-            h.epochs = v.parse().unwrap_or(h.epochs);
+            h.epochs = v.parse()
+                .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("platoo_epochs") {
-            h.platoo_epochs = v.parse().unwrap_or(h.platoo_epochs);
+            h.platoo_epochs = v.parse()
+                .map_err(|_| format!("--platoo-epochs: invalid integer `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("n_nearest") {
-            h.n_nearest = v.parse().unwrap_or(h.n_nearest);
+            h.n_nearest = v.parse()
+                .map_err(|_| format!("--n-nearest: invalid integer `{v}`"))?;
         }
         if args.get_flag("verbose") {
             h.verbose = true;
         }
-        h
+        h.validate()?;
+        Ok(h)
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        if self.n_nearest == 0 {
+            return Err("n_nearest must be >= 1".to_string());
+        }
+        Ok(())
     }
 }
 
@@ -220,6 +232,7 @@ impl Default for SAOptions {
 
 impl SAOptions {
     pub fn validate(&self) -> Result<(), String> {
+        self.heuristic.validate()?;
         if self.cooling_rate <= 0.0 {
             return Err(format!("cooling_rate must be > 0 (got {})", self.cooling_rate));
         }
@@ -273,28 +286,22 @@ impl SAOptions {
         Ok(sa)
     }
 
-    pub fn from_cli(args: &clap::ArgMatches) -> Self {
-        let mut sa = SAOptions::default();
-        if let Some(v) = args.get_one::<String>("epochs") {
-            sa.heuristic.epochs = v.parse().unwrap_or(sa.heuristic.epochs);
-        }
-        if let Some(v) = args.get_one::<String>("platoo_epochs") {
-            sa.heuristic.platoo_epochs = v.parse().unwrap_or(sa.heuristic.platoo_epochs);
-        }
-        if let Some(v) = args.get_one::<String>("n_nearest") {
-            sa.heuristic.n_nearest = v.parse().unwrap_or(sa.heuristic.n_nearest);
-        }
-        if args.get_flag("verbose") { sa.heuristic.verbose = true; }
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut sa = SAOptions { heuristic: HeuristicOptions::from_cli(args)?, ..SAOptions::default() };
         if let Some(v) = args.get_one::<String>("cooling_rate") {
-            sa.cooling_rate = v.parse().unwrap_or(sa.cooling_rate);
+            sa.cooling_rate = v.parse()
+                .map_err(|_| format!("--cooling-rate: invalid float `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("min_temperature") {
-            sa.min_temperature = v.parse().unwrap_or(sa.min_temperature);
+            sa.min_temperature = v.parse()
+                .map_err(|_| format!("--min-temperature: invalid float `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("max_temperature") {
-            sa.max_temperature = v.parse().unwrap_or(sa.max_temperature);
+            sa.max_temperature = v.parse()
+                .map_err(|_| format!("--max-temperature: invalid float `{v}`"))?;
         }
-        sa
+        sa.validate()?;
+        Ok(sa)
     }
 }
 
@@ -317,6 +324,7 @@ impl Default for GAOptions {
 
 impl GAOptions {
     pub fn validate(&self) -> Result<(), String> {
+        self.heuristic.validate()?;
         if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
             return Err(format!(
                 "mutation_probability must be in [0, 1] (got {})",
@@ -360,25 +368,18 @@ impl GAOptions {
         Ok(ga)
     }
 
-    pub fn from_cli(args: &clap::ArgMatches) -> Self {
-        let mut ga = GAOptions::default();
-        if let Some(v) = args.get_one::<String>("epochs") {
-            ga.heuristic.epochs = v.parse().unwrap_or(ga.heuristic.epochs);
-        }
-        if let Some(v) = args.get_one::<String>("platoo_epochs") {
-            ga.heuristic.platoo_epochs = v.parse().unwrap_or(ga.heuristic.platoo_epochs);
-        }
-        if let Some(v) = args.get_one::<String>("n_nearest") {
-            ga.heuristic.n_nearest = v.parse().unwrap_or(ga.heuristic.n_nearest);
-        }
-        if args.get_flag("verbose") { ga.heuristic.verbose = true; }
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut ga = GAOptions { heuristic: HeuristicOptions::from_cli(args)?, ..GAOptions::default() };
         if let Some(v) = args.get_one::<String>("mutation_probability") {
-            ga.mutation_probability = v.parse().unwrap_or(ga.mutation_probability);
+            ga.mutation_probability = v.parse()
+                .map_err(|_| format!("--mutation-probability: invalid float `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("n_elite") {
-            ga.n_elite = v.parse().unwrap_or(ga.n_elite);
+            ga.n_elite = v.parse()
+                .map_err(|_| format!("--n-elite: invalid integer `{v}`"))?;
         }
-        ga
+        ga.validate()?;
+        Ok(ga)
     }
 }
 
@@ -396,6 +397,7 @@ impl Default for CSOptions {
 
 impl CSOptions {
     pub fn validate(&self) -> Result<(), String> {
+        self.heuristic.validate()?;
         if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
             return Err(format!(
                 "mutation_probability must be in [0, 1] (got {})",
@@ -435,22 +437,14 @@ impl CSOptions {
         Ok(cs)
     }
 
-    pub fn from_cli(args: &clap::ArgMatches) -> Self {
-        let mut cs = CSOptions::default();
-        if let Some(v) = args.get_one::<String>("epochs") {
-            cs.heuristic.epochs = v.parse().unwrap_or(cs.heuristic.epochs);
-        }
-        if let Some(v) = args.get_one::<String>("platoo_epochs") {
-            cs.heuristic.platoo_epochs = v.parse().unwrap_or(cs.heuristic.platoo_epochs);
-        }
-        if let Some(v) = args.get_one::<String>("n_nearest") {
-            cs.heuristic.n_nearest = v.parse().unwrap_or(cs.heuristic.n_nearest);
-        }
-        if args.get_flag("verbose") { cs.heuristic.verbose = true; }
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut cs = CSOptions { heuristic: HeuristicOptions::from_cli(args)?, ..CSOptions::default() };
         if let Some(v) = args.get_one::<String>("mutation_probability") {
-            cs.mutation_probability = v.parse().unwrap_or(cs.mutation_probability);
+            cs.mutation_probability = v.parse()
+                .map_err(|_| format!("--mutation-probability: invalid float `{v}`"))?;
         }
-        cs
+        cs.validate()?;
+        Ok(cs)
     }
 }
 
@@ -468,6 +462,7 @@ impl Default for FPAOptions {
 
 impl FPAOptions {
     pub fn validate(&self) -> Result<(), String> {
+        self.heuristic.validate()?;
         if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
             return Err(format!(
                 "mutation_probability must be in [0, 1] (got {})",
@@ -507,22 +502,14 @@ impl FPAOptions {
         Ok(fpa)
     }
 
-    pub fn from_cli(args: &clap::ArgMatches) -> Self {
-        let mut fpa = FPAOptions::default();
-        if let Some(v) = args.get_one::<String>("epochs") {
-            fpa.heuristic.epochs = v.parse().unwrap_or(fpa.heuristic.epochs);
-        }
-        if let Some(v) = args.get_one::<String>("platoo_epochs") {
-            fpa.heuristic.platoo_epochs = v.parse().unwrap_or(fpa.heuristic.platoo_epochs);
-        }
-        if let Some(v) = args.get_one::<String>("n_nearest") {
-            fpa.heuristic.n_nearest = v.parse().unwrap_or(fpa.heuristic.n_nearest);
-        }
-        if args.get_flag("verbose") { fpa.heuristic.verbose = true; }
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut fpa = FPAOptions { heuristic: HeuristicOptions::from_cli(args)?, ..FPAOptions::default() };
         if let Some(v) = args.get_one::<String>("mutation_probability") {
-            fpa.mutation_probability = v.parse().unwrap_or(fpa.mutation_probability);
+            fpa.mutation_probability = v.parse()
+                .map_err(|_| format!("--mutation-probability: invalid float `{v}`"))?;
         }
-        fpa
+        fpa.validate()?;
+        Ok(fpa)
     }
 }
 
@@ -820,6 +807,58 @@ mod tests {
         assert_eq!(h.epochs, 5000);
         assert_eq!(h.n_nearest, 5);
         assert!(h.verbose);
+    }
+
+    #[test]
+    fn test_heuristic_validate_rejects_n_nearest_zero() {
+        let h = HeuristicOptions { epochs: 100, platoo_epochs: 50, n_nearest: 0, verbose: false };
+        let err = h.validate().unwrap_err();
+        assert!(err.contains("n_nearest"), "error should name the field: {err}");
+    }
+
+    #[test]
+    fn test_heuristic_validate_accepts_epochs_zero_and_platoo_zero() {
+        // epochs=0 is "run forever"; platoo_epochs=0 disables plateau restarts — both valid.
+        let h = HeuristicOptions { epochs: 0, platoo_epochs: 0, n_nearest: 1, verbose: false };
+        assert!(h.validate().is_ok());
+    }
+
+    #[test]
+    fn test_heuristic_from_cli_errors_on_bad_integer() {
+        use clap::{Arg, ArgAction, Command};
+        let cmd = Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(Arg::new("platoo_epochs").long("platoo_epochs").action(ArgAction::Set))
+            .arg(Arg::new("n_nearest").long("n_nearest").action(ArgAction::Set))
+            .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue));
+        let args = cmd.get_matches_from(["t", "--epochs", "bad"]);
+        let result = HeuristicOptions::from_cli(&args);
+        assert!(result.is_err(), "expected Err for --epochs bad");
+    }
+
+    fn sa_test_cmd() -> clap::Command {
+        use clap::{Arg, ArgAction, Command};
+        Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(Arg::new("platoo_epochs").long("platoo_epochs").action(ArgAction::Set))
+            .arg(Arg::new("n_nearest").long("n_nearest").action(ArgAction::Set))
+            .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
+            .arg(Arg::new("cooling_rate").long("cooling_rate").action(ArgAction::Set))
+            .arg(Arg::new("min_temperature").long("min_temperature").action(ArgAction::Set))
+            .arg(Arg::new("max_temperature").long("max_temperature").action(ArgAction::Set))
+    }
+
+    #[test]
+    fn test_sa_from_cli_errors_on_bad_float() {
+        let args = sa_test_cmd().get_matches_from(["t", "--cooling_rate", "xyz"]);
+        assert!(SAOptions::from_cli(&args).is_err(), "expected Err for --cooling_rate xyz");
+    }
+
+    #[test]
+    fn test_sa_from_cli_errors_on_out_of_range_cooling_rate() {
+        let args = sa_test_cmd().get_matches_from(["t", "--cooling_rate", "5.0"]);
+        let result = SAOptions::from_cli(&args);
+        assert!(result.is_err(), "expected Err for cooling_rate=5.0 (out of (0,1))");
     }
 
     #[test]
