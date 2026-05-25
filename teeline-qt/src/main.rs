@@ -1,3 +1,6 @@
+mod file_loader;
+
+use file_loader::FileLoader;
 use qtbridge::{qobject_impl, QApp};
 
 #[derive(Default)]
@@ -9,6 +12,7 @@ impl AppBackend {}
 fn main() {
     QApp::new()
         .register::<AppBackend>()
+        .register::<FileLoader>()
         .load_qml(include_bytes!("Main.qml"))
         .run();
 }

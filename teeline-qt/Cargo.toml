@@ -16,3 +16,4 @@ dist = false  # requires Qt runtime; not a standalone distributable binary
 [dependencies]
 qtbridge = { git = "https://github.com/qt/qtbridge-rust", branch = "dev" }
 teeline = { path = ".." }
+serde_json = "1"
