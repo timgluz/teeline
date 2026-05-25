@@ -1,10 +1,9 @@
-use std::cell::RefCell;
 use std::cmp::Ordering;
 
 use super::NearestResult;
 
 pub type PointMatrix = Vec<Vec<f32>>;
-pub type KDSubTree = Option<Box<KDNode>>;
+pub(crate) type KDSubTree = Option<Box<KDNode>>;
 
 /// builds a collection of KDPoints from PointMatrix,
 /// where id would be the row_id of PointMatri
@@ -40,12 +39,10 @@ fn build_subtree(points: Vec<KDPoint>, depth: usize) -> KDSubTree {
     }
 
     if points.len() == 1 {
-        let leaf_node = KDNode::leaf(points[0].clone(), depth);
-        return Some(Box::new(leaf_node));
+        return Some(Box::new(KDNode::leaf(points[0], depth)));
     }
 
-    let k = points[0].dim();
-    let (pivot_pt, left_points, right_points) = partition_points(points, depth, k);
+    let (pivot_pt, left_points, right_points) = partition_points(points, depth);
     let root = KDNode::from_subtrees(
         pivot_pt,
         depth,
@@ -57,28 +54,22 @@ fn build_subtree(points: Vec<KDPoint>, depth: usize) -> KDSubTree {
 }
 
 fn partition_points(
-    points: Vec<KDPoint>,
+    mut points: Vec<KDPoint>,
     depth: usize,
-    k: usize,
 ) -> (KDPoint, Vec<KDPoint>, Vec<KDPoint>) {
-    let mut sorted_points = points.clone();
+    let coord = depth % 2;
+    let pivot_idx = points.len() / 2;
 
-    if sorted_points.len() == 1 {
-        let pivot_pt = sorted_points[0].clone();
-        return (pivot_pt, vec![], vec![]);
-    }
+    points.select_nth_unstable_by(pivot_idx, |a, b| {
+        a.cmp_by_coord(b, coord).unwrap_or(Ordering::Equal)
+    });
 
-    let coord = depth % k;
-    sorted_points.sort_by(|a, b| a.cmp_by_coord(b, coord).unwrap());
+    let pivot_pt = points[pivot_idx];
+    let right = points.split_off(pivot_idx + 1);
+    points.pop(); // remove pivot
+    let left = points;
 
-    let pivot_idx = sorted_points.len() / 2;
-    let pivot_pt = sorted_points[pivot_idx].clone();
-
-    (
-        pivot_pt,
-        sorted_points[0..pivot_idx].to_vec(),
-        sorted_points[(pivot_idx + 1)..].to_vec(),
-    )
+    (pivot_pt, left, right)
 }
 
 #[derive(Debug)]
@@ -88,7 +79,8 @@ pub struct KDTree {
 }
 
 impl KDTree {
-    pub fn new(root: KDNode) -> Self {
+    #[cfg(test)]
+    pub(crate) fn new(root: KDNode) -> Self {
         KDTree {
             root: Some(Box::new(root)),
             size: 1,
@@ -102,25 +94,24 @@ impl KDTree {
         }
     }
 
-    pub fn walk(&self, callback: impl Fn(&KDPoint)) {
-        self.walk_in_order(&self.root, &callback);
+    pub fn walk(&self, mut callback: impl FnMut(&KDPoint)) {
+        Self::walk_in_order(&self.root, &mut callback);
     }
 
-    pub fn walk_in_order(&self, subtree: &KDSubTree, callback: &impl Fn(&KDPoint)) {
+    fn walk_in_order(subtree: &KDSubTree, callback: &mut impl FnMut(&KDPoint)) {
         if let Some(node) = subtree {
-            self.walk_in_order(&node.left, callback);
+            Self::walk_in_order(&node.left, callback);
             callback(&node.point);
-            self.walk_in_order(&node.right, callback);
+            Self::walk_in_order(&node.right, callback);
         }
     }
 
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let best_result = NearestResult::new(target.clone(), f32::INFINITY, n);
-
-        match &self.root {
-            None => best_result,
-            Some(n) => n.nearest(target, best_result),
+        let mut acc = NearestResult::new(*target, f32::INFINITY, n);
+        if let Some(root) = &self.root {
+            root.nearest(target, &mut acc);
         }
+        acc
     }
 
     pub fn len(&self) -> usize {
@@ -132,138 +123,99 @@ impl KDTree {
     }
 
     pub fn to_vec(&self) -> PointMatrix {
-        let pts: RefCell<PointMatrix> = RefCell::new(vec![]);
-
-        self.walk(|n| pts.borrow_mut().push(n.coords().to_vec()));
-
-        pts.borrow().to_vec()
+        let mut pts = vec![];
+        self.walk(|p| pts.push(p.coords().to_vec()));
+        pts
     }
 }
 
 #[derive(Debug)]
-pub struct KDNode {
+pub(crate) struct KDNode {
     point: KDPoint,
     depth: usize,
-    size: usize, // todo: remove seems redundant
     left: KDSubTree,
     right: KDSubTree,
 }
 
 impl KDNode {
-    pub fn new(point: KDPoint, depth: usize, left: Option<KDNode>, right: Option<KDNode>) -> Self {
-        let left_node = left.map(Box::new);
-        let right_node = right.map(Box::new);
-
-        let left_size = left_node.as_ref().map_or(0, |n| n.len());
-        let right_size = right_node.as_ref().map_or(0, |n| n.len());
-
+    #[cfg(test)]
+    pub(crate) fn new(point: KDPoint, depth: usize, left: Option<KDNode>, right: Option<KDNode>) -> Self {
         KDNode {
             point,
             depth,
-            size: 1 + left_size + right_size,
-            left: left_node,
-            right: right_node,
+            left: left.map(Box::new),
+            right: right.map(Box::new),
         }
     }
 
-    pub fn from_subtrees(point: KDPoint, depth: usize, left: KDSubTree, right: KDSubTree) -> Self {
-        let left_size = left.as_ref().map_or(0, |n| n.len());
-        let right_size = right.as_ref().map_or(0, |n| n.len());
-
+    pub(crate) fn from_subtrees(point: KDPoint, depth: usize, left: KDSubTree, right: KDSubTree) -> Self {
         KDNode {
             point,
             depth,
             left,
             right,
-            size: 1 + left_size + right_size,
         }
     }
 
-    pub fn leaf(point: KDPoint, depth: usize) -> Self {
+    pub(crate) fn leaf(point: KDPoint, depth: usize) -> Self {
         KDNode {
             point,
             depth,
-            size: 1,
             left: None,
             right: None,
         }
     }
 
-    pub fn nearest(&self, target_point: &KDPoint, best_result: NearestResult) -> NearestResult {
-        if self.is_empty() {
-            return best_result;
-        }
+    // The pruning invariant: we skip the far branch only when every point in it
+    // is guaranteed farther than our k-th best candidate so far.
+    // Guard: acc.search_radius() > split_dist
+    //   - search_radius() == INFINITY while the buffer has fewer than n items,
+    //     ensuring we never prune before the buffer is full.
+    //   - Once full, search_radius() == farthest_distance(), the standard
+    //     k-d tree k-NN pruning condition.
+    fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
+        acc.add(self.point, self.point.distance(target_point));
 
-        let distance_from_target = self.point.distance(target_point);
-
-        let best_distance = best_result.distance;
-        let mut nearest_result = best_result;
-
-        if distance_from_target <= best_distance {
-            let pt = self.point.clone();
-            nearest_result.add(pt, distance_from_target);
-        };
-
-        let (closest_branch, futher_branch) = match self.cmp_by_point(target_point) {
+        let (closest_branch, further_branch) = match self.cmp_by_point(target_point) {
             None => panic!("Dimension conflict in nearest function"),
             Some(Ordering::Greater) => (self.left(), self.right()),
             Some(_) => (self.right(), self.left()),
         };
 
         if let Some(branch) = closest_branch {
-            let closest_result = branch.nearest(target_point, nearest_result.clone());
-            let pt_distance = closest_result.closest_distance();
-            nearest_result.add(closest_result.point, pt_distance);
+            branch.nearest(target_point, acc);
         }
 
-        // check distance from split line
         let split_dist = self.point.split_distance(target_point, self.level_coord());
-        if nearest_result.closest_distance() > split_dist
-            && let Some(branch) = futher_branch
-        {
-            let further_result = branch.nearest(target_point, nearest_result.clone());
-            let pt_distance = further_result.closest_distance();
-            nearest_result.add(further_result.point, pt_distance);
+        if acc.search_radius() > split_dist && let Some(branch) = further_branch {
+            branch.nearest(target_point, acc);
         }
-
-        nearest_result
     }
 
     fn cmp_by_point(&self, other: &KDPoint) -> Option<Ordering> {
         self.point.cmp_by_coord(other, self.level_coord())
     }
 
-    /// returns a dimension for comparision
     fn level_coord(&self) -> usize {
-        self.depth % self.point.dimensionality
+        self.depth % 2
     }
 
-    pub fn left(&self) -> Option<&KDNode> {
+    pub(crate) fn left(&self) -> Option<&KDNode> {
         self.left.as_deref()
     }
 
-    pub fn right(&self) -> Option<&KDNode> {
+    pub(crate) fn right(&self) -> Option<&KDNode> {
         self.right.as_deref()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+    #[cfg(test)]
+    pub(crate) fn is_leaf(&self) -> bool {
+        self.left.is_none() && self.right.is_none()
     }
 
-    pub fn is_leaf(&self) -> bool {
-        self.len() == 1
-    }
-
-    pub fn len(&self) -> usize {
-        self.size
-    }
-
-    /// returns the number of levels in the subtree rooted at this node;
-    /// leaves have height 1
-    pub fn height(&self) -> usize {
-        if self.is_empty() {
-            0
-        } else if self.is_leaf() {
+    #[cfg(test)]
+    pub(crate) fn height(&self) -> usize {
+        if self.is_leaf() {
             1
         } else {
             let left_height = self.left().map_or(0, |n| n.height());
@@ -274,36 +226,27 @@ impl KDNode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct KDPoint {
     pub id: usize,
-    dimensionality: usize,
-    coords: Vec<f32>,
+    pub coords: [f32; 2],
 }
 
 impl KDPoint {
     pub fn new(coords: &[f32]) -> Self {
-        KDPoint {
-            id: 0,
-            dimensionality: coords.len(),
-            coords: coords.to_vec(),
-        }
+        KDPoint { id: 0, coords: [coords[0], coords[1]] }
     }
 
     pub fn new_with_id(id: usize, coords: &[f32]) -> Self {
-        KDPoint {
-            id,
-            dimensionality: coords.len(),
-            coords: coords.to_vec(),
-        }
+        KDPoint { id, coords: [coords[0], coords[1]] }
     }
 
     pub fn dim(&self) -> usize {
-        self.dimensionality
+        2
     }
 
     pub fn coords(&self) -> &[f32] {
-        &self.coords[..]
+        &self.coords
     }
 
     pub fn get(&self, dimension: usize) -> Option<f32> {
@@ -311,63 +254,39 @@ impl KDPoint {
     }
 
     pub fn distance(&self, other: &KDPoint) -> f32 {
-        let distance: f32 = self
-            .coords
-            .iter()
-            .zip(other.coords())
-            .map(|(x, y)| (x - y).powi(2))
-            .sum::<f32>()
-            .sqrt();
-
-        distance
+        let dx = self.coords[0] - other.coords[0];
+        let dy = self.coords[1] - other.coords[1];
+        (dx * dx + dy * dy).sqrt()
     }
 
-    /// returns distance from split level
     fn split_distance(&self, other: &KDPoint, coord: usize) -> f32 {
-        (self.coords[coord] - other.get(coord).unwrap()).abs()
+        (self.coords[coord] - other.coords[coord]).abs()
     }
 
     pub fn cmp_by_coord(&self, other: &KDPoint, coord: usize) -> Option<Ordering> {
-        if self.get(coord).is_none() || other.get(coord).is_none() {
-            return None;
-        }
-
-        let self_coord = self.get(coord).unwrap();
-        let other_coord = other.get(coord).unwrap();
-
-        let res = if self_coord < other_coord {
+        let a = self.coords.get(coord)?;
+        let b = other.coords.get(coord)?;
+        let res = if a < b {
             Ordering::Less
-        } else if (self_coord - other_coord).abs() < f32::EPSILON {
+        } else if (a - b).abs() < f32::EPSILON {
             Ordering::Equal
         } else {
             Ordering::Greater
         };
-
         Some(res)
     }
 
     pub fn x(&self) -> f32 {
-        if self.dimensionality < 1 {
-            panic!("for accessing y, dimensionality must be > 0");
-        }
-
         self.coords[0]
     }
 
     pub fn y(&self) -> f32 {
-        if self.dimensionality < 2 {
-            panic!("for accessing y, dimensionality must be > 1");
-        }
-
         self.coords[1]
     }
 }
 
 impl PartialEq for KDPoint {
     fn eq(&self, other: &KDPoint) -> bool {
-        if self.dimensionality != other.dimensionality {
-            return false;
-        }
         self.distance(other) < f32::EPSILON
     }
 }
@@ -376,22 +295,11 @@ impl PartialEq for KDPoint {
 mod tests {
     use super::*;
     use crate::test::helpers::assert_approx;
-    use std::cell::RefCell;
 
     #[test]
-    fn kdpoint_cmp_by_coord_with_empty_points() {
-        let first_pt = KDPoint::new(&[]);
-        let other_pt = KDPoint::new(&[]);
-
-        assert_eq!(None, first_pt.cmp_by_coord(&other_pt, 0));
-    }
-
-    #[test]
-    fn kdpoint_cmp_by_coord_when_other_node_has_different_dim() {
-        let first_pt = KDPoint::new(&[1.0, 0.0]);
-        let other_pt = KDPoint::new(&[0.0]);
-
-        assert_eq!(None, first_pt.cmp_by_coord(&other_pt, 1));
+    fn kdpoint_cmp_by_coord_out_of_bounds_returns_none() {
+        let pt = KDPoint::new(&[1.0, 0.0]);
+        assert_eq!(None, pt.cmp_by_coord(&pt, 2));
     }
 
     #[test]
@@ -461,10 +369,10 @@ mod tests {
     fn kdtree_walk_with_empty_tree() {
         let tree = KDTree::empty();
 
-        let pts: RefCell<Vec<KDPoint>> = RefCell::new(vec![]);
-        tree.walk(|pt| pts.borrow_mut().push(pt.clone()));
+        let mut pts: Vec<KDPoint> = vec![];
+        tree.walk(|pt| pts.push(*pt));
 
-        assert!(pts.borrow().is_empty());
+        assert!(pts.is_empty());
     }
 
     #[test]
@@ -472,19 +380,19 @@ mod tests {
         let root = KDNode::new(KDPoint::new(&[0.0, 0.0]), 0, None, None);
         let tree = KDTree::new(root);
 
-        let pts: RefCell<Vec<KDPoint>> = RefCell::new(vec![]);
-        tree.walk(|pt| pts.borrow_mut().push(pt.clone()));
+        let mut pts: Vec<KDPoint> = vec![];
+        tree.walk(|pt| pts.push(*pt));
 
-        assert!(!pts.borrow().is_empty());
-        assert_eq!(1, pts.borrow().len());
-        assert_eq!(&[0.0, 0.0], pts.borrow().get(0).unwrap().coords());
+        assert!(!pts.is_empty());
+        assert_eq!(1, pts.len());
+        assert_eq!(&[0.0, 0.0], pts[0].coords());
     }
 
     #[test]
     fn partition_points_single_elem() {
         let points = build_points(&[vec![0.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert!(res.1.is_empty());
         assert!(res.2.is_empty());
@@ -494,7 +402,7 @@ mod tests {
     fn partition_points_with_2points_with_left_subtree() {
         let points = build_points(&[vec![-1.0, 0.0], vec![0.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert_eq!(&[-1.0, 0.0], res.1[0].coords());
         assert!(res.2.is_empty());
@@ -504,7 +412,7 @@ mod tests {
     fn partition_points_with_2points_with_right_subtree() {
         let points = build_points(&vec![vec![0.0, 0.0], vec![2.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[2.0, 0.0], res.0.coords());
         assert_eq!(&[0.0, 0.0], res.1[0].coords());
         assert!(res.2.is_empty());
@@ -514,7 +422,7 @@ mod tests {
     fn partition_points_with_2points_with_full_tree() {
         let points = build_points(&vec![vec![-1.0, 0.0], vec![2.0, 0.0], vec![0.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert_eq!(&[-1.0, 0.0], res.1[0].coords());
         assert_eq!(&[2.0, 0.0], res.2[0].coords());
@@ -524,7 +432,7 @@ mod tests {
     fn partition_points_with_3points_by_second_dimension() {
         let points = build_points(&vec![vec![0.0, 0.0], vec![2.0, -1.0], vec![1.0, 2.0]]);
 
-        let res = partition_points(points, 1, 2);
+        let res = partition_points(points, 1);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert_eq!(&[2.0, -1.0], res.1[0].coords());
         assert_eq!(&[1.0, 2.0], res.2[0].coords());
@@ -545,16 +453,16 @@ mod tests {
 
         assert_eq!(7, tree.len());
 
-        let points: RefCell<PointMatrix> = RefCell::new(vec![]);
-        tree.walk(|n| points.borrow_mut().push(n.coords().to_vec()));
+        let mut coords: PointMatrix = vec![];
+        tree.walk(|n| coords.push(n.coords().to_vec()));
 
-        assert_eq!(vec![-1.0, -1.0], points.borrow()[0]);
-        assert_eq!(vec![-1.0, 0.0], points.borrow()[1]);
-        assert_eq!(vec![-1.0, 1.0], points.borrow()[2]);
-        assert_eq!(vec![0.0, 0.0], points.borrow()[3]);
-        assert_eq!(vec![1.0, -1.0], points.borrow()[4]);
-        assert_eq!(vec![1.0, 0.0], points.borrow()[5]);
-        assert_eq!(vec![1.0, 1.0], points.borrow()[6]);
+        assert_eq!(vec![-1.0, -1.0], coords[0]);
+        assert_eq!(vec![-1.0, 0.0], coords[1]);
+        assert_eq!(vec![-1.0, 1.0], coords[2]);
+        assert_eq!(vec![0.0, 0.0], coords[3]);
+        assert_eq!(vec![1.0, -1.0], coords[4]);
+        assert_eq!(vec![1.0, 0.0], coords[5]);
+        assert_eq!(vec![1.0, 1.0], coords[6]);
     }
 
     #[test]

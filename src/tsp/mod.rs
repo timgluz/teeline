@@ -811,7 +811,7 @@ impl TspProblem {
 pub type CityTable = HashMap<usize, KDPoint>;
 
 pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
-    cities.iter().map(|c| (c.id, c.clone())).collect()
+    cities.iter().map(|c| (c.id, *c)).collect()
 }
 
 pub struct Solution {
@@ -891,7 +891,7 @@ impl NearestResult {
         let results = Vec::with_capacity(n);
 
         NearestResult {
-            target: point.clone(),
+            target: point,
             point,
             distance,
             n,
@@ -906,10 +906,14 @@ impl NearestResult {
 
         if new_distance < self.closest_distance() {
             self.distance = new_distance;
-            self.point = pt.clone();
+            self.point = pt;
         }
 
-        if new_distance < self.farthest_distance() {
+        // Use search_radius so we always fill the buffer before applying the
+        // farthest-distance gate. Without this, farthest_distance() returns the
+        // distance of the current last item (not INFINITY) and subsequent farther
+        // candidates are rejected even when the buffer is not yet full.
+        if new_distance < self.search_radius() {
             if self.results.len() >= self.n {
                 self.results.pop();
             }
@@ -930,6 +934,17 @@ impl NearestResult {
 
     pub fn farthest_distance(&self) -> f32 {
         self.results.last().map(|x| x.distance).unwrap_or(f32::MAX)
+    }
+
+    /// Pruning radius for k-NN search: INFINITY until the result buffer holds n
+    /// items (so we never prune while the buffer is still filling), then the
+    /// distance to the k-th (farthest) candidate.
+    pub fn search_radius(&self) -> f32 {
+        if self.results.len() < self.n {
+            f32::INFINITY
+        } else {
+            self.farthest_distance()
+        }
     }
 }
 

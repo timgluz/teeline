@@ -80,7 +80,7 @@ impl TspLibData {
                     .cities
                     .iter()
                     .enumerate()
-                    .map(|(i, c)| (i, c.clone()))
+                    .map(|(i, c)| (i, *c))
                     .collect();
                 Ok(DistanceMatrix::new(n, dists.clone(), city_table))
             }
@@ -373,6 +373,7 @@ mod tests {
 
     #[test]
     fn test_coords_from_text_3dim_coord() {
+        // KDPoint is 2-D only; extra coordinates in the input are silently ignored.
         let txt = "3 1.0 -2.0 3";
 
         let res = coords_from_text(0, txt);
@@ -380,10 +381,10 @@ mod tests {
 
         let pt = res.unwrap();
         assert_eq!(3, pt.id);
-        assert_eq!(3, pt.dim());
+        assert_eq!(2, pt.dim());
         assert_eq!(Some(1.0), pt.get(0));
         assert_eq!(Some(-2.0), pt.get(1));
-        assert_eq!(Some(3.0), pt.get(2));
+        assert_eq!(None, pt.get(2));
     }
 
     #[test]
