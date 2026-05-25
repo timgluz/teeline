@@ -530,25 +530,42 @@ ApplicationWindow {
                 // ── Form body ─────────────────────────────────────────────
                 ColumnLayout {
                     Layout.margins: 32
-                    spacing: 24
+                    spacing: 28
+
+                    // Shared TextField style: light background + dark text
+                    component Cfg_Label: Text {
+                        color: "#c8c8e0"; font.pixelSize: 13; font.bold: true
+                    }
+                    component Cfg_Hint: Text {
+                        color: "#7890a8"; font.pixelSize: 11
+                    }
+                    component Cfg_Field: TextField {
+                        font.pixelSize: 14
+                        color: acceptableInput ? "#111122" : "#c0302a"
+                        placeholderTextColor: "#8888aa"
+                        background: Rectangle {
+                            color: "#dde0f5"; radius: 4
+                            border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"
+                            border.width: 1
+                        }
+                    }
 
                     // ── Common: epochs ────────────────────────────────────
                     ColumnLayout {
                         spacing: 6; Layout.fillWidth: true
-                        Text { text: "Epochs"; color: "#9e9e9e"; font.pixelSize: 12 }
-                        TextField {
+                        Cfg_Label { text: "Epochs" }
+                        Cfg_Field {
                             id: epochsField
-                            Layout.preferredWidth: 200
-                            text: isSA ? saDefaults.epochs : isGA ? gaDefaults.epochs
-                                       : isPSO ? psoDefaults.epochs : isCS ? csDefaults.epochs : fpaDefaults.epochs
+                            Layout.preferredWidth: 220
+                            text: isSA ? saDefaults.epochs.toString()
+                                       : isGA ? gaDefaults.epochs.toString()
+                                       : isPSO ? psoDefaults.epochs.toString()
+                                       : isCS ? csDefaults.epochs.toString()
+                                       : fpaDefaults.epochs.toString()
                             placeholderText: "10000"
-                            color: acceptableInput ? "#e0e0e0" : "#ef5350"
                             validator: IntValidator { bottom: 1; top: 10000000 }
                         }
-                        Text {
-                            text: "Number of iterations the solver will run"
-                            color: "#607d8b"; font.pixelSize: 11
-                        }
+                        Cfg_Hint { text: "Number of iterations the solver will run" }
                     }
 
                     // ── SA fields ─────────────────────────────────────────
@@ -558,41 +575,38 @@ ApplicationWindow {
 
                         ColumnLayout {
                             spacing: 6; Layout.fillWidth: true
-                            Text { text: "Cooling rate"; color: "#9e9e9e"; font.pixelSize: 12 }
-                            TextField {
+                            Cfg_Label { text: "Cooling rate" }
+                            Cfg_Field {
                                 id: crField
-                                Layout.preferredWidth: 200
+                                Layout.preferredWidth: 220
                                 text: saDefaults.cooling_rate.toString()
                                 placeholderText: "0.0001"
-                                color: acceptableInput ? "#e0e0e0" : "#ef5350"
                                 validator: DoubleValidator { bottom: 0.000001; top: 0.999999; notation: DoubleValidator.StandardNotation }
                             }
-                            Text { text: "Must be > 0 and < 1"; color: "#607d8b"; font.pixelSize: 11 }
+                            Cfg_Hint { text: "Must be > 0 and < 1" }
                         }
 
                         RowLayout {
-                            spacing: 24; Layout.fillWidth: true
+                            spacing: 32; Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 6
-                                Text { text: "Min temperature"; color: "#9e9e9e"; font.pixelSize: 12 }
-                                TextField {
+                                Cfg_Label { text: "Min temperature" }
+                                Cfg_Field {
                                     id: minTField
-                                    width: 160
+                                    width: 180
                                     text: saDefaults.min_temperature.toString()
                                     placeholderText: "0.001"
-                                    color: "#e0e0e0"
                                     validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
                                 }
                             }
                             ColumnLayout {
                                 spacing: 6
-                                Text { text: "Max temperature"; color: "#9e9e9e"; font.pixelSize: 12 }
-                                TextField {
+                                Cfg_Label { text: "Max temperature" }
+                                Cfg_Field {
                                     id: maxTField
-                                    width: 160
+                                    width: 180
                                     text: saDefaults.max_temperature.toString()
                                     placeholderText: "1000.0"
-                                    color: "#e0e0e0"
                                     validator: DoubleValidator { bottom: 0.000001; notation: DoubleValidator.StandardNotation }
                                 }
                             }
@@ -603,8 +617,8 @@ ApplicationWindow {
                                 var mx = parseFloat(maxTField.text)
                                 return !isNaN(mn) && !isNaN(mx) && mn >= mx
                             }
-                            text: "Min temperature must be < max temperature"
-                            color: "#ef5350"; font.pixelSize: 11
+                            text: "⚠  Min temperature must be less than max temperature"
+                            color: "#ef5350"; font.pixelSize: 12
                         }
                     }
 
@@ -615,32 +629,28 @@ ApplicationWindow {
 
                         ColumnLayout {
                             spacing: 6; Layout.fillWidth: true
-                            Text { text: "Mutation probability"; color: "#9e9e9e"; font.pixelSize: 12 }
-                            TextField {
+                            Cfg_Label { text: "Mutation probability" }
+                            Cfg_Field {
                                 id: mpField
-                                Layout.preferredWidth: 200
-                                text: isGA ? gaDefaults.mutation_probability.toString()
-                                           : isCS ? csDefaults.mutation_probability.toString()
-                                           : fpaDefaults.mutation_probability.toString()
+                                Layout.preferredWidth: 220
+                                text: gaDefaults.mutation_probability.toString()
                                 placeholderText: "0.001"
-                                color: acceptableInput ? "#e0e0e0" : "#ef5350"
                                 validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
                             }
-                            Text { text: "Range [0, 1]"; color: "#607d8b"; font.pixelSize: 11 }
+                            Cfg_Hint { text: "Range [0, 1]" }
                         }
 
                         ColumnLayout {
                             spacing: 6
-                            Text { text: "Elite count (n_elite)"; color: "#9e9e9e"; font.pixelSize: 12 }
-                            TextField {
+                            Cfg_Label { text: "Elite count" }
+                            Cfg_Field {
                                 id: eliteField
-                                width: 120
+                                width: 140
                                 text: gaDefaults.n_elite.toString()
                                 placeholderText: "3"
-                                color: acceptableInput ? "#e0e0e0" : "#ef5350"
                                 validator: IntValidator { bottom: 1; top: 1000 }
                             }
-                            Text { text: "Number of elite solutions preserved each generation"; color: "#607d8b"; font.pixelSize: 11 }
+                            Cfg_Hint { text: "Elite solutions preserved each generation" }
                         }
                     }
 
@@ -648,33 +658,31 @@ ApplicationWindow {
                     ColumnLayout {
                         visible: isCS || isFPA
                         spacing: 6; Layout.fillWidth: true
-                        Text { text: "Mutation probability"; color: "#9e9e9e"; font.pixelSize: 12 }
-                        TextField {
+                        Cfg_Label { text: "Mutation probability" }
+                        Cfg_Field {
                             id: mpField2
-                            Layout.preferredWidth: 200
+                            Layout.preferredWidth: 220
                             text: isCS ? csDefaults.mutation_probability.toString()
                                        : fpaDefaults.mutation_probability.toString()
                             placeholderText: "0.001"
-                            color: acceptableInput ? "#e0e0e0" : "#ef5350"
                             validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
                         }
-                        Text { text: "Range [0, 1]"; color: "#607d8b"; font.pixelSize: 11 }
+                        Cfg_Hint { text: "Range [0, 1]" }
                     }
 
                     // ── PSO fields ────────────────────────────────────────
                     ColumnLayout {
                         visible: isPSO
                         spacing: 6
-                        Text { text: "Swarm size (min)"; color: "#9e9e9e"; font.pixelSize: 12 }
-                        TextField {
+                        Cfg_Label { text: "Swarm size (min)" }
+                        Cfg_Field {
                             id: swarmField
-                            width: 120
+                            width: 140
                             text: psoDefaults.n_nearest.toString()
                             placeholderText: "30"
-                            color: acceptableInput ? "#e0e0e0" : "#ef5350"
                             validator: IntValidator { bottom: 1; top: 10000 }
                         }
-                        Text { text: "Minimum number of particles (effective minimum is 30)"; color: "#607d8b"; font.pixelSize: 11 }
+                        Cfg_Hint { text: "Minimum particle count (floor is 30)" }
                     }
                 }
             }
