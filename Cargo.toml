@@ -5,9 +5,13 @@ resolver = "2"
 
 [package]
 name = "teeline"
-version = "0.3.0"
+version = "1.0.0"
 authors = ["Timo Sulg <timgluz@gmail.com>"]
 edition = "2024"
+repository = "https://github.com/timgluz/teeline"
+license = "MIT"
+license-file = "LICENSE.txt"
+keywords = ["tsp", "optimization"]
 
 [lib]
 name = "teeline"
@@ -25,3 +29,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [dev-dependencies]
 wasmtime = { version = "36", features = ["component-model"] }
 wasmtime-wasi = "36"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
