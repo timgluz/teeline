@@ -56,11 +56,11 @@ impl FileLoader {
     #[qslot]
     fn load_file(&mut self, path: String) {
         let clean = path
-            .strip_prefix("file:///")
-            .or_else(|| path.strip_prefix("file://"))
+            .strip_prefix("file://")
             .unwrap_or(&path)
             .to_string();
 
+        eprintln!("[FileLoader] loading: {clean}");
         match tsplib::read_from_file(Path::new(&clean)) {
             Ok(data) => {
                 let ew_type = if data.has_explicit_weights() { "EXPLICIT" } else { "EUC_2D" };
