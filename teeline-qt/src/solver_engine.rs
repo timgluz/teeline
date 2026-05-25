@@ -5,7 +5,8 @@ use std::time::Instant;
 
 use qtbridge::{QObjectHolder, invoke_method, qobject_impl};
 use teeline::tsp::{
-    self, AppOptions, Solvers, TspProblem,
+    self, AppOptions, GAOptions, CSOptions, FPAOptions, HeuristicOptions, SAOptions,
+    Solvers, TspProblem,
     progress::ProgressMessage,
     tsplib,
 };
@@ -60,16 +61,53 @@ impl SolverEngine {
         self.set_selected_solver(alias);
     }
 
-    /// Reset state and launch the solver on a background thread.
+    /// Reset state and launch the solver with default options.
     #[qslot]
     fn start_solve(&mut self, file_path: String) {
+        self.launch(file_path, AppOptions::default());
+    }
+
+    /// Reset state and launch the solver with options parsed from a JSON object.
+    /// The JSON keys map to the active solver's option fields.
+    #[qslot]
+    fn start_solve_with_opts(&mut self, file_path: String, opts_json: String) {
+        let opts = build_app_options(&self.selected_solver, &opts_json);
+        self.launch(file_path, opts);
+    }
+
+    /// Called on the Qt main thread by the progress-forwarding thread.
+    #[qslot]
+    fn on_progress_update(&mut self, tour_json: String, cost: f32, iteration: i32, elapsed_ms: i32) {
+        self.set_tour_json(tour_json);
+        self.set_best_cost(cost);
+        self.set_iteration(iteration);
+        self.set_elapsed_ms(elapsed_ms);
+    }
+
+    /// Called on the Qt main thread when the solver finishes (or errors).
+    #[qslot]
+    fn on_solve_done(&mut self, tour_json: String, cost: f32, elapsed_ms: i32, _error: String) {
+        self.set_tour_json(tour_json);
+        self.set_best_cost(cost);
+        self.set_elapsed_ms(elapsed_ms);
+        self.set_running(false);
+    }
+
+    /// Stop displaying updates (solver continues in background).
+    #[qslot]
+    fn cancel(&mut self) {
+        self.set_running(false);
+    }
+}
+
+impl SolverEngine {
+    fn launch(&mut self, file_path: String, opts: AppOptions) {
         self.set_running(true);
         self.set_best_cost(0.0);
         self.set_iteration(0);
         self.set_elapsed_ms(0);
         self.set_tour_json("[]".to_string());
 
-        // Two invokers: progress updates and the final done notification.
         let inv_progress = self.get_qml_method_invoker();
         let inv_done = self.get_qml_method_invoker();
         let alias = self.selected_solver.clone();
@@ -78,7 +116,8 @@ impl SolverEngine {
             let solver = match Solvers::from_str(&alias) {
                 Ok(s) => s,
                 Err(_) => {
-                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, format!("Unknown solver: {alias}"));
+                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32,
+                                   format!("Unknown solver: {alias}"));
                     return;
                 }
             };
@@ -100,12 +139,10 @@ impl SolverEngine {
                 }
             };
             let problem = TspProblem::new(cities, distances);
-            let opts = AppOptions::default();
 
             let (tx, rx) = mpsc::channel::<ProgressMessage>();
             let start = Instant::now();
 
-            // Progress-forwarding thread: receives solver updates, fires Qt slots.
             std::thread::spawn(move || {
                 let mut epoch = 0i32;
                 while let Ok(msg) = rx.recv() {
@@ -116,9 +153,7 @@ impl SolverEngine {
                             let ms = start.elapsed().as_millis() as i32;
                             invoke_method!(inv_progress, "onProgressUpdate", tour, cost, epoch, ms);
                         }
-                        ProgressMessage::EpochUpdate(n) => {
-                            epoch = n as i32;
-                        }
+                        ProgressMessage::EpochUpdate(n) => { epoch = n as i32; }
                         ProgressMessage::Done | ProgressMessage::OptimalTour(_) => break,
                         _ => {}
                     }
@@ -137,29 +172,87 @@ impl SolverEngine {
             }
         });
     }
+}
 
-    /// Called on the Qt main thread by the progress-forwarding thread.
-    #[qslot]
-    fn on_progress_update(&mut self, tour_json: String, cost: f32, iteration: i32, elapsed_ms: i32) {
-        self.set_tour_json(tour_json);
-        self.set_best_cost(cost);
-        self.set_iteration(iteration);
-        self.set_elapsed_ms(elapsed_ms);
+// ── Options construction ──────────────────────────────────────────────────────
+
+fn get_f32(v: &serde_json::Value, key: &str, default: f32) -> f32 {
+    v.get(key)
+        .and_then(|x| x.as_f64())
+        .map(|x| x as f32)
+        .unwrap_or(default)
+}
+
+fn get_usize(v: &serde_json::Value, key: &str, default: usize) -> usize {
+    v.get(key)
+        .and_then(|x| x.as_u64())
+        .map(|x| x as usize)
+        .unwrap_or(default)
+}
+
+fn build_heuristic(v: &serde_json::Value) -> HeuristicOptions {
+    let def = HeuristicOptions::default();
+    HeuristicOptions {
+        epochs:        get_usize(v, "epochs",        def.epochs),
+        platoo_epochs: get_usize(v, "platoo_epochs", def.platoo_epochs),
+        n_nearest:     get_usize(v, "n_nearest",     def.n_nearest),
+        verbose:       false,
     }
+}
 
-    /// Called on the Qt main thread when the solver finishes (or errors).
-    #[qslot]
-    fn on_solve_done(&mut self, tour_json: String, cost: f32, elapsed_ms: i32, _error: String) {
-        self.set_tour_json(tour_json);
-        self.set_best_cost(cost);
-        self.set_elapsed_ms(elapsed_ms);
-        self.set_running(false);
-    }
+fn build_app_options(alias: &str, json: &str) -> AppOptions {
+    let v: serde_json::Value = serde_json::from_str(json).unwrap_or(serde_json::Value::Object(Default::default()));
+    let h = build_heuristic(&v);
 
-    /// Stop displaying updates (solver continues in background, harmlessly).
-    #[qslot]
-    fn cancel(&mut self) {
-        self.set_running(false);
+    match alias {
+        "sa" | "simulated_annealing" => {
+            let def = SAOptions::default();
+            AppOptions {
+                sa: Some(SAOptions {
+                    heuristic: h,
+                    cooling_rate:    get_f32(&v, "cooling_rate",    def.cooling_rate),
+                    min_temperature: get_f32(&v, "min_temperature", def.min_temperature),
+                    max_temperature: get_f32(&v, "max_temperature", def.max_temperature),
+                }),
+                ..AppOptions::default()
+            }
+        }
+        "ga" | "genetic_algorithm" => {
+            let def = GAOptions::default();
+            AppOptions {
+                ga: Some(GAOptions {
+                    heuristic: h,
+                    mutation_probability: get_f32(&v, "mutation_probability", def.mutation_probability),
+                    n_elite: get_usize(&v, "n_elite", def.n_elite),
+                }),
+                ..AppOptions::default()
+            }
+        }
+        "cs" | "cuckoo_search" => {
+            let def = CSOptions::default();
+            AppOptions {
+                cs: Some(CSOptions {
+                    heuristic: h,
+                    mutation_probability: get_f32(&v, "mutation_probability", def.mutation_probability),
+                }),
+                ..AppOptions::default()
+            }
+        }
+        "fpa" | "flower_pollination" => {
+            let def = FPAOptions::default();
+            AppOptions {
+                fpa: Some(FPAOptions {
+                    heuristic: h,
+                    mutation_probability: get_f32(&v, "mutation_probability", def.mutation_probability),
+                }),
+                ..AppOptions::default()
+            }
+        }
+        // PSO and all others use HeuristicOptions
+        _ => AppOptions {
+            heuristic: Some(h),
+            ..AppOptions::default()
+        },
     }
 }
 

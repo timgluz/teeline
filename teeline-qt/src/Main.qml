@@ -426,22 +426,298 @@ ApplicationWindow {
         }
     }
 
-    // ── Inline component: ConfigPage (placeholder — issue #106) ─────────────
+    // ── Inline component: ConfigPage (issue #106) ───────────────────────────
     component ConfigPage: Page {
         signal backRequested()
         signal solveRequested()
+
         background: Rectangle { color: "#1a1a2e" }
-        ColumnLayout {
-            anchors.centerIn: parent
-            spacing: 16
-            Text { text: "Solver Config"; font.pixelSize: 24; color: "#e0e0e0"; Layout.alignment: Qt.AlignHCenter }
-            Text { text: "Coming in issue #106"; font.pixelSize: 14; color: "#9e9e9e"; Layout.alignment: Qt.AlignHCenter }
-            Text { text: "Solver: " + SolverEngine.selectedSolver; font.pixelSize: 13; color: "#4fc3f7"; Layout.alignment: Qt.AlignHCenter }
+
+        // Defaults matching Rust structs
+        readonly property var saDefaults:  ({ epochs: 10000, cooling_rate: 0.0001, min_temperature: 0.001, max_temperature: 1000.0 })
+        readonly property var gaDefaults:  ({ epochs: 10000, mutation_probability: 0.001, n_elite: 3 })
+        readonly property var psoDefaults: ({ epochs: 10000, n_nearest: 30 })
+        readonly property var csDefaults:  ({ epochs: 10000, mutation_probability: 0.001 })
+        readonly property var fpaDefaults: ({ epochs: 10000, mutation_probability: 0.001 })
+
+        property string alias: SolverEngine.selectedSolver
+        property bool isSA:  alias === "sa"  || alias === "simulated_annealing"
+        property bool isGA:  alias === "ga"  || alias === "genetic_algorithm"
+        property bool isPSO: alias === "pso" || alias === "particle_swarm"
+        property bool isCS:  alias === "cs"  || alias === "cuckoo_search"
+        property bool isFPA: alias === "fpa" || alias === "flower_pollination"
+
+        // Collect current field values as JSON for passing to Rust
+        function collectOpts() {
+            var obj = { epochs: parseInt(epochsField.text) || 10000 }
+            if (isSA) {
+                obj.cooling_rate    = parseFloat(crField.text)   || 0.0001
+                obj.min_temperature = parseFloat(minTField.text) || 0.001
+                obj.max_temperature = parseFloat(maxTField.text) || 1000.0
+            } else if (isGA) {
+                obj.mutation_probability = parseFloat(mpField.text) || 0.001
+                obj.n_elite = parseInt(eliteField.text) || 3
+            } else if (isPSO) {
+                obj.n_nearest = parseInt(swarmField.text) || 30
+            } else if (isCS || isFPA) {
+                obj.mutation_probability = parseFloat(mpField2.text) || 0.001
+            }
+            return JSON.stringify(obj)
+        }
+
+        function hasError() {
+            if (isNaN(parseInt(epochsField.text)) || parseInt(epochsField.text) < 1) return true
+            if (isSA) {
+                var cr = parseFloat(crField.text)
+                if (isNaN(cr) || cr <= 0 || cr >= 1) return true
+                var minT = parseFloat(minTField.text)
+                var maxT = parseFloat(maxTField.text)
+                if (isNaN(minT) || minT < 0) return true
+                if (isNaN(maxT) || maxT <= 0) return true
+                if (minT >= maxT) return true
+            }
+            if (isGA) {
+                var mp = parseFloat(mpField.text)
+                if (isNaN(mp) || mp < 0 || mp > 1) return true
+                if (isNaN(parseInt(eliteField.text)) || parseInt(eliteField.text) < 1) return true
+            }
+            if (isCS || isFPA) {
+                var mp2 = parseFloat(mpField2.text)
+                if (isNaN(mp2) || mp2 < 0 || mp2 > 1) return true
+            }
+            if (isPSO) {
+                if (isNaN(parseInt(swarmField.text)) || parseInt(swarmField.text) < 1) return true
+            }
+            return false
+        }
+
+        ScrollView {
+            id: scrollView
+            anchors.fill: parent
+            anchors.bottomMargin: 64
+            contentWidth: availableWidth
+
+            ColumnLayout {
+                width: scrollView.availableWidth
+                spacing: 0
+
+                // ── Header ────────────────────────────────────────────────
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 64
+                    color: "#13132b"
+
+                    RowLayout {
+                        anchors { fill: parent; leftMargin: 24; rightMargin: 24 }
+                        Text {
+                            text: "Configure Solver"
+                            font.pixelSize: 20; font.bold: true; color: "#e0e0e0"
+                        }
+                        Item { Layout.fillWidth: true }
+                        Rectangle {
+                            width: solverChip.implicitWidth + 20; height: 28; radius: 14
+                            color: "#1e3a5f"; border.color: "#4fc3f7"; border.width: 1
+                            Text {
+                                id: solverChip
+                                anchors.centerIn: parent
+                                text: SolverEngine.selectedSolver
+                                color: "#4fc3f7"; font.pixelSize: 13
+                            }
+                        }
+                    }
+                }
+
+                // ── Form body ─────────────────────────────────────────────
+                ColumnLayout {
+                    Layout.margins: 32
+                    spacing: 28
+
+                    // ── Common: epochs ────────────────────────────────────
+                    ColumnLayout {
+                        spacing: 6; Layout.fillWidth: true
+                        Text { text: "Epochs"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                        TextField {
+                            id: epochsField
+                            Layout.preferredWidth: 220
+                            font.pixelSize: 14
+                            text: isSA ? saDefaults.epochs.toString()
+                                       : isGA ? gaDefaults.epochs.toString()
+                                       : isPSO ? psoDefaults.epochs.toString()
+                                       : isCS ? csDefaults.epochs.toString()
+                                       : fpaDefaults.epochs.toString()
+                            placeholderText: "10000"
+                            color: acceptableInput ? "#111122" : "#c0302a"
+                            placeholderTextColor: "#8888aa"
+                            validator: IntValidator { bottom: 1; top: 10000000 }
+                            background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                        }
+                        Text { text: "Number of iterations the solver will run"; color: "#7890a8"; font.pixelSize: 11 }
+                    }
+
+                    // ── SA fields ─────────────────────────────────────────
+                    ColumnLayout {
+                        visible: isSA
+                        spacing: 20; Layout.fillWidth: true
+
+                        ColumnLayout {
+                            spacing: 6; Layout.fillWidth: true
+                            Text { text: "Cooling rate"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                            TextField {
+                                id: crField
+                                Layout.preferredWidth: 220
+                                font.pixelSize: 14
+                                text: saDefaults.cooling_rate.toString()
+                                placeholderText: "0.0001"
+                                color: acceptableInput ? "#111122" : "#c0302a"
+                                placeholderTextColor: "#8888aa"
+                                validator: DoubleValidator { bottom: 0.000001; top: 0.999999; notation: DoubleValidator.StandardNotation }
+                                background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                            }
+                            Text { text: "Must be > 0 and < 1"; color: "#7890a8"; font.pixelSize: 11 }
+                        }
+
+                        RowLayout {
+                            spacing: 32; Layout.fillWidth: true
+                            ColumnLayout {
+                                spacing: 6
+                                Text { text: "Min temperature"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                                TextField {
+                                    id: minTField
+                                    width: 180; font.pixelSize: 14
+                                    text: saDefaults.min_temperature.toString()
+                                    placeholderText: "0.001"
+                                    color: "#111122"; placeholderTextColor: "#8888aa"
+                                    validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                                    background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                }
+                            }
+                            ColumnLayout {
+                                spacing: 6
+                                Text { text: "Max temperature"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                                TextField {
+                                    id: maxTField
+                                    width: 180; font.pixelSize: 14
+                                    text: saDefaults.max_temperature.toString()
+                                    placeholderText: "1000.0"
+                                    color: "#111122"; placeholderTextColor: "#8888aa"
+                                    validator: DoubleValidator { bottom: 0.000001; notation: DoubleValidator.StandardNotation }
+                                    background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                }
+                            }
+                        }
+                        Text {
+                            visible: { var mn = parseFloat(minTField.text); var mx = parseFloat(maxTField.text); return !isNaN(mn) && !isNaN(mx) && mn >= mx }
+                            text: "⚠  Min temperature must be less than max temperature"
+                            color: "#ef5350"; font.pixelSize: 12
+                        }
+                    }
+
+                    // ── GA fields ─────────────────────────────────────────
+                    ColumnLayout {
+                        visible: isGA
+                        spacing: 20; Layout.fillWidth: true
+
+                        ColumnLayout {
+                            spacing: 6; Layout.fillWidth: true
+                            Text { text: "Mutation probability"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                            TextField {
+                                id: mpField
+                                Layout.preferredWidth: 220; font.pixelSize: 14
+                                text: gaDefaults.mutation_probability.toString()
+                                placeholderText: "0.001"
+                                color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                                validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
+                                background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                            }
+                            Text { text: "Range [0, 1]"; color: "#7890a8"; font.pixelSize: 11 }
+                        }
+
+                        ColumnLayout {
+                            spacing: 6
+                            Text { text: "Elite count"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                            TextField {
+                                id: eliteField
+                                width: 140; font.pixelSize: 14
+                                text: gaDefaults.n_elite.toString()
+                                placeholderText: "3"
+                                color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                                validator: IntValidator { bottom: 1; top: 1000 }
+                                background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                            }
+                            Text { text: "Elite solutions preserved each generation"; color: "#7890a8"; font.pixelSize: 11 }
+                        }
+                    }
+
+                    // ── CS / FPA shared mutation field ────────────────────
+                    ColumnLayout {
+                        visible: isCS || isFPA
+                        spacing: 6; Layout.fillWidth: true
+                        Text { text: "Mutation probability"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                        TextField {
+                            id: mpField2
+                            Layout.preferredWidth: 220; font.pixelSize: 14
+                            text: isCS ? csDefaults.mutation_probability.toString()
+                                       : fpaDefaults.mutation_probability.toString()
+                            placeholderText: "0.001"
+                            color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                            validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
+                            background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                        }
+                        Text { text: "Range [0, 1]"; color: "#7890a8"; font.pixelSize: 11 }
+                    }
+
+                    // ── PSO fields ────────────────────────────────────────
+                    ColumnLayout {
+                        visible: isPSO
+                        spacing: 6
+                        Text { text: "Swarm size (min)"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                        TextField {
+                            id: swarmField
+                            width: 140; font.pixelSize: 14
+                            text: psoDefaults.n_nearest.toString()
+                            placeholderText: "30"
+                            color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                            validator: IntValidator { bottom: 1; top: 10000 }
+                            background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                        }
+                        Text { text: "Minimum particle count (floor is 30)"; color: "#7890a8"; font.pixelSize: 11 }
+                    }
+                }
+            }
+        }
+
+        // ── Bottom bar ────────────────────────────────────────────────────
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 56
+            color: "#0d0d1e"
+            z: 10
+
             RowLayout {
-                Layout.alignment: Qt.AlignHCenter
+                anchors { fill: parent; leftMargin: 20; rightMargin: 20 }
                 spacing: 12
+
                 Button { text: "← Back"; onClicked: backRequested() }
-                Button { text: "Solve ▶"; highlighted: true; onClicked: solveRequested() }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    visible: hasError()
+                    text: "Fix validation errors above"
+                    color: "#ef5350"; font.pixelSize: 12
+                }
+
+                Button {
+                    text: "Solve ▶"
+                    highlighted: true
+                    enabled: !hasError()
+                    onClicked: {
+                        SolverEngine.startSolveWithOpts(FileLoader.filePath, collectOpts())
+                        solveRequested()
+                    }
+                }
             }
         }
     }
@@ -668,10 +944,7 @@ ApplicationWindow {
         id: configComp
         ConfigPage {
             onBackRequested:  stackView.pop()
-            onSolveRequested: {
-                SolverEngine.startSolve(FileLoader.filePath)
-                stackView.push(vizComp)
-            }
+            onSolveRequested: stackView.push(vizComp)
         }
     }
 
