@@ -212,7 +212,7 @@ ApplicationWindow {
         { name: "Stochastic Hill Climb",alias: "stochastic_hill",category: "Metaheuristic",
           desc: "Random-restart hill climbing to escape local optima.",
           complexity: "O(epochs · n)", hasOptions: false, exact: false },
-        { name: "Tabu Search",          alias: "tabu",           category: "Metaheuristic",
+        { name: "Tabu Search",          alias: "tabu_search",    category: "Metaheuristic",
           desc: "Local search with a memory structure to avoid revisiting solutions.",
           complexity: "O(epochs · n)", hasOptions: false, exact: false },
         { name: "Random Shuffle",       alias: "shuffle",        category: "Utility",
@@ -446,17 +446,197 @@ ApplicationWindow {
         }
     }
 
-    // ── Inline component: VisualizationPage (placeholder — issue #105) ──────
+    // ── Inline component: VisualizationPage (issue #105) ────────────────────
     component VisualizationPage: Page {
         signal backRequested()
+
         background: Rectangle { color: "#0f0f23" }
-        ColumnLayout {
-            anchors.centerIn: parent
-            spacing: 16
-            Text { text: "Visualization"; font.pixelSize: 24; color: "#e0e0e0"; Layout.alignment: Qt.AlignHCenter }
-            Text { text: "Coming in issue #105"; font.pixelSize: 14; color: "#9e9e9e"; Layout.alignment: Qt.AlignHCenter }
-            Text { text: "Solver: " + SolverEngine.selectedSolver; font.pixelSize: 13; color: "#00e676"; Layout.alignment: Qt.AlignHCenter }
-            Button { text: "← Back"; Layout.alignment: Qt.AlignHCenter; onClicked: backRequested() }
+
+        // ── Tour canvas ────────────────────────────────────────────────────
+        Canvas {
+            id: tourCanvas
+            anchors.fill: parent
+
+            property var cityPos: ({})   // id → {x,y} in canvas coords
+
+            function rebuild() {
+                var raw = FileLoader.citiesJson
+                if (!raw || raw === "[]") { cityPos = {}; return }
+                var cities = JSON.parse(raw)
+                var pad = 48, w = width - pad*2, h = height - pad*2 - 56
+                var m = {}
+                for (var i = 0; i < cities.length; i++) {
+                    m[cities[i].id] = {
+                        x: pad + cities[i].x * w,
+                        y: pad + cities[i].y * h
+                    }
+                }
+                cityPos = m
+            }
+
+            onWidthChanged:  { rebuild(); requestPaint() }
+            onHeightChanged: { rebuild(); requestPaint() }
+            Component.onCompleted: { rebuild(); requestPaint() }
+
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.fillStyle = "#0f0f23"
+                ctx.fillRect(0, 0, width, height)
+
+                var pos = cityPos
+                var ids = Object.keys(pos)
+                if (!ids.length) return
+
+                // Tour edges
+                var tourRaw = SolverEngine.tourJson
+                if (tourRaw && tourRaw !== "[]") {
+                    var tour = JSON.parse(tourRaw)
+                    if (tour.length > 1) {
+                        ctx.strokeStyle = "#00e676"
+                        ctx.lineWidth = 1.2
+                        ctx.globalAlpha = 0.65
+                        ctx.beginPath()
+                        var p0 = pos[tour[0]]
+                        if (p0) { ctx.moveTo(p0.x, p0.y) }
+                        for (var j = 1; j < tour.length; j++) {
+                            var p = pos[tour[j]]
+                            if (p) ctx.lineTo(p.x, p.y)
+                        }
+                        if (p0) ctx.lineTo(p0.x, p0.y)
+                        ctx.stroke()
+                        ctx.globalAlpha = 1.0
+                    }
+                }
+
+                // City dots
+                ctx.fillStyle = "#4fc3f7"
+                for (var i = 0; i < ids.length; i++) {
+                    var c = pos[ids[i]]
+                    ctx.beginPath()
+                    ctx.arc(c.x, c.y, 3.5, 0, Math.PI*2)
+                    ctx.fill()
+                }
+            }
+
+            Connections {
+                target: SolverEngine
+                function onTourJsonChanged() { tourCanvas.requestPaint() }
+            }
+            Connections {
+                target: FileLoader
+                function onCitiesJsonChanged() { tourCanvas.rebuild(); tourCanvas.requestPaint() }
+            }
+        }
+
+        // ── KPI overlay (top-right) ────────────────────────────────────────
+        Rectangle {
+            anchors.top: parent.top
+            anchors.right: parent.right
+            anchors.margins: 12
+            width: kpiCol.implicitWidth + 24
+            height: kpiCol.implicitHeight + 20
+            color: "#cc0a0a1e"
+            radius: 8
+            border.color: "#2a2a5a"
+            border.width: 1
+            z: 10
+
+            ColumnLayout {
+                id: kpiCol
+                anchors.centerIn: parent
+                spacing: 6
+
+                RowLayout {
+                    spacing: 12
+                    Text { text: "Solver"; color: "#607d8b"; font.pixelSize: 11 }
+                    Text { text: SolverEngine.selectedSolver; color: "#4fc3f7"; font.pixelSize: 13; font.bold: true }
+                }
+                RowLayout {
+                    spacing: 12
+                    Text { text: "Best cost"; color: "#607d8b"; font.pixelSize: 11 }
+                    Text {
+                        text: SolverEngine.bestCost > 0 ? SolverEngine.bestCost.toFixed(2) : "—"
+                        color: "#00e676"; font.pixelSize: 15; font.bold: true
+                    }
+                }
+                RowLayout {
+                    spacing: 12
+                    Text { text: "Iteration"; color: "#607d8b"; font.pixelSize: 11 }
+                    Text { text: SolverEngine.iteration.toString(); color: "#e0e0e0"; font.pixelSize: 13 }
+                }
+                RowLayout {
+                    spacing: 12
+                    Text { text: "Elapsed"; color: "#607d8b"; font.pixelSize: 11 }
+                    Text {
+                        text: {
+                            var ms = SolverEngine.elapsedMs
+                            if (ms < 1000) return ms + " ms"
+                            return (ms / 1000).toFixed(1) + " s"
+                        }
+                        color: "#e0e0e0"; font.pixelSize: 13
+                    }
+                }
+
+                // Running indicator
+                RowLayout {
+                    visible: SolverEngine.running
+                    spacing: 6
+                    Rectangle {
+                        width: 8; height: 8; radius: 4; color: "#00e676"
+                        SequentialAnimation on opacity {
+                            loops: Animation.Infinite
+                            NumberAnimation { to: 0.2; duration: 600 }
+                            NumberAnimation { to: 1.0; duration: 600 }
+                        }
+                    }
+                    Text { text: "Solving…"; color: "#00e676"; font.pixelSize: 11 }
+                }
+            }
+        }
+
+        // ── Bottom bar ─────────────────────────────────────────────────────
+        Rectangle {
+            anchors.bottom: parent.bottom
+            anchors.left: parent.left
+            anchors.right: parent.right
+            height: 56
+            color: "#0d0d1e"
+            z: 10
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 20
+                anchors.rightMargin: 20
+                spacing: 12
+
+                Button {
+                    text: "← Back"
+                    visible: !SolverEngine.running
+                    onClicked: backRequested()
+                }
+
+                Button {
+                    text: "Stop"
+                    visible: SolverEngine.running
+                    onClicked: SolverEngine.cancel()
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    visible: !SolverEngine.running && SolverEngine.bestCost > 0
+                    text: "Tour length: " + SolverEngine.bestCost.toFixed(2)
+                    color: "#00e676"
+                    font.pixelSize: 15
+                    font.bold: true
+                }
+
+                Button {
+                    text: "← New problem"
+                    visible: !SolverEngine.running && SolverEngine.bestCost > 0
+                    onClicked: backRequested()
+                }
+            }
         }
     }
 
@@ -477,7 +657,10 @@ ApplicationWindow {
         SolverPage {
             onBackRequested:    stackView.pop()
             onConfigureRequested: stackView.push(configComp)
-            onSolveRequested:   stackView.push(vizComp)
+            onSolveRequested: {
+                SolverEngine.startSolve(FileLoader.filePath)
+                stackView.push(vizComp)
+            }
         }
     }
 
@@ -485,7 +668,10 @@ ApplicationWindow {
         id: configComp
         ConfigPage {
             onBackRequested:  stackView.pop()
-            onSolveRequested: stackView.push(vizComp)
+            onSolveRequested: {
+                SolverEngine.startSolve(FileLoader.filePath)
+                stackView.push(vizComp)
+            }
         }
     }
 

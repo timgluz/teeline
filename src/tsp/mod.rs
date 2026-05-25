@@ -746,7 +746,7 @@ pub fn solve_problem(
     solve_with_context(solver, problem, opts, None, None)
 }
 
-pub(crate) fn solve_with_context(
+pub fn solve_with_context(
     solver: Solvers,
     problem: &TspProblem,
     opts: &AppOptions,

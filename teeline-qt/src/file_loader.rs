@@ -10,6 +10,7 @@ pub struct FileLoader {
     error_message: String,
     cities_json: String,
     recent_files_json: String,
+    file_path: String,
 }
 
 impl Default for FileLoader {
@@ -22,6 +23,7 @@ impl Default for FileLoader {
             error_message: String::new(),
             cities_json: "[]".to_string(),
             recent_files_json: load_recent_files(),
+            file_path: String::new(),
         }
     }
 }
@@ -35,6 +37,7 @@ impl FileLoader {
     qproperty!("errorMessage",     Member = error_message,     Write = set_error_message,     Notify = "errorMessageChanged");
     qproperty!("citiesJson",       Member = cities_json,       Write = set_cities_json,       Notify = "citiesJsonChanged");
     qproperty!("recentFilesJson",  Member = recent_files_json, Write = set_recent_files_json, Notify = "recentFilesJsonChanged");
+    qproperty!("filePath",         Member = file_path,         Write = set_file_path,         Notify = "filePathChanged");
 
     fn set_city_count(&mut self, v: i32)       { self.city_count = v;        self.city_count_changed(); }
     fn set_problem_name(&mut self, v: String)   { self.problem_name = v;      self.problem_name_changed(); }
@@ -43,6 +46,7 @@ impl FileLoader {
     fn set_error_message(&mut self, v: String)  { self.error_message = v;     self.error_message_changed(); }
     fn set_cities_json(&mut self, v: String)    { self.cities_json = v;       self.cities_json_changed(); }
     fn set_recent_files_json(&mut self, v: String) { self.recent_files_json = v; self.recent_files_json_changed(); }
+    fn set_file_path(&mut self, v: String)      { self.file_path = v;         self.file_path_changed(); }
 
     #[qsignal] fn city_count_changed(&self);
     #[qsignal] fn problem_name_changed(&self);
@@ -51,6 +55,7 @@ impl FileLoader {
     #[qsignal] fn error_message_changed(&self);
     #[qsignal] fn cities_json_changed(&self);
     #[qsignal] fn recent_files_json_changed(&self);
+    #[qsignal] fn file_path_changed(&self);
 
     /// Load a TSPLIB file. `path` may be a filesystem path or a file:// URL.
     #[qslot]
@@ -70,6 +75,7 @@ impl FileLoader {
                 self.set_cities_json(cities_to_json(data.cities()));
                 self.set_error_message(String::new());
                 self.set_is_loaded(true);
+                self.set_file_path(clean.clone());
 
                 let updated = push_recent(clean, &self.recent_files_json);
                 save_recent_files(&updated);
@@ -132,7 +138,7 @@ fn cities_to_json(cities: &[KDPoint]) -> String {
         .map(|c| {
             let nx = (c.x() - min_x) / rx;
             let ny = (c.y() - min_y) / ry;
-            format!("{{\"x\":{:.4},\"y\":{:.4}}}", nx, ny)
+            format!("{{\"id\":{},\"x\":{:.4},\"y\":{:.4}}}", c.id, nx, ny)
         })
         .collect();
     format!("[{}]", pts.join(","))
