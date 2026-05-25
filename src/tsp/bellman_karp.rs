@@ -45,7 +45,7 @@ pub fn solve(
             .distance_by_pos(i, last_pos)
             .unwrap_or(UNKNOWN_DISTANCE);
 
-        if let Some(city_id) = dists.pos2city_id(&i)
+        if let Some(city_id) = dists.pos2city_id(i)
             && let Some(tx) = progress_tx
         {
             let _ = tx.send(ProgressMessage::CityChange(city_id));
@@ -149,7 +149,7 @@ fn read_optimal_route(opt: &DPTable, dm: &DistanceMatrix, n: usize, best_val: f3
 
     let route: Vec<usize> = route_ids
         .iter()
-        .map(|pos| dm.pos2city_id(pos).unwrap_or(0))
+        .map(|&pos| dm.pos2city_id(pos).unwrap_or(0))
         .collect();
 
     route
