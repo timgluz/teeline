@@ -403,8 +403,14 @@ ApplicationWindow {
 
                     Button {
                         text: "Pipeline →"
-                        flat: true
                         onClicked: pipelineRequested()
+                        contentItem: Text {
+                            text: parent.text
+                            color: "#4fc3f7"
+                            font: parent.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
                         ToolTip.visible: hovered
                         ToolTip.text: "Chain multiple solvers in sequence"
                         ToolTip.delay: 400
@@ -737,7 +743,10 @@ ApplicationWindow {
         property var stages: []
 
         function stagesJson() {
-            return JSON.stringify(stages.map(function(s) { return { solver: s.solver } }))
+            return JSON.stringify(stages.map(function(s, i) {
+                var item = stageRepeater.itemAt(i)
+                return { solver: s.solver, opts: item ? item.getOpts() : {} }
+            }))
         }
 
         ColumnLayout {
@@ -793,25 +802,59 @@ ApplicationWindow {
 
                     // Stage cards
                     Repeater {
+                        id: stageRepeater
                         model: stages
                         delegate: Rectangle {
                             required property var modelData
                             required property int index
                             width: parent ? parent.width - 48 : 400
-                            height: 64
                             radius: 6
                             color: "#16213e"
-                            border.color: "#2a3a6a"
+                            border.color: configOpen ? "#4fc3f7" : "#2a3a6a"
                             border.width: 1
+                            clip: true
 
+                            property bool configOpen: false
+                            property bool hasSA:  modelData.solver === "sa"  || modelData.solver === "simulated_annealing"
+                            property bool hasGA:  modelData.solver === "ga"  || modelData.solver === "genetic_algorithm"
+                            property bool hasPSO: modelData.solver === "pso" || modelData.solver === "particle_swarm"
+                            property bool hasCS:  modelData.solver === "cs"  || modelData.solver === "cuckoo_search"
+                            property bool hasFPA: modelData.solver === "fpa" || modelData.solver === "flower_pollination"
+                            property bool hasAnyOpts: hasSA || hasGA || hasPSO || hasCS || hasFPA
+
+                            // Height: 64 base + accordion when open
+                            property int accordionExpandedH: hasSA ? 240 : (hasGA ? 180 : 130)
+                            height: 64 + (configOpen ? accordionExpandedH : 0)
+                            Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutQuad } }
+
+                            function getOpts() {
+                                if (!hasAnyOpts) return {}
+                                var opts = { epochs: parseInt(epochsField.text) || 10000 }
+                                if (hasSA) {
+                                    opts.cooling_rate    = parseFloat(crField.text)   || 0.0001
+                                    opts.min_temperature = parseFloat(minTField.text) || 0.001
+                                    opts.max_temperature = parseFloat(maxTField.text) || 1000.0
+                                } else if (hasGA) {
+                                    opts.mutation_probability = parseFloat(mpField.text) || 0.001
+                                    opts.n_elite = parseInt(eliteField.text) || 3
+                                } else if (hasPSO) {
+                                    opts.n_nearest = parseInt(swarmField.text) || 30
+                                } else if (hasCS || hasFPA) {
+                                    opts.mutation_probability = parseFloat(mpField.text) || 0.001
+                                }
+                                return opts
+                            }
+
+                            // ── Main row ──────────────────────────────────────────────────
                             RowLayout {
-                                anchors { fill: parent; leftMargin: 16; rightMargin: 8 }
-                                spacing: 12
+                                id: mainRow
+                                anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 16; rightMargin: 8 }
+                                height: 64
+                                spacing: 8
 
                                 // Stage number badge
                                 Rectangle {
-                                    width: 28; height: 28; radius: 14
-                                    color: "#1e3a5f"
+                                    width: 28; height: 28; radius: 14; color: "#1e3a5f"
                                     Text {
                                         anchors.centerIn: parent
                                         text: (index + 1).toString()
@@ -819,32 +862,43 @@ ApplicationWindow {
                                     }
                                 }
 
-                                // Arrow between stages
+                                // Arrow connector
                                 Text {
                                     visible: index > 0
-                                    text: "→"
-                                    color: "#607d8b"; font.pixelSize: 14
-                                    // Note: shown as part of this card for simplicity
+                                    text: "→"; color: "#607d8b"; font.pixelSize: 14
                                 }
 
                                 ColumnLayout {
-                                    spacing: 2
-                                    Layout.fillWidth: true
-                                    Text {
-                                        text: modelData.name
-                                        color: "#e0e0e0"; font.pixelSize: 14; font.bold: true
+                                    spacing: 2; Layout.fillWidth: true
+                                    Text { text: modelData.name;     color: "#e0e0e0"; font.pixelSize: 14; font.bold: true }
+                                    Text { text: modelData.category; color: "#607d8b"; font.pixelSize: 11 }
+                                }
+
+                                // Config toggle
+                                Button {
+                                    text: configOpen ? "⚙ Close" : "⚙ Config"
+                                    visible: hasAnyOpts
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: configOpen ? "#4fc3f7" : "#e0e0e0"
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
                                     }
-                                    Text {
-                                        text: modelData.category
-                                        color: "#607d8b"; font.pixelSize: 11
-                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: configOpen ? "Close configuration" : "Configure solver options"
+                                    ToolTip.delay: 400
+                                    onClicked: configOpen = !configOpen
                                 }
 
                                 // Move up
                                 Button {
-                                    text: "↑"
+                                    text: "↑ Up"
                                     enabled: index > 0
-                                    flat: true
+                                    opacity: index > 0 ? 1.0 : 0.3
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Move stage earlier in pipeline"
+                                    ToolTip.delay: 400
                                     onClicked: {
                                         var arr = stages.slice()
                                         var tmp = arr[index - 1]
@@ -856,9 +910,12 @@ ApplicationWindow {
 
                                 // Move down
                                 Button {
-                                    text: "↓"
+                                    text: "↓ Down"
                                     enabled: index < stages.length - 1
-                                    flat: true
+                                    opacity: index < stages.length - 1 ? 1.0 : 0.3
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Move stage later in pipeline"
+                                    ToolTip.delay: 400
                                     onClicked: {
                                         var arr = stages.slice()
                                         var tmp = arr[index + 1]
@@ -870,12 +927,122 @@ ApplicationWindow {
 
                                 // Remove
                                 Button {
-                                    text: "✕"
-                                    flat: true
+                                    text: "✕ Remove"
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Remove this stage"
+                                    ToolTip.delay: 400
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: "#ef5350"
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
                                     onClicked: {
                                         var arr = stages.slice()
                                         arr.splice(index, 1)
                                         stages = arr
+                                    }
+                                }
+                            }
+
+                            // ── Accordion separator ───────────────────────────────────────
+                            Rectangle {
+                                anchors { left: parent.left; right: parent.right; top: mainRow.bottom }
+                                height: 1
+                                color: "#2a3a6a"
+                            }
+
+                            // ── Accordion: solver options ─────────────────────────────────
+                            ColumnLayout {
+                                id: accordionContent
+                                anchors { left: parent.left; right: parent.right; top: mainRow.bottom; topMargin: 10; leftMargin: 20; rightMargin: 20 }
+                                spacing: 10
+
+                                // Epochs (all configurable solvers)
+                                RowLayout {
+                                    spacing: 12
+                                    Text { text: "Epochs"; color: "#9e9e9e"; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: epochsField
+                                        Layout.preferredWidth: 180
+                                        text: "10000"; color: "#111122"; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 10000000 }
+                                        background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    }
+                                }
+
+                                // SA: cooling rate
+                                RowLayout {
+                                    visible: hasSA; spacing: 12
+                                    Text { text: "Cooling rate"; color: "#9e9e9e"; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: crField
+                                        Layout.preferredWidth: 180
+                                        text: "0.0001"; color: "#111122"; font.pixelSize: 13
+                                        background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    }
+                                }
+
+                                // SA: min temperature
+                                RowLayout {
+                                    visible: hasSA; spacing: 12
+                                    Text { text: "Min temperature"; color: "#9e9e9e"; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: minTField
+                                        Layout.preferredWidth: 180
+                                        text: "0.001"; color: "#111122"; font.pixelSize: 13
+                                        background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    }
+                                }
+
+                                // SA: max temperature
+                                RowLayout {
+                                    visible: hasSA; spacing: 12
+                                    Text { text: "Max temperature"; color: "#9e9e9e"; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: maxTField
+                                        Layout.preferredWidth: 180
+                                        text: "1000.0"; color: "#111122"; font.pixelSize: 13
+                                        background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    }
+                                }
+
+                                // GA / CS / FPA: mutation probability
+                                RowLayout {
+                                    visible: hasGA || hasCS || hasFPA; spacing: 12
+                                    Text { text: "Mutation probability"; color: "#9e9e9e"; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: mpField
+                                        Layout.preferredWidth: 180
+                                        text: "0.001"; color: "#111122"; font.pixelSize: 13
+                                        background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    }
+                                }
+
+                                // GA: elite count
+                                RowLayout {
+                                    visible: hasGA; spacing: 12
+                                    Text { text: "Elite count"; color: "#9e9e9e"; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: eliteField
+                                        Layout.preferredWidth: 180
+                                        text: "3"; color: "#111122"; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 1000 }
+                                        background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    }
+                                }
+
+                                // PSO: swarm size (n_nearest)
+                                RowLayout {
+                                    visible: hasPSO; spacing: 12
+                                    Text { text: "Swarm size (n_nearest)"; color: "#9e9e9e"; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: swarmField
+                                        Layout.preferredWidth: 180
+                                        text: "30"; color: "#111122"; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 10000 }
+                                        background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
                                     }
                                 }
                             }
