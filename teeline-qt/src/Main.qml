@@ -880,7 +880,7 @@ ApplicationWindow {
                                     visible: hasAnyOpts
                                     contentItem: Text {
                                         text: parent.text
-                                        color: configOpen ? "#4fc3f7" : "#e0e0e0"
+                                        color: configOpen ? "#4fc3f7" : "#111122"
                                         font: parent.font
                                         horizontalAlignment: Text.AlignHCenter
                                         verticalAlignment: Text.AlignVCenter
