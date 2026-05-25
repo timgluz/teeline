@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "teeline-wasm", "teeline-cli"]
+members = [".", "teeline-wasm", "teeline-cli", "teeline-qt"]
 default-members = ["."]
 resolver = "2"
 
@@ -10,7 +10,6 @@ authors = ["Timo Sulg <timgluz@gmail.com>"]
 edition = "2024"
 repository = "https://github.com/timgluz/teeline"
 license = "MIT"
-license-file = "LICENSE.txt"
 keywords = ["tsp", "optimization"]
 
 [lib]

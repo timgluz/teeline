@@ -44,3 +44,19 @@ jobs:
         files: lcov.info
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  build-qt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install build dependencies
+      run: sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev
+    - name: Install Qt 6
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.11.*'
+        cache: true
+    - name: Build teeline-qt
+      run: cargo build -p teeline-qt 2>&1
+      env:
+        RUST_LOG: debug

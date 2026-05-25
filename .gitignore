@@ -8,3 +8,6 @@
 .kb/workspaces/
 .claude/plans
 docs/superpowers/
+
+# env files
+.env*
