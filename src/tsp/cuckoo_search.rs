@@ -1,11 +1,12 @@
+use std::sync::mpsc;
+
 use rand::Rng;
 
-use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::probability::levy_step;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{Solution, SolverOptions};
+use super::{CSOptions, Solution, TspProblem};
+
 const DEFAULT_N_NESTS: usize = 25;
 
 
@@ -23,9 +24,16 @@ fn apply_k_random_2opt(tour: &[usize], k: usize, rng: &mut impl Rng) -> Vec<usiz
     result
 }
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
-    let n_nests = options.n_nearest.max(DEFAULT_N_NESTS);
-    let pa = (options.mutation_probability as f64).clamp(0.01, 0.99);
+pub fn solve(
+    problem: &TspProblem,
+    opts: &CSOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
+) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
+    let n_nests = opts.heuristic.n_nearest.max(DEFAULT_N_NESTS);
+    let pa = (opts.mutation_probability as f64).clamp(0.01, 0.99);
     let n_cities = cities.len();
 
     let mut rng = rand::rng();
@@ -34,7 +42,7 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut nests: Vec<Vec<usize>> = (0..n_nests)
         .map(|idx| {
             if idx == 0 {
-                options.initial_tour.clone().unwrap_or_else(|| {
+                init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
                     let mut t = city_ids.clone();
                     for i in (1..n_cities).rev() {
                         let j = rng.random_range(0..=i);
@@ -63,11 +71,11 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut best: Vec<usize> = nests[best_idx].clone();
     let mut best_cost: f32 = costs[best_idx];
 
-    options.send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+    }
 
-    for epoch in 0..options.epochs {
-        // 1. Each nest generates one cuckoo via Lévy flight (Yang & Deb 2009: n cuckoos/epoch).
-        //    |levy_step| is used as step magnitude; sign is irrelevant for a discrete mapping.
+    for epoch in 0..opts.heuristic.epochs {
         for cuckoo_idx in 0..n_nests {
             let levy = levy_step(&mut rng).abs();
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
@@ -76,8 +84,6 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             let new_tour = apply_k_random_2opt(&nests[cuckoo_idx], k, &mut rng);
             let new_cost = distances.tour_length(&new_tour);
 
-            // Replace a randomly chosen nest if cuckoo is better.
-            // cuckoo_idx may equal target_idx; harmless (nest replaces itself only if better).
             let target_idx = rng.random_range(0..n_nests);
             if new_cost < costs[target_idx] {
                 nests[target_idx] = new_tour;
@@ -86,13 +92,13 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
                 if new_cost < best_cost {
                     best = nests[target_idx].clone();
                     best_cost = new_cost;
-                    options.send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+                    if let Some(tx) = progress_tx {
+                        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+                    }
                 }
             }
         }
 
-        // 2. Per-nest Bernoulli abandonment (Yang & Deb 2009): each nest independently
-        //    re-seeded with probability pa, preserving discovered information per epoch.
         for idx in 0..n_nests {
             let r: f64 = rng.random();
             if r < pa {
@@ -108,22 +114,28 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
                 if cost < best_cost {
                     best = nests[idx].clone();
                     best_cost = cost;
-                    options.send_progress(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+                    if let Some(tx) = progress_tx {
+                        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
+                    }
                 }
             }
         }
 
-        options.send_progress(ProgressMessage::EpochUpdate(epoch));
+        if let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
+        }
     }
 
-    options.send_progress(ProgressMessage::Done);
-    Solution::new(&best, cities, distances)
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::Done);
+    }
+    Solution::from_parts(&best, cities, distances)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree};
+    use crate::tsp::{distance_matrix, kdtree, CSOptions, HeuristicOptions, TspProblem};
 
     #[test]
     fn test_cs_respects_initial_tour() {
@@ -137,12 +149,12 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = SolverOptions {
-            epochs: 0,
-            initial_tour: Some(optimal.clone()),
-            ..SolverOptions::default()
+        let opts = CSOptions {
+            heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+            ..CSOptions::default()
         };
-        let result = solve(&cities, &dm, &opts);
+        let problem = TspProblem::new(cities.clone(), dm);
+        let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();
@@ -178,13 +190,12 @@ mod tests {
             vec![0.0, 1.0],
         ]);
         let distances = distance_matrix::from_cities(&cities);
-        let options = SolverOptions {
-            epochs: 30,
-            n_nearest: 5,
+        let opts = CSOptions {
+            heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
             mutation_probability: 0.25,
-            ..SolverOptions::default()
         };
-        let sol = solve(&cities, &distances, &options);
+        let problem = TspProblem::new(cities.clone(), distances);
+        let sol = solve(&problem, &opts, None, None);
         let mut visited = sol.route().to_vec();
         visited.sort();
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();

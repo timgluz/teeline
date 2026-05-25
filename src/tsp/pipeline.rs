@@ -1,61 +1,66 @@
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
-use super::{validate_tour, Solution, SolverOptions, Solvers};
+use super::{validate_tour, AppOptions, Solution, Solvers, TspProblem};
 
-#[derive(Clone, Debug)]
 pub struct PipelineStage {
     pub solver: Solvers,
-    pub options: SolverOptions, // fully resolved at config-load time
+    pub options: AppOptions,
+    pub problem: TspProblem,
+    pub progress_tx: Option<mpsc::Sender<ProgressMessage>>,
 }
 
-/// Run a pipeline of stages. `progress_tx` and `initial_tour` are injected at
-/// runtime per stage and cannot be set via config.
-pub fn solve(
-    stages: &[PipelineStage],
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
-    progress_tx: Option<mpsc::Sender<ProgressMessage>>,
-) -> Result<Solution, String> {
-    assert!(!stages.is_empty(), "pipeline: stages must not be empty — validate at call site");
-
-    let mut seed: Option<Vec<usize>> = None;
-    let mut last_solution: Option<Solution> = None;
-
-    for (i, stage) in stages.iter().enumerate() {
-        if let Some(ref t) = seed
-            && let Err(e) = validate_tour(t, cities)
-        {
-            tracing::warn!("pipeline stage {i}: invalid seed ({e}); using default seeding");
-            seed = None;
-        }
-
-        let mut stage_opts = stage.options.clone();
-        stage_opts.progress_tx = progress_tx.clone();
-        stage_opts.initial_tour = seed.take();
-
-        tracing::info!(stage = i, solver = ?stage.solver, "pipeline: stage starting");
-
-        let solution = super::solve(stage.solver, cities, distances, &stage_opts)
-            .map_err(|e| format!("pipeline stage {i} ({:?}): {e}", stage.solver))?;
-
-        tracing::info!(stage = i, cost = solution.total, "pipeline: stage complete");
-
-        seed = Some(solution.route().to_vec());
-        last_solution = Some(solution);
+impl PipelineStage {
+    pub fn new(
+        solver: Solvers,
+        options: AppOptions,
+        problem: TspProblem,
+        progress_tx: Option<mpsc::Sender<ProgressMessage>>,
+    ) -> Self {
+        PipelineStage { solver, options, problem, progress_tx }
     }
 
-    Ok(last_solution.expect("loop executed — asserted non-empty above"))
+    pub fn solve(&self, init_tour: Option<&[usize]>) -> Result<Solution, String> {
+        super::solve_with_context(
+            self.solver,
+            &self.problem,
+            &self.options,
+            self.progress_tx.clone(),
+            init_tour,
+        )
+    }
+}
+
+pub fn run_pipeline(stages: &[PipelineStage]) -> Result<Solution, String> {
+    if stages.is_empty() {
+        return Err("pipeline has no stages".into());
+    }
+    let mut seed: Option<Vec<usize>> = None;
+    for stage in stages {
+        if let Some(ref t) = seed
+            && let Err(e) = validate_tour(t, &stage.problem.cities) {
+            tracing::warn!("pipeline: invalid seed ({e}); using default seeding");
+            seed = None;
+        }
+        tracing::info!(solver = ?stage.solver, "pipeline: stage starting");
+        let solution = stage.solve(seed.as_deref())?;
+        validate_tour(solution.route(), &stage.problem.cities)
+            .map_err(|e| format!("stage {:?} invalid tour: {e}", stage.solver))?;
+        tracing::info!(cost = solution.total, "pipeline: stage complete");
+        seed = Some(solution.route().to_vec());
+    }
+
+    let last = stages.last().unwrap();
+    let route = seed.unwrap();
+    Ok(Solution::new(&route, &last.problem))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, SolverOptions, Solvers};
+    use crate::tsp::{distance_matrix, kdtree, AppOptions, Solvers, TspProblem};
 
-    fn small_cities() -> Vec<KDPoint> {
+    fn small_cities() -> Vec<kdtree::KDPoint> {
         kdtree::build_points(&[
             vec![0.0, 0.0],
             vec![1.0, 0.0],
@@ -65,30 +70,24 @@ mod tests {
         ])
     }
 
-    fn stage(solver: Solvers) -> PipelineStage {
-        PipelineStage { solver, options: SolverOptions::default() }
-    }
-
-    fn stage_with(solver: Solvers, options: SolverOptions) -> PipelineStage {
-        PipelineStage { solver, options }
+    fn make_stage(solver: Solvers, problem: TspProblem) -> PipelineStage {
+        PipelineStage::new(solver, AppOptions::default(), problem, None)
     }
 
     #[test]
     fn test_pipeline_single_step_nn_produces_valid_tour() {
         let cities = small_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let stages = [stage(Solvers::NearestNeighbor)];
+        let problem = TspProblem::new(cities.clone(), dm);
+        let stages = [make_stage(Solvers::NearestNeighbor, problem)];
 
-        let result = solve(&stages, &cities, &dm, None).unwrap();
+        let result = run_pipeline(&stages).unwrap();
 
         assert_eq!(result.len(), cities.len());
         let mut seen = result.route().to_vec();
         seen.sort();
-        let expected: Vec<usize> = {
-            let mut ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
-            ids.sort();
-            ids
-        };
+        let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        expected.sort();
         assert_eq!(seen, expected);
     }
 
@@ -96,26 +95,34 @@ mod tests {
     fn test_pipeline_two_steps_nn_then_2opt_no_worse_than_nn() {
         let cities = small_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let opts = SolverOptions { epochs: 100, ..SolverOptions::default() };
+        let problem = TspProblem::new(cities.clone(), dm);
 
-        let nn_result = super::super::solve(
-            Solvers::NearestNeighbor, &cities, &dm, &opts,
-        ).unwrap();
+        let nn_result = make_stage(Solvers::NearestNeighbor, problem.clone())
+            .solve(None)
+            .unwrap();
 
-        let stages = [stage(Solvers::NearestNeighbor), stage_with(Solvers::TwoOpt, opts)];
-        let pipeline_result = solve(&stages, &cities, &dm, None).unwrap();
+        let stages = [
+            make_stage(Solvers::NearestNeighbor, problem.clone()),
+            make_stage(Solvers::TwoOpt, problem.clone()),
+        ];
+        let pipeline_result = run_pipeline(&stages).unwrap();
 
-        // 2-opt cannot worsen a tour
         assert!(pipeline_result.total <= nn_result.total * 1.001);
     }
 
     #[test]
-    fn test_pipeline_stage_opts_prevent_recursion() {
+    fn test_pipeline_empty_stages_errors() {
+        assert!(run_pipeline(&[]).is_err());
+    }
+
+    #[test]
+    fn test_pipeline_stage_twoopt_produces_valid_tour() {
         let cities = small_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let stages = [stage(Solvers::TwoOpt)];
+        let problem = TspProblem::new(cities, dm);
+        let stages = [make_stage(Solvers::TwoOpt, problem)];
 
-        let result = solve(&stages, &cities, &dm, None);
+        let result = run_pipeline(&stages);
         assert!(result.is_ok());
     }
 }

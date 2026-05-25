@@ -1,35 +1,41 @@
+use std::sync::mpsc;
+
 use rand::Rng;
 
-use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::probability::{cooling, metropolis};
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{Solution, SolverOptions};
+use super::{SAOptions, Solution, TspProblem};
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
-    let cooling_rate = options.cooling_rate;
+pub fn solve(
+    problem: &TspProblem,
+    opts: &SAOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
+) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
+    let cooling_rate = opts.cooling_rate;
     let mut epoch = 0;
 
     tracing::info!(
-        epochs = options.epochs,
-        max_temp = options.max_temperature,
-        cooling_rate = options.cooling_rate,
+        epochs = opts.heuristic.epochs,
+        max_temp = opts.max_temperature,
+        cooling_rate = opts.cooling_rate,
         "SA starting"
     );
 
-    let mut best_route = options.initial_tour.as_deref()
+    let mut best_route = init_tour
         .map(Route::new)
         .unwrap_or_else(|| Route::from_cities(cities));
     let mut best_distance = distances.tour_length(best_route.route());
 
-    options.send_progress(ProgressMessage::PathUpdate(
-        best_route.clone(),
-        best_distance,
-    ));
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
+    }
 
-    let mut temperature = options.max_temperature;
-    while epoch < options.epochs || temperature > options.min_temperature {
+    let mut temperature = opts.max_temperature;
+    while epoch < opts.heuristic.epochs || temperature > opts.min_temperature {
         let candidate = best_route.random_successor();
         let candidate_distance = distances.tour_length(candidate.route());
 
@@ -37,10 +43,9 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             best_route = candidate;
             best_distance = candidate_distance;
 
-            options.send_progress(ProgressMessage::PathUpdate(
-                best_route.clone(),
-                best_distance,
-            ));
+            if let Some(tx) = progress_tx {
+                let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
+            }
             tracing::info!(epoch, tour_length = best_distance, "SA: new best");
         }
 
@@ -49,8 +54,10 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         epoch += 1;
     }
 
-    options.send_progress(ProgressMessage::Done);
-    Solution::new(best_route.route(), cities, distances)
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::Done);
+    }
+    Solution::from_parts(best_route.route(), cities, distances)
 }
 
 fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool {
@@ -58,7 +65,6 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
         return true;
     }
 
-    // if they are basically same - then false
     if (new_distance - old_distance).abs() < f32::EPSILON {
         return false;
     }
@@ -73,47 +79,42 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, SAOptions, TspProblem};
 
     #[test]
     fn test_sa_respects_initial_tour() {
-        use crate::tsp::{distance_matrix, kdtree};
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0], vec![0.0, 0.5], vec![0.0, 1.0],
             vec![1.0, 1.0], vec![1.0, 0.0],
         ]);
         let dm = distance_matrix::from_cities(&cities);
-        // Provide optimal tour; run 0 epochs so SA can't change it
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        let mut opts = SolverOptions {
-            epochs: 0,
-            min_temperature: 1_000_000.0, // ensures loop exits immediately
+        let opts = SAOptions {
+            heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+            min_temperature: 1_000_000.0,
             max_temperature: 0.0,
-            ..SolverOptions::default()
+            ..SAOptions::default()
         };
-        opts.initial_tour = Some(optimal.clone());
-        let result = solve(&cities, &dm, &opts);
+        let problem = TspProblem::new(cities, dm);
+        let result = solve(&problem, &opts, None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 
     #[test]
     fn test_is_acceptable_always_accepts_improvement() {
-        // lower distance = better, so new_distance < old_distance must always be accepted
-        let temperature = 0.001; // near-zero — almost no random acceptance
+        let temperature = 0.001;
         assert!(is_acceptable(temperature, 100.0, 50.0));
         assert!(is_acceptable(temperature, 100.0, 99.999));
     }
 
     #[test]
     fn test_is_acceptable_never_accepts_equal_distance() {
-        // Equal energies: the function returns false (not an improvement, no chance roll)
-        let temperature = 1_000_000.0; // very high — would normally accept anything
+        let temperature = 1_000_000.0;
         assert!(!is_acceptable(temperature, 10.0, 10.0));
     }
 
     #[test]
     fn test_is_acceptable_probabilistic_for_worsening_at_high_temperature() {
-        // At very high temperature the acceptance probability approaches 1.
-        // Run many trials; almost all should be accepted.
         let temperature = 1_000_000.0;
         let accepted = (0..1000)
             .filter(|_| is_acceptable(temperature, 10.0, 10.001))
@@ -123,7 +124,6 @@ mod tests {
 
     #[test]
     fn test_is_acceptable_rarely_accepts_worsening_at_low_temperature() {
-        // At near-zero temperature, worsening moves should almost never be accepted.
         let temperature = 0.0001;
         let accepted = (0..1000)
             .filter(|_| is_acceptable(temperature, 10.0, 20.0))

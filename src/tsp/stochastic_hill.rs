@@ -1,17 +1,24 @@
-use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
+use std::sync::mpsc;
+
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{Solution, SolverOptions};
+use super::{HeuristicOptions, Solution, TspProblem};
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
+pub fn solve(
+    problem: &TspProblem,
+    opts: &HeuristicOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    init_tour: Option<&[usize]>,
+) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     tracing::info!(
-        epochs = options.epochs,
-        platoo_epochs = options.platoo_epochs,
+        epochs = opts.epochs,
+        platoo_epochs = opts.platoo_epochs,
         "hill climbing starting"
     );
 
-    let mut current_route = match options.initial_tour.as_deref() {
+    let mut current_route = match init_tour {
         Some(t) => Route::new(t),
         None => {
             let mut r = Route::from_cities(cities);
@@ -19,10 +26,10 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
             r
         }
     };
-    options.send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
+    }
 
-    // Baseline from the shuffled state — sequential ordering would be
-    // an artificially low bar that random successors can never beat.
     let mut best_route = current_route.clone();
     let mut best_distance = distances.tour_length(best_route.route());
 
@@ -34,53 +41,54 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
         let candidate_distance = distances.tour_length(candidate.route());
 
         if candidate_distance < best_distance {
-            current_route = candidate.clone(); // follow the gradient
+            current_route = candidate.clone();
             best_route = candidate;
             best_distance = candidate_distance;
             found_improvement = true;
 
             n_stale = 0;
 
-            options.send_progress(ProgressMessage::PathUpdate(
-                best_route.clone(),
-                best_distance,
-            ));
+            if let Some(tx) = progress_tx {
+                let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
+            }
 
             tracing::info!(epoch, tour_length = best_distance, "hill: new best");
         } else {
-            n_stale += 1; // to measure how long we have been walking around on the platoo
+            n_stale += 1;
         }
 
         epoch += 1;
 
-        // restart search if been wandering too long on the platoo
-        if n_stale > options.platoo_epochs && options.platoo_epochs > 0 {
-            tracing::warn!(epoch, plateau_epochs = options.platoo_epochs, "hill: plateau, restarting");
+        if n_stale > opts.platoo_epochs && opts.platoo_epochs > 0 {
+            tracing::warn!(epoch, plateau_epochs = opts.platoo_epochs, "hill: plateau, restarting");
 
             current_route.shuffle();
             n_stale = 0;
 
-            options.send_progress(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
+            if let Some(tx) = progress_tx {
+                let _ = tx.send(ProgressMessage::PathUpdate(current_route.clone(), 0.0));
+            }
         }
 
-        // check if we should finish the search
-        if options.epochs > 0 && epoch > options.epochs {
+        if opts.epochs > 0 && epoch > opts.epochs {
             break;
         }
     }
 
     if !found_improvement {
-        tracing::warn!(epochs = options.epochs, tour_length = best_distance, "hill: no improvement found");
+        tracing::warn!(epochs = opts.epochs, tour_length = best_distance, "hill: no improvement found");
     }
 
-    options.send_progress(ProgressMessage::Done);
-    Solution::new(best_route.route(), cities, distances)
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::Done);
+    }
+    Solution::from_parts(best_route.route(), cities, distances)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree};
+    use crate::tsp::{distance_matrix, kdtree, kdtree::KDPoint, HeuristicOptions, TspProblem};
 
     fn tsp5_cities() -> Vec<KDPoint> {
         kdtree::build_points(&[
@@ -92,29 +100,19 @@ mod tests {
         ])
     }
 
-    fn fast_options() -> SolverOptions {
-        let mut opts = SolverOptions::default();
-        opts.epochs = 500;
-        opts.platoo_epochs = 100;
-        opts
+    fn fast_opts() -> HeuristicOptions {
+        HeuristicOptions { epochs: 500, platoo_epochs: 100, ..HeuristicOptions::default() }
     }
 
     #[test]
     fn test_hill_respects_initial_tour_skips_shuffle() {
-        // When seeded, hill climbing should NOT shuffle the tour.
-        // Verify by providing the known-optimal tour and checking
-        // the solver doesn't produce something worse than sequential
-        // (if it shuffled, average quality would degrade).
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let mut opts = SolverOptions::default();
-        opts.epochs = 1;
-        opts.platoo_epochs = 1;
-        opts.initial_tour = Some(optimal.clone());
-        let result = solve(&cities, &dm, &opts);
-        // Seeded from optimal: result should equal optimal (1 epoch can't improve on optimal)
+        let opts = HeuristicOptions { epochs: 1, platoo_epochs: 1, ..HeuristicOptions::default() };
+        let problem = TspProblem::new(cities, dm);
+        let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
     }
 
@@ -122,7 +120,8 @@ mod tests {
     fn test_solve_visits_all_cities() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &fast_options());
+        let problem = TspProblem::new(cities.clone(), dm);
+        let tour = solve(&problem, &fast_opts(), None, None);
 
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
@@ -133,7 +132,8 @@ mod tests {
     fn test_solve_tour_length_is_positive_and_finite() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let tour = solve(&cities, &dm, &fast_options());
+        let problem = TspProblem::new(cities, dm);
+        let tour = solve(&problem, &fast_opts(), None, None);
 
         assert!(tour.total > 0.0, "tour length should be positive");
         assert!(tour.total.is_finite(), "tour length should be finite");
@@ -143,10 +143,9 @@ mod tests {
     fn test_solve_terminates_within_epoch_limit() {
         let cities = tsp5_cities();
         let dm = distance_matrix::from_cities(&cities);
-        let mut opts = SolverOptions::default();
-        opts.epochs = 100;
-        opts.platoo_epochs = 50;
-        let tour = solve(&cities, &dm, &opts);
+        let problem = TspProblem::new(cities.clone(), dm);
+        let opts = HeuristicOptions { epochs: 100, platoo_epochs: 50, ..HeuristicOptions::default() };
+        let tour = solve(&problem, &opts, None, None);
         assert_eq!(tour.route().len(), cities.len());
     }
 }

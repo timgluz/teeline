@@ -130,73 +130,426 @@ impl FromStr for Solvers {
     }
 }
 
-// -- SolverOptions
+// ---------------------------------------------------------------------------
+// Heuristic options shared across all solver-specific option structs
+// ---------------------------------------------------------------------------
 
-#[derive(Clone)]
-pub struct SolverOptions {
+#[derive(Clone, Debug, PartialEq)]
+pub struct HeuristicOptions {
     pub epochs: usize,
     pub platoo_epochs: usize,
-    pub verbose: bool,
     pub n_nearest: usize,
-    pub mutation_probability: f32,
-    pub n_elite: usize,
-    pub cooling_rate: f32,
-    pub max_temperature: f32,
-    pub min_temperature: f32,
-    pub progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
-    pub initial_tour: Option<Vec<usize>>,
+    pub verbose: bool,
 }
 
-impl std::fmt::Debug for SolverOptions {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SolverOptions")
-            .field("epochs", &self.epochs)
-            .field("platoo_epochs", &self.platoo_epochs)
-            .field("verbose", &self.verbose)
-            .field("n_nearest", &self.n_nearest)
-            .field("mutation_probability", &self.mutation_probability)
-            .field("n_elite", &self.n_elite)
-            .field("cooling_rate", &self.cooling_rate)
-            .field("max_temperature", &self.max_temperature)
-            .field("min_temperature", &self.min_temperature)
-            .field("progress_tx", &self.progress_tx.is_some())
-            .field("initial_tour", &self.initial_tour.is_some())
-            .finish()
+impl Default for HeuristicOptions {
+    fn default() -> Self {
+        HeuristicOptions { epochs: 10_000, platoo_epochs: 500, n_nearest: 3, verbose: false }
     }
 }
 
-impl Default for SolverOptions {
+impl HeuristicOptions {
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut h = HeuristicOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    h.epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))? as usize;
+                }
+                "platoo_epochs" => {
+                    h.platoo_epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `platoo_epochs` must be an integer, got {v}"))? as usize;
+                }
+                "n_nearest" => {
+                    h.n_nearest = v.as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))? as usize;
+                }
+                "verbose" => {
+                    h.verbose = v.as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                other => return Err(format!(
+                    "config: unknown field `{other}` in [heuristic] — valid: epochs, platoo_epochs, n_nearest, verbose"
+                )),
+            }
+        }
+        Ok(h)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Self {
+        let mut h = HeuristicOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            h.epochs = v.parse().unwrap_or(h.epochs);
+        }
+        if let Some(v) = args.get_one::<String>("platoo_epochs") {
+            h.platoo_epochs = v.parse().unwrap_or(h.platoo_epochs);
+        }
+        if let Some(v) = args.get_one::<String>("n_nearest") {
+            h.n_nearest = v.parse().unwrap_or(h.n_nearest);
+        }
+        if args.get_flag("verbose") {
+            h.verbose = true;
+        }
+        h
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Solver-specific option structs
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SAOptions {
+    pub heuristic: HeuristicOptions,
+    pub cooling_rate: f32,
+    pub min_temperature: f32,
+    pub max_temperature: f32,
+}
+
+impl Default for SAOptions {
     fn default() -> Self {
-        SolverOptions {
-            epochs: 10_000,
-            platoo_epochs: 500,
-            verbose: false,
-            n_nearest: 3,
-            mutation_probability: 0.001,
-            n_elite: 3,
+        SAOptions {
+            heuristic: HeuristicOptions::default(),
             cooling_rate: 0.0001,
             min_temperature: 0.001,
             max_temperature: 1_000.0,
-            progress_tx: None,
-            initial_tour: None,
         }
     }
 }
 
-impl SolverOptions {
-    pub fn send_progress(&self, msg: progress::ProgressMessage) {
-        if let Some(ref tx) = self.progress_tx {
-            let _ = tx.send(msg);
+impl SAOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.cooling_rate <= 0.0 {
+            return Err(format!("cooling_rate must be > 0 (got {})", self.cooling_rate));
         }
+        if self.cooling_rate >= 1.0 {
+            return Err(format!("cooling_rate must be < 1 (got {})", self.cooling_rate));
+        }
+        if self.max_temperature <= 0.0 {
+            return Err(format!("max_temperature must be > 0 (got {})", self.max_temperature));
+        }
+        if self.min_temperature < 0.0 {
+            return Err(format!("min_temperature must be >= 0 (got {})", self.min_temperature));
+        }
+        if self.min_temperature >= self.max_temperature {
+            return Err(format!(
+                "min_temperature ({}) must be < max_temperature ({})",
+                self.min_temperature, self.max_temperature
+            ));
+        }
+        Ok(())
     }
 
-    pub fn for_internal_seed(&self) -> SolverOptions {
-        SolverOptions {
-            progress_tx: None,
-            initial_tour: None,
-            ..self.clone()
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut sa = SAOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    sa.heuristic.epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))? as usize;
+                }
+                "platoo_epochs" => {
+                    sa.heuristic.platoo_epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `platoo_epochs` must be an integer, got {v}"))? as usize;
+                }
+                "n_nearest" => {
+                    sa.heuristic.n_nearest = v.as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))? as usize;
+                }
+                "verbose" => {
+                    sa.heuristic.verbose = v.as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                "cooling_rate" => { sa.cooling_rate = parse_f32(v, "sa.cooling_rate")?; }
+                "max_temperature" => { sa.max_temperature = parse_f32(v, "sa.max_temperature")?; }
+                "min_temperature" => { sa.min_temperature = parse_f32(v, "sa.min_temperature")?; }
+                other => return Err(format!(
+                    "config: unknown field `{other}` in [sa] — valid: epochs, platoo_epochs, n_nearest, verbose, cooling_rate, max_temperature, min_temperature"
+                )),
+            }
+        }
+        sa.validate()?;
+        Ok(sa)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Self {
+        let mut sa = SAOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            sa.heuristic.epochs = v.parse().unwrap_or(sa.heuristic.epochs);
+        }
+        if let Some(v) = args.get_one::<String>("platoo_epochs") {
+            sa.heuristic.platoo_epochs = v.parse().unwrap_or(sa.heuristic.platoo_epochs);
+        }
+        if let Some(v) = args.get_one::<String>("n_nearest") {
+            sa.heuristic.n_nearest = v.parse().unwrap_or(sa.heuristic.n_nearest);
+        }
+        if args.get_flag("verbose") { sa.heuristic.verbose = true; }
+        if let Some(v) = args.get_one::<String>("cooling_rate") {
+            sa.cooling_rate = v.parse().unwrap_or(sa.cooling_rate);
+        }
+        if let Some(v) = args.get_one::<String>("min_temperature") {
+            sa.min_temperature = v.parse().unwrap_or(sa.min_temperature);
+        }
+        if let Some(v) = args.get_one::<String>("max_temperature") {
+            sa.max_temperature = v.parse().unwrap_or(sa.max_temperature);
+        }
+        sa
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct GAOptions {
+    pub heuristic: HeuristicOptions,
+    pub mutation_probability: f32,
+    pub n_elite: usize,
+}
+
+impl Default for GAOptions {
+    fn default() -> Self {
+        GAOptions {
+            heuristic: HeuristicOptions::default(),
+            mutation_probability: 0.001,
+            n_elite: 3,
         }
     }
+}
+
+impl GAOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
+            return Err(format!(
+                "mutation_probability must be in [0, 1] (got {})",
+                self.mutation_probability
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut ga = GAOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    ga.heuristic.epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))? as usize;
+                }
+                "platoo_epochs" => {
+                    ga.heuristic.platoo_epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `platoo_epochs` must be an integer, got {v}"))? as usize;
+                }
+                "n_nearest" => {
+                    ga.heuristic.n_nearest = v.as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))? as usize;
+                }
+                "verbose" => {
+                    ga.heuristic.verbose = v.as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                "mutation_probability" => { ga.mutation_probability = parse_f32(v, "ga.mutation_probability")?; }
+                "n_elite" => {
+                    ga.n_elite = v.as_integer()
+                        .ok_or_else(|| format!("config: `ga.n_elite` must be an integer, got {v}"))? as usize;
+                }
+                other => return Err(format!(
+                    "config: unknown field `{other}` in [ga] — valid: epochs, platoo_epochs, n_nearest, verbose, mutation_probability, n_elite"
+                )),
+            }
+        }
+        ga.validate()?;
+        Ok(ga)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Self {
+        let mut ga = GAOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            ga.heuristic.epochs = v.parse().unwrap_or(ga.heuristic.epochs);
+        }
+        if let Some(v) = args.get_one::<String>("platoo_epochs") {
+            ga.heuristic.platoo_epochs = v.parse().unwrap_or(ga.heuristic.platoo_epochs);
+        }
+        if let Some(v) = args.get_one::<String>("n_nearest") {
+            ga.heuristic.n_nearest = v.parse().unwrap_or(ga.heuristic.n_nearest);
+        }
+        if args.get_flag("verbose") { ga.heuristic.verbose = true; }
+        if let Some(v) = args.get_one::<String>("mutation_probability") {
+            ga.mutation_probability = v.parse().unwrap_or(ga.mutation_probability);
+        }
+        if let Some(v) = args.get_one::<String>("n_elite") {
+            ga.n_elite = v.parse().unwrap_or(ga.n_elite);
+        }
+        ga
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CSOptions {
+    pub heuristic: HeuristicOptions,
+    pub mutation_probability: f32,
+}
+
+impl Default for CSOptions {
+    fn default() -> Self {
+        CSOptions { heuristic: HeuristicOptions::default(), mutation_probability: 0.001 }
+    }
+}
+
+impl CSOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
+            return Err(format!(
+                "mutation_probability must be in [0, 1] (got {})",
+                self.mutation_probability
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut cs = CSOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    cs.heuristic.epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))? as usize;
+                }
+                "platoo_epochs" => {
+                    cs.heuristic.platoo_epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `platoo_epochs` must be an integer, got {v}"))? as usize;
+                }
+                "n_nearest" => {
+                    cs.heuristic.n_nearest = v.as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))? as usize;
+                }
+                "verbose" => {
+                    cs.heuristic.verbose = v.as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                "mutation_probability" => { cs.mutation_probability = parse_f32(v, "cs.mutation_probability")?; }
+                other => return Err(format!(
+                    "config: unknown field `{other}` in [cs] — valid: epochs, platoo_epochs, n_nearest, verbose, mutation_probability"
+                )),
+            }
+        }
+        cs.validate()?;
+        Ok(cs)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Self {
+        let mut cs = CSOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            cs.heuristic.epochs = v.parse().unwrap_or(cs.heuristic.epochs);
+        }
+        if let Some(v) = args.get_one::<String>("platoo_epochs") {
+            cs.heuristic.platoo_epochs = v.parse().unwrap_or(cs.heuristic.platoo_epochs);
+        }
+        if let Some(v) = args.get_one::<String>("n_nearest") {
+            cs.heuristic.n_nearest = v.parse().unwrap_or(cs.heuristic.n_nearest);
+        }
+        if args.get_flag("verbose") { cs.heuristic.verbose = true; }
+        if let Some(v) = args.get_one::<String>("mutation_probability") {
+            cs.mutation_probability = v.parse().unwrap_or(cs.mutation_probability);
+        }
+        cs
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FPAOptions {
+    pub heuristic: HeuristicOptions,
+    pub mutation_probability: f32,
+}
+
+impl Default for FPAOptions {
+    fn default() -> Self {
+        FPAOptions { heuristic: HeuristicOptions::default(), mutation_probability: 0.001 }
+    }
+}
+
+impl FPAOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
+            return Err(format!(
+                "mutation_probability must be in [0, 1] (got {})",
+                self.mutation_probability
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut fpa = FPAOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    fpa.heuristic.epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))? as usize;
+                }
+                "platoo_epochs" => {
+                    fpa.heuristic.platoo_epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `platoo_epochs` must be an integer, got {v}"))? as usize;
+                }
+                "n_nearest" => {
+                    fpa.heuristic.n_nearest = v.as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))? as usize;
+                }
+                "verbose" => {
+                    fpa.heuristic.verbose = v.as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                "mutation_probability" => { fpa.mutation_probability = parse_f32(v, "fpa.mutation_probability")?; }
+                other => return Err(format!(
+                    "config: unknown field `{other}` in [fpa] — valid: epochs, platoo_epochs, n_nearest, verbose, mutation_probability"
+                )),
+            }
+        }
+        fpa.validate()?;
+        Ok(fpa)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Self {
+        let mut fpa = FPAOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            fpa.heuristic.epochs = v.parse().unwrap_or(fpa.heuristic.epochs);
+        }
+        if let Some(v) = args.get_one::<String>("platoo_epochs") {
+            fpa.heuristic.platoo_epochs = v.parse().unwrap_or(fpa.heuristic.platoo_epochs);
+        }
+        if let Some(v) = args.get_one::<String>("n_nearest") {
+            fpa.heuristic.n_nearest = v.parse().unwrap_or(fpa.heuristic.n_nearest);
+        }
+        if args.get_flag("verbose") { fpa.heuristic.verbose = true; }
+        if let Some(v) = args.get_one::<String>("mutation_probability") {
+            fpa.mutation_probability = v.parse().unwrap_or(fpa.mutation_probability);
+        }
+        fpa
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AppOptions — pure config shell; no runtime state
+// ---------------------------------------------------------------------------
+
+/// Pure config container. No progress channel, no initial tour — those are runtime concerns.
+/// Each field is populated only for the solver that uses it.
+#[derive(Clone, Debug, Default)]
+pub struct AppOptions {
+    pub sa:        Option<SAOptions>,
+    pub ga:        Option<GAOptions>,
+    pub cs:        Option<CSOptions>,
+    pub fpa:       Option<FPAOptions>,
+    pub heuristic: Option<HeuristicOptions>,
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+fn parse_f32(v: &toml::Value, name: &str) -> Result<f32, String> {
+    v.as_float()
+        .or_else(|| v.as_integer().map(|i| i as f64))
+        .ok_or_else(|| format!("config: `{name}` must be a float, got {v}"))
+        .map(|f| f as f32)
 }
 
 pub fn validate_tour(tour: &[usize], cities: &[KDPoint]) -> Result<(), String> {
@@ -216,32 +569,70 @@ pub fn find_solver(name: &str) -> Result<Solvers, String> {
         .map_err(|_| format!("unknown solver: {name}"))
 }
 
-pub fn solve(
+// ---------------------------------------------------------------------------
+// Internal dispatcher — used by pipeline and tests
+// ---------------------------------------------------------------------------
+
+/// Public entry point for external crates (e.g. WASM). Runs `solver` against
+/// `problem` with `opts`, no progress channel, no warm-start tour.
+pub fn solve_problem(
     solver: Solvers,
-    cities: &[KDPoint],
-    distances: &DistanceMatrix,
-    opts: &SolverOptions,
+    problem: &TspProblem,
+    opts: &AppOptions,
 ) -> Result<Solution, String> {
+    solve_with_context(solver, problem, opts, None, None)
+}
+
+pub(crate) fn solve_with_context(
+    solver: Solvers,
+    problem: &TspProblem,
+    opts: &AppOptions,
+    progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
+    init_tour: Option<&[usize]>,
+) -> Result<Solution, String> {
+    let tx = progress_tx.as_ref();
+    let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
     let solution = match solver {
-        Solvers::BellmanKarp => bellman_karp::solve(cities, distances, opts),
-        Solvers::BranchBound => branch_bound::solve(cities, distances, opts),
-        Solvers::CuckooSearch => cuckoo_search::solve(cities, distances, opts),
-        Solvers::FlowerPollination => flower_pollination::solve(cities, distances, opts),
-        Solvers::NearestNeighbor => nearest_neighbor::solve(cities, distances, opts),
-        Solvers::GeneticAlgorithm => genetic_algorithm::solve(cities, distances, opts),
-        Solvers::ParticleSwarmOptimization => particle_swarm::solve(cities, distances, opts),
-        Solvers::RandomShuffle => random_shuffle::solve(cities, distances, opts),
-        Solvers::SimulatedAnnealing => simulated_annealing::solve(cities, distances, opts),
-        Solvers::StochasticHill => stochastic_hill::solve(cities, distances, opts),
-        Solvers::TabuSearch => tabu_search::solve(cities, distances, opts),
-        Solvers::ThreeOpt => three_opt::solve(cities, distances, opts),
-        Solvers::TwoOpt => two_opt::solve(cities, distances, opts),
-        Solvers::Unspecified => return Err("solver not specified".to_string()),
+        Solvers::BellmanKarp               => bellman_karp::solve(problem, &h, tx, init_tour),
+        Solvers::BranchBound               => branch_bound::solve(problem, &h, tx, init_tour),
+        Solvers::CuckooSearch              => { let cs = opts.cs.as_ref().cloned().unwrap_or_default(); cuckoo_search::solve(problem, &cs, tx, init_tour) }
+        Solvers::FlowerPollination         => { let fpa = opts.fpa.as_ref().cloned().unwrap_or_default(); flower_pollination::solve(problem, &fpa, tx, init_tour) }
+        Solvers::NearestNeighbor           => nearest_neighbor::solve(problem, &h, tx, init_tour),
+        Solvers::GeneticAlgorithm          => { let ga = opts.ga.as_ref().cloned().unwrap_or_default(); genetic_algorithm::solve(problem, &ga, tx, init_tour) }
+        Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
+        Solvers::RandomShuffle             => random_shuffle::solve(problem, &h, tx, init_tour),
+        Solvers::SimulatedAnnealing        => { let sa = opts.sa.as_ref().cloned().unwrap_or_default(); simulated_annealing::solve(problem, &sa, tx, init_tour) }
+        Solvers::StochasticHill            => stochastic_hill::solve(problem, &h, tx, init_tour),
+        Solvers::TabuSearch                => tabu_search::solve(problem, &h, tx, init_tour),
+        Solvers::ThreeOpt                  => three_opt::solve(problem, &h, tx, init_tour),
+        Solvers::TwoOpt                    => two_opt::solve(problem, &h, tx, init_tour),
+        Solvers::Unspecified               => return Err("solver not specified".to_string()),
     };
     Ok(solution)
 }
 
-// -- solution implementation
+// ---------------------------------------------------------------------------
+// TspProblem
+// ---------------------------------------------------------------------------
+
+/// The TSP problem instance: city layout + precomputed distance matrix.
+/// Always created together from a TSPLIB file and passed as a unit.
+#[derive(Clone)]
+pub struct TspProblem {
+    pub cities: Vec<KDPoint>,
+    pub distances: DistanceMatrix,
+}
+
+impl TspProblem {
+    pub fn new(cities: Vec<KDPoint>, distances: DistanceMatrix) -> Self {
+        TspProblem { cities, distances }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Solution
+// ---------------------------------------------------------------------------
+
 pub type CityTable = HashMap<usize, KDPoint>;
 
 pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
@@ -256,7 +647,26 @@ pub struct Solution {
 }
 
 impl Solution {
-    pub fn new(route: &[usize], cities: &[kdtree::KDPoint], distances: &DistanceMatrix) -> Self {
+    pub fn new(route: &[usize], problem: &TspProblem) -> Self {
+        let cities = &problem.cities;
+        let distances = &problem.distances;
+        let cities_idx = cities
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.id, i))
+            .collect();
+
+        Solution {
+            total: distances.tour_length(route),
+            route: route.to_vec(),
+            cities: cities.to_vec(),
+            cities_idx,
+        }
+    }
+
+    /// Convenience constructor for solver functions that already hold separate `cities`
+    /// and `distances` slices and do not need to construct a full [`TspProblem`].
+    pub(crate) fn from_parts(route: &[usize], cities: &[kdtree::KDPoint], distances: &DistanceMatrix) -> Self {
         let cities_idx = cities
             .iter()
             .enumerate()
@@ -382,27 +792,60 @@ mod tests {
     use crate::test::helpers::assert_approx;
 
     #[test]
-    fn test_send_progress_with_none_is_noop() {
-        let options = SolverOptions::default();
-        options.send_progress(progress::ProgressMessage::Done);
+    fn test_heuristic_options_has_expected_fields() {
+        let h = HeuristicOptions { epochs: 100, platoo_epochs: 10, n_nearest: 3, verbose: false };
+        assert_eq!(h.epochs, 100);
+        assert_eq!(h.platoo_epochs, 10);
     }
 
     #[test]
-    fn test_send_progress_with_channel_delivers_message() {
-        use std::sync::mpsc;
-        let (tx, rx) = mpsc::channel();
-        let mut options = SolverOptions::default();
-        options.progress_tx = Some(tx);
-        options.send_progress(progress::ProgressMessage::EpochUpdate(99));
-        match rx.recv().unwrap() {
-            progress::ProgressMessage::EpochUpdate(n) => assert_eq!(n, 99),
-            other => panic!("unexpected message: {:?}", other),
-        }
+    fn test_sa_options_embeds_heuristic() {
+        let sa = SAOptions::default();
+        assert!(sa.heuristic.epochs > 0);
+        assert!(sa.cooling_rate > 0.0);
     }
 
     #[test]
-    fn test_solver_options_initial_tour_defaults_to_none() {
-        assert!(SolverOptions::default().initial_tour.is_none());
+    fn test_app_options_has_no_flat_epoch_fields() {
+        let a = AppOptions { sa: None, ga: None, cs: None, fpa: None, heuristic: None };
+        drop(a);
+    }
+
+    #[test]
+    fn test_heuristic_options_from_toml() {
+        let t: toml::Table = toml::from_str(
+            "epochs=5000\nplatoo_epochs=200\nn_nearest=5\nverbose=true"
+        ).unwrap();
+        let h = HeuristicOptions::from_toml(&t).unwrap();
+        assert_eq!(h.epochs, 5000);
+        assert_eq!(h.n_nearest, 5);
+        assert!(h.verbose);
+    }
+
+    #[test]
+    fn test_sa_options_from_toml_parses_all_fields() {
+        let t: toml::Table = toml::from_str(
+            "epochs=5000\ncooling_rate=0.0005\nmax_temperature=200.0\nmin_temperature=0.001"
+        ).unwrap();
+        let sa = SAOptions::from_toml(&t).unwrap();
+        assert_eq!(sa.heuristic.epochs, 5000);
+        assert!((sa.cooling_rate - 0.0005).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_sa_options_from_toml_unknown_key_errors() {
+        let t: toml::Table = toml::from_str("bogus=1.0").unwrap();
+        assert!(SAOptions::from_toml(&t).unwrap_err().contains("bogus"));
+    }
+
+    #[test]
+    fn test_ga_options_from_toml_parses_fields() {
+        let t: toml::Table = toml::from_str(
+            "mutation_probability=0.05\nn_elite=5\nepochs=2000"
+        ).unwrap();
+        let ga = GAOptions::from_toml(&t).unwrap();
+        assert!((ga.mutation_probability - 0.05).abs() < 1e-7);
+        assert_eq!(ga.heuristic.epochs, 2000);
     }
 
     #[test]
@@ -435,14 +878,12 @@ mod tests {
 
     #[test]
     fn test_auto_expand_nn_false_for_stochastic_and_constructors() {
-        // Stochastic solvers use shuffle expansion, not NN
         assert!(!Solvers::SimulatedAnnealing.auto_expand_with_nn());
         assert!(!Solvers::StochasticHill.auto_expand_with_nn());
         assert!(!Solvers::GeneticAlgorithm.auto_expand_with_nn());
         assert!(!Solvers::ParticleSwarmOptimization.auto_expand_with_nn());
         assert!(!Solvers::CuckooSearch.auto_expand_with_nn());
         assert!(!Solvers::FlowerPollination.auto_expand_with_nn());
-        // Constructors: no expansion
         assert!(!Solvers::NearestNeighbor.auto_expand_with_nn());
         assert!(!Solvers::BellmanKarp.auto_expand_with_nn());
         assert!(!Solvers::BranchBound.auto_expand_with_nn());
@@ -470,19 +911,6 @@ mod tests {
     }
 
     #[test]
-    fn test_for_internal_seed_clears_initial_tour_and_progress() {
-        use std::sync::mpsc;
-        let (tx, _rx) = mpsc::channel();
-        let mut opts = SolverOptions::default();
-        opts.initial_tour = Some(vec![1, 2, 3]);
-        opts.progress_tx = Some(tx);
-        let inner = opts.for_internal_seed();
-        assert!(inner.initial_tour.is_none());
-        assert!(inner.progress_tx.is_none());
-        assert_eq!(inner.epochs, opts.epochs); // other fields preserved
-    }
-
-    #[test]
     fn test_solution_total_for_tsp_5_1() {
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
@@ -501,7 +929,8 @@ mod tests {
         ];
 
         let dm = distance_matrix::from_cities(&cities);
-        let sol = Solution::new(&route, &cities, &dm);
+        let problem = TspProblem::new(cities, dm);
+        let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
     }
 }

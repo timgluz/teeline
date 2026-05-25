@@ -9,20 +9,21 @@
 #   ./target/debug/bin pipeline --config=configs/classic-tuned.toml \
 #       -i data/tsplib/berlin52.tsp
 
-[global]
-epochs       = 10000
-platoo_epochs = 500
-
 [[stage]]
 solver = "nn"
 
 [[stage]]
 solver = "2opt"
+
+[stage.heuristic]
 epochs = 2000
 
 [[stage]]
 solver = "sa"
+
+[stage.sa]
 max_temperature = 200.0   # lower start: 2-opt already cleaned up most crossings
 min_temperature = 0.001
 cooling_rate    = 0.0005  # faster cooling: already near a local optimum
 epochs          = 10000
+platoo_epochs   = 500

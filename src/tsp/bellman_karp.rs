@@ -9,21 +9,28 @@
 ///
 ///
 ///
+use std::sync::mpsc;
+
 use super::distance_matrix::DistanceMatrix;
-use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{Solution, SolverOptions};
+use super::{HeuristicOptions, Solution, TspProblem};
 
-// 0-1 Set, where 1 means that city N is collected
 type FlagSet = u64;
 type DPTable = Vec<Vec<f32>>;
 
 const UNKNOWN_DISTANCE: f32 = f32::MAX;
 
-pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution {
+pub fn solve(
+    problem: &TspProblem,
+    opts: &HeuristicOptions,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    _init_tour: Option<&[usize]>,
+) -> Solution {
+    let cities = &problem.cities;
+    let distances = &problem.distances;
     let n_cities = cities.len();
-    let n_others = n_cities - 1; // we start from last city
+    let n_others = n_cities - 1;
     let n_powersets = 1 << n_others;
 
     tracing::info!(n_cities, n_subsets = n_powersets, "BHK starting");
@@ -32,15 +39,15 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     let mut opt = vec![vec![UNKNOWN_DISTANCE; n_powersets]; n_others];
 
     tracing::info!("BHK: initialising DP table");
-    // inialize tables first row with distance from first cities to other cities
     let last_pos = n_others;
     for i in 0..n_others {
         opt[i][1 << i] = dists
             .distance_by_pos(i, last_pos)
             .unwrap_or(UNKNOWN_DISTANCE);
 
-        if let Some(city_id) = dists.pos2city_id(&i) {
-            options.send_progress(ProgressMessage::CityChange(city_id));
+        if let Some(city_id) = dists.pos2city_id(&i)
+            && let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::CityChange(city_id));
         }
     }
 
@@ -50,12 +57,10 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     }
 
     tracing::info!("BHK: DP complete");
-    if options.verbose {
+    if opts.verbose {
         show_table(&opt);
     }
 
-    // Find the actual optimal tour distance: min over all ending cities of
-    // (cost to visit all n_others cities ending at i) + (return edge to start city)
     let optimal_distance = (0..n_others)
         .filter_map(|i| {
             let return_dist = dists.distance_by_pos(i, last_pos).ok()?;
@@ -71,12 +76,13 @@ pub fn solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOpt
     tracing::info!(optimal_distance, "BHK: optimal tour found");
     let route_vec = read_optimal_route(&opt, dists, n_cities, optimal_distance);
 
-    // send final route to the visualizer
     let route = Route::new(route_vec.as_ref());
-    options.send_progress(ProgressMessage::PathUpdate(route, 0.0));
-    options.send_progress(ProgressMessage::Done);
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(route, 0.0));
+        let _ = tx.send(ProgressMessage::Done);
+    }
 
-    Solution::new(&route_vec, cities, distances)
+    Solution::from_parts(&route_vec, cities, distances)
 }
 
 fn solve_bhk(
@@ -87,22 +93,18 @@ fn solve_bhk(
 ) -> f32 {
     let mut best_val = f32::MAX;
 
-    // distance is already calculated
     let selected_pos = selected_set as usize;
     if opt[city_pos][selected_pos] < UNKNOWN_DISTANCE {
         return opt[city_pos][selected_pos];
     }
 
-    // rest_selected R = S \ t , all other than city_id
     let rest_selected = selected_set & !(1 << city_pos);
-    let n_other = opt.len(); // one row per non-start city (positions 0..n_others)
+    let n_other = opt.len();
     for i in 0..n_other {
-        // if city i is not in rest_selected
         if (rest_selected & (1 << i)) == 0 {
             continue;
         }
 
-        // solve sub problem
         let step_dist = dm
             .distance_by_pos(i, city_pos)
             .expect("solve_bhk tried to access non-existent cities");
@@ -180,27 +182,24 @@ fn show_table(opt: &DPTable) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree};
+    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
 
-    fn default_options() -> SolverOptions {
-        SolverOptions::default()
-    }
-
-    fn tsp_5_1_cities() -> Vec<kdtree::KDPoint> {
-        kdtree::build_points(&[
+    fn tsp_5_1_problem() -> TspProblem {
+        let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
             vec![0.0, 0.5],
             vec![0.0, 1.0],
             vec![1.0, 1.0],
             vec![1.0, 0.0],
-        ])
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        TspProblem::new(cities, dm)
     }
 
     #[test]
     fn test_solve_returns_all_cities() {
-        let cities = tsp_5_1_cities();
-        let dm = distance_matrix::from_cities(&cities);
-        let solution = solve(&cities, &dm, &default_options());
+        let problem = tsp_5_1_problem();
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();
@@ -213,11 +212,9 @@ mod tests {
 
     #[test]
     fn test_solve_finds_optimal_tour_length() {
-        let cities = tsp_5_1_cities();
-        let dm = distance_matrix::from_cities(&cities);
-        let solution = solve(&cities, &dm, &default_options());
+        let problem = tsp_5_1_problem();
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
 
-        // optimal tour: 0→1→2→3→4→0 = 0.5 + 0.5 + 1.0 + 1.0 + 1.0 = 4.0
         assert!(
             (solution.total - 4.0).abs() < 1e-3,
             "expected tour length ~4.0, got {}",
@@ -233,13 +230,13 @@ mod tests {
             vec![0.0, 4.0],
         ]);
         let dm = distance_matrix::from_cities(&cities);
-        let solution = solve(&cities, &dm, &default_options());
+        let problem = TspProblem::new(cities, dm);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();
         assert_eq!(visited, vec![0, 1, 2]);
 
-        // tour is 3 + 4 + 5 = 12.0
         assert!((solution.total - 12.0).abs() < 1e-3, "got {}", solution.total);
     }
 }
