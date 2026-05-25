@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: true
     - name: Install cargo-component
       uses: taiki-e/install-action@v2
       with:
@@ -28,6 +30,8 @@ jobs:
       run: cargo component build --manifest-path teeline-wasm/Cargo.toml
     - name: Run tests
       run: cargo test --verbose
+    - name: Run e2e tests (BATS)
+      run: ./tests/bats/bin/bats tests/e2e/
     - name: Clippy
       run: cargo clippy -- -D warnings
     - name: Install cargo-llvm-cov
