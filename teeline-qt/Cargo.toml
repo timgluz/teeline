@@ -1,0 +1,18 @@
+[package]
+name = "teeline-qt"
+version = "0.1.0"
+edition = "2024"
+authors = ["Timo Sulg <timgluz@gmail.com>"]
+repository = "https://github.com/timgluz/teeline"
+license = "MIT"
+
+[[bin]]
+name = "teeline-qt"
+path = "src/main.rs"
+
+[package.metadata.dist]
+dist = false  # requires Qt runtime; not a standalone distributable binary
+
+[dependencies]
+qtbridge = { git = "https://github.com/qt/qtbridge-rust", branch = "dev" }
+teeline = { path = ".." }

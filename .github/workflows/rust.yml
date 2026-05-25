@@ -44,3 +44,15 @@ jobs:
         files: lcov.info
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  build-qt:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Qt 6
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.7.*'
+        modules: 'qtquick qtquickcontrols2'
+    - name: Build teeline-qt
+      run: cargo build -p teeline-qt --verbose
