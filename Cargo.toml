@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "teeline-wasm", "teeline-gui"]
+members = [".", "teeline-wasm", "teeline-cli"]
 default-members = ["."]
 resolver = "2"
 

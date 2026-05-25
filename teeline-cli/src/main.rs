@@ -12,7 +12,7 @@ use teeline::tsp::{
     pipeline::{PipelineStage, run_pipeline},
     progress, tsplib,
 };
-use teeline_gui::ProgressPlot;
+use teeline_cli::ProgressPlot;
 use tracing_subscriber::EnvFilter;
 
 // ---------------------------------------------------------------------------

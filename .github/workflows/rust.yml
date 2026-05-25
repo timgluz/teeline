@@ -25,19 +25,19 @@ jobs:
     - name: Add wasm32-wasip2 target
       run: rustup target add wasm32-wasip2
     - name: Build
-      run: cargo build -p teeline -p teeline-gui --verbose
+      run: cargo build -p teeline -p teeline-cli --verbose
     - name: Build WASM component
       run: cargo component build --manifest-path teeline-wasm/Cargo.toml
     - name: Run tests
-      run: cargo test -p teeline -p teeline-gui --verbose
+      run: cargo test -p teeline -p teeline-cli --verbose
     - name: Run e2e tests (BATS)
       run: ./tests/bats/bin/bats tests/e2e/
     - name: Clippy
-      run: cargo clippy -p teeline -p teeline-gui -- -D warnings
+      run: cargo clippy -p teeline -p teeline-cli -- -D warnings
     - name: Install cargo-llvm-cov
       uses: taiki-e/install-action@cargo-llvm-cov
     - name: Coverage
-      run: cargo llvm-cov -p teeline -p teeline-gui --lcov --output-path lcov.info
+      run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
     - name: Upload coverage
       uses: codecov/codecov-action@v4
       with:
