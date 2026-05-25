@@ -29,7 +29,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn five_city_problem() -> TspProblem {
         let cities = kdtree::build_points(&[

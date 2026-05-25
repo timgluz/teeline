@@ -32,20 +32,27 @@ pub fn solve(
             }
 
             for j in (i + 2)..n_indices {
-                let current_distance =
-                    distances.distance_between(path[i], path[i + 1]).expect("two_opt: invalid city pair")
-                    + distances.distance_between(path[j], path[j + 1]).expect("two_opt: invalid city pair");
+                let current_distance = distances
+                    .distance_between(path[i], path[i + 1])
+                    .expect("two_opt: invalid city pair")
+                    + distances
+                        .distance_between(path[j], path[j + 1])
+                        .expect("two_opt: invalid city pair");
 
-                let new_distance =
-                    distances.distance_between(path[i], path[j]).expect("two_opt: invalid city pair")
-                    + distances.distance_between(path[i + 1], path[j + 1]).expect("two_opt: invalid city pair");
+                let new_distance = distances
+                    .distance_between(path[i], path[j])
+                    .expect("two_opt: invalid city pair")
+                    + distances
+                        .distance_between(path[i + 1], path[j + 1])
+                        .expect("two_opt: invalid city pair");
 
                 if new_distance < current_distance {
                     swap_2opt(&mut path, i + 1, j);
                     improved = true;
 
                     if let Some(tx) = progress_tx {
-                        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), new_distance));
+                        let _ =
+                            tx.send(ProgressMessage::PathUpdate(Route::new(&path), new_distance));
                     }
                     tracing::debug!(i, j, tour_length = new_distance, "2-opt: improvement");
                 }
@@ -74,7 +81,7 @@ fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     #[test]
     fn test_swap_2opt_2middle_elems_in_even_size_list() {

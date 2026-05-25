@@ -12,15 +12,15 @@ type RectCoords = [f64; 4];
 type Point2D = (f64, f64);
 type EdgeData = (Pos2, Pos2);
 
-const WHITE:              Color32 = Color32::from_rgb(255, 255, 255);
-const CITY_COLOR:         Color32 = Color32::from_rgb(30,  30,  30);
-const CURRENT_CITY_COLOR: Color32 = Color32::from_rgb(220, 30,  30);
-const BEST_EDGE_COLOR:    Color32 = Color32::from_rgb(34,  139, 34);
-const SHARED_EDGE_COLOR:  Color32 = Color32::from_rgb(0,   100, 0);
-const UNIQUE_OPT_COLOR:   Color32 = Color32::from_rgb(180, 180, 180);
-const CURRENT_EDGE_COLOR: Color32 = Color32::from_rgb(30,  100, 220);
-const ACTIVE_EDGE_COLOR:  Color32 = Color32::from_rgb(255, 140, 0);
-const STATUS_COLOR:       Color32 = Color32::from_rgb(220, 30,  30);
+const WHITE: Color32 = Color32::from_rgb(255, 255, 255);
+const CITY_COLOR: Color32 = Color32::from_rgb(30, 30, 30);
+const CURRENT_CITY_COLOR: Color32 = Color32::from_rgb(220, 30, 30);
+const BEST_EDGE_COLOR: Color32 = Color32::from_rgb(34, 139, 34);
+const SHARED_EDGE_COLOR: Color32 = Color32::from_rgb(0, 100, 0);
+const UNIQUE_OPT_COLOR: Color32 = Color32::from_rgb(180, 180, 180);
+const CURRENT_EDGE_COLOR: Color32 = Color32::from_rgb(30, 100, 220);
+const ACTIVE_EDGE_COLOR: Color32 = Color32::from_rgb(255, 140, 0);
+const STATUS_COLOR: Color32 = Color32::from_rgb(220, 30, 30);
 const FONT_SIZE: f32 = 16.0;
 
 struct NodeData {
@@ -46,9 +46,12 @@ pub struct ProgressPlot {
 }
 
 impl ProgressPlot {
-    pub fn new_with_channel(cities: &[KDPoint], width: f64, height: f64, margin: f64)
-        -> (Self, mpsc::Sender<ProgressMessage>)
-    {
+    pub fn new_with_channel(
+        cities: &[KDPoint],
+        width: f64,
+        height: f64,
+        margin: f64,
+    ) -> (Self, mpsc::Sender<ProgressMessage>) {
         let (tx, rx) = mpsc::channel();
         let mut plot = ProgressPlot {
             rx,
@@ -169,7 +172,12 @@ impl ProgressPlot {
                 self.city_table.get(&a).cloned(),
                 self.city_table.get(&b).cloned(),
             ) {
-                let edge = build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions);
+                let edge = build_edge(
+                    &from,
+                    &to,
+                    &self.cities_bounding_box,
+                    &self.viewport_dimensions,
+                );
                 data.push(((a.min(b), a.max(b)), edge));
             }
         }
@@ -186,7 +194,12 @@ impl ProgressPlot {
                 self.city_table.get(&from_id).cloned(),
                 self.city_table.get(to_id).cloned(),
             ) {
-                edges.push(build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions));
+                edges.push(build_edge(
+                    &from,
+                    &to,
+                    &self.cities_bounding_box,
+                    &self.viewport_dimensions,
+                ));
                 from_id = *to_id;
             }
         }
@@ -195,7 +208,12 @@ impl ProgressPlot {
             self.city_table.get(&from_id).cloned(),
             self.city_table.get(&path[0]).cloned(),
         ) {
-            edges.push(build_edge(&from, &to, &self.cities_bounding_box, &self.viewport_dimensions));
+            edges.push(build_edge(
+                &from,
+                &to,
+                &self.cities_bounding_box,
+                &self.viewport_dimensions,
+            ));
         }
 
         edges
@@ -235,8 +253,16 @@ impl eframe::App for ProgressPlot {
                 }
 
                 if let (Some(prev_id), Some(curr_id)) = (self.prev_city_id, self.current_city_id) {
-                    let prev_pos = self.nodes.iter().find(|n| n.city_id == prev_id).map(|n| n.pos);
-                    let curr_pos = self.nodes.iter().find(|n| n.city_id == curr_id).map(|n| n.pos);
+                    let prev_pos = self
+                        .nodes
+                        .iter()
+                        .find(|n| n.city_id == prev_id)
+                        .map(|n| n.pos);
+                    let curr_pos = self
+                        .nodes
+                        .iter()
+                        .find(|n| n.city_id == curr_id)
+                        .map(|n| n.pos);
                     if let (Some(p), Some(c)) = (prev_pos, curr_pos) {
                         painter.line_segment([p, c], Stroke::new(3.0, ACTIVE_EDGE_COLOR));
                     }
@@ -271,7 +297,11 @@ impl eframe::App for ProgressPlot {
                     STATUS_COLOR,
                 );
 
-                draw_legend(painter, &self.viewport_dimensions, !self.optimal_edge_data.is_empty());
+                draw_legend(
+                    painter,
+                    &self.viewport_dimensions,
+                    !self.optimal_edge_data.is_empty(),
+                );
             });
 
         ctx.request_repaint_after(std::time::Duration::from_millis(16));
@@ -287,15 +317,27 @@ struct ViewportDimensions {
 
 impl ViewportDimensions {
     fn new(width: f64, height: f64, margin: f64) -> Self {
-        ViewportDimensions { height, width, margin }
+        ViewportDimensions {
+            height,
+            width,
+            margin,
+        }
     }
 }
 
 #[allow(clippy::cast_possible_truncation)]
-fn build_edge(from: &KDPoint, to: &KDPoint, bbox: &RectCoords, vp: &ViewportDimensions) -> EdgeData {
+fn build_edge(
+    from: &KDPoint,
+    to: &KDPoint,
+    bbox: &RectCoords,
+    vp: &ViewportDimensions,
+) -> EdgeData {
     let (fx, fy) = scaled_point(from, bbox, vp);
     let (tx, ty) = scaled_point(to, bbox, vp);
-    (Pos2::new(fx as f32, fy as f32), Pos2::new(tx as f32, ty as f32))
+    (
+        Pos2::new(fx as f32, fy as f32),
+        Pos2::new(tx as f32, ty as f32),
+    )
 }
 
 fn scaled_point(point: &KDPoint, window: &RectCoords, viewport: &ViewportDimensions) -> Point2D {
@@ -310,12 +352,20 @@ fn cities_bounding_box(cities: &[KDPoint]) -> RectCoords {
 
     for city in cities.iter() {
         if let Some(x) = city.get(0) {
-            if x < x_min { x_min = x; }
-            if x > x_max { x_max = x; }
+            if x < x_min {
+                x_min = x;
+            }
+            if x > x_max {
+                x_max = x;
+            }
         }
         if let Some(y) = city.get(1) {
-            if y < y_min { y_min = y; }
-            if y > y_max { y_max = y; }
+            if y < y_min {
+                y_min = y;
+            }
+            if y > y_max {
+                y_max = y;
+            }
         }
     }
 
@@ -358,7 +408,12 @@ fn draw_legend(painter: &egui::Painter, vp: &ViewportDimensions, show_optimal: b
 }
 
 // converts EUC2D space into GUI coords [0..self.height, 0..self.width]
-fn point_to_viewport(x: f64, y: f64, window: &RectCoords, viewport: &ViewportDimensions) -> Point2D {
+fn point_to_viewport(
+    x: f64,
+    y: f64,
+    window: &RectCoords,
+    viewport: &ViewportDimensions,
+) -> Point2D {
     let x_min = window[0];
     let y_min = window[1];
     let x_max = window[2];
@@ -397,11 +452,7 @@ mod tests {
 
     #[test]
     fn test_cities_bounding_box_basic() {
-        let cities = build_points(&[
-            vec![0.0, 5.0],
-            vec![10.0, 0.0],
-            vec![3.0, 8.0],
-        ]);
+        let cities = build_points(&[vec![0.0, 5.0], vec![10.0, 0.0], vec![3.0, 8.0]]);
         let bbox = cities_bounding_box(&cities);
         assert!((bbox[0] - 0.0).abs() < 0.01);
         assert!((bbox[1] - 0.0).abs() < 0.01);

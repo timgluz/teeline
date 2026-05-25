@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 
-use teeline::config::{resolve_config_file, select_pipeline_source, IdentityProvider};
+use teeline::config::{IdentityProvider, resolve_config_file, select_pipeline_source};
 use teeline::tsp::{
-    pipeline::{run_pipeline, PipelineStage},
-    tsplib, Solvers, TspProblem,
+    Solvers, TspProblem,
+    pipeline::{PipelineStage, run_pipeline},
+    tsplib,
 };
 
 const BERLIN52: &str = "tests/fixtures/berlin52.tsp";
@@ -17,9 +18,7 @@ fn berlin52_stages(stage_configs: Vec<(Solvers, teeline::tsp::AppOptions)>) -> V
     let problem = TspProblem::new(tsp.cities().to_vec(), tsp.distance_matrix().unwrap());
     stage_configs
         .into_iter()
-        .map(|(solver, options)| {
-            PipelineStage::new(solver, options, problem.clone(), None)
-        })
+        .map(|(solver, options)| PipelineStage::new(solver, options, problem.clone(), None))
         .collect()
 }
 
@@ -42,7 +41,9 @@ fn test_pipeline_config_sa_stage_epochs_applied() {
     let p = fixture("pipeline_global_nn_sa.toml");
     let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
     // SA stage should have epochs=50 in its [stage.sa] options
-    let sa_stage = stage_configs.iter().find(|(s, _)| *s == Solvers::SimulatedAnnealing);
+    let sa_stage = stage_configs
+        .iter()
+        .find(|(s, _)| *s == Solvers::SimulatedAnnealing);
     assert!(sa_stage.is_some(), "expected SA stage in fixture");
     let (_, opts) = sa_stage.unwrap();
     assert_eq!(opts.sa.as_ref().unwrap().heuristic.epochs, 50);

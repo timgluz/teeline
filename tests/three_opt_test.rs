@@ -4,14 +4,15 @@
 /// Slow tests on berlin52 and att48 are marked #[ignore] and can be run with:
 ///   cargo test --test three_opt_test -- --include-ignored
 use std::path::Path;
-use teeline::tsp::{distance_matrix, kdtree, nearest_neighbor, three_opt, tsplib, HeuristicOptions, TspProblem};
+use teeline::tsp::{
+    HeuristicOptions, TspProblem, distance_matrix, kdtree, nearest_neighbor, three_opt, tsplib,
+};
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 fn load_tsp(fixture: &str) -> tsplib::TspLibData {
     let path = Path::new("tests/fixtures").join(fixture);
-    tsplib::read_from_file(&path)
-        .unwrap_or_else(|e| panic!("failed to read {fixture}: {e}"))
+    tsplib::read_from_file(&path).unwrap_or_else(|e| panic!("failed to read {fixture}: {e}"))
 }
 
 fn build_dm(cities: &[kdtree::KDPoint]) -> distance_matrix::DistanceMatrix {
@@ -32,7 +33,13 @@ fn is_valid_tour(route: &[usize], cities: &[kdtree::KDPoint]) -> bool {
 }
 
 fn nn_tour_length(cities: &[kdtree::KDPoint]) -> f32 {
-    nearest_neighbor::solve(&make_problem(cities.to_vec()), &HeuristicOptions::default(), None, None).total
+    nearest_neighbor::solve(
+        &make_problem(cities.to_vec()),
+        &HeuristicOptions::default(),
+        None,
+        None,
+    )
+    .total
 }
 
 // ─── fast integration tests (gr17, 17 cities) ────────────────────────────────
@@ -40,14 +47,25 @@ fn nn_tour_length(cities: &[kdtree::KDPoint]) -> f32 {
 #[test]
 fn three_opt_valid_tour_gr17() {
     let cities = load_tsp("gr17.tsp").cities().to_vec();
-    let tour = three_opt::solve(&make_problem(cities.clone()), &HeuristicOptions::default(), None, None);
+    let tour = three_opt::solve(
+        &make_problem(cities.clone()),
+        &HeuristicOptions::default(),
+        None,
+        None,
+    );
     assert!(is_valid_tour(tour.route(), &cities), "gr17 tour is invalid");
 }
 
 #[test]
 fn three_opt_improves_on_gr17() {
     let cities = load_tsp("gr17.tsp").cities().to_vec();
-    let three_opt_total = three_opt::solve(&make_problem(cities.clone()), &HeuristicOptions::default(), None, None).total;
+    let three_opt_total = three_opt::solve(
+        &make_problem(cities.clone()),
+        &HeuristicOptions::default(),
+        None,
+        None,
+    )
+    .total;
     let nn_total = nn_tour_length(&cities);
     assert!(
         three_opt_total < nn_total,
@@ -62,15 +80,29 @@ fn three_opt_improves_on_gr17() {
 #[ignore = "slow in debug mode (~minutes); run with: cargo test --test three_opt_test -- --include-ignored"]
 fn three_opt_valid_tour_berlin52() {
     let cities = load_tsp("berlin52.tsp").cities().to_vec();
-    let tour = three_opt::solve(&make_problem(cities.clone()), &HeuristicOptions::default(), None, None);
-    assert!(is_valid_tour(tour.route(), &cities), "berlin52 tour is invalid");
+    let tour = three_opt::solve(
+        &make_problem(cities.clone()),
+        &HeuristicOptions::default(),
+        None,
+        None,
+    );
+    assert!(
+        is_valid_tour(tour.route(), &cities),
+        "berlin52 tour is invalid"
+    );
 }
 
 #[test]
 #[ignore = "slow in debug mode (~minutes); run with: cargo test --test three_opt_test -- --include-ignored"]
 fn three_opt_improves_on_berlin52() {
     let cities = load_tsp("berlin52.tsp").cities().to_vec();
-    let three_opt_total = three_opt::solve(&make_problem(cities.clone()), &HeuristicOptions::default(), None, None).total;
+    let three_opt_total = three_opt::solve(
+        &make_problem(cities.clone()),
+        &HeuristicOptions::default(),
+        None,
+        None,
+    )
+    .total;
     let nn_total = nn_tour_length(&cities);
     assert!(
         three_opt_total < nn_total,
@@ -82,15 +114,29 @@ fn three_opt_improves_on_berlin52() {
 #[ignore = "slow in debug mode (~minutes); run with: cargo test --test three_opt_test -- --include-ignored"]
 fn three_opt_valid_tour_att48() {
     let cities = load_tsp("att48.tsp").cities().to_vec();
-    let tour = three_opt::solve(&make_problem(cities.clone()), &HeuristicOptions::default(), None, None);
-    assert!(is_valid_tour(tour.route(), &cities), "att48 tour is invalid");
+    let tour = three_opt::solve(
+        &make_problem(cities.clone()),
+        &HeuristicOptions::default(),
+        None,
+        None,
+    );
+    assert!(
+        is_valid_tour(tour.route(), &cities),
+        "att48 tour is invalid"
+    );
 }
 
 #[test]
 #[ignore = "slow in debug mode (~minutes); run with: cargo test --test three_opt_test -- --include-ignored"]
 fn three_opt_improves_on_att48() {
     let cities = load_tsp("att48.tsp").cities().to_vec();
-    let three_opt_total = three_opt::solve(&make_problem(cities.clone()), &HeuristicOptions::default(), None, None).total;
+    let three_opt_total = three_opt::solve(
+        &make_problem(cities.clone()),
+        &HeuristicOptions::default(),
+        None,
+        None,
+    )
+    .total;
     let nn_total = nn_tour_length(&cities);
     assert!(
         three_opt_total < nn_total,

@@ -31,7 +31,10 @@ pub fn solve(
     let mut best_distance = distances.tour_length(best_route.route());
 
     if let Some(tx) = progress_tx {
-        let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
+        let _ = tx.send(ProgressMessage::PathUpdate(
+            best_route.clone(),
+            best_distance,
+        ));
     }
 
     let mut temperature = opts.max_temperature;
@@ -44,7 +47,10 @@ pub fn solve(
             best_distance = candidate_distance;
 
             if let Some(tx) = progress_tx {
-                let _ = tx.send(ProgressMessage::PathUpdate(best_route.clone(), best_distance));
+                let _ = tx.send(ProgressMessage::PathUpdate(
+                    best_route.clone(),
+                    best_distance,
+                ));
             }
             tracing::info!(epoch, tour_length = best_distance, "SA: new best");
         }
@@ -79,18 +85,24 @@ fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, SAOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, SAOptions, TspProblem, distance_matrix, kdtree};
 
     #[test]
     fn test_sa_respects_initial_tour() {
         let cities = kdtree::build_points(&[
-            vec![0.0, 0.0], vec![0.0, 0.5], vec![0.0, 1.0],
-            vec![1.0, 1.0], vec![1.0, 0.0],
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
         ]);
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let opts = SAOptions {
-            heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+            heuristic: HeuristicOptions {
+                epochs: 0,
+                ..HeuristicOptions::default()
+            },
             min_temperature: 1_000_000.0,
             max_temperature: 0.0,
             ..SAOptions::default()
@@ -119,7 +131,10 @@ mod tests {
         let accepted = (0..1000)
             .filter(|_| is_acceptable(temperature, 10.0, 10.001))
             .count();
-        assert!(accepted > 900, "expected >90% acceptance at high T, got {accepted}/1000");
+        assert!(
+            accepted > 900,
+            "expected >90% acceptance at high T, got {accepted}/1000"
+        );
     }
 
     #[test]
@@ -128,6 +143,9 @@ mod tests {
         let accepted = (0..1000)
             .filter(|_| is_acceptable(temperature, 10.0, 20.0))
             .count();
-        assert!(accepted < 100, "expected <10% acceptance at low T, got {accepted}/1000");
+        assert!(
+            accepted < 100,
+            "expected <10% acceptance at low T, got {accepted}/1000"
+        );
     }
 }

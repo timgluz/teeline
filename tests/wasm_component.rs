@@ -48,11 +48,31 @@ fn make_store(engine: &Engine) -> Store<HostState> {
 fn five_cities() -> Vec<crate::teeline::solver::types::City> {
     use crate::teeline::solver::types::City;
     vec![
-        City { id: 0, x: 565.0, y: 575.0 },
-        City { id: 1, x: 25.0, y: 185.0 },
-        City { id: 2, x: 345.0, y: 750.0 },
-        City { id: 3, x: 945.0, y: 685.0 },
-        City { id: 4, x: 845.0, y: 655.0 },
+        City {
+            id: 0,
+            x: 565.0,
+            y: 575.0,
+        },
+        City {
+            id: 1,
+            x: 25.0,
+            y: 185.0,
+        },
+        City {
+            id: 2,
+            x: 345.0,
+            y: 750.0,
+        },
+        City {
+            id: 3,
+            x: 945.0,
+            y: 685.0,
+        },
+        City {
+            id: 4,
+            x: 845.0,
+            y: 655.0,
+        },
     ]
 }
 

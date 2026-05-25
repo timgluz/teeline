@@ -8,9 +8,9 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
+use super::CityTable;
 use super::distance_matrix::{self, DistanceMatrix};
 use super::kdtree::KDPoint;
-use super::CityTable;
 
 const COORD_SECTION_KEY: &str = "NODE_COORD_SECTION";
 const DISPLAY_DATA_SECTION_KEY: &str = "DISPLAY_DATA_SECTION";
@@ -140,17 +140,14 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
                 }
             },
             TspReaderStates::Insection(section_id)
-                if (section_id == COORD_SECTION_KEY
-                    || section_id == DISPLAY_DATA_SECTION_KEY) =>
+                if (section_id == COORD_SECTION_KEY || section_id == DISPLAY_DATA_SECTION_KEY) =>
             {
                 match coords_from_text(line_no, &line) {
                     Err(msg) => return Err(msg),
                     Ok(pt) => cities.push(pt),
                 }
             }
-            TspReaderStates::Insection(section_id)
-                if section_id == EDGE_WEIGHT_SECTION_KEY =>
-            {
+            TspReaderStates::Insection(section_id) if section_id == EDGE_WEIGHT_SECTION_KEY => {
                 raw_weight_tokens.extend(
                     line.split_whitespace()
                         .filter_map(|t| f32::from_str(t).ok()),

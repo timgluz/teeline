@@ -168,7 +168,10 @@ EOF";
         let result = parse_from_str(WRONG_TYPE_TOUR);
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("TYPE"), "error should mention TYPE, got: {msg}");
+        assert!(
+            msg.contains("TYPE"),
+            "error should mention TYPE, got: {msg}"
+        );
     }
 
     #[test]

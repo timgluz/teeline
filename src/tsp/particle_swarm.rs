@@ -2,7 +2,7 @@ use rand::Rng;
 use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
-use super::route::{apply_swaps, swap_sequence, Route};
+use super::route::{Route, apply_swaps, swap_sequence};
 use super::{HeuristicOptions, Solution, TspProblem};
 
 type Swap = (usize, usize);
@@ -14,7 +14,6 @@ const C1: f64 = 1.5;
 const C2: f64 = 1.5;
 const DEFAULT_N_PARTICLES: usize = 30;
 const V_MAX_FACTOR: f64 = 0.35;
-
 
 fn trim_velocity(v: &[Swap], keep: usize) -> Velocity {
     v.iter().take(keep).copied().collect()
@@ -132,7 +131,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, HeuristicOptions, TspProblem};
+    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     #[test]
     fn test_pso_respects_initial_tour() {
@@ -146,7 +145,10 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = HeuristicOptions { epochs: 0, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 0,
+            ..HeuristicOptions::default()
+        };
         let problem = TspProblem::new(cities.clone(), dm);
         let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
@@ -174,7 +176,11 @@ mod tests {
             vec![0.0, 1.0],
         ]);
         let distances = distance_matrix::from_cities(&cities);
-        let opts = HeuristicOptions { epochs: 20, n_nearest: 5, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 20,
+            n_nearest: 5,
+            ..HeuristicOptions::default()
+        };
         let problem = TspProblem::new(cities.clone(), distances);
         let sol = solve(&problem, &opts, None, None);
         assert_eq!(sol.route().len(), cities.len());

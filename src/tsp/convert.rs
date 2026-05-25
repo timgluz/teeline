@@ -123,21 +123,30 @@ mod tests {
     fn test_parse_discopt_empty_after_skip_errors() {
         let input = "0\n";
         let result = parse_discopt(input);
-        assert!(result.is_err(), "expected error for file with only a header line");
+        assert!(
+            result.is_err(),
+            "expected error for file with only a header line"
+        );
     }
 
     #[test]
     fn test_parse_discopt_bad_float_errors() {
         let input = "2\n0.0 abc\n1.0 2.0\n";
         let result = parse_discopt(input);
-        assert!(result.is_err(), "expected parse error for non-numeric coordinate");
+        assert!(
+            result.is_err(),
+            "expected parse error for non-numeric coordinate"
+        );
     }
 
     #[test]
     fn test_parse_discopt_missing_y_errors() {
         let input = "1\n1.5\n";
         let result = parse_discopt(input);
-        assert!(result.is_err(), "expected error when y coordinate is absent");
+        assert!(
+            result.is_err(),
+            "expected error when y coordinate is absent"
+        );
     }
 
     // ── write_tsplib ─────────────────────────────────────────────────────────
@@ -233,7 +242,10 @@ mod tests {
         fs::write(&input, "1\n").unwrap(); // header only, no coords
 
         let result = convert_file(&input, &output);
-        assert!(result.is_err(), "must return Err when content has no coordinates");
+        assert!(
+            result.is_err(),
+            "must return Err when content has no coordinates"
+        );
     }
 
     // ── convert_dir ──────────────────────────────────────────────────────────
@@ -262,7 +274,10 @@ mod tests {
             Path::new("/tmp/teeline_cd_err_out"),
         );
         assert_eq!(ok, 0);
-        assert!(!errors.is_empty(), "must report an error for missing directory");
+        assert!(
+            !errors.is_empty(),
+            "must report an error for missing directory"
+        );
     }
 
     #[test]

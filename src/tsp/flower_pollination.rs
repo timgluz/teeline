@@ -4,11 +4,10 @@ use rand::Rng;
 
 use super::probability::{bernoulli, levy_step, sample_without_replacement};
 use super::progress::ProgressMessage;
-use super::route::{apply_swaps, swap_sequence, Route};
+use super::route::{Route, apply_swaps, swap_sequence};
 use super::{FPAOptions, Solution, TspProblem};
 
 const DEFAULT_N_FLOWERS: usize = 25;
-
 
 fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl Rng) -> Vec<usize> {
     let seq = swap_sequence(flower, gbest);
@@ -16,7 +15,11 @@ fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl Rng) -> 
         return flower.to_vec();
     }
     let levy = levy_step(rng).abs();
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
     let n_swaps = ((levy * seq.len() as f64 * 0.5).ceil() as usize).clamp(1, seq.len());
     apply_swaps(flower, &seq[..n_swaps])
 }
@@ -38,7 +41,11 @@ fn local_pollination(
         return flower.to_vec();
     }
     let epsilon: f64 = rng.random();
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
     let n_swaps = ((epsilon * seq.len() as f64).ceil() as usize).clamp(1, seq.len());
     apply_swaps(flower, &seq[..n_swaps])
 }
@@ -124,7 +131,8 @@ pub fn solve(
                     gbest = flowers[i].clone();
                     gbest_cost = new_cost;
                     if let Some(tx) = progress_tx {
-                        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+                        let _ =
+                            tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
                     }
                     tracing::info!(epoch, tour_length = gbest_cost, "FPA: new best");
                 }
@@ -145,7 +153,7 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{distance_matrix, kdtree, FPAOptions, HeuristicOptions, TspProblem};
+    use crate::tsp::{FPAOptions, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     #[test]
     fn test_fpa_respects_initial_tour() {
@@ -160,7 +168,10 @@ mod tests {
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
         let opts = FPAOptions {
-            heuristic: HeuristicOptions { epochs: 0, ..HeuristicOptions::default() },
+            heuristic: HeuristicOptions {
+                epochs: 0,
+                ..HeuristicOptions::default()
+            },
             ..FPAOptions::default()
         };
         let problem = TspProblem::new(cities.clone(), dm);
@@ -189,7 +200,11 @@ mod tests {
         let problem = four_city_setup();
         let cities = problem.cities.clone();
         let opts = FPAOptions {
-            heuristic: HeuristicOptions { epochs: 30, n_nearest: 5, ..HeuristicOptions::default() },
+            heuristic: HeuristicOptions {
+                epochs: 30,
+                n_nearest: 5,
+                ..HeuristicOptions::default()
+            },
             mutation_probability: 0.8,
         };
         let sol = solve(&problem, &opts, None, None);
@@ -197,7 +212,10 @@ mod tests {
         visited.sort();
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
         expected.sort();
-        assert_eq!(visited, expected, "FPA tour does not visit all cities exactly once");
+        assert_eq!(
+            visited, expected,
+            "FPA tour does not visit all cities exactly once"
+        );
         assert!(sol.total > 0.0);
         assert!(sol.total.is_finite());
     }
