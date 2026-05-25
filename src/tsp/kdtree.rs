@@ -115,12 +115,11 @@ impl KDTree {
     }
 
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let best_result = NearestResult::new(target.clone(), f32::INFINITY, n);
-
-        match &self.root {
-            None => best_result,
-            Some(n) => n.nearest(target, best_result),
+        let mut acc = NearestResult::new(target.clone(), f32::INFINITY, n);
+        if let Some(root) = &self.root {
+            root.nearest(target, &mut acc);
         }
+        acc
     }
 
     pub fn len(&self) -> usize {
@@ -189,44 +188,32 @@ impl KDNode {
         }
     }
 
-    pub fn nearest(&self, target_point: &KDPoint, best_result: NearestResult) -> NearestResult {
-        if self.is_empty() {
-            return best_result;
-        }
+    // The pruning invariant: we skip the far branch only when every point in it
+    // is guaranteed farther than our k-th best candidate so far.
+    // Guard: acc.search_radius() > split_dist
+    //   - search_radius() == INFINITY while the buffer has fewer than n items,
+    //     ensuring we never prune before the buffer is full.
+    //   - Once full, search_radius() == farthest_distance(), the standard
+    //     k-d tree k-NN pruning condition.
+    fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
+        acc.add(self.point.clone(), self.point.distance(target_point));
 
-        let distance_from_target = self.point.distance(target_point);
-
-        let best_distance = best_result.distance;
-        let mut nearest_result = best_result;
-
-        if distance_from_target <= best_distance {
-            let pt = self.point.clone();
-            nearest_result.add(pt, distance_from_target);
-        };
-
-        let (closest_branch, futher_branch) = match self.cmp_by_point(target_point) {
+        let (closest_branch, further_branch) = match self.cmp_by_point(target_point) {
             None => panic!("Dimension conflict in nearest function"),
             Some(Ordering::Greater) => (self.left(), self.right()),
             Some(_) => (self.right(), self.left()),
         };
 
         if let Some(branch) = closest_branch {
-            let closest_result = branch.nearest(target_point, nearest_result.clone());
-            let pt_distance = closest_result.closest_distance();
-            nearest_result.add(closest_result.point, pt_distance);
+            branch.nearest(target_point, acc);
         }
 
-        // check distance from split line
         let split_dist = self.point.split_distance(target_point, self.level_coord());
-        if nearest_result.closest_distance() > split_dist
-            && let Some(branch) = futher_branch
-        {
-            let further_result = branch.nearest(target_point, nearest_result.clone());
-            let pt_distance = further_result.closest_distance();
-            nearest_result.add(further_result.point, pt_distance);
+        if acc.search_radius() > split_dist {
+            if let Some(branch) = further_branch {
+                branch.nearest(target_point, acc);
+            }
         }
-
-        nearest_result
     }
 
     fn cmp_by_point(&self, other: &KDPoint) -> Option<Ordering> {
