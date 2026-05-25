@@ -40,7 +40,7 @@ fn build_subtree(points: Vec<KDPoint>, depth: usize) -> KDSubTree {
     }
 
     if points.len() == 1 {
-        let leaf_node = KDNode::leaf(points[0].clone(), depth);
+        let leaf_node = KDNode::leaf(points[0], depth);
         return Some(Box::new(leaf_node));
     }
 
@@ -64,7 +64,7 @@ fn partition_points(
     let mut sorted_points = points.clone();
 
     if sorted_points.len() == 1 {
-        let pivot_pt = sorted_points[0].clone();
+        let pivot_pt = sorted_points[0];
         return (pivot_pt, vec![], vec![]);
     }
 
@@ -72,7 +72,7 @@ fn partition_points(
     sorted_points.sort_by(|a, b| a.cmp_by_coord(b, coord).unwrap());
 
     let pivot_idx = sorted_points.len() / 2;
-    let pivot_pt = sorted_points[pivot_idx].clone();
+    let pivot_pt = sorted_points[pivot_idx];
 
     (
         pivot_pt,
@@ -183,7 +183,7 @@ impl KDNode {
     //   - Once full, search_radius() == farthest_distance(), the standard
     //     k-d tree k-NN pruning condition.
     fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
-        acc.add(self.point.clone(), self.point.distance(target_point));
+        acc.add(self.point, self.point.distance(target_point));
 
         let (closest_branch, further_branch) = match self.cmp_by_point(target_point) {
             None => panic!("Dimension conflict in nearest function"),
@@ -207,9 +207,8 @@ impl KDNode {
         self.point.cmp_by_coord(other, self.level_coord())
     }
 
-    /// returns a dimension for comparision
     fn level_coord(&self) -> usize {
-        self.depth % self.point.dimensionality
+        self.depth % 2
     }
 
     pub fn left(&self) -> Option<&KDNode> {
@@ -238,36 +237,27 @@ impl KDNode {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct KDPoint {
     pub id: usize,
-    dimensionality: usize,
-    coords: Vec<f32>,
+    pub coords: [f32; 2],
 }
 
 impl KDPoint {
     pub fn new(coords: &[f32]) -> Self {
-        KDPoint {
-            id: 0,
-            dimensionality: coords.len(),
-            coords: coords.to_vec(),
-        }
+        KDPoint { id: 0, coords: [coords[0], coords[1]] }
     }
 
     pub fn new_with_id(id: usize, coords: &[f32]) -> Self {
-        KDPoint {
-            id,
-            dimensionality: coords.len(),
-            coords: coords.to_vec(),
-        }
+        KDPoint { id, coords: [coords[0], coords[1]] }
     }
 
     pub fn dim(&self) -> usize {
-        self.dimensionality
+        2
     }
 
     pub fn coords(&self) -> &[f32] {
-        &self.coords[..]
+        &self.coords
     }
 
     pub fn get(&self, dimension: usize) -> Option<f32> {
@@ -275,63 +265,39 @@ impl KDPoint {
     }
 
     pub fn distance(&self, other: &KDPoint) -> f32 {
-        let distance: f32 = self
-            .coords
-            .iter()
-            .zip(other.coords())
-            .map(|(x, y)| (x - y).powi(2))
-            .sum::<f32>()
-            .sqrt();
-
-        distance
+        let dx = self.coords[0] - other.coords[0];
+        let dy = self.coords[1] - other.coords[1];
+        (dx * dx + dy * dy).sqrt()
     }
 
-    /// returns distance from split level
     fn split_distance(&self, other: &KDPoint, coord: usize) -> f32 {
-        (self.coords[coord] - other.get(coord).unwrap()).abs()
+        (self.coords[coord] - other.coords[coord]).abs()
     }
 
     pub fn cmp_by_coord(&self, other: &KDPoint, coord: usize) -> Option<Ordering> {
-        if self.get(coord).is_none() || other.get(coord).is_none() {
-            return None;
-        }
-
-        let self_coord = self.get(coord).unwrap();
-        let other_coord = other.get(coord).unwrap();
-
-        let res = if self_coord < other_coord {
+        let a = self.coords.get(coord)?;
+        let b = other.coords.get(coord)?;
+        let res = if a < b {
             Ordering::Less
-        } else if (self_coord - other_coord).abs() < f32::EPSILON {
+        } else if (a - b).abs() < f32::EPSILON {
             Ordering::Equal
         } else {
             Ordering::Greater
         };
-
         Some(res)
     }
 
     pub fn x(&self) -> f32 {
-        if self.dimensionality < 1 {
-            panic!("for accessing y, dimensionality must be > 0");
-        }
-
         self.coords[0]
     }
 
     pub fn y(&self) -> f32 {
-        if self.dimensionality < 2 {
-            panic!("for accessing y, dimensionality must be > 1");
-        }
-
         self.coords[1]
     }
 }
 
 impl PartialEq for KDPoint {
     fn eq(&self, other: &KDPoint) -> bool {
-        if self.dimensionality != other.dimensionality {
-            return false;
-        }
         self.distance(other) < f32::EPSILON
     }
 }
@@ -343,19 +309,9 @@ mod tests {
     use std::cell::RefCell;
 
     #[test]
-    fn kdpoint_cmp_by_coord_with_empty_points() {
-        let first_pt = KDPoint::new(&[]);
-        let other_pt = KDPoint::new(&[]);
-
-        assert_eq!(None, first_pt.cmp_by_coord(&other_pt, 0));
-    }
-
-    #[test]
-    fn kdpoint_cmp_by_coord_when_other_node_has_different_dim() {
-        let first_pt = KDPoint::new(&[1.0, 0.0]);
-        let other_pt = KDPoint::new(&[0.0]);
-
-        assert_eq!(None, first_pt.cmp_by_coord(&other_pt, 1));
+    fn kdpoint_cmp_by_coord_out_of_bounds_returns_none() {
+        let pt = KDPoint::new(&[1.0, 0.0]);
+        assert_eq!(None, pt.cmp_by_coord(&pt, 2));
     }
 
     #[test]

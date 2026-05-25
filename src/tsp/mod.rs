@@ -891,7 +891,7 @@ impl NearestResult {
         let results = Vec::with_capacity(n);
 
         NearestResult {
-            target: point.clone(),
+            target: point,
             point,
             distance,
             n,
@@ -906,7 +906,7 @@ impl NearestResult {
 
         if new_distance < self.closest_distance() {
             self.distance = new_distance;
-            self.point = pt.clone();
+            self.point = pt;
         }
 
         // Use search_radius so we always fill the buffer before applying the

@@ -97,7 +97,7 @@ impl DistanceMatrix {
 
         let mut distances = Vec::with_capacity(size);
         for (i, pt1) in cities.iter().enumerate() {
-            city_table.insert(i, pt1.clone());
+            city_table.insert(i, *pt1);
 
             for pt2 in cities.iter().take(i) {
                 distances.push(pt1.distance(pt2));
@@ -200,7 +200,7 @@ impl DistanceMatrix {
     }
 
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let mut search_result = NearestResult::new(target.clone(), f32::INFINITY, n);
+        let mut search_result = NearestResult::new(*target, f32::INFINITY, n);
 
         if let Some(city_pos) = self.city_id2pos(&target.id) {
             let distances_from_target = self.distances_from_index(city_pos);
@@ -208,7 +208,7 @@ impl DistanceMatrix {
                 // Look up by matrix position, not city_id.  city_id != pos when city IDs
                 // are not 0-based (e.g. 1-indexed TSPLIB files like berlin52.tsp).
                 if let Some(pt) = self.cities.get(&pos) {
-                    search_result.add(pt.clone(), *distance);
+                    search_result.add(*pt, *distance);
                 }
             }
         } else {
