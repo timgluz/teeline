@@ -11,11 +11,58 @@ ApplicationWindow {
     height: 640
     title: "teeline-qt — TSP Solver"
 
+    // ── Colour theme (single source of truth for all palette values) ────────
+    QtObject {
+        id: theme
+        // Backgrounds
+        readonly property color bgApp:       "#1a1a2e"  // main window
+        readonly property color bgPanel:     "#13132b"  // headers / side panels
+        readonly property color bgCard:      "#16213e"  // list items / stage cards
+        readonly property color bgDeep:      "#0f0f23"  // visualization canvas
+        readonly property color bgBar:       "#0d0d1e"  // bottom action bar
+        readonly property color bgHighlight: "#1e3a5f"  // selected item / badges
+        readonly property color bgDropHover: "#2a3f5f"  // drop-zone hover
+
+        // Borders
+        readonly property color border:        "#2a3a6a"
+        readonly property color borderDrop:    "#3a4f7a"  // drop-zone outline
+        readonly property color borderDiv:     "#2a2a4a"  // panel divider
+        readonly property color overlayBorder: "#2a2a5a"  // KPI overlay
+        readonly property color overlayBg:     "#cc0a0a1e" // KPI overlay (80 % alpha)
+
+        // Accents
+        readonly property color accent:      "#4fc3f7"  // primary blue
+        readonly property color accentGreen: "#00e676"  // success / running
+
+        // Text
+        readonly property color textPrimary:  "#e0e0e0"
+        readonly property color textSub:      "#b0b0b0"  // description body
+        readonly property color textMuted:    "#9e9e9e"  // secondary labels
+        readonly property color textLabel:    "#c8c8e0"  // form field labels
+        readonly property color textDim:      "#607d8b"  // section headers
+        readonly property color textHint:     "#7890a8"  // form hints
+        readonly property color textDisabled: "#555555"  // disabled / empty states
+        readonly property color textDark:     "#111122"  // on light backgrounds
+
+        // Form fields
+        readonly property color fieldBg:          "#dde0f5"
+        readonly property color fieldBorder:      "#9090c0"
+        readonly property color fieldPlaceholder: "#8888aa"
+        readonly property color inputError:       "#c0302a"
+
+        // Status
+        readonly property color errorRed:   "#ef5350"
+        readonly property color warnOrange: "#ff9800"
+        readonly property color warnBorder: "#ff6d00"
+        readonly property color warnBg:     "#3a1a00"
+    }
+
+
     // ── Inline component: WelcomePage ───────────────────────────────────────
     component WelcomePage: Page {
         signal nextRequested()
 
-        background: Rectangle { color: "#1a1a2e" }
+        background: Rectangle { color: theme.bgApp }
 
         ColumnLayout {
             anchors.fill: parent
@@ -26,7 +73,7 @@ ApplicationWindow {
                 text: "teeline-qt"
                 font.pixelSize: 28
                 font.bold: true
-                color: "#e0e0e0"
+                color: theme.textPrimary
             }
 
             // Drop zone
@@ -34,8 +81,8 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 height: 160
                 radius: 8
-                color: dropArea.containsDrag ? "#2a3f5f" : "#16213e"
-                border.color: dropArea.containsDrag ? "#4fc3f7" : "#3a4f7a"
+                color: dropArea.containsDrag ? theme.bgDropHover : theme.bgCard
+                border.color: dropArea.containsDrag ? theme.accent : theme.borderDrop
                 border.width: 2
 
                 ColumnLayout {
@@ -45,7 +92,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                         text: "Drop a .tsp file here"
                         font.pixelSize: 16
-                        color: "#9e9e9e"
+                        color: theme.textMuted
                     }
                     Button {
                         Layout.alignment: Qt.AlignHCenter
@@ -68,7 +115,7 @@ ApplicationWindow {
             Text {
                 visible: FileLoader.errorMessage !== ""
                 text: FileLoader.errorMessage
-                color: "#ef5350"
+                color: theme.errorRed
                 font.pixelSize: 13
                 wrapMode: Text.WordWrap
                 Layout.fillWidth: true
@@ -83,12 +130,12 @@ ApplicationWindow {
                 ColumnLayout {
                     spacing: 8
                     Layout.preferredWidth: 240
-                    Text { text: "Problem:";       color: "#9e9e9e"; font.pixelSize: 12 }
-                    Text { text: FileLoader.problemName;    color: "#e0e0e0"; font.pixelSize: 14; font.bold: true }
-                    Text { text: "Cities:";        color: "#9e9e9e"; font.pixelSize: 12 }
-                    Text { text: FileLoader.cityCount;      color: "#e0e0e0"; font.pixelSize: 14 }
-                    Text { text: "Edge weights:";  color: "#9e9e9e"; font.pixelSize: 12 }
-                    Text { text: FileLoader.edgeWeightType; color: "#e0e0e0"; font.pixelSize: 14 }
+                    Text { text: "Problem:";       color: theme.textMuted; font.pixelSize: 12 }
+                    Text { text: FileLoader.problemName;    color: theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                    Text { text: "Cities:";        color: theme.textMuted; font.pixelSize: 12 }
+                    Text { text: FileLoader.cityCount;      color: theme.textPrimary; font.pixelSize: 14 }
+                    Text { text: "Edge weights:";  color: theme.textMuted; font.pixelSize: 12 }
+                    Text { text: FileLoader.edgeWeightType; color: theme.textPrimary; font.pixelSize: 14 }
                 }
 
                 Canvas {
@@ -98,7 +145,7 @@ ApplicationWindow {
 
                     onPaint: {
                         var ctx = getContext("2d")
-                        ctx.fillStyle = "#0f0f23"
+                        ctx.fillStyle = theme.bgDeep
                         ctx.beginPath()
                         ctx.roundedRect(0, 0, width, height, 4, 4)
                         ctx.fill()
@@ -107,7 +154,7 @@ ApplicationWindow {
                         if (!raw || raw === "[]") return
                         var cities = JSON.parse(raw)
                         var pad = 8, w = width - pad*2, h = height - pad*2
-                        ctx.fillStyle = "#00e676"
+                        ctx.fillStyle = theme.accentGreen
                         for (var i = 0; i < cities.length; i++) {
                             ctx.beginPath()
                             ctx.arc(pad + cities[i].x * w, pad + cities[i].y * h, 2.5, 0, Math.PI*2)
@@ -129,13 +176,13 @@ ApplicationWindow {
                                          ? JSON.parse(FileLoader.recentFilesJson) : []
                 visible: recentList.length > 0
                 spacing: 4
-                Text { text: "Recent files"; color: "#9e9e9e"; font.pixelSize: 12 }
+                Text { text: "Recent files"; color: theme.textMuted; font.pixelSize: 12 }
                 Repeater {
                     model: recentSection.recentList.slice(0, 5)
                     delegate: Text {
                         required property string modelData
                         text: modelData
-                        color: "#4fc3f7"
+                        color: theme.accent
                         font.pixelSize: 13
                         elide: Text.ElideLeft
                         width: 420
@@ -153,11 +200,6 @@ ApplicationWindow {
             // Bottom bar
             RowLayout {
                 Layout.fillWidth: true
-                Switch {
-                    text: "Advanced (Pipeline Builder)"
-                    enabled: false
-                    opacity: 0.4
-                }
                 Item { Layout.fillWidth: true }
                 Button {
                     text: "Next →"
@@ -225,8 +267,9 @@ ApplicationWindow {
         signal backRequested()
         signal solveRequested()
         signal configureRequested()
+        signal pipelineRequested()
 
-        background: Rectangle { color: "#1a1a2e" }
+        background: Rectangle { color: theme.bgApp }
 
         // Track which item is selected by index
         property int selectedIdx: -1
@@ -246,7 +289,7 @@ ApplicationWindow {
             Rectangle {
                 Layout.preferredWidth: 280
                 Layout.fillHeight: true
-                color: "#13132b"
+                color: theme.bgPanel
 
                 ListView {
                     id: solverListView
@@ -268,7 +311,7 @@ ApplicationWindow {
                             text: section
                             font.pixelSize: 11
                             font.bold: true
-                            color: "#607d8b"
+                            color: theme.textDim
                             font.letterSpacing: 1.2
                         }
                     }
@@ -286,13 +329,13 @@ ApplicationWindow {
 
                         contentItem: Text {
                             text: modelData.name
-                            color: isExactWarning ? "#555" : (index === selectedIdx ? "#00e676" : "#e0e0e0")
+                            color: isExactWarning ? theme.textDisabled : (index === selectedIdx ? theme.accentGreen : theme.textPrimary)
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         background: Rectangle {
-                            color: index === selectedIdx ? "#1e3a5f" : "transparent"
+                            color: index === selectedIdx ? theme.bgHighlight : "transparent"
                             radius: 4
                         }
 
@@ -309,7 +352,7 @@ ApplicationWindow {
             }
 
             // Divider
-            Rectangle { width: 1; Layout.fillHeight: true; color: "#2a2a4a" }
+            Rectangle { width: 1; Layout.fillHeight: true; color: theme.borderDiv }
 
             // ── Right panel: detail ──────────────────────────────────────────
             ColumnLayout {
@@ -328,7 +371,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                         text: "Select a solver"
                         font.pixelSize: 18
-                        color: "#555"
+                        color: theme.textDisabled
                     }
                     Item { Layout.fillHeight: true }
                 }
@@ -343,30 +386,30 @@ ApplicationWindow {
                         text: selectedSolver ? selectedSolver.name : ""
                         font.pixelSize: 22
                         font.bold: true
-                        color: "#e0e0e0"
+                        color: theme.textPrimary
                     }
 
                     Text {
                         text: selectedSolver ? selectedSolver.category : ""
                         font.pixelSize: 12
-                        color: "#607d8b"
+                        color: theme.textDim
                         font.letterSpacing: 1
                     }
 
                     Text {
                         text: selectedSolver ? selectedSolver.desc : ""
                         font.pixelSize: 14
-                        color: "#b0b0b0"
+                        color: theme.textSub
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
                     }
 
                     RowLayout {
                         spacing: 8
-                        Text { text: "Complexity:"; color: "#607d8b"; font.pixelSize: 12 }
+                        Text { text: "Complexity:"; color: theme.textDim; font.pixelSize: 12 }
                         Text {
                             text: selectedSolver ? selectedSolver.complexity : ""
-                            color: "#e0e0e0"
+                            color: theme.textPrimary
                             font.pixelSize: 12
                             font.family: "monospace"
                         }
@@ -377,16 +420,16 @@ ApplicationWindow {
                         visible: exactWarning
                         Layout.fillWidth: true
                         height: warningText.implicitHeight + 16
-                        color: "#3a1a00"
+                        color: theme.warnBg
                         radius: 6
-                        border.color: "#ff6d00"
+                        border.color: theme.warnBorder
                         border.width: 1
 
                         Text {
                             id: warningText
                             anchors { fill: parent; margins: 8 }
                             text: "⚠  " + FileLoader.cityCount + " cities — exact solvers are practical only for n ≤ 20"
-                            color: "#ff9800"
+                            color: theme.warnOrange
                             font.pixelSize: 12
                             wrapMode: Text.WordWrap
                         }
@@ -403,6 +446,21 @@ ApplicationWindow {
                     Button {
                         text: "← Back"
                         onClicked: backRequested()
+                    }
+
+                    Button {
+                        text: "Pipeline →"
+                        onClicked: pipelineRequested()
+                        contentItem: Text {
+                            text: parent.text
+                            color: theme.accent
+                            font: parent.font
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment: Text.AlignVCenter
+                        }
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Chain multiple solvers in sequence"
+                        ToolTip.delay: 400
                     }
 
                     Item { Layout.fillWidth: true }
@@ -431,7 +489,7 @@ ApplicationWindow {
         signal backRequested()
         signal solveRequested()
 
-        background: Rectangle { color: "#1a1a2e" }
+        background: Rectangle { color: theme.bgApp }
 
         // Defaults matching Rust structs
         readonly property var saDefaults:  ({ epochs: 10000, cooling_rate: 0.0001, min_temperature: 0.001, max_temperature: 1000.0 })
@@ -505,23 +563,23 @@ ApplicationWindow {
                 Rectangle {
                     Layout.fillWidth: true
                     height: 64
-                    color: "#13132b"
+                    color: theme.bgPanel
 
                     RowLayout {
                         anchors { fill: parent; leftMargin: 24; rightMargin: 24 }
                         Text {
                             text: "Configure Solver"
-                            font.pixelSize: 20; font.bold: true; color: "#e0e0e0"
+                            font.pixelSize: 20; font.bold: true; color: theme.textPrimary
                         }
                         Item { Layout.fillWidth: true }
                         Rectangle {
                             width: solverChip.implicitWidth + 20; height: 28; radius: 14
-                            color: "#1e3a5f"; border.color: "#4fc3f7"; border.width: 1
+                            color: theme.bgHighlight; border.color: theme.accent; border.width: 1
                             Text {
                                 id: solverChip
                                 anchors.centerIn: parent
                                 text: SolverEngine.selectedSolver
-                                color: "#4fc3f7"; font.pixelSize: 13
+                                color: theme.accent; font.pixelSize: 13
                             }
                         }
                     }
@@ -535,7 +593,7 @@ ApplicationWindow {
                     // ── Common: epochs ────────────────────────────────────
                     ColumnLayout {
                         spacing: 6; Layout.fillWidth: true
-                        Text { text: "Epochs"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                        Text { text: "Epochs"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                         TextField {
                             id: epochsField
                             Layout.preferredWidth: 220
@@ -546,12 +604,12 @@ ApplicationWindow {
                                        : isCS ? csDefaults.epochs.toString()
                                        : fpaDefaults.epochs.toString()
                             placeholderText: "10000"
-                            color: acceptableInput ? "#111122" : "#c0302a"
-                            placeholderTextColor: "#8888aa"
+                            color: acceptableInput ? theme.textDark : theme.inputError
+                            placeholderTextColor: theme.fieldPlaceholder
                             validator: IntValidator { bottom: 1; top: 10000000 }
-                            background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                         }
-                        Text { text: "Number of iterations the solver will run"; color: "#7890a8"; font.pixelSize: 11 }
+                        Text { text: "Number of iterations the solver will run"; color: theme.textHint; font.pixelSize: 11 }
                     }
 
                     // ── SA fields ─────────────────────────────────────────
@@ -561,54 +619,54 @@ ApplicationWindow {
 
                         ColumnLayout {
                             spacing: 6; Layout.fillWidth: true
-                            Text { text: "Cooling rate"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                            Text { text: "Cooling rate"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                             TextField {
                                 id: crField
                                 Layout.preferredWidth: 220
                                 font.pixelSize: 14
                                 text: saDefaults.cooling_rate.toString()
                                 placeholderText: "0.0001"
-                                color: acceptableInput ? "#111122" : "#c0302a"
-                                placeholderTextColor: "#8888aa"
+                                color: acceptableInput ? theme.textDark : theme.inputError
+                                placeholderTextColor: theme.fieldPlaceholder
                                 validator: DoubleValidator { bottom: 0.000001; top: 0.999999; notation: DoubleValidator.StandardNotation }
-                                background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                             }
-                            Text { text: "Must be > 0 and < 1"; color: "#7890a8"; font.pixelSize: 11 }
+                            Text { text: "Must be > 0 and < 1"; color: theme.textHint; font.pixelSize: 11 }
                         }
 
                         RowLayout {
                             spacing: 32; Layout.fillWidth: true
                             ColumnLayout {
                                 spacing: 6
-                                Text { text: "Min temperature"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                                Text { text: "Min temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                                 TextField {
                                     id: minTField
                                     width: 180; font.pixelSize: 14
                                     text: saDefaults.min_temperature.toString()
                                     placeholderText: "0.001"
-                                    color: "#111122"; placeholderTextColor: "#8888aa"
+                                    color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
                                     validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
-                                    background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                                 }
                             }
                             ColumnLayout {
                                 spacing: 6
-                                Text { text: "Max temperature"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                                Text { text: "Max temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                                 TextField {
                                     id: maxTField
                                     width: 180; font.pixelSize: 14
                                     text: saDefaults.max_temperature.toString()
                                     placeholderText: "1000.0"
-                                    color: "#111122"; placeholderTextColor: "#8888aa"
+                                    color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
                                     validator: DoubleValidator { bottom: 0.000001; notation: DoubleValidator.StandardNotation }
-                                    background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                                 }
                             }
                         }
                         Text {
                             visible: { var mn = parseFloat(minTField.text); var mx = parseFloat(maxTField.text); return !isNaN(mn) && !isNaN(mx) && mn >= mx }
                             text: "⚠  Min temperature must be less than max temperature"
-                            color: "#ef5350"; font.pixelSize: 12
+                            color: theme.errorRed; font.pixelSize: 12
                         }
                     }
 
@@ -619,32 +677,32 @@ ApplicationWindow {
 
                         ColumnLayout {
                             spacing: 6; Layout.fillWidth: true
-                            Text { text: "Mutation probability"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                            Text { text: "Mutation probability"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                             TextField {
                                 id: mpField
                                 Layout.preferredWidth: 220; font.pixelSize: 14
                                 text: gaDefaults.mutation_probability.toString()
                                 placeholderText: "0.001"
-                                color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                                color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
                                 validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
-                                background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                             }
-                            Text { text: "Range [0, 1]"; color: "#7890a8"; font.pixelSize: 11 }
+                            Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
                         }
 
                         ColumnLayout {
                             spacing: 6
-                            Text { text: "Elite count"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                            Text { text: "Elite count"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                             TextField {
                                 id: eliteField
                                 width: 140; font.pixelSize: 14
                                 text: gaDefaults.n_elite.toString()
                                 placeholderText: "3"
-                                color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                                color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
                                 validator: IntValidator { bottom: 1; top: 1000 }
-                                background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                                background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                             }
-                            Text { text: "Elite solutions preserved each generation"; color: "#7890a8"; font.pixelSize: 11 }
+                            Text { text: "Elite solutions preserved each generation"; color: theme.textHint; font.pixelSize: 11 }
                         }
                     }
 
@@ -652,35 +710,35 @@ ApplicationWindow {
                     ColumnLayout {
                         visible: isCS || isFPA
                         spacing: 6; Layout.fillWidth: true
-                        Text { text: "Mutation probability"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                        Text { text: "Mutation probability"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                         TextField {
                             id: mpField2
                             Layout.preferredWidth: 220; font.pixelSize: 14
                             text: isCS ? csDefaults.mutation_probability.toString()
                                        : fpaDefaults.mutation_probability.toString()
                             placeholderText: "0.001"
-                            color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                            color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
                             validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
-                            background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                         }
-                        Text { text: "Range [0, 1]"; color: "#7890a8"; font.pixelSize: 11 }
+                        Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
                     }
 
                     // ── PSO fields ────────────────────────────────────────
                     ColumnLayout {
                         visible: isPSO
                         spacing: 6
-                        Text { text: "Swarm size (min)"; color: "#c8c8e0"; font.pixelSize: 13; font.bold: true }
+                        Text { text: "Swarm size (min)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                         TextField {
                             id: swarmField
                             width: 140; font.pixelSize: 14
                             text: psoDefaults.n_nearest.toString()
                             placeholderText: "30"
-                            color: acceptableInput ? "#111122" : "#c0302a"; placeholderTextColor: "#8888aa"
+                            color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
                             validator: IntValidator { bottom: 1; top: 10000 }
-                            background: Rectangle { color: "#dde0f5"; radius: 4; border.color: parent.activeFocus ? "#4fc3f7" : "#9090c0"; border.width: 1 }
+                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                         }
-                        Text { text: "Minimum particle count (floor is 30)"; color: "#7890a8"; font.pixelSize: 11 }
+                        Text { text: "Minimum particle count (floor is 30)"; color: theme.textHint; font.pixelSize: 11 }
                     }
                 }
             }
@@ -692,7 +750,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             height: 56
-            color: "#0d0d1e"
+            color: theme.bgBar
             z: 10
 
             RowLayout {
@@ -706,7 +764,7 @@ ApplicationWindow {
                 Text {
                     visible: hasError()
                     text: "Fix validation errors above"
-                    color: "#ef5350"; font.pixelSize: 12
+                    color: theme.errorRed; font.pixelSize: 12
                 }
 
                 Button {
@@ -722,11 +780,424 @@ ApplicationWindow {
         }
     }
 
+    // ── Inline component: PipelinePage (issue #107) ─────────────────────────
+    component PipelinePage: Page {
+        signal backRequested()
+
+        background: Rectangle { color: theme.bgApp }
+
+        // Each stage: { solver: "nn", name: "Nearest Neighbor", category: "Constructive" }
+        property var stages: []
+
+        function stagesJson() {
+            return JSON.stringify(stages.map(function(s, i) {
+                var item = stageRepeater.itemAt(i)
+                return { solver: s.solver, opts: item ? item.getOpts() : {} }
+            }))
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 0
+            spacing: 0
+
+            // ── Header ────────────────────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                height: 60
+                color: theme.bgPanel
+                RowLayout {
+                    anchors { fill: parent; leftMargin: 24; rightMargin: 24 }
+                    Text { text: "Pipeline Builder"; font.pixelSize: 20; font.bold: true; color: theme.textPrimary }
+                    Item { Layout.fillWidth: true }
+                    Text {
+                        text: stages.length + " stage" + (stages.length === 1 ? "" : "s")
+                        color: theme.textDim; font.pixelSize: 13
+                    }
+                }
+            }
+
+            // ── Stage list ────────────────────────────────────────────────
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentWidth: availableWidth
+                clip: true
+
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 8
+                    Item { height: 8 }
+
+                    // Empty state
+                    ColumnLayout {
+                        visible: stages.length === 0
+                        Layout.fillWidth: true
+                        Layout.topMargin: 60
+                        spacing: 8
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "No stages yet"
+                            font.pixelSize: 18; color: theme.textDisabled
+                        }
+                        Text {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Press + to add a solver stage"
+                            font.pixelSize: 13; color: theme.textDisabled
+                        }
+                    }
+
+                    // Stage cards
+                    Repeater {
+                        id: stageRepeater
+                        model: stages
+                        delegate: Rectangle {
+                            required property var modelData
+                            required property int index
+                            width: parent ? parent.width - 48 : 400
+                            radius: 6
+                            color: theme.bgCard
+                            border.color: configOpen ? theme.accent : theme.border
+                            border.width: 1
+                            clip: true
+
+                            property bool configOpen: false
+                            property bool hasSA:  modelData.solver === "sa"  || modelData.solver === "simulated_annealing"
+                            property bool hasGA:  modelData.solver === "ga"  || modelData.solver === "genetic_algorithm"
+                            property bool hasPSO: modelData.solver === "pso" || modelData.solver === "particle_swarm"
+                            property bool hasCS:  modelData.solver === "cs"  || modelData.solver === "cuckoo_search"
+                            property bool hasFPA: modelData.solver === "fpa" || modelData.solver === "flower_pollination"
+                            property bool hasAnyOpts: hasSA || hasGA || hasPSO || hasCS || hasFPA
+
+                            // Height: 64 base + accordion when open
+                            property int accordionExpandedH: hasSA ? 240 : (hasGA ? 180 : 130)
+                            height: 64 + (configOpen ? accordionExpandedH : 0)
+                            Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutQuad } }
+
+                            function getOpts() {
+                                if (!hasAnyOpts) return {}
+                                var opts = { epochs: parseInt(epochsField.text) || 10000 }
+                                if (hasSA) {
+                                    opts.cooling_rate    = parseFloat(crField.text)   || 0.0001
+                                    opts.min_temperature = parseFloat(minTField.text) || 0.001
+                                    opts.max_temperature = parseFloat(maxTField.text) || 1000.0
+                                } else if (hasGA) {
+                                    opts.mutation_probability = parseFloat(mpField.text) || 0.001
+                                    opts.n_elite = parseInt(eliteField.text) || 3
+                                } else if (hasPSO) {
+                                    opts.n_nearest = parseInt(swarmField.text) || 30
+                                } else if (hasCS || hasFPA) {
+                                    opts.mutation_probability = parseFloat(mpField.text) || 0.001
+                                }
+                                return opts
+                            }
+
+                            // ── Main row ──────────────────────────────────────────────────
+                            RowLayout {
+                                id: mainRow
+                                anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 16; rightMargin: 8 }
+                                height: 64
+                                spacing: 8
+
+                                // Stage number badge
+                                Rectangle {
+                                    width: 28; height: 28; radius: 14; color: theme.bgHighlight
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: (index + 1).toString()
+                                        color: theme.accent; font.pixelSize: 13; font.bold: true
+                                    }
+                                }
+
+                                // Arrow connector
+                                Text {
+                                    visible: index > 0
+                                    text: "→"; color: theme.textDim; font.pixelSize: 14
+                                }
+
+                                ColumnLayout {
+                                    spacing: 2; Layout.fillWidth: true
+                                    Text { text: modelData.name;     color: theme.textPrimary; font.pixelSize: 14; font.bold: true }
+                                    Text { text: modelData.category; color: theme.textDim; font.pixelSize: 11 }
+                                }
+
+                                // Config toggle
+                                Button {
+                                    text: configOpen ? "⚙ Close" : "⚙ Config"
+                                    visible: hasAnyOpts
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: configOpen ? theme.accent : theme.textDark
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: configOpen ? "Close configuration" : "Configure solver options"
+                                    ToolTip.delay: 400
+                                    onClicked: configOpen = !configOpen
+                                }
+
+                                // Move up
+                                Button {
+                                    text: "↑ Up"
+                                    enabled: index > 0
+                                    opacity: index > 0 ? 1.0 : 0.3
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Move stage earlier in pipeline"
+                                    ToolTip.delay: 400
+                                    onClicked: {
+                                        var arr = stages.slice()
+                                        var tmp = arr[index - 1]
+                                        arr[index - 1] = arr[index]
+                                        arr[index] = tmp
+                                        stages = arr
+                                    }
+                                }
+
+                                // Move down
+                                Button {
+                                    text: "↓ Down"
+                                    enabled: index < stages.length - 1
+                                    opacity: index < stages.length - 1 ? 1.0 : 0.3
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Move stage later in pipeline"
+                                    ToolTip.delay: 400
+                                    onClicked: {
+                                        var arr = stages.slice()
+                                        var tmp = arr[index + 1]
+                                        arr[index + 1] = arr[index]
+                                        arr[index] = tmp
+                                        stages = arr
+                                    }
+                                }
+
+                                // Remove
+                                Button {
+                                    text: "✕ Remove"
+                                    ToolTip.visible: hovered
+                                    ToolTip.text: "Remove this stage"
+                                    ToolTip.delay: 400
+                                    contentItem: Text {
+                                        text: parent.text
+                                        color: theme.errorRed
+                                        font: parent.font
+                                        horizontalAlignment: Text.AlignHCenter
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    onClicked: {
+                                        var arr = stages.slice()
+                                        arr.splice(index, 1)
+                                        stages = arr
+                                    }
+                                }
+                            }
+
+                            // ── Accordion separator ───────────────────────────────────────
+                            Rectangle {
+                                anchors { left: parent.left; right: parent.right; top: mainRow.bottom }
+                                height: 1
+                                color: theme.border
+                            }
+
+                            // ── Accordion: solver options ─────────────────────────────────
+                            ColumnLayout {
+                                id: accordionContent
+                                anchors { left: parent.left; right: parent.right; top: mainRow.bottom; topMargin: 10; leftMargin: 20; rightMargin: 20 }
+                                spacing: 10
+
+                                // Epochs (all configurable solvers)
+                                RowLayout {
+                                    spacing: 12
+                                    Text { text: "Epochs"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: epochsField
+                                        Layout.preferredWidth: 180
+                                        text: "10000"; color: theme.textDark; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 10000000 }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // SA: cooling rate
+                                RowLayout {
+                                    visible: hasSA; spacing: 12
+                                    Text { text: "Cooling rate"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: crField
+                                        Layout.preferredWidth: 180
+                                        text: "0.0001"; color: theme.textDark; font.pixelSize: 13
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // SA: min temperature
+                                RowLayout {
+                                    visible: hasSA; spacing: 12
+                                    Text { text: "Min temperature"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: minTField
+                                        Layout.preferredWidth: 180
+                                        text: "0.001"; color: theme.textDark; font.pixelSize: 13
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // SA: max temperature
+                                RowLayout {
+                                    visible: hasSA; spacing: 12
+                                    Text { text: "Max temperature"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: maxTField
+                                        Layout.preferredWidth: 180
+                                        text: "1000.0"; color: theme.textDark; font.pixelSize: 13
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // GA / CS / FPA: mutation probability
+                                RowLayout {
+                                    visible: hasGA || hasCS || hasFPA; spacing: 12
+                                    Text { text: "Mutation probability"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: mpField
+                                        Layout.preferredWidth: 180
+                                        text: "0.001"; color: theme.textDark; font.pixelSize: 13
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // GA: elite count
+                                RowLayout {
+                                    visible: hasGA; spacing: 12
+                                    Text { text: "Elite count"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: eliteField
+                                        Layout.preferredWidth: 180
+                                        text: "3"; color: theme.textDark; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 1000 }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // PSO: swarm size (n_nearest)
+                                RowLayout {
+                                    visible: hasPSO; spacing: 12
+                                    Text { text: "Swarm size (n_nearest)"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: swarmField
+                                        Layout.preferredWidth: 180
+                                        text: "30"; color: theme.textDark; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 10000 }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Add stage button
+                    Button {
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 8
+                        text: "+ Add Stage"
+                        onClicked: addStagePopup.open()
+                    }
+                }
+            }
+
+            // ── Bottom bar ─────────────────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                height: 56
+                color: theme.bgBar
+
+                RowLayout {
+                    anchors { fill: parent; leftMargin: 20; rightMargin: 20 }
+                    spacing: 12
+
+                    Button { text: "← Back"; onClicked: backRequested() }
+
+                    Item { Layout.fillWidth: true }
+
+                    Text {
+                        visible: stages.length < 2
+                        text: "Add at least 2 stages to run"
+                        color: theme.textDim; font.pixelSize: 12
+                    }
+
+                    Button {
+                        text: "Run Pipeline ▶"
+                        highlighted: true
+                        enabled: stages.length >= 1
+                        onClicked: {
+                            SolverEngine.runPipelineStages(FileLoader.filePath, stagesJson())
+                            stackView.push(vizComp)
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Add-stage popup ───────────────────────────────────────────────
+        Popup {
+            id: addStagePopup
+            parent: Overlay.overlay
+            anchors.centerIn: parent
+            width: 340
+            height: Math.min(480, solverListView2.contentHeight + 80)
+            modal: true
+            closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+            background: Rectangle { color: theme.bgPanel; radius: 8; border.color: theme.border; border.width: 1 }
+
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: 16
+                spacing: 8
+
+                Text { text: "Add a stage"; font.pixelSize: 16; font.bold: true; color: theme.textPrimary }
+
+                ListView {
+                    id: solverListView2
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    model: solverList
+                    clip: true
+                    spacing: 2
+
+                    delegate: ItemDelegate {
+                        width: solverListView2.width
+                        height: 40
+                        required property var modelData
+
+                        contentItem: ColumnLayout {
+                            spacing: 1
+                            Text { text: modelData.name; color: theme.textPrimary; font.pixelSize: 13 }
+                            Text { text: modelData.category; color: theme.textDim; font.pixelSize: 10 }
+                        }
+
+                        background: Rectangle {
+                            color: parent.hovered ? theme.bgHighlight : "transparent"; radius: 4
+                        }
+
+                        onClicked: {
+                            var arr = stages.slice()
+                            arr.push({ solver: modelData.alias, name: modelData.name, category: modelData.category })
+                            stages = arr
+                            addStagePopup.close()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // ── Inline component: VisualizationPage (issue #105) ────────────────────
     component VisualizationPage: Page {
         signal backRequested()
 
-        background: Rectangle { color: "#0f0f23" }
+        background: Rectangle { color: theme.bgDeep }
 
         // ── Tour canvas ────────────────────────────────────────────────────
         Canvas {
@@ -756,7 +1227,7 @@ ApplicationWindow {
 
             onPaint: {
                 var ctx = getContext("2d")
-                ctx.fillStyle = "#0f0f23"
+                ctx.fillStyle = theme.bgDeep
                 ctx.fillRect(0, 0, width, height)
 
                 var pos = cityPos
@@ -768,7 +1239,7 @@ ApplicationWindow {
                 if (tourRaw && tourRaw !== "[]") {
                     var tour = JSON.parse(tourRaw)
                     if (tour.length > 1) {
-                        ctx.strokeStyle = "#00e676"
+                        ctx.strokeStyle = theme.accentGreen
                         ctx.lineWidth = 1.2
                         ctx.globalAlpha = 0.65
                         ctx.beginPath()
@@ -785,7 +1256,7 @@ ApplicationWindow {
                 }
 
                 // City dots
-                ctx.fillStyle = "#4fc3f7"
+                ctx.fillStyle = theme.accent
                 for (var i = 0; i < ids.length; i++) {
                     var c = pos[ids[i]]
                     ctx.beginPath()
@@ -811,9 +1282,9 @@ ApplicationWindow {
             anchors.margins: 12
             width: kpiCol.implicitWidth + 24
             height: kpiCol.implicitHeight + 20
-            color: "#cc0a0a1e"
+            color: theme.overlayBg
             radius: 8
-            border.color: "#2a2a5a"
+            border.color: theme.overlayBorder
             border.width: 1
             z: 10
 
@@ -824,32 +1295,32 @@ ApplicationWindow {
 
                 RowLayout {
                     spacing: 12
-                    Text { text: "Solver"; color: "#607d8b"; font.pixelSize: 11 }
-                    Text { text: SolverEngine.selectedSolver; color: "#4fc3f7"; font.pixelSize: 13; font.bold: true }
+                    Text { text: "Solver"; color: theme.textDim; font.pixelSize: 11 }
+                    Text { text: SolverEngine.selectedSolver; color: theme.accent; font.pixelSize: 13; font.bold: true }
                 }
                 RowLayout {
                     spacing: 12
-                    Text { text: "Best cost"; color: "#607d8b"; font.pixelSize: 11 }
+                    Text { text: "Best cost"; color: theme.textDim; font.pixelSize: 11 }
                     Text {
                         text: SolverEngine.bestCost > 0 ? SolverEngine.bestCost.toFixed(2) : "—"
-                        color: "#00e676"; font.pixelSize: 15; font.bold: true
+                        color: theme.accentGreen; font.pixelSize: 15; font.bold: true
                     }
                 }
                 RowLayout {
                     spacing: 12
-                    Text { text: "Iteration"; color: "#607d8b"; font.pixelSize: 11 }
-                    Text { text: SolverEngine.iteration.toString(); color: "#e0e0e0"; font.pixelSize: 13 }
+                    Text { text: "Iteration"; color: theme.textDim; font.pixelSize: 11 }
+                    Text { text: SolverEngine.iteration.toString(); color: theme.textPrimary; font.pixelSize: 13 }
                 }
                 RowLayout {
                     spacing: 12
-                    Text { text: "Elapsed"; color: "#607d8b"; font.pixelSize: 11 }
+                    Text { text: "Elapsed"; color: theme.textDim; font.pixelSize: 11 }
                     Text {
                         text: {
                             var ms = SolverEngine.elapsedMs
                             if (ms < 1000) return ms + " ms"
                             return (ms / 1000).toFixed(1) + " s"
                         }
-                        color: "#e0e0e0"; font.pixelSize: 13
+                        color: theme.textPrimary; font.pixelSize: 13
                     }
                 }
 
@@ -858,14 +1329,14 @@ ApplicationWindow {
                     visible: SolverEngine.running
                     spacing: 6
                     Rectangle {
-                        width: 8; height: 8; radius: 4; color: "#00e676"
+                        width: 8; height: 8; radius: 4; color: theme.accentGreen
                         SequentialAnimation on opacity {
                             loops: Animation.Infinite
                             NumberAnimation { to: 0.2; duration: 600 }
                             NumberAnimation { to: 1.0; duration: 600 }
                         }
                     }
-                    Text { text: "Solving…"; color: "#00e676"; font.pixelSize: 11 }
+                    Text { text: "Solving…"; color: theme.accentGreen; font.pixelSize: 11 }
                 }
             }
         }
@@ -876,7 +1347,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             height: 56
-            color: "#0d0d1e"
+            color: theme.bgBar
             z: 10
 
             RowLayout {
@@ -902,7 +1373,7 @@ ApplicationWindow {
                 Text {
                     visible: !SolverEngine.running && SolverEngine.bestCost > 0
                     text: "Tour length: " + SolverEngine.bestCost.toFixed(2)
-                    color: "#00e676"
+                    color: theme.accentGreen
                     font.pixelSize: 15
                     font.bold: true
                 }
@@ -925,14 +1396,22 @@ ApplicationWindow {
 
     Component {
         id: welcomeComp
-        WelcomePage { onNextRequested: stackView.push(solverComp) }
+        WelcomePage {
+            onNextRequested: stackView.push(solverComp)
+        }
+    }
+
+    Component {
+        id: pipelineComp
+        PipelinePage { onBackRequested: stackView.pop() }
     }
 
     Component {
         id: solverComp
         SolverPage {
-            onBackRequested:    stackView.pop()
+            onBackRequested:      stackView.pop()
             onConfigureRequested: stackView.push(configComp)
+            onPipelineRequested:  stackView.push(pipelineComp)
             onSolveRequested: {
                 SolverEngine.startSolve(FileLoader.filePath)
                 stackView.push(vizComp)

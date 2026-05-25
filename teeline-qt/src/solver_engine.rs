@@ -7,6 +7,7 @@ use qtbridge::{QObjectHolder, invoke_method, qobject_impl};
 use teeline::tsp::{
     self, AppOptions, GAOptions, CSOptions, FPAOptions, HeuristicOptions, SAOptions,
     Solvers, TspProblem,
+    pipeline::{PipelineStage, run_pipeline},
     progress::ProgressMessage,
     tsplib,
 };
@@ -97,6 +98,92 @@ impl SolverEngine {
     #[qslot]
     fn cancel(&mut self) {
         self.set_running(false);
+    }
+
+    /// Run a JSON-described pipeline: `[{"solver":"nn"},{"solver":"2opt"},...]`.
+    #[qslot]
+    fn run_pipeline_stages(&mut self, file_path: String, stages_json: String) {
+        self.set_running(true);
+        self.set_best_cost(0.0);
+        self.set_iteration(0);
+        self.set_elapsed_ms(0);
+        self.set_tour_json("[]".to_string());
+
+        let inv_progress = self.get_qml_method_invoker();
+        let inv_done = self.get_qml_method_invoker();
+
+        std::thread::spawn(move || {
+            let stage_specs: Vec<serde_json::Value> =
+                serde_json::from_str(&stages_json).unwrap_or_default();
+
+            let data = match tsplib::read_from_file(Path::new(&file_path)) {
+                Ok(d) => d,
+                Err(e) => {
+                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
+                    return;
+                }
+            };
+            let cities = data.cities().to_vec();
+            let distances = match data.distance_matrix() {
+                Ok(d) => d,
+                Err(e) => {
+                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e.to_string());
+                    return;
+                }
+            };
+            let problem = TspProblem::new(cities, distances);
+            let start = Instant::now();
+
+            // Build pipeline stages — each gets the same problem + its own progress channel.
+            let (tx, rx) = mpsc::channel::<ProgressMessage>();
+            let inv2 = inv_progress;
+            std::thread::spawn(move || {
+                let mut epoch = 0i32;
+                while let Ok(msg) = rx.recv() {
+                    match msg {
+                        ProgressMessage::PathUpdate(route, cost) => {
+                            epoch += 1;
+                            let tour = route_to_json(route.route());
+                            let ms = start.elapsed().as_millis() as i32;
+                            invoke_method!(inv2, "onProgressUpdate", tour, cost, epoch, ms);
+                        }
+                        ProgressMessage::EpochUpdate(n) => { epoch = n as i32; }
+                        ProgressMessage::Done | ProgressMessage::OptimalTour(_) => break,
+                        _ => {}
+                    }
+                }
+            });
+
+            let stages: Vec<PipelineStage> = stage_specs
+                .iter()
+                .filter_map(|s| {
+                    let alias = s.get("solver")?.as_str()?;
+                    let solver = Solvers::from_str(alias).ok()?;
+                    let opts_str = s.get("opts")
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "{}".to_string());
+                    let opts = build_app_options(alias, &opts_str);
+                    Some(PipelineStage::new(solver, opts, problem.clone(), Some(tx.clone())))
+                })
+                .collect();
+
+            if stages.is_empty() {
+                invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32,
+                               "No valid stages in pipeline".to_string());
+                return;
+            }
+
+            match run_pipeline(&stages) {
+                Ok(solution) => {
+                    let tour = route_to_json(solution.route());
+                    let ms = start.elapsed().as_millis() as i32;
+                    invoke_method!(inv_done, "onSolveDone", tour, solution.total, ms, String::new());
+                }
+                Err(e) => {
+                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
+                }
+            }
+        });
     }
 }
 
