@@ -1,0 +1,18 @@
+[package]
+name = "teeline-gui"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "teeline_gui"
+
+[[bin]]
+name = "bin"
+path = "src/main.rs"
+
+[dependencies]
+teeline = { path = ".." }
+eframe = { version = "0.33", features = ["x11", "wayland"] }
+clap = "4.6.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

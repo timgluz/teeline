@@ -3776,7 +3776,6 @@ name = "teeline"
 version = "0.3.0"
 dependencies = [
  "clap",
- "eframe",
  "rand 0.9.4",
  "regex",
  "serde",
@@ -3785,6 +3784,17 @@ dependencies = [
  "tracing-subscriber",
  "wasmtime",
  "wasmtime-wasi",
+]
+
+[[package]]
+name = "teeline-gui"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "eframe",
+ "teeline",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

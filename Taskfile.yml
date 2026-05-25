@@ -2,14 +2,14 @@ version: '3'
 
 tasks:
   build:
-    desc: Compile debug binary
+    desc: Compile debug binary (teeline-gui)
     cmds:
-      - cargo build
+      - cargo build -p teeline-gui
 
   build:release:
-    desc: Compile optimised binary
+    desc: Compile optimised binary (teeline-gui)
     cmds:
-      - cargo build --release
+      - cargo build -p teeline-gui --release
 
   build:wasm:
     desc: Build WASM component (requires cargo-component and wasm32-wasip2 target)

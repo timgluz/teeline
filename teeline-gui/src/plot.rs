@@ -1,12 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 
-use eframe;
 use eframe::egui::{self, Align2, Color32, FontId, Pos2, Rect, Stroke};
 
-use super::kdtree::KDPoint;
-use super::progress::ProgressMessage;
-use super::route::Route;
+use teeline::tsp::kdtree::KDPoint;
+use teeline::tsp::progress::ProgressMessage;
+use teeline::tsp::route::Route;
 
 type RectCoords = [f64; 4];
 type Point2D = (f64, f64);
@@ -429,8 +428,8 @@ fn point_to_viewport(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::kdtree::build_points;
-    use crate::tsp::route::Route;
+    use teeline::tsp::kdtree::build_points;
+    use teeline::tsp::route::Route;
 
     #[test]
     fn test_route_edge_keys_triangle() {
