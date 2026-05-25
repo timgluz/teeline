@@ -1,10 +1,10 @@
 [package]
-name = "teeline-gui"
+name = "teeline-cli"
 version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "teeline_gui"
+name = "teeline_cli"
 
 [[bin]]
 name = "bin"
