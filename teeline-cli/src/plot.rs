@@ -133,7 +133,7 @@ impl ProgressPlot {
 
     fn add_cities(&mut self, cities: &[KDPoint]) {
         for city in cities.iter() {
-            self.city_table.insert(city.id, city.clone());
+            self.city_table.insert(city.id, *city);
         }
     }
 
