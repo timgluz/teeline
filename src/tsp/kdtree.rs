@@ -40,12 +40,10 @@ fn build_subtree(points: Vec<KDPoint>, depth: usize) -> KDSubTree {
     }
 
     if points.len() == 1 {
-        let leaf_node = KDNode::leaf(points[0], depth);
-        return Some(Box::new(leaf_node));
+        return Some(Box::new(KDNode::leaf(points[0], depth)));
     }
 
-    let k = points[0].dim();
-    let (pivot_pt, left_points, right_points) = partition_points(points, depth, k);
+    let (pivot_pt, left_points, right_points) = partition_points(points, depth);
     let root = KDNode::from_subtrees(
         pivot_pt,
         depth,
@@ -57,28 +55,22 @@ fn build_subtree(points: Vec<KDPoint>, depth: usize) -> KDSubTree {
 }
 
 fn partition_points(
-    points: Vec<KDPoint>,
+    mut points: Vec<KDPoint>,
     depth: usize,
-    k: usize,
 ) -> (KDPoint, Vec<KDPoint>, Vec<KDPoint>) {
-    let mut sorted_points = points.clone();
+    let coord = depth % 2;
+    let pivot_idx = points.len() / 2;
 
-    if sorted_points.len() == 1 {
-        let pivot_pt = sorted_points[0];
-        return (pivot_pt, vec![], vec![]);
-    }
+    points.select_nth_unstable_by(pivot_idx, |a, b| {
+        a.cmp_by_coord(b, coord).unwrap_or(Ordering::Equal)
+    });
 
-    let coord = depth % k;
-    sorted_points.sort_by(|a, b| a.cmp_by_coord(b, coord).unwrap());
+    let pivot_pt = points[pivot_idx];
+    let right = points.split_off(pivot_idx + 1);
+    points.pop(); // remove pivot
+    let left = points;
 
-    let pivot_idx = sorted_points.len() / 2;
-    let pivot_pt = sorted_points[pivot_idx];
-
-    (
-        pivot_pt,
-        sorted_points[0..pivot_idx].to_vec(),
-        sorted_points[(pivot_idx + 1)..].to_vec(),
-    )
+    (pivot_pt, left, right)
 }
 
 #[derive(Debug)]
@@ -404,7 +396,7 @@ mod tests {
     fn partition_points_single_elem() {
         let points = build_points(&[vec![0.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert!(res.1.is_empty());
         assert!(res.2.is_empty());
@@ -414,7 +406,7 @@ mod tests {
     fn partition_points_with_2points_with_left_subtree() {
         let points = build_points(&[vec![-1.0, 0.0], vec![0.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert_eq!(&[-1.0, 0.0], res.1[0].coords());
         assert!(res.2.is_empty());
@@ -424,7 +416,7 @@ mod tests {
     fn partition_points_with_2points_with_right_subtree() {
         let points = build_points(&vec![vec![0.0, 0.0], vec![2.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[2.0, 0.0], res.0.coords());
         assert_eq!(&[0.0, 0.0], res.1[0].coords());
         assert!(res.2.is_empty());
@@ -434,7 +426,7 @@ mod tests {
     fn partition_points_with_2points_with_full_tree() {
         let points = build_points(&vec![vec![-1.0, 0.0], vec![2.0, 0.0], vec![0.0, 0.0]]);
 
-        let res = partition_points(points, 0, 2);
+        let res = partition_points(points, 0);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert_eq!(&[-1.0, 0.0], res.1[0].coords());
         assert_eq!(&[2.0, 0.0], res.2[0].coords());
@@ -444,7 +436,7 @@ mod tests {
     fn partition_points_with_3points_by_second_dimension() {
         let points = build_points(&vec![vec![0.0, 0.0], vec![2.0, -1.0], vec![1.0, 2.0]]);
 
-        let res = partition_points(points, 1, 2);
+        let res = partition_points(points, 1);
         assert_eq!(&[0.0, 0.0], res.0.coords());
         assert_eq!(&[2.0, -1.0], res.1[0].coords());
         assert_eq!(&[1.0, 2.0], res.2[0].coords());
