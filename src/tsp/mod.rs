@@ -287,8 +287,7 @@ impl SAOptions {
     }
 
     pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
-        let mut sa = SAOptions::default();
-        sa.heuristic = HeuristicOptions::from_cli(args)?;
+        let mut sa = SAOptions { heuristic: HeuristicOptions::from_cli(args)?, ..SAOptions::default() };
         if let Some(v) = args.get_one::<String>("cooling_rate") {
             sa.cooling_rate = v.parse()
                 .map_err(|_| format!("--cooling-rate: invalid float `{v}`"))?;
@@ -370,8 +369,7 @@ impl GAOptions {
     }
 
     pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
-        let mut ga = GAOptions::default();
-        ga.heuristic = HeuristicOptions::from_cli(args)?;
+        let mut ga = GAOptions { heuristic: HeuristicOptions::from_cli(args)?, ..GAOptions::default() };
         if let Some(v) = args.get_one::<String>("mutation_probability") {
             ga.mutation_probability = v.parse()
                 .map_err(|_| format!("--mutation-probability: invalid float `{v}`"))?;
@@ -440,8 +438,7 @@ impl CSOptions {
     }
 
     pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
-        let mut cs = CSOptions::default();
-        cs.heuristic = HeuristicOptions::from_cli(args)?;
+        let mut cs = CSOptions { heuristic: HeuristicOptions::from_cli(args)?, ..CSOptions::default() };
         if let Some(v) = args.get_one::<String>("mutation_probability") {
             cs.mutation_probability = v.parse()
                 .map_err(|_| format!("--mutation-probability: invalid float `{v}`"))?;
@@ -506,8 +503,7 @@ impl FPAOptions {
     }
 
     pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
-        let mut fpa = FPAOptions::default();
-        fpa.heuristic = HeuristicOptions::from_cli(args)?;
+        let mut fpa = FPAOptions { heuristic: HeuristicOptions::from_cli(args)?, ..FPAOptions::default() };
         if let Some(v) = args.get_one::<String>("mutation_probability") {
             fpa.mutation_probability = v.parse()
                 .map_err(|_| format!("--mutation-probability: invalid float `{v}`"))?;
