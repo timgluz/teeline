@@ -5,7 +5,7 @@
 
 setup() {
     REPO_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/../.." >/dev/null 2>&1 && pwd )"
-    BIN="$REPO_ROOT/target/debug/bin"
+    BIN="$REPO_ROOT/target/debug/teeline"
 }
 
 # ---------------------------------------------------------------------------

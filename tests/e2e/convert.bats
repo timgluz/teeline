@@ -5,7 +5,7 @@
 
 setup() {
     REPO_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/../.." >/dev/null 2>&1 && pwd )"
-    BIN="$REPO_ROOT/target/debug/bin"
+    BIN="$REPO_ROOT/target/debug/teeline"
     FIXTURE_DIR="$REPO_ROOT/tests/fixtures"
     # Write converted output to a temp dir so tests are side-effect-free.
     TMPDIR="$(mktemp -d)"
