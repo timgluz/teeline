@@ -34,19 +34,19 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
         use teeline::tsp::{CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions};
         match self.solver {
             Solvers::SimulatedAnnealing => {
-                base.sa = Some(SAOptions::from_cli(self.args));
+                base.sa = Some(SAOptions::from_cli(self.args)?);
             }
             Solvers::GeneticAlgorithm => {
-                base.ga = Some(GAOptions::from_cli(self.args));
+                base.ga = Some(GAOptions::from_cli(self.args)?);
             }
             Solvers::CuckooSearch => {
-                base.cs = Some(CSOptions::from_cli(self.args));
+                base.cs = Some(CSOptions::from_cli(self.args)?);
             }
             Solvers::FlowerPollination => {
-                base.fpa = Some(FPAOptions::from_cli(self.args));
+                base.fpa = Some(FPAOptions::from_cli(self.args)?);
             }
             _ => {
-                base.heuristic = Some(HeuristicOptions::from_cli(self.args));
+                base.heuristic = Some(HeuristicOptions::from_cli(self.args)?);
             }
         }
         Ok(base)
@@ -54,9 +54,13 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
 }
 
 fn solver_options_from_args(args: &ArgMatches, solver: Solvers) -> AppOptions {
-    CliArgsProvider::new(args, solver)
-        .provide(AppOptions::default())
-        .unwrap_or_default()
+    match CliArgsProvider::new(args, solver).provide(AppOptions::default()) {
+        Ok(opts) => opts,
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -525,10 +529,20 @@ mod tests {
     }
 
     #[test]
-    fn test_solver_options_invalid_epochs_keeps_default() {
+    fn test_solver_options_invalid_epochs_errors() {
+        // Invalid parse must now return Err (strict CLI validation).
         let args = options_cmd().get_matches_from(["test", "nn", "--epochs", "bad"]);
+        let result = CliArgsProvider::new(&args, Solvers::NearestNeighbor)
+            .provide(AppOptions::default());
+        assert!(result.is_err(), "expected Err for --epochs bad");
+    }
+
+    #[test]
+    fn test_solver_options_epochs_zero_is_valid() {
+        // epochs=0 is a documented "run forever" sentinel — must not be rejected.
+        let args = options_cmd().get_matches_from(["test", "nn", "--epochs", "0"]);
         let opts = solver_options_from_args(&args, Solvers::NearestNeighbor);
-        assert_eq!(opts.heuristic.unwrap_or_default().epochs, HeuristicOptions::default().epochs);
+        assert_eq!(opts.heuristic.unwrap_or_default().epochs, 0);
     }
 
     #[test]
@@ -561,15 +575,13 @@ mod tests {
     }
 
     #[test]
-    fn test_solver_options_invalid_mutation_probability_keeps_default() {
+    fn test_solver_options_invalid_mutation_probability_errors() {
+        // Invalid parse must return Err (strict CLI validation).
         let args = options_cmd()
             .get_matches_from(["test", "ga", "--mutation_probability", "nope"]);
-        let opts = solver_options_from_args(&args, Solvers::GeneticAlgorithm);
-        use teeline::tsp::GAOptions;
-        assert!((opts.ga.unwrap_or_default().mutation_probability
-            - GAOptions::default().mutation_probability)
-            .abs()
-            < 1e-5);
+        let result = CliArgsProvider::new(&args, Solvers::GeneticAlgorithm)
+            .provide(AppOptions::default());
+        assert!(result.is_err(), "expected Err for --mutation_probability nope");
     }
 
     #[test]

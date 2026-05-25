@@ -182,7 +182,7 @@ pub fn resolve_config_file<P: AppOptionsProvider>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{AppOptions, HeuristicOptions, SAOptions};
+    use crate::tsp::AppOptions;
 
     // --- TomlTableProvider ---
 
