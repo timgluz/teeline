@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 authors = ["Timo Sulg <timgluz@gmail.com>"]
 repository = "https://github.com/timgluz/teeline"
-license = "MIT"
+license = "LGPL-3.0-or-later"
 
 [[bin]]
 name = "teeline-qt"

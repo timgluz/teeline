@@ -263,26 +263,88 @@ ApplicationWindow {
     ]
 
     // ── Inline component: SolverPage ────────────────────────────────────────
+    // ── Inline component: SolverPage (merged with ConfigPage, issues #104 + #106 + #114) ──
     component SolverPage: Page {
         signal backRequested()
         signal solveRequested()
-        signal configureRequested()
         signal pipelineRequested()
 
         background: Rectangle { color: theme.bgApp }
 
-        // Track which item is selected by index
         property int selectedIdx: -1
         property var selectedSolver: selectedIdx >= 0 ? solverList[selectedIdx] : null
+        property bool exactWarning: selectedSolver !== null && selectedSolver.exact && FileLoader.cityCount > 20
 
-        // Disable exact solvers when problem is too large
-        property bool exactWarning: selectedSolver !== null
-                                    && selectedSolver.exact
-                                    && FileLoader.cityCount > 20
+        // ── Solver-option helpers (merged from ConfigPage) ─────────────────
+        readonly property var saDefaults:  ({ epochs: 10000, cooling_rate: 0.0001, min_temperature: 0.001, max_temperature: 1000.0 })
+        readonly property var gaDefaults:  ({ epochs: 10000, mutation_probability: 0.001, n_elite: 3 })
+        readonly property var psoDefaults: ({ epochs: 10000, n_nearest: 30 })
+        readonly property var csDefaults:  ({ epochs: 10000, mutation_probability: 0.001 })
+        readonly property var fpaDefaults: ({ epochs: 10000, mutation_probability: 0.001 })
+
+        property string selectedAlias: selectedSolver ? selectedSolver.alias : ""
+        property bool isSA:  selectedAlias === "sa"  || selectedAlias === "simulated_annealing"
+        property bool isGA:  selectedAlias === "ga"  || selectedAlias === "genetic_algorithm"
+        property bool isPSO: selectedAlias === "pso" || selectedAlias === "particle_swarm"
+        property bool isCS:  selectedAlias === "cs"  || selectedAlias === "cuckoo_search"
+        property bool isFPA: selectedAlias === "fpa" || selectedAlias === "flower_pollination"
+
+        // Reset fields to defaults whenever the selected solver changes
+        onSelectedSolverChanged: {
+            if      (isSA)  { epochsField.text = saDefaults.epochs.toString();  crField.text = saDefaults.cooling_rate.toString(); minTField.text = saDefaults.min_temperature.toString(); maxTField.text = saDefaults.max_temperature.toString() }
+            else if (isGA)  { epochsField.text = gaDefaults.epochs.toString();  mpField.text = gaDefaults.mutation_probability.toString(); eliteField.text = gaDefaults.n_elite.toString() }
+            else if (isPSO) { epochsField.text = psoDefaults.epochs.toString(); swarmField.text = psoDefaults.n_nearest.toString() }
+            else if (isCS)  { epochsField.text = csDefaults.epochs.toString();  mpField2.text = csDefaults.mutation_probability.toString() }
+            else if (isFPA) { epochsField.text = fpaDefaults.epochs.toString(); mpField2.text = fpaDefaults.mutation_probability.toString() }
+        }
+
+        function collectOpts() {
+            if (!selectedSolver || !selectedSolver.hasOptions) return "{}"
+            var obj = { epochs: parseInt(epochsField.text) || 10000 }
+            if (isSA) {
+                obj.cooling_rate    = parseFloat(crField.text)   || 0.0001
+                obj.min_temperature = parseFloat(minTField.text) || 0.001
+                obj.max_temperature = parseFloat(maxTField.text) || 1000.0
+            } else if (isGA) {
+                obj.mutation_probability = parseFloat(mpField.text) || 0.001
+                obj.n_elite = parseInt(eliteField.text) || 3
+            } else if (isPSO) {
+                obj.n_nearest = parseInt(swarmField.text) || 30
+            } else if (isCS || isFPA) {
+                obj.mutation_probability = parseFloat(mpField2.text) || 0.001
+            }
+            return JSON.stringify(obj)
+        }
+
+        function hasError() {
+            if (!selectedSolver || !selectedSolver.hasOptions) return false
+            if (isNaN(parseInt(epochsField.text)) || parseInt(epochsField.text) < 1) return true
+            if (isSA) {
+                var cr = parseFloat(crField.text)
+                if (isNaN(cr) || cr <= 0 || cr >= 1) return true
+                var minT = parseFloat(minTField.text)
+                var maxT = parseFloat(maxTField.text)
+                if (isNaN(minT) || minT < 0) return true
+                if (isNaN(maxT) || maxT <= 0) return true
+                if (minT >= maxT) return true
+            }
+            if (isGA) {
+                var mp = parseFloat(mpField.text)
+                if (isNaN(mp) || mp < 0 || mp > 1) return true
+                if (isNaN(parseInt(eliteField.text)) || parseInt(eliteField.text) < 1) return true
+            }
+            if (isCS || isFPA) {
+                var mp2 = parseFloat(mpField2.text)
+                if (isNaN(mp2) || mp2 < 0 || mp2 > 1) return true
+            }
+            if (isPSO) {
+                if (isNaN(parseInt(swarmField.text)) || parseInt(swarmField.text) < 1) return true
+            }
+            return false
+        }
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 0
             spacing: 0
 
             // ── Left panel: solver list ──────────────────────────────────────
@@ -354,426 +416,290 @@ ApplicationWindow {
             // Divider
             Rectangle { width: 1; Layout.fillHeight: true; color: theme.borderDiv }
 
-            // ── Right panel: detail ──────────────────────────────────────────
-            ColumnLayout {
+            // ── Right panel: description + config ────────────────────────────
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.margins: 32
-                spacing: 16
 
-                // No selection state
-                ColumnLayout {
-                    visible: selectedSolver === null
-                    Layout.fillWidth: true
-                    spacing: 8
-                    Item { Layout.fillHeight: true }
-                    Text {
-                        Layout.alignment: Qt.AlignHCenter
-                        text: "Select a solver"
-                        font.pixelSize: 18
-                        color: theme.textDisabled
-                    }
-                    Item { Layout.fillHeight: true }
-                }
+                // Scrollable content
+                ScrollView {
+                    id: rightScrollView
+                    anchors { fill: parent; bottomMargin: 56 }
+                    contentWidth: availableWidth
+                    clip: true
 
-                // Detail panel
-                ColumnLayout {
-                    visible: selectedSolver !== null
-                    Layout.fillWidth: true
-                    spacing: 12
-
-                    Text {
-                        text: selectedSolver ? selectedSolver.name : ""
-                        font.pixelSize: 22
-                        font.bold: true
-                        color: theme.textPrimary
-                    }
-
-                    Text {
-                        text: selectedSolver ? selectedSolver.category : ""
-                        font.pixelSize: 12
-                        color: theme.textDim
-                        font.letterSpacing: 1
-                    }
-
-                    Text {
-                        text: selectedSolver ? selectedSolver.desc : ""
-                        font.pixelSize: 14
-                        color: theme.textSub
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-
-                    RowLayout {
-                        spacing: 8
-                        Text { text: "Complexity:"; color: theme.textDim; font.pixelSize: 12 }
-                        Text {
-                            text: selectedSolver ? selectedSolver.complexity : ""
-                            color: theme.textPrimary
-                            font.pixelSize: 12
-                            font.family: "monospace"
-                        }
-                    }
-
-                    // Exact solver warning
-                    Rectangle {
-                        visible: exactWarning
-                        Layout.fillWidth: true
-                        height: warningText.implicitHeight + 16
-                        color: theme.warnBg
-                        radius: 6
-                        border.color: theme.warnBorder
-                        border.width: 1
-
-                        Text {
-                            id: warningText
-                            anchors { fill: parent; margins: 8 }
-                            text: "⚠  " + FileLoader.cityCount + " cities — exact solvers are practical only for n ≤ 20"
-                            color: theme.warnOrange
-                            font.pixelSize: 12
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                }
-
-                Item { Layout.fillHeight: true }
-
-                // Bottom action bar
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 12
-
-                    Button {
-                        text: "← Back"
-                        onClicked: backRequested()
-                    }
-
-                    Button {
-                        text: "Pipeline →"
-                        onClicked: pipelineRequested()
-                        contentItem: Text {
-                            text: parent.text
-                            color: theme.accent
-                            font: parent.font
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                        }
-                        ToolTip.visible: hovered
-                        ToolTip.text: "Chain multiple solvers in sequence"
-                        ToolTip.delay: 400
-                    }
-
-                    Item { Layout.fillWidth: true }
-
-                    Button {
-                        text: "Configure →"
-                        visible: selectedSolver !== null && selectedSolver.hasOptions
-                        enabled: selectedSolver !== null && !exactWarning
-                        onClicked: configureRequested()
-                    }
-
-                    Button {
-                        text: "Solve ▶"
-                        highlighted: true
-                        visible: selectedSolver !== null && !selectedSolver.hasOptions
-                        enabled: selectedSolver !== null && !exactWarning
-                        onClicked: solveRequested()
-                    }
-                }
-            }
-        }
-    }
-
-    // ── Inline component: ConfigPage (issue #106) ───────────────────────────
-    component ConfigPage: Page {
-        signal backRequested()
-        signal solveRequested()
-
-        background: Rectangle { color: theme.bgApp }
-
-        // Defaults matching Rust structs
-        readonly property var saDefaults:  ({ epochs: 10000, cooling_rate: 0.0001, min_temperature: 0.001, max_temperature: 1000.0 })
-        readonly property var gaDefaults:  ({ epochs: 10000, mutation_probability: 0.001, n_elite: 3 })
-        readonly property var psoDefaults: ({ epochs: 10000, n_nearest: 30 })
-        readonly property var csDefaults:  ({ epochs: 10000, mutation_probability: 0.001 })
-        readonly property var fpaDefaults: ({ epochs: 10000, mutation_probability: 0.001 })
-
-        property string alias: SolverEngine.selectedSolver
-        property bool isSA:  alias === "sa"  || alias === "simulated_annealing"
-        property bool isGA:  alias === "ga"  || alias === "genetic_algorithm"
-        property bool isPSO: alias === "pso" || alias === "particle_swarm"
-        property bool isCS:  alias === "cs"  || alias === "cuckoo_search"
-        property bool isFPA: alias === "fpa" || alias === "flower_pollination"
-
-        // Collect current field values as JSON for passing to Rust
-        function collectOpts() {
-            var obj = { epochs: parseInt(epochsField.text) || 10000 }
-            if (isSA) {
-                obj.cooling_rate    = parseFloat(crField.text)   || 0.0001
-                obj.min_temperature = parseFloat(minTField.text) || 0.001
-                obj.max_temperature = parseFloat(maxTField.text) || 1000.0
-            } else if (isGA) {
-                obj.mutation_probability = parseFloat(mpField.text) || 0.001
-                obj.n_elite = parseInt(eliteField.text) || 3
-            } else if (isPSO) {
-                obj.n_nearest = parseInt(swarmField.text) || 30
-            } else if (isCS || isFPA) {
-                obj.mutation_probability = parseFloat(mpField2.text) || 0.001
-            }
-            return JSON.stringify(obj)
-        }
-
-        function hasError() {
-            if (isNaN(parseInt(epochsField.text)) || parseInt(epochsField.text) < 1) return true
-            if (isSA) {
-                var cr = parseFloat(crField.text)
-                if (isNaN(cr) || cr <= 0 || cr >= 1) return true
-                var minT = parseFloat(minTField.text)
-                var maxT = parseFloat(maxTField.text)
-                if (isNaN(minT) || minT < 0) return true
-                if (isNaN(maxT) || maxT <= 0) return true
-                if (minT >= maxT) return true
-            }
-            if (isGA) {
-                var mp = parseFloat(mpField.text)
-                if (isNaN(mp) || mp < 0 || mp > 1) return true
-                if (isNaN(parseInt(eliteField.text)) || parseInt(eliteField.text) < 1) return true
-            }
-            if (isCS || isFPA) {
-                var mp2 = parseFloat(mpField2.text)
-                if (isNaN(mp2) || mp2 < 0 || mp2 > 1) return true
-            }
-            if (isPSO) {
-                if (isNaN(parseInt(swarmField.text)) || parseInt(swarmField.text) < 1) return true
-            }
-            return false
-        }
-
-        ScrollView {
-            id: scrollView
-            anchors.fill: parent
-            anchors.bottomMargin: 64
-            contentWidth: availableWidth
-
-            ColumnLayout {
-                width: scrollView.availableWidth
-                spacing: 0
-
-                // ── Header ────────────────────────────────────────────────
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 64
-                    color: theme.bgPanel
-
-                    RowLayout {
-                        anchors { fill: parent; leftMargin: 24; rightMargin: 24 }
-                        Text {
-                            text: "Configure Solver"
-                            font.pixelSize: 20; font.bold: true; color: theme.textPrimary
-                        }
-                        Item { Layout.fillWidth: true }
-                        Rectangle {
-                            width: solverChip.implicitWidth + 20; height: 28; radius: 14
-                            color: theme.bgHighlight; border.color: theme.accent; border.width: 1
-                            Text {
-                                id: solverChip
-                                anchors.centerIn: parent
-                                text: SolverEngine.selectedSolver
-                                color: theme.accent; font.pixelSize: 13
-                            }
-                        }
-                    }
-                }
-
-                // ── Form body ─────────────────────────────────────────────
-                ColumnLayout {
-                    Layout.margins: 32
-                    spacing: 28
-
-                    // ── Common: epochs ────────────────────────────────────
                     ColumnLayout {
-                        spacing: 6; Layout.fillWidth: true
-                        Text { text: "Epochs"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                        TextField {
-                            id: epochsField
-                            Layout.preferredWidth: 220
-                            font.pixelSize: 14
-                            text: isSA ? saDefaults.epochs.toString()
-                                       : isGA ? gaDefaults.epochs.toString()
-                                       : isPSO ? psoDefaults.epochs.toString()
-                                       : isCS ? csDefaults.epochs.toString()
-                                       : fpaDefaults.epochs.toString()
-                            placeholderText: "10000"
-                            color: acceptableInput ? theme.textDark : theme.inputError
-                            placeholderTextColor: theme.fieldPlaceholder
-                            validator: IntValidator { bottom: 1; top: 10000000 }
-                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                        width: rightScrollView.availableWidth
+                        spacing: 0
+
+                        // Empty state
+                        Text {
+                            visible: selectedSolver === null
+                            Layout.alignment: Qt.AlignHCenter
+                            Layout.topMargin: 120
+                            text: "Select a solver"
+                            font.pixelSize: 18
+                            color: theme.textDisabled
                         }
-                        Text { text: "Number of iterations the solver will run"; color: theme.textHint; font.pixelSize: 11 }
-                    }
 
-                    // ── SA fields ─────────────────────────────────────────
-                    ColumnLayout {
-                        visible: isSA
-                        spacing: 20; Layout.fillWidth: true
-
+                        // Detail + config (when solver selected)
                         ColumnLayout {
-                            spacing: 6; Layout.fillWidth: true
-                            Text { text: "Cooling rate"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                            TextField {
-                                id: crField
-                                Layout.preferredWidth: 220
-                                font.pixelSize: 14
-                                text: saDefaults.cooling_rate.toString()
-                                placeholderText: "0.0001"
-                                color: acceptableInput ? theme.textDark : theme.inputError
-                                placeholderTextColor: theme.fieldPlaceholder
-                                validator: DoubleValidator { bottom: 0.000001; top: 0.999999; notation: DoubleValidator.StandardNotation }
-                                background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                            visible: selectedSolver !== null
+                            Layout.margins: 32
+                            spacing: 12
+
+                            // ── Description ───────────────────────────────────
+                            Text {
+                                text: selectedSolver ? selectedSolver.name : ""
+                                font.pixelSize: 22; font.bold: true; color: theme.textPrimary
                             }
-                            Text { text: "Must be > 0 and < 1"; color: theme.textHint; font.pixelSize: 11 }
+                            Text {
+                                text: selectedSolver ? selectedSolver.category : ""
+                                font.pixelSize: 12; color: theme.textDim; font.letterSpacing: 1
+                            }
+                            Text {
+                                text: selectedSolver ? selectedSolver.desc : ""
+                                font.pixelSize: 14; color: theme.textSub
+                                wrapMode: Text.WordWrap; Layout.fillWidth: true
+                            }
+                            RowLayout {
+                                spacing: 8
+                                Text { text: "Complexity:"; color: theme.textDim; font.pixelSize: 12 }
+                                Text {
+                                    text: selectedSolver ? selectedSolver.complexity : ""
+                                    color: theme.textPrimary; font.pixelSize: 12; font.family: "monospace"
+                                }
+                            }
+
+                            // Exact solver warning
+                            Rectangle {
+                                visible: exactWarning
+                                Layout.fillWidth: true
+                                height: warnText.implicitHeight + 16
+                                color: theme.warnBg; radius: 6
+                                border.color: theme.warnBorder; border.width: 1
+                                Text {
+                                    id: warnText
+                                    anchors { fill: parent; margins: 8 }
+                                    text: "⚠  " + FileLoader.cityCount + " cities — exact solvers are practical only for n ≤ 20"
+                                    color: theme.warnOrange; font.pixelSize: 12; wrapMode: Text.WordWrap
+                                }
+                            }
+
+                            // ── Parameters section ────────────────────────────
+                            Rectangle {
+                                visible: selectedSolver !== null && selectedSolver.hasOptions
+                                Layout.fillWidth: true
+                                height: 1
+                                color: theme.border
+                                Layout.topMargin: 8
+                            }
+                            Text {
+                                visible: selectedSolver !== null && selectedSolver.hasOptions
+                                text: "PARAMETERS"
+                                font.pixelSize: 11; font.bold: true
+                                color: theme.textDim; font.letterSpacing: 1.2
+                            }
+
+                            // Epochs (all option-bearing solvers)
+                            ColumnLayout {
+                                visible: selectedSolver !== null && selectedSolver.hasOptions
+                                spacing: 6; Layout.fillWidth: true
+                                Text { text: "Epochs"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                TextField {
+                                    id: epochsField
+                                    Layout.preferredWidth: 220; font.pixelSize: 14
+                                    text: "10000"; placeholderText: "10000"
+                                    color: acceptableInput ? theme.textDark : theme.inputError
+                                    placeholderTextColor: theme.fieldPlaceholder
+                                    validator: IntValidator { bottom: 1; top: 10000000 }
+                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                }
+                                Text { text: "Number of iterations the solver will run"; color: theme.textHint; font.pixelSize: 11 }
+                            }
+
+                            // ── SA fields ─────────────────────────────────────
+                            ColumnLayout {
+                                visible: isSA
+                                spacing: 16; Layout.fillWidth: true
+
+                                ColumnLayout {
+                                    spacing: 6; Layout.fillWidth: true
+                                    Text { text: "Cooling rate"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                    TextField {
+                                        id: crField
+                                        Layout.preferredWidth: 220; font.pixelSize: 14
+                                        text: saDefaults.cooling_rate.toString(); placeholderText: "0.0001"
+                                        color: acceptableInput ? theme.textDark : theme.inputError
+                                        placeholderTextColor: theme.fieldPlaceholder
+                                        validator: DoubleValidator { bottom: 0.000001; top: 0.999999; notation: DoubleValidator.StandardNotation }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                    Text { text: "Must be > 0 and < 1"; color: theme.textHint; font.pixelSize: 11 }
+                                }
+
+                                RowLayout {
+                                    spacing: 32; Layout.fillWidth: true
+                                    ColumnLayout {
+                                        spacing: 6
+                                        Text { text: "Min temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                        TextField {
+                                            id: minTField
+                                            width: 180; font.pixelSize: 14
+                                            text: saDefaults.min_temperature.toString(); placeholderText: "0.001"
+                                            color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
+                                            validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
+                                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                        }
+                                    }
+                                    ColumnLayout {
+                                        spacing: 6
+                                        Text { text: "Max temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                        TextField {
+                                            id: maxTField
+                                            width: 180; font.pixelSize: 14
+                                            text: saDefaults.max_temperature.toString(); placeholderText: "1000.0"
+                                            color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
+                                            validator: DoubleValidator { bottom: 0.000001; notation: DoubleValidator.StandardNotation }
+                                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                        }
+                                    }
+                                }
+                                Text {
+                                    visible: { var mn = parseFloat(minTField.text); var mx = parseFloat(maxTField.text); return !isNaN(mn) && !isNaN(mx) && mn >= mx }
+                                    text: "⚠  Min temperature must be less than max temperature"
+                                    color: theme.errorRed; font.pixelSize: 12
+                                }
+                            }
+
+                            // ── GA fields ─────────────────────────────────────
+                            ColumnLayout {
+                                visible: isGA
+                                spacing: 16; Layout.fillWidth: true
+
+                                ColumnLayout {
+                                    spacing: 6; Layout.fillWidth: true
+                                    Text { text: "Mutation probability"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                    TextField {
+                                        id: mpField
+                                        Layout.preferredWidth: 220; font.pixelSize: 14
+                                        text: gaDefaults.mutation_probability.toString(); placeholderText: "0.001"
+                                        color: acceptableInput ? theme.textDark : theme.inputError
+                                        placeholderTextColor: theme.fieldPlaceholder
+                                        validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                    Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Text { text: "Elite count"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                    TextField {
+                                        id: eliteField
+                                        width: 140; font.pixelSize: 14
+                                        text: gaDefaults.n_elite.toString(); placeholderText: "3"
+                                        color: acceptableInput ? theme.textDark : theme.inputError
+                                        placeholderTextColor: theme.fieldPlaceholder
+                                        validator: IntValidator { bottom: 1; top: 1000 }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                    Text { text: "Elite solutions preserved each generation"; color: theme.textHint; font.pixelSize: 11 }
+                                }
+                            }
+
+                            // ── CS / FPA: mutation probability ─────────────────
+                            ColumnLayout {
+                                visible: isCS || isFPA
+                                spacing: 6; Layout.fillWidth: true
+                                Text { text: "Mutation probability"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                TextField {
+                                    id: mpField2
+                                    Layout.preferredWidth: 220; font.pixelSize: 14
+                                    text: isCS ? csDefaults.mutation_probability.toString() : fpaDefaults.mutation_probability.toString()
+                                    placeholderText: "0.001"
+                                    color: acceptableInput ? theme.textDark : theme.inputError
+                                    placeholderTextColor: theme.fieldPlaceholder
+                                    validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
+                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                }
+                                Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
+                            }
+
+                            // ── PSO: swarm size ────────────────────────────────
+                            ColumnLayout {
+                                visible: isPSO
+                                spacing: 6
+                                Text { text: "Swarm size (n_nearest)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                TextField {
+                                    id: swarmField
+                                    width: 140; font.pixelSize: 14
+                                    text: psoDefaults.n_nearest.toString(); placeholderText: "30"
+                                    color: acceptableInput ? theme.textDark : theme.inputError
+                                    placeholderTextColor: theme.fieldPlaceholder
+                                    validator: IntValidator { bottom: 1; top: 10000 }
+                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                }
+                                Text { text: "Minimum particle count (floor is 30)"; color: theme.textHint; font.pixelSize: 11 }
+                            }
+
+                            Item { Layout.preferredHeight: 16 }
+                        }
+                    }
+                }
+
+                // ── Fixed bottom action bar ───────────────────────────────────
+                Rectangle {
+                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                    height: 56
+                    color: theme.bgBar
+                    z: 10
+
+                    RowLayout {
+                        anchors { fill: parent; leftMargin: 20; rightMargin: 20 }
+                        spacing: 12
+
+                        Button {
+                            text: "← Back"
+                            onClicked: backRequested()
                         }
 
-                        RowLayout {
-                            spacing: 32; Layout.fillWidth: true
-                            ColumnLayout {
-                                spacing: 6
-                                Text { text: "Min temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                                TextField {
-                                    id: minTField
-                                    width: 180; font.pixelSize: 14
-                                    text: saDefaults.min_temperature.toString()
-                                    placeholderText: "0.001"
-                                    color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
-                                    validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
-                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
-                                }
+                        Button {
+                            text: "Pipeline →"
+                            onClicked: pipelineRequested()
+                            contentItem: Text {
+                                text: parent.text
+                                color: theme.accent; font: parent.font
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
                             }
-                            ColumnLayout {
-                                spacing: 6
-                                Text { text: "Max temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                                TextField {
-                                    id: maxTField
-                                    width: 180; font.pixelSize: 14
-                                    text: saDefaults.max_temperature.toString()
-                                    placeholderText: "1000.0"
-                                    color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
-                                    validator: DoubleValidator { bottom: 0.000001; notation: DoubleValidator.StandardNotation }
-                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
-                                }
-                            }
+                            ToolTip.visible: hovered
+                            ToolTip.text: "Chain multiple solvers in sequence"
+                            ToolTip.delay: 400
                         }
+
+                        Item { Layout.fillWidth: true }
+
                         Text {
-                            visible: { var mn = parseFloat(minTField.text); var mx = parseFloat(maxTField.text); return !isNaN(mn) && !isNaN(mx) && mn >= mx }
-                            text: "⚠  Min temperature must be less than max temperature"
+                            visible: selectedSolver !== null && selectedSolver.hasOptions && hasError()
+                            text: "Fix validation errors above"
                             color: theme.errorRed; font.pixelSize: 12
                         }
-                    }
 
-                    // ── GA fields ─────────────────────────────────────────
-                    ColumnLayout {
-                        visible: isGA
-                        spacing: 20; Layout.fillWidth: true
-
-                        ColumnLayout {
-                            spacing: 6; Layout.fillWidth: true
-                            Text { text: "Mutation probability"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                            TextField {
-                                id: mpField
-                                Layout.preferredWidth: 220; font.pixelSize: 14
-                                text: gaDefaults.mutation_probability.toString()
-                                placeholderText: "0.001"
-                                color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
-                                validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
-                                background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                        Button {
+                            text: "Solve ▶"
+                            highlighted: true
+                            visible: selectedSolver !== null
+                            enabled: selectedSolver !== null && !exactWarning
+                                     && (!selectedSolver.hasOptions || !hasError())
+                            onClicked: {
+                                if (selectedSolver.hasOptions)
+                                    SolverEngine.startSolveWithOpts(FileLoader.filePath, collectOpts())
+                                else
+                                    SolverEngine.startSolve(FileLoader.filePath)
+                                solveRequested()
                             }
-                            Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
                         }
-
-                        ColumnLayout {
-                            spacing: 6
-                            Text { text: "Elite count"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                            TextField {
-                                id: eliteField
-                                width: 140; font.pixelSize: 14
-                                text: gaDefaults.n_elite.toString()
-                                placeholderText: "3"
-                                color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
-                                validator: IntValidator { bottom: 1; top: 1000 }
-                                background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
-                            }
-                            Text { text: "Elite solutions preserved each generation"; color: theme.textHint; font.pixelSize: 11 }
-                        }
-                    }
-
-                    // ── CS / FPA shared mutation field ────────────────────
-                    ColumnLayout {
-                        visible: isCS || isFPA
-                        spacing: 6; Layout.fillWidth: true
-                        Text { text: "Mutation probability"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                        TextField {
-                            id: mpField2
-                            Layout.preferredWidth: 220; font.pixelSize: 14
-                            text: isCS ? csDefaults.mutation_probability.toString()
-                                       : fpaDefaults.mutation_probability.toString()
-                            placeholderText: "0.001"
-                            color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
-                            validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
-                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
-                        }
-                        Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
-                    }
-
-                    // ── PSO fields ────────────────────────────────────────
-                    ColumnLayout {
-                        visible: isPSO
-                        spacing: 6
-                        Text { text: "Swarm size (min)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                        TextField {
-                            id: swarmField
-                            width: 140; font.pixelSize: 14
-                            text: psoDefaults.n_nearest.toString()
-                            placeholderText: "30"
-                            color: acceptableInput ? theme.textDark : theme.inputError; placeholderTextColor: theme.fieldPlaceholder
-                            validator: IntValidator { bottom: 1; top: 10000 }
-                            background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
-                        }
-                        Text { text: "Minimum particle count (floor is 30)"; color: theme.textHint; font.pixelSize: 11 }
-                    }
-                }
-            }
-        }
-
-        // ── Bottom bar ────────────────────────────────────────────────────
-        Rectangle {
-            anchors.bottom: parent.bottom
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 56
-            color: theme.bgBar
-            z: 10
-
-            RowLayout {
-                anchors { fill: parent; leftMargin: 20; rightMargin: 20 }
-                spacing: 12
-
-                Button { text: "← Back"; onClicked: backRequested() }
-
-                Item { Layout.fillWidth: true }
-
-                Text {
-                    visible: hasError()
-                    text: "Fix validation errors above"
-                    color: theme.errorRed; font.pixelSize: 12
-                }
-
-                Button {
-                    text: "Solve ▶"
-                    highlighted: true
-                    enabled: !hasError()
-                    onClicked: {
-                        SolverEngine.startSolveWithOpts(FileLoader.filePath, collectOpts())
-                        solveRequested()
                     }
                 }
             }
@@ -1409,21 +1335,9 @@ ApplicationWindow {
     Component {
         id: solverComp
         SolverPage {
-            onBackRequested:      stackView.pop()
-            onConfigureRequested: stackView.push(configComp)
-            onPipelineRequested:  stackView.push(pipelineComp)
-            onSolveRequested: {
-                SolverEngine.startSolve(FileLoader.filePath)
-                stackView.push(vizComp)
-            }
-        }
-    }
-
-    Component {
-        id: configComp
-        ConfigPage {
-            onBackRequested:  stackView.pop()
-            onSolveRequested: stackView.push(vizComp)
+            onBackRequested:     stackView.pop()
+            onPipelineRequested: stackView.push(pipelineComp)
+            onSolveRequested:    stackView.push(vizComp)
         }
     }
 
