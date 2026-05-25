@@ -107,6 +107,79 @@ impl Solvers {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Solver catalogue — single source of truth for the `solvers` subcommand
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SolverKind {
+    Exact,
+    Heuristic,
+    Utility,
+}
+
+impl SolverKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SolverKind::Exact => "exact",
+            SolverKind::Heuristic => "heuristic",
+            SolverKind::Utility => "utility",
+        }
+    }
+}
+
+pub struct SolverMeta {
+    pub name: &'static str,
+    pub alias: Option<&'static str>,
+    pub kind: SolverKind,
+}
+
+impl SolverMeta {
+    pub fn short(&self) -> &'static str {
+        self.alias.unwrap_or(self.name)
+    }
+}
+
+impl Solvers {
+    pub fn all_meta() -> &'static [SolverMeta] {
+        &[
+            SolverMeta { name: "bellman_karp", alias: Some("bhk"), kind: SolverKind::Exact },
+            SolverMeta { name: "branch_bound", alias: None, kind: SolverKind::Exact },
+            SolverMeta { name: "nearest_neighbor", alias: Some("nn"), kind: SolverKind::Heuristic },
+            SolverMeta { name: "two_opt", alias: Some("2opt"), kind: SolverKind::Heuristic },
+            SolverMeta { name: "three_opt", alias: Some("3opt"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "simulated_annealing",
+                alias: Some("sa"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
+                name: "genetic_algorithm",
+                alias: Some("ga"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta { name: "tabu_search", alias: Some("tabu"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "particle_swarm",
+                alias: Some("pso"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta { name: "cuckoo_search", alias: Some("cs"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "flower_pollination",
+                alias: Some("fpa"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta { name: "stochastic_hill", alias: None, kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "random_shuffle",
+                alias: Some("shuffle"),
+                kind: SolverKind::Utility,
+            },
+        ]
+    }
+}
+
 impl FromStr for Solvers {
     type Err = &'static str;
 

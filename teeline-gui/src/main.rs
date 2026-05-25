@@ -8,7 +8,7 @@ use teeline::config::{
     select_pipeline_source,
 };
 use teeline::tsp::{
-    self, AppOptions, Solution, Solvers, TspProblem, distance_matrix,
+    self, AppOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
     pipeline::{PipelineStage, run_pipeline},
     progress, tsplib,
 };
@@ -137,6 +137,29 @@ fn main() {
                 .required(false),
         );
 
+    let solvers_cmd = Command::new("solvers")
+        .about("List supported solvers")
+        .arg(
+            Arg::new("short")
+                .long("short")
+                .action(ArgAction::SetTrue)
+                .help("machine-readable: one alias per line (suitable for shell scripting)"),
+        )
+        .arg(
+            Arg::new("heuristic")
+                .long("heuristic")
+                .action(ArgAction::SetTrue)
+                .conflicts_with("exact")
+                .help("show only heuristic solvers"),
+        )
+        .arg(
+            Arg::new("exact")
+                .long("exact")
+                .action(ArgAction::SetTrue)
+                .conflicts_with("heuristic")
+                .help("show only exact solvers"),
+        );
+
     let cli = Command::new("Teeline")
         .version(tsp::VERSION)
         .author(tsp::AUTHOR)
@@ -145,12 +168,14 @@ fn main() {
         .subcommand(solve_cmd)
         .subcommand(pipeline_cmd)
         .subcommand(convert_cmd)
+        .subcommand(solvers_cmd)
         .get_matches();
 
     match cli.subcommand() {
         Some(("solve", args)) => run_solve(args),
         Some(("pipeline", args)) => run_pipeline_cmd(args),
         Some(("convert", args)) => run_convert(args),
+        Some(("solvers", args)) => run_solvers(args),
         _ => unreachable!("clap ensures a subcommand is always present"),
     }
 }
@@ -425,6 +450,34 @@ fn run_convert(args: &ArgMatches) {
         if let Err(e) = tsp::convert::convert_file(&input, &out_path) {
             eprintln!("error: {e}");
             std::process::exit(1);
+        }
+    }
+}
+
+fn run_solvers(args: &ArgMatches) {
+    let only_heuristic = args.get_flag("heuristic");
+    let only_exact = args.get_flag("exact");
+    let short = args.get_flag("short");
+
+    let all = Solvers::all_meta();
+    let filtered = all.iter().filter(|m| {
+        if only_heuristic {
+            m.kind == SolverKind::Heuristic
+        } else if only_exact {
+            m.kind == SolverKind::Exact
+        } else {
+            true
+        }
+    });
+
+    if short {
+        for m in filtered {
+            println!("{}", m.short());
+        }
+    } else {
+        println!("{:<22} {:<8} TYPE", "NAME", "ALIAS");
+        for m in filtered {
+            println!("{:<22} {:<8} {}", m.name, m.alias.unwrap_or("—"), m.kind.as_str());
         }
     }
 }
