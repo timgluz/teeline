@@ -56,21 +56,31 @@ cargo test -p teeline -p teeline-cli
 ./tests/bats/bin/bats tests/e2e/
 
 # check the CLI help
-./target/release/bin --help
-./target/release/bin solve --help
-./target/release/bin convert --help
-./target/release/bin solvers --help
+./target/release/teeline --help
+./target/release/teeline solve --help
+./target/release/teeline convert --help
+./target/release/teeline solvers --help
 ```
 
-### Install locally (optional)
+### Install from a GitHub Release (no Rust required)
 
-Copy or symlink the binary so you can call it as `teeline`:
+Pre-built binaries for Linux (x86\_64/aarch64), macOS (x86\_64/aarch64), and Windows (x86\_64) are published on the [Releases page](https://github.com/timgluz/teeline/releases).
+
+A shell installer is also available:
 
 ```bash
-cp ./target/release/bin ~/bin/teeline   # or any directory on your PATH
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/timgluz/teeline/releases/latest/download/teeline-cli-installer.sh | sh
 ```
 
-All examples below assume this step has been done. If you skipped it, replace `teeline` with `./target/release/bin`.
+Each release also includes `teeline-solver.wasm` — the WebAssembly component built with `cargo-component`.
+
+### Install locally from source (optional)
+
+```bash
+cp ./target/release/teeline ~/bin/teeline   # or any directory on your PATH
+```
+
+All examples below assume `teeline` is on your PATH.
 
 ---
 
@@ -612,6 +622,23 @@ task check               # build + test + lint + fmt:check (mirrors CI)
 task run -- solve nn -i tests/fixtures/berlin52.tsp   # run solver via cargo run
 task bench:berlin52      # compare all approximate solvers on berlin52 (release build)
 task build:wasm          # build the WebAssembly component
+```
+
+### Releasing
+
+Releases are automated via [cargo-dist](https://axodotdev.github.io/cargo-dist/). To cut a new release:
+
+```bash
+# 1. Bump version in teeline-cli/Cargo.toml, commit and push
+# 2. Tag the commit
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The `release.yml` workflow triggers, builds native binaries for all five platforms plus the WASM component, and publishes everything to a GitHub Release. You can preview what will be built with:
+
+```bash
+dist plan
 ```
 
 ---

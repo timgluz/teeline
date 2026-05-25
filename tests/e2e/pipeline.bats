@@ -7,7 +7,7 @@ setup() {
     # Resolve the repo root relative to this file so tests work regardless of
     # the working directory from which bats is invoked.
     REPO_ROOT="$( cd "$( dirname "$BATS_TEST_FILENAME" )/../.." >/dev/null 2>&1 && pwd )"
-    BIN="$REPO_ROOT/target/debug/bin"
+    BIN="$REPO_ROOT/target/debug/teeline"
     BERLIN52="$REPO_ROOT/tests/fixtures/berlin52.tsp"
     GR17="$REPO_ROOT/tests/fixtures/gr17.tsp"
     FIXTURE_DIR="$REPO_ROOT/tests/fixtures"

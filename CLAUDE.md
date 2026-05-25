@@ -19,16 +19,16 @@ cargo test
 # Run a specific test
 cargo test test_coords_from_text_only_ints
 
-# Run (debug binary is named 'bin')
-cat ./data/tsplib/berlin52.tsp | ./target/debug/bin solve nn
-./target/debug/bin solve two_opt -i ./data/tsplib/berlin52.tsp
-./target/debug/bin --help
-./target/debug/bin solve --help
-./target/debug/bin convert --help
+# Run (debug binary)
+cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
+./target/debug/teeline solve two_opt -i ./data/tsplib/berlin52.tsp
+./target/debug/teeline --help
+./target/debug/teeline solve --help
+./target/debug/teeline convert --help
 
 # Convert DiscOpt files to TSPLIB format
-./target/debug/bin convert -i ./data/raw/tsp_51_1 -o ./data/discopt/
-./target/debug/bin convert -i ./data/raw/ -o ./data/discopt/
+./target/debug/teeline convert -i ./data/raw/tsp_51_1 -o ./data/discopt/
+./target/debug/teeline convert -i ./data/raw/ -o ./data/discopt/
 ```
 
 ## Architecture

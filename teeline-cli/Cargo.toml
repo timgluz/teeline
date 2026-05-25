@@ -13,7 +13,7 @@ keywords = ["tsp", "optimization"]
 name = "teeline_cli"
 
 [[bin]]
-name = "bin"
+name = "teeline"
 path = "src/main.rs"
 
 [dependencies]

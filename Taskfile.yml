@@ -70,7 +70,7 @@ tasks:
     deps: [build:release]
     cmds:
       - echo "=== berlin52 (optimal 7542) ==="
-      - for solver in $(./target/release/bin solvers --heuristic --short); do printf "%-12s " $solver; ./target/release/bin solve $solver -i tests/fixtures/berlin52.tsp 2>/dev/null | head -1; done
+      - for solver in $(./target/release/teeline solvers --heuristic --short); do printf "%-12s " $solver; ./target/release/teeline solve $solver -i tests/fixtures/berlin52.tsp 2>/dev/null | head -1; done
 
   clean:
     desc: Remove build artifacts
