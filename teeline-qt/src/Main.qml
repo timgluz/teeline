@@ -96,11 +96,13 @@ ApplicationWindow {
                     width: 200
                     height: 200
 
-                    Rectangle { anchors.fill: parent; color: "#0f0f23"; radius: 4 }
-
                     onPaint: {
                         var ctx = getContext("2d")
-                        ctx.clearRect(0, 0, width, height)
+                        ctx.fillStyle = "#0f0f23"
+                        ctx.beginPath()
+                        ctx.roundedRect(0, 0, width, height, 4, 4)
+                        ctx.fill()
+
                         var raw = FileLoader.citiesJson
                         if (!raw || raw === "[]") return
                         var cities = JSON.parse(raw)
