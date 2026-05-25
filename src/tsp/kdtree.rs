@@ -143,38 +143,26 @@ impl KDTree {
 pub struct KDNode {
     point: KDPoint,
     depth: usize,
-    size: usize, // todo: remove seems redundant
     left: KDSubTree,
     right: KDSubTree,
 }
 
 impl KDNode {
     pub fn new(point: KDPoint, depth: usize, left: Option<KDNode>, right: Option<KDNode>) -> Self {
-        let left_node = left.map(Box::new);
-        let right_node = right.map(Box::new);
-
-        let left_size = left_node.as_ref().map_or(0, |n| n.len());
-        let right_size = right_node.as_ref().map_or(0, |n| n.len());
-
         KDNode {
             point,
             depth,
-            size: 1 + left_size + right_size,
-            left: left_node,
-            right: right_node,
+            left: left.map(Box::new),
+            right: right.map(Box::new),
         }
     }
 
     pub fn from_subtrees(point: KDPoint, depth: usize, left: KDSubTree, right: KDSubTree) -> Self {
-        let left_size = left.as_ref().map_or(0, |n| n.len());
-        let right_size = right.as_ref().map_or(0, |n| n.len());
-
         KDNode {
             point,
             depth,
             left,
             right,
-            size: 1 + left_size + right_size,
         }
     }
 
@@ -182,7 +170,6 @@ impl KDNode {
         KDNode {
             point,
             depth,
-            size: 1,
             left: None,
             right: None,
         }
@@ -233,24 +220,14 @@ impl KDNode {
         self.right.as_deref()
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     pub fn is_leaf(&self) -> bool {
-        self.len() == 1
-    }
-
-    pub fn len(&self) -> usize {
-        self.size
+        self.left.is_none() && self.right.is_none()
     }
 
     /// returns the number of levels in the subtree rooted at this node;
     /// leaves have height 1
     pub fn height(&self) -> usize {
-        if self.is_empty() {
-            0
-        } else if self.is_leaf() {
+        if self.is_leaf() {
             1
         } else {
             let left_height = self.left().map_or(0, |n| n.height());
