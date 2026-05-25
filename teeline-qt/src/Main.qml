@@ -14,7 +14,6 @@ ApplicationWindow {
     // ── Inline component: WelcomePage ───────────────────────────────────────
     component WelcomePage: Page {
         signal nextRequested()
-        signal pipelineRequested()
 
         background: Rectangle { color: "#1a1a2e" }
 
@@ -154,18 +153,12 @@ ApplicationWindow {
             // Bottom bar
             RowLayout {
                 Layout.fillWidth: true
-                Switch {
-                    id: advancedSwitch
-                    text: "Pipeline Builder"
-                    enabled: FileLoader.isLoaded
-                    opacity: FileLoader.isLoaded ? 1.0 : 0.4
-                }
                 Item { Layout.fillWidth: true }
                 Button {
                     text: "Next →"
                     enabled: FileLoader.isLoaded
                     highlighted: FileLoader.isLoaded
-                    onClicked: advancedSwitch.checked ? pipelineRequested() : nextRequested()
+                    onClicked: nextRequested()
                 }
             }
         }
@@ -227,6 +220,7 @@ ApplicationWindow {
         signal backRequested()
         signal solveRequested()
         signal configureRequested()
+        signal pipelineRequested()
 
         background: Rectangle { color: "#1a1a2e" }
 
@@ -405,6 +399,15 @@ ApplicationWindow {
                     Button {
                         text: "← Back"
                         onClicked: backRequested()
+                    }
+
+                    Button {
+                        text: "Pipeline →"
+                        flat: true
+                        onClicked: pipelineRequested()
+                        ToolTip.visible: hovered
+                        ToolTip.text: "Chain multiple solvers in sequence"
+                        ToolTip.delay: 400
                     }
 
                     Item { Layout.fillWidth: true }
@@ -1180,8 +1183,7 @@ ApplicationWindow {
     Component {
         id: welcomeComp
         WelcomePage {
-            onNextRequested:     stackView.push(solverComp)
-            onPipelineRequested: stackView.push(pipelineComp)
+            onNextRequested: stackView.push(solverComp)
         }
     }
 
@@ -1193,8 +1195,9 @@ ApplicationWindow {
     Component {
         id: solverComp
         SolverPage {
-            onBackRequested:    stackView.pop()
+            onBackRequested:      stackView.pop()
             onConfigureRequested: stackView.push(configComp)
+            onPipelineRequested:  stackView.push(pipelineComp)
             onSolveRequested: {
                 SolverEngine.startSolve(FileLoader.filePath)
                 stackView.push(vizComp)
