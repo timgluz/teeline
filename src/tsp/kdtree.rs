@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::cmp::Ordering;
 
 use super::NearestResult;
@@ -94,15 +93,15 @@ impl KDTree {
         }
     }
 
-    pub fn walk(&self, callback: impl Fn(&KDPoint)) {
-        self.walk_in_order(&self.root, &callback);
+    pub fn walk(&self, mut callback: impl FnMut(&KDPoint)) {
+        Self::walk_in_order(&self.root, &mut callback);
     }
 
-    pub fn walk_in_order(&self, subtree: &KDSubTree, callback: &impl Fn(&KDPoint)) {
+    fn walk_in_order(subtree: &KDSubTree, callback: &mut impl FnMut(&KDPoint)) {
         if let Some(node) = subtree {
-            self.walk_in_order(&node.left, callback);
+            Self::walk_in_order(&node.left, callback);
             callback(&node.point);
-            self.walk_in_order(&node.right, callback);
+            Self::walk_in_order(&node.right, callback);
         }
     }
 
@@ -123,11 +122,9 @@ impl KDTree {
     }
 
     pub fn to_vec(&self) -> PointMatrix {
-        let pts: RefCell<PointMatrix> = RefCell::new(vec![]);
-
-        self.walk(|n| pts.borrow_mut().push(n.coords().to_vec()));
-
-        pts.borrow().to_vec()
+        let mut pts = vec![];
+        self.walk(|p| pts.push(p.coords().to_vec()));
+        pts
     }
 }
 
@@ -298,7 +295,6 @@ impl PartialEq for KDPoint {
 mod tests {
     use super::*;
     use crate::test::helpers::assert_approx;
-    use std::cell::RefCell;
 
     #[test]
     fn kdpoint_cmp_by_coord_out_of_bounds_returns_none() {
@@ -373,10 +369,10 @@ mod tests {
     fn kdtree_walk_with_empty_tree() {
         let tree = KDTree::empty();
 
-        let pts: RefCell<Vec<KDPoint>> = RefCell::new(vec![]);
-        tree.walk(|pt| pts.borrow_mut().push(pt.clone()));
+        let mut pts: Vec<KDPoint> = vec![];
+        tree.walk(|pt| pts.push(*pt));
 
-        assert!(pts.borrow().is_empty());
+        assert!(pts.is_empty());
     }
 
     #[test]
@@ -384,12 +380,12 @@ mod tests {
         let root = KDNode::new(KDPoint::new(&[0.0, 0.0]), 0, None, None);
         let tree = KDTree::new(root);
 
-        let pts: RefCell<Vec<KDPoint>> = RefCell::new(vec![]);
-        tree.walk(|pt| pts.borrow_mut().push(pt.clone()));
+        let mut pts: Vec<KDPoint> = vec![];
+        tree.walk(|pt| pts.push(*pt));
 
-        assert!(!pts.borrow().is_empty());
-        assert_eq!(1, pts.borrow().len());
-        assert_eq!(&[0.0, 0.0], pts.borrow().get(0).unwrap().coords());
+        assert!(!pts.is_empty());
+        assert_eq!(1, pts.len());
+        assert_eq!(&[0.0, 0.0], pts[0].coords());
     }
 
     #[test]
@@ -457,16 +453,16 @@ mod tests {
 
         assert_eq!(7, tree.len());
 
-        let points: RefCell<PointMatrix> = RefCell::new(vec![]);
-        tree.walk(|n| points.borrow_mut().push(n.coords().to_vec()));
+        let mut coords: PointMatrix = vec![];
+        tree.walk(|n| coords.push(n.coords().to_vec()));
 
-        assert_eq!(vec![-1.0, -1.0], points.borrow()[0]);
-        assert_eq!(vec![-1.0, 0.0], points.borrow()[1]);
-        assert_eq!(vec![-1.0, 1.0], points.borrow()[2]);
-        assert_eq!(vec![0.0, 0.0], points.borrow()[3]);
-        assert_eq!(vec![1.0, -1.0], points.borrow()[4]);
-        assert_eq!(vec![1.0, 0.0], points.borrow()[5]);
-        assert_eq!(vec![1.0, 1.0], points.borrow()[6]);
+        assert_eq!(vec![-1.0, -1.0], coords[0]);
+        assert_eq!(vec![-1.0, 0.0], coords[1]);
+        assert_eq!(vec![-1.0, 1.0], coords[2]);
+        assert_eq!(vec![0.0, 0.0], coords[3]);
+        assert_eq!(vec![1.0, -1.0], coords[4]);
+        assert_eq!(vec![1.0, 0.0], coords[5]);
+        assert_eq!(vec![1.0, 1.0], coords[6]);
     }
 
     #[test]
