@@ -26,19 +26,31 @@ After finishing the book I took the [Discrete Optimization](https://coursera.org
 
 ### Build
 
-```bash
-# debug build (faster compile, slower runtime)
-cargo build
+The workspace has two crates: `teeline` (pure solver library) and `teeline-gui` (CLI binary + egui visualisation). To get the runnable binary, build `teeline-gui`:
 
-# optimised release build (recommended for real use)
-cargo build --release
+```bash
+# debug build — fast compile, slower runtime
+cargo build -p teeline-gui
+
+# optimised release build — recommended for real use
+cargo build -p teeline-gui --release
+
+# solver library only (no GUI, no eframe dependency — useful for embedding)
+cargo build -p teeline
+```
+
+With [go-task](https://taskfile.dev/) installed you can use the shorter aliases:
+
+```bash
+task build          # debug binary (teeline-gui)
+task build:release  # release binary
 ```
 
 ### Quick test
 
 ```bash
 # run the unit and integration test suite
-cargo test
+cargo test -p teeline -p teeline-gui
 
 # run end-to-end CLI tests (requires the debug binary to be built first)
 ./tests/bats/bin/bats tests/e2e/
