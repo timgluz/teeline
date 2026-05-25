@@ -59,6 +59,7 @@ cargo test -p teeline -p teeline-gui
 ./target/release/bin --help
 ./target/release/bin solve --help
 ./target/release/bin convert --help
+./target/release/bin solvers --help
 ```
 
 ### Install locally (optional)
@@ -135,6 +136,53 @@ Output format:
 ```
 
 First line: `<tour_cost> <optimised_flag>`. Second line: space-separated city IDs in visit order.
+
+---
+
+## Listing available solvers
+
+The `solvers` subcommand prints the solver catalogue so you never have to look up alias names manually.
+
+```bash
+# human-readable table: full name, short alias, type
+teeline solvers
+
+# one alias per line — suitable for shell scripting
+teeline solvers --short
+
+# heuristic solvers only (excludes exact algorithms)
+teeline solvers --heuristic --short
+
+# exact solvers only
+teeline solvers --exact
+```
+
+Example output:
+
+```
+NAME                   ALIAS    TYPE
+bellman_karp           bhk      exact
+branch_bound           —        exact
+nearest_neighbor       nn       heuristic
+two_opt                2opt     heuristic
+three_opt              3opt     heuristic
+simulated_annealing    sa       heuristic
+genetic_algorithm      ga       heuristic
+tabu_search            tabu     heuristic
+particle_swarm         pso      heuristic
+cuckoo_search          cs       heuristic
+flower_pollination     fpa      heuristic
+stochastic_hill        —        heuristic
+random_shuffle         shuffle  utility
+```
+
+The `--short` form is useful for driving scripts or benchmarks:
+
+```bash
+for solver in $(teeline solvers --heuristic --short); do
+    teeline solve $solver -i data/tsplib/berlin52.tsp 2>/dev/null | head -1
+done
+```
 
 ---
 
@@ -579,7 +627,7 @@ In short:
 3. Add tests — unit tests go inline with the source file; library integration tests go in `tests/`; CLI end-to-end tests go in `tests/e2e/` as BATS scripts.
 4. Open a pull request and wait for a code review.
 
-When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, then register it in three places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, and the `tsp::solve` dispatch match arm. The WASM surface picks it up automatically.
+When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, then register it in four places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, the `tsp::solve` dispatch match arm, and `Solvers::all_meta()` (the catalogue used by the `solvers` subcommand). The WASM surface picks it up automatically.
 
 ---
 
