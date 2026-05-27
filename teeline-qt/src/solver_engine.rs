@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::sync::mpsc;
 use std::time::Instant;
 
+use serde_json::json;
 use qtbridge::{QObjectHolder, invoke_method, qobject_impl};
 use teeline::tsp::{
     self, AppOptions, GAOptions, CSOptions, FPAOptions, HeuristicOptions, SAOptions,
@@ -19,6 +20,7 @@ pub struct SolverEngine {
     iteration: i32,
     elapsed_ms: i32,
     tour_json: String,
+    solvers_json: String,
 }
 
 impl Default for SolverEngine {
@@ -30,8 +32,25 @@ impl Default for SolverEngine {
             iteration: 0,
             elapsed_ms: 0,
             tour_json: "[]".to_string(),
+            solvers_json: build_solvers_json(),
         }
     }
+}
+
+fn build_solvers_json() -> String {
+    let arr: Vec<serde_json::Value> = teeline::tsp::list_solvers()
+        .iter()
+        .map(|s| json!({
+            "name":       s.name,
+            "alias":      s.alias,
+            "category":   s.category,
+            "desc":       s.desc,
+            "complexity": s.complexity,
+            "hasOptions": s.has_options,
+            "exact":      s.exact
+        }))
+        .collect();
+    serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string())
 }
 
 #[qobject_impl(Singleton)]
@@ -42,6 +61,7 @@ impl SolverEngine {
     qproperty!("iteration",      Member = iteration,       Write = set_iteration,       Notify = "iterationChanged");
     qproperty!("elapsedMs",      Member = elapsed_ms,      Write = set_elapsed_ms,      Notify = "elapsedMsChanged");
     qproperty!("tourJson",       Member = tour_json,       Write = set_tour_json,       Notify = "tourJsonChanged");
+    qproperty!("solversJson",    Member = solvers_json,    Write = set_solvers_json,    Notify = "solversJsonChanged");
 
     fn set_selected_solver(&mut self, v: String)  { self.selected_solver = v;  self.selected_solver_changed(); }
     fn set_running(&mut self, v: bool)             { self.running = v;           self.running_changed(); }
@@ -49,6 +69,7 @@ impl SolverEngine {
     fn set_iteration(&mut self, v: i32)            { self.iteration = v;         self.iteration_changed(); }
     fn set_elapsed_ms(&mut self, v: i32)           { self.elapsed_ms = v;        self.elapsed_ms_changed(); }
     fn set_tour_json(&mut self, v: String)         { self.tour_json = v;         self.tour_json_changed(); }
+    fn set_solvers_json(&mut self, v: String)      { self.solvers_json = v;      self.solvers_json_changed(); }
 
     #[qsignal] fn selected_solver_changed(&self);
     #[qsignal] fn running_changed(&self);
@@ -56,6 +77,7 @@ impl SolverEngine {
     #[qsignal] fn iteration_changed(&self);
     #[qsignal] fn elapsed_ms_changed(&self);
     #[qsignal] fn tour_json_changed(&self);
+    #[qsignal] fn solvers_json_changed(&self);
 
     #[qslot]
     fn select_solver(&mut self, alias: String) {
