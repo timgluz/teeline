@@ -15,6 +15,6 @@ path = "src/main.rs"
 dist = false  # requires Qt runtime; not a standalone distributable binary
 
 [dependencies]
-qtbridge = { git = "https://github.com/qt/qtbridge-rust", branch = "dev", rev = "66583b7be5f7060feb27790741996ce350836091" }
+qtbridge = { git = "https://github.com/qt/qtbridge-rust", rev = "66583b7be5f7060feb27790741996ce350836091" }
 teeline = { path = ".." }
 serde_json = "1"
