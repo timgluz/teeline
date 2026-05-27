@@ -73,7 +73,6 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 - The binary is named `bin` (not `teeline`) — set by `[[bin]] name = "bin"` in `Cargo.toml`.
 - `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity — don't use them on datasets larger than ~30 cities.
-- The visualization window is **off by default**. Pass `--gui` to open it. In headless/CI environments never pass `--gui`; the CI workflow (`cargo test`) avoids running the binary directly.
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
 - `bin convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
 - `download_data.sh` fetches benchmark datasets.

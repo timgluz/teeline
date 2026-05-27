@@ -10,9 +10,8 @@ use teeline::config::{
 use teeline::tsp::{
     self, AppOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
     pipeline::{PipelineStage, run_pipeline},
-    progress, tsplib,
+    tsplib,
 };
-use teeline_cli::ProgressPlot;
 use tracing_subscriber::EnvFilter;
 
 // ---------------------------------------------------------------------------
@@ -226,11 +225,6 @@ fn tuning_args() -> Vec<Arg> {
             .help("print debug lines")
             .action(ArgAction::SetTrue)
             .required(false),
-        Arg::new("gui")
-            .long("gui")
-            .help("open the visualization window while solving")
-            .action(ArgAction::SetTrue)
-            .required(false),
         Arg::new("optimal_tour")
             .long("optimal-tour")
             .value_name("FILE_PATH")
@@ -355,17 +349,6 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
         }
     };
 
-    let maybe_display: Option<ProgressPlot>;
-    let progress_tx;
-    if args.get_flag("gui") {
-        let (display, tx) = ProgressPlot::new_with_channel(&cities, 1024.0, 1024.0, 50.0);
-        progress_tx = Some(tx);
-        maybe_display = Some(display);
-    } else {
-        progress_tx = None;
-        maybe_display = None;
-    }
-
     let opt_tour = args.get_one::<String>("optimal_tour").and_then(|p| {
         match teeline::tsp::opt_tour::read_from_file(Path::new(p.as_str())) {
             Ok(t) => Some(t),
@@ -376,20 +359,6 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
         }
     });
 
-    if let Some(ref ot) = opt_tour
-        && let Some(ref tx) = progress_tx
-    {
-        if ot.dimension == tsp_data.len() {
-            let _ = tx.send(progress::ProgressMessage::OptimalTour(ot.route.clone()));
-        } else {
-            eprintln!(
-                "--optimal-tour: dimension mismatch ({} vs {}); skipping visualization overlay",
-                ot.dimension,
-                tsp_data.len()
-            );
-        }
-    }
-
     let stages: Vec<PipelineStage> = stage_configs
         .into_iter()
         .map(|(solver, options)| {
@@ -397,26 +366,22 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
                 solver,
                 options,
                 TspProblem::new(cities.clone(), distances.clone()),
-                progress_tx.clone(),
+                None,
             )
         })
         .collect();
 
     let n_stages = stages.len();
     let span = tracing::info_span!("solver", n_stages);
-    let solver_handle = thread::spawn(move || {
+    let tour = thread::spawn(move || {
         let _enter = span.entered();
         let tour = run_pipeline(&stages).expect("solver failed");
         tracing::info!(tour_length = tour.total, "solver finished");
         print_solution(&tour, false);
         tour
-    });
-
-    if let Some(display) = maybe_display {
-        display.run();
-    }
-
-    let tour = solver_handle.join().expect("Solver thread failed");
+    })
+    .join()
+    .expect("Solver thread failed");
 
     if let Some(ot) = opt_tour {
         print_optimal_comparison(&tour, &distances, tsp_data.len(), &ot);

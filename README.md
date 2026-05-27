@@ -26,7 +26,7 @@ After finishing the book I took the [Discrete Optimization](https://coursera.org
 
 ### Build
 
-The workspace has two crates: `teeline` (pure solver library) and `teeline-cli` (CLI binary + egui visualisation). To get the runnable binary, build `teeline-cli`:
+The workspace has two crates: `teeline` (pure solver library) and `teeline-cli` (CLI binary). To get the runnable binary, build `teeline-cli`:
 
 ```bash
 # debug build — fast compile, slower runtime
@@ -35,7 +35,7 @@ cargo build -p teeline-cli
 # optimised release build — recommended for real use
 cargo build -p teeline-cli --release
 
-# solver library only (no GUI, no eframe dependency — useful for embedding)
+# solver library only (useful for embedding)
 cargo build -p teeline
 ```
 
@@ -133,9 +133,6 @@ teeline solve nn -i ./data/tsplib/berlin52.tsp
 
 # from stdin
 cat ./data/tsplib/berlin52.tsp | teeline solve nn
-
-# with the visualization window
-teeline solve nn -i ./data/tsplib/berlin52.tsp --gui
 ```
 
 Output format:
@@ -533,11 +530,7 @@ See **[docs/wasm.md](docs/wasm.md)** for the full interface reference, build ins
 
 ---
 
-## Visualising Results
-
-While solving, Teeline runs headless by default. Pass `--gui` to open a window that shows the current best route updating in real time.
-
-### Comparing against a known-optimal tour
+## Comparing against a known-optimal tour
 
 Pass `--optimal-tour <FILE>` with a TSPLIB `.opt.tour` file to overlay the optimal route on the visualisation and print a gap comparison to stderr after solving.
 
@@ -554,15 +547,6 @@ Optimal  : 7544.36572  (from BERLIN52.OPT.TOUR)
 Solver   : 7953.25830
 Gap      : +5.42 %
 ```
-
-The visualisation window uses colour to show how the solver's best tour compares to the optimal:
-
-| Colour | Meaning |
-|--------|---------|
-| Very dark green (thick) | Edge appears in **both** the optimal tour and the solver's best — correctly found |
-| Light gray | Edge is in the optimal tour but **missed** by the solver |
-| Dark green | Solver's best route |
-| Blue | Current route being explored |
 
 Optimal tour files for the TSPLIB benchmark instances are included in `data/tsplib/` (e.g. `berlin52.opt.tour`).
 
