@@ -6,6 +6,16 @@ Teeline is a solver for the symmetric Traveling Salesman Problem, written in Rus
 
 It is a work in progress. It already implements all algorithms typically covered by a CS algorithms course. More advanced algorithms will be added once the code structure and interfaces have stabilised.
 
+## Subprojects
+
+| Subproject | Description |
+|---|---|
+| [teeline-cli](teeline-cli/README.md) | Command-line solver — reads TSPLIB files, prints the best tour found |
+| [teeline-qt](teeline-qt/README.md) | Qt 6 desktop GUI with live solver visualization and a pipeline builder |
+| [teeline-wasm](teeline-wasm/README.md) | WebAssembly Component Model build — callable from JS, Python, Go, and Rust |
+
+The `teeline` crate at the root is the pure solver library shared by all three.
+
 ## Backstory
 
 It all started from the ["In Pursuit of the Traveling Salesman"](https://www.amazon.de/Pursuit-Traveling-Salesman-Mathematics-Computation-ebook/dp/B0073X0IR2/) book — a fantastic read that covers the history of the problem and the big ideas behind the Concorde solver. I was genuinely surprised that Linear Programming works so well here and can provide exact solutions for very large instances.
