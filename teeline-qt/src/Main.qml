@@ -221,48 +221,8 @@ ApplicationWindow {
 
     }
 
-    // ── Solver metadata (static) ────────────────────────────────────────────
-    readonly property var solverList: [
-        { name: "Bellman-Held-Karp",    alias: "bhk",            category: "Exact",
-          desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
-          complexity: "O(n² · 2ⁿ)", hasOptions: false, exact: true },
-        { name: "Branch & Bound",       alias: "branch_bound",   category: "Exact",
-          desc: "Exact branch-and-bound with lower-bound pruning.",
-          complexity: "O(n!)",        hasOptions: false, exact: true },
-        { name: "Nearest Neighbor",     alias: "nn",             category: "Constructive",
-          desc: "Greedy heuristic: always visit the nearest unvisited city.",
-          complexity: "O(n²)",        hasOptions: false, exact: false },
-        { name: "2-opt",                alias: "2opt",           category: "Local Search",
-          desc: "Iteratively reverses sub-tours to remove crossing edges.",
-          complexity: "O(n²) / pass", hasOptions: false, exact: false },
-        { name: "3-opt",                alias: "3opt",           category: "Local Search",
-          desc: "Extends 2-opt by considering triple-edge reconnections.",
-          complexity: "O(n³) / pass", hasOptions: false, exact: false },
-        { name: "Simulated Annealing",  alias: "sa",             category: "Metaheuristic",
-          desc: "Accepts worse moves with decreasing probability to escape local optima.",
-          complexity: "O(epochs · n)", hasOptions: true,  exact: false },
-        { name: "Genetic Algorithm",    alias: "ga",             category: "Metaheuristic",
-          desc: "Evolves a population of tours via crossover and mutation operators.",
-          complexity: "O(epochs · pop · n)", hasOptions: true, exact: false },
-        { name: "Particle Swarm",       alias: "pso",            category: "Metaheuristic",
-          desc: "Discrete PSO with velocity-capped particles guided by a global best.",
-          complexity: "O(epochs · swarm · n)", hasOptions: true, exact: false },
-        { name: "Cuckoo Search",        alias: "cs",             category: "Metaheuristic",
-          desc: "Lévy-flight search with probabilistic nest abandonment.",
-          complexity: "O(epochs · nests · n)", hasOptions: true, exact: false },
-        { name: "Flower Pollination",   alias: "fpa",            category: "Metaheuristic",
-          desc: "Global Lévy-flight toward best tour; local ε-scaled cross-pollination.",
-          complexity: "O(epochs · pop · n)", hasOptions: true, exact: false },
-        { name: "Stochastic Hill Climb",alias: "stochastic_hill",category: "Metaheuristic",
-          desc: "Random-restart hill climbing to escape local optima.",
-          complexity: "O(epochs · n)", hasOptions: false, exact: false },
-        { name: "Tabu Search",          alias: "tabu_search",    category: "Metaheuristic",
-          desc: "Local search with a memory structure to avoid revisiting solutions.",
-          complexity: "O(epochs · n)", hasOptions: false, exact: false },
-        { name: "Random Shuffle",       alias: "shuffle",        category: "Utility",
-          desc: "Baseline random tour. Useful as a warm-start seed for pipelines.",
-          complexity: "O(n)",          hasOptions: false, exact: false },
-    ]
+    // ── Solver metadata — populated from Rust backend at startup (issue #118) ──
+    readonly property var solverList: JSON.parse(SolverEngine.solversJson)
 
     // ── Inline component: SolverPage ────────────────────────────────────────
     // ── Inline component: SolverPage (merged with ConfigPage, issues #104 + #106 + #114) ──

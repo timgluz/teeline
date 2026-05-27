@@ -180,6 +180,66 @@ impl Solvers {
     }
 }
 
+// ---------------------------------------------------------------------------
+// UI-facing solver metadata (used by teeline-qt)
+// ---------------------------------------------------------------------------
+
+pub struct SolverInfo {
+    pub name:        &'static str,
+    pub alias:       &'static str,
+    pub category:    &'static str,
+    pub desc:        &'static str,
+    pub complexity:  &'static str,
+    pub has_options: bool,
+    pub exact:       bool,
+}
+
+static SOLVER_LIST: [SolverInfo; 13] = [
+    SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
+                 desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
+                 complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
+    SolverInfo { name: "Branch & Bound",        alias: "branch_bound",    category: "Exact",
+                 desc: "Exact branch-and-bound with lower-bound pruning.",
+                 complexity: "O(n!)", has_options: false, exact: true },
+    SolverInfo { name: "Nearest Neighbor",      alias: "nn",              category: "Constructive",
+                 desc: "Greedy heuristic: always visit the nearest unvisited city.",
+                 complexity: "O(n\u{00b2})", has_options: false, exact: false },
+    SolverInfo { name: "2-opt",                 alias: "2opt",            category: "Local Search",
+                 desc: "Iteratively reverses sub-tours to remove crossing edges.",
+                 complexity: "O(n\u{00b2}) / pass", has_options: false, exact: false },
+    SolverInfo { name: "3-opt",                 alias: "3opt",            category: "Local Search",
+                 desc: "Extends 2-opt by considering triple-edge reconnections.",
+                 complexity: "O(n\u{00b3}) / pass", has_options: false, exact: false },
+    SolverInfo { name: "Simulated Annealing",   alias: "sa",              category: "Metaheuristic",
+                 desc: "Accepts worse moves with decreasing probability to escape local optima.",
+                 complexity: "O(epochs \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Genetic Algorithm",     alias: "ga",              category: "Metaheuristic",
+                 desc: "Evolves a population of tours via crossover and mutation operators.",
+                 complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Particle Swarm",        alias: "pso",             category: "Metaheuristic",
+                 desc: "Discrete PSO with velocity-capped particles guided by a global best.",
+                 complexity: "O(epochs \u{00b7} swarm \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Cuckoo Search",         alias: "cs",              category: "Metaheuristic",
+                 desc: "L\u{00e9}vy-flight search with probabilistic nest abandonment.",
+                 complexity: "O(epochs \u{00b7} nests \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Flower Pollination",    alias: "fpa",             category: "Metaheuristic",
+                 desc: "Global L\u{00e9}vy-flight toward best tour; local \u{03b5}-scaled cross-pollination.",
+                 complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Stochastic Hill Climb", alias: "stochastic_hill", category: "Metaheuristic",
+                 desc: "Random-restart hill climbing to escape local optima.",
+                 complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
+    SolverInfo { name: "Tabu Search",           alias: "tabu_search",     category: "Metaheuristic",
+                 desc: "Local search with a memory structure to avoid revisiting solutions.",
+                 complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
+    SolverInfo { name: "Random Shuffle",        alias: "shuffle",         category: "Utility",
+                 desc: "Baseline random tour. Useful as a warm-start seed for pipelines.",
+                 complexity: "O(n)", has_options: false, exact: false },
+];
+
+pub fn list_solvers() -> &'static [SolverInfo] {
+    &SOLVER_LIST
+}
+
 impl FromStr for Solvers {
     type Err = &'static str;
 
