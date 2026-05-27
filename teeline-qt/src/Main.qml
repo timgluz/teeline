@@ -4,6 +4,8 @@ import QtQuick.Layouts
 import QtQuick.Dialogs
 import teeline_qt
 
+pragma ComponentBehavior: Bound
+
 ApplicationWindow {
     id: root
     visible: true
@@ -106,7 +108,7 @@ ApplicationWindow {
                     anchors.fill: parent
                     onDropped: function(drop) {
                         if (drop.urls.length > 0)
-                            FileLoader.loadFile(drop.urls[0].toString())
+                            FileLoader.loadFile(drop.urls[0])
                     }
                 }
             }
@@ -140,8 +142,8 @@ ApplicationWindow {
 
                 Canvas {
                     id: miniMap
-                    width: 200
-                    height: 200
+                    Layout.preferredWidth: 200
+                    Layout.preferredHeight: 200
 
                     onPaint: {
                         var ctx = getContext("2d")
@@ -185,7 +187,7 @@ ApplicationWindow {
                         color: theme.accent
                         font.pixelSize: 13
                         elide: Text.ElideLeft
-                        width: 420
+                        Layout.preferredWidth: 420
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
@@ -214,7 +216,7 @@ ApplicationWindow {
             id: fileDialog
             title: "Open TSPLIB file"
             nameFilters: ["TSPLIB files (*.tsp)", "All files (*)"]
-            onAccepted: FileLoader.loadFile(selectedFile.toString())
+            onAccepted: FileLoader.loadFile(selectedFile)
         }
 
     }
@@ -265,6 +267,7 @@ ApplicationWindow {
     // ── Inline component: SolverPage ────────────────────────────────────────
     // ── Inline component: SolverPage (merged with ConfigPage, issues #104 + #106 + #114) ──
     component SolverPage: Page {
+        id: solverPageRoot
         signal backRequested()
         signal solveRequested()
         signal pipelineRequested()
@@ -272,7 +275,7 @@ ApplicationWindow {
         background: Rectangle { color: theme.bgApp }
 
         property int selectedIdx: -1
-        property var selectedSolver: selectedIdx >= 0 ? solverList[selectedIdx] : null
+        property var selectedSolver: selectedIdx >= 0 ? root.solverList[selectedIdx] : null
         property bool exactWarning: selectedSolver !== null && selectedSolver.exact && FileLoader.cityCount > 20
 
         // ── Solver-option helpers (merged from ConfigPage) ─────────────────
@@ -357,7 +360,7 @@ ApplicationWindow {
                     id: solverListView
                     anchors.fill: parent
                     anchors.margins: 8
-                    model: solverList
+                    model: root.solverList
                     clip: true
 
                     section.property: "category"
@@ -386,23 +389,23 @@ ApplicationWindow {
 
                         property bool isExactWarning: modelData.exact && FileLoader.cityCount > 20
 
-                        highlighted: index === selectedIdx
+                        highlighted: index === solverPageRoot.selectedIdx
                         enabled: !isExactWarning
 
                         contentItem: Text {
                             text: modelData.name
-                            color: isExactWarning ? theme.textDisabled : (index === selectedIdx ? theme.accentGreen : theme.textPrimary)
+                            color: isExactWarning ? theme.textDisabled : (index === solverPageRoot.selectedIdx ? theme.accentGreen : theme.textPrimary)
                             font.pixelSize: 13
                             verticalAlignment: Text.AlignVCenter
                         }
 
                         background: Rectangle {
-                            color: index === selectedIdx ? theme.bgHighlight : "transparent"
+                            color: index === solverPageRoot.selectedIdx ? theme.bgHighlight : "transparent"
                             radius: 4
                         }
 
                         onClicked: {
-                            selectedIdx = index
+                            solverPageRoot.selectedIdx = index
                             SolverEngine.selectSolver(modelData.alias)
                         }
 
@@ -545,7 +548,7 @@ ApplicationWindow {
                                         Text { text: "Min temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                                         TextField {
                                             id: minTField
-                                            width: 180; font.pixelSize: 14
+                                            Layout.preferredWidth: 180; font.pixelSize: 14
                                             text: saDefaults.min_temperature.toString(); placeholderText: "0.001"
                                             color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
                                             validator: DoubleValidator { bottom: 0; notation: DoubleValidator.StandardNotation }
@@ -557,7 +560,7 @@ ApplicationWindow {
                                         Text { text: "Max temperature"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                                         TextField {
                                             id: maxTField
-                                            width: 180; font.pixelSize: 14
+                                            Layout.preferredWidth: 180; font.pixelSize: 14
                                             text: saDefaults.max_temperature.toString(); placeholderText: "1000.0"
                                             color: theme.textDark; placeholderTextColor: theme.fieldPlaceholder
                                             validator: DoubleValidator { bottom: 0.000001; notation: DoubleValidator.StandardNotation }
@@ -597,7 +600,7 @@ ApplicationWindow {
                                     Text { text: "Elite count"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                                     TextField {
                                         id: eliteField
-                                        width: 140; font.pixelSize: 14
+                                        Layout.preferredWidth: 140; font.pixelSize: 14
                                         text: gaDefaults.n_elite.toString(); placeholderText: "3"
                                         color: acceptableInput ? theme.textDark : theme.inputError
                                         placeholderTextColor: theme.fieldPlaceholder
@@ -633,7 +636,7 @@ ApplicationWindow {
                                 Text { text: "Swarm size (n_nearest)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
                                 TextField {
                                     id: swarmField
-                                    width: 140; font.pixelSize: 14
+                                    Layout.preferredWidth: 140; font.pixelSize: 14
                                     text: psoDefaults.n_nearest.toString(); placeholderText: "30"
                                     color: acceptableInput ? theme.textDark : theme.inputError
                                     placeholderTextColor: theme.fieldPlaceholder
@@ -708,7 +711,9 @@ ApplicationWindow {
 
     // ── Inline component: PipelinePage (issue #107) ─────────────────────────
     component PipelinePage: Page {
+        id: pipelinePageRoot
         signal backRequested()
+        signal solveRequested()
 
         background: Rectangle { color: theme.bgApp }
 
@@ -830,7 +835,7 @@ ApplicationWindow {
                                     width: 28; height: 28; radius: 14; color: theme.bgHighlight
                                     Text {
                                         anchors.centerIn: parent
-                                        text: (index + 1).toString()
+                                        text: index + 1
                                         color: theme.accent; font.pixelSize: 13; font.bold: true
                                     }
                                 }
@@ -873,28 +878,28 @@ ApplicationWindow {
                                     ToolTip.text: "Move stage earlier in pipeline"
                                     ToolTip.delay: 400
                                     onClicked: {
-                                        var arr = stages.slice()
+                                        var arr = pipelinePageRoot.stages.slice()
                                         var tmp = arr[index - 1]
                                         arr[index - 1] = arr[index]
                                         arr[index] = tmp
-                                        stages = arr
+                                        pipelinePageRoot.stages = arr
                                     }
                                 }
 
                                 // Move down
                                 Button {
                                     text: "↓ Down"
-                                    enabled: index < stages.length - 1
-                                    opacity: index < stages.length - 1 ? 1.0 : 0.3
+                                    enabled: index < pipelinePageRoot.stages.length - 1
+                                    opacity: index < pipelinePageRoot.stages.length - 1 ? 1.0 : 0.3
                                     ToolTip.visible: hovered
                                     ToolTip.text: "Move stage later in pipeline"
                                     ToolTip.delay: 400
                                     onClicked: {
-                                        var arr = stages.slice()
+                                        var arr = pipelinePageRoot.stages.slice()
                                         var tmp = arr[index + 1]
                                         arr[index + 1] = arr[index]
                                         arr[index] = tmp
-                                        stages = arr
+                                        pipelinePageRoot.stages = arr
                                     }
                                 }
 
@@ -912,9 +917,9 @@ ApplicationWindow {
                                         verticalAlignment: Text.AlignVCenter
                                     }
                                     onClicked: {
-                                        var arr = stages.slice()
+                                        var arr = pipelinePageRoot.stages.slice()
                                         arr.splice(index, 1)
-                                        stages = arr
+                                        pipelinePageRoot.stages = arr
                                     }
                                 }
                             }
@@ -1058,7 +1063,7 @@ ApplicationWindow {
                         enabled: stages.length >= 1
                         onClicked: {
                             SolverEngine.runPipelineStages(FileLoader.filePath, stagesJson())
-                            stackView.push(vizComp)
+                            solveRequested()
                         }
                     }
                 }
@@ -1088,11 +1093,12 @@ ApplicationWindow {
                     id: solverListView2
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    model: solverList
+                    model: root.solverList
                     clip: true
                     spacing: 2
 
                     delegate: ItemDelegate {
+                        id: addStageDelegateItem
                         width: solverListView2.width
                         height: 40
                         required property var modelData
@@ -1104,13 +1110,13 @@ ApplicationWindow {
                         }
 
                         background: Rectangle {
-                            color: parent.hovered ? theme.bgHighlight : "transparent"; radius: 4
+                            color: addStageDelegateItem.hovered ? theme.bgHighlight : "transparent"; radius: 4
                         }
 
                         onClicked: {
-                            var arr = stages.slice()
+                            var arr = pipelinePageRoot.stages.slice()
                             arr.push({ solver: modelData.alias, name: modelData.name, category: modelData.category })
-                            stages = arr
+                            pipelinePageRoot.stages = arr
                             addStagePopup.close()
                         }
                     }
@@ -1235,7 +1241,7 @@ ApplicationWindow {
                 RowLayout {
                     spacing: 12
                     Text { text: "Iteration"; color: theme.textDim; font.pixelSize: 11 }
-                    Text { text: SolverEngine.iteration.toString(); color: theme.textPrimary; font.pixelSize: 13 }
+                    Text { text: SolverEngine.iteration; color: theme.textPrimary; font.pixelSize: 13 }
                 }
                 RowLayout {
                     spacing: 12
@@ -1255,7 +1261,7 @@ ApplicationWindow {
                     visible: SolverEngine.running
                     spacing: 6
                     Rectangle {
-                        width: 8; height: 8; radius: 4; color: theme.accentGreen
+                        Layout.preferredWidth: 8; Layout.preferredHeight: 8; radius: 4; color: theme.accentGreen
                         SequentialAnimation on opacity {
                             loops: Animation.Infinite
                             NumberAnimation { to: 0.2; duration: 600 }
@@ -1329,7 +1335,10 @@ ApplicationWindow {
 
     Component {
         id: pipelineComp
-        PipelinePage { onBackRequested: stackView.pop() }
+        PipelinePage {
+            onBackRequested:  stackView.pop()
+            onSolveRequested: stackView.push(vizComp)
+        }
     }
 
     Component {
