@@ -7,16 +7,12 @@ repository = "https://github.com/timgluz/teeline"
 license = "MIT"
 keywords = ["tsp", "optimization"]
 
-[lib]
-name = "teeline_cli"
-
 [[bin]]
 name = "teeline"
 path = "src/main.rs"
 
 [dependencies]
 teeline = { path = ".." }
-eframe = { version = "0.33", features = ["x11", "wayland"] }
 clap = "4.6.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
