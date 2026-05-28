@@ -9,6 +9,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use super::CityTable;
+use super::DistanceType;
 use super::distance_matrix::{self, DistanceMatrix};
 use super::kdtree::KDPoint;
 
@@ -29,6 +30,7 @@ pub struct TspLibData {
     cities: Vec<KDPoint>,
     dimension: usize,
     raw_distances: Option<Vec<f32>>,
+    pub distance_type: DistanceType,
 }
 
 impl TspLibData {
@@ -38,6 +40,7 @@ impl TspLibData {
         cities: Vec<KDPoint>,
         dimension: usize,
         raw_distances: Option<Vec<f32>>,
+        distance_type: DistanceType,
     ) -> Self {
         TspLibData {
             name,
@@ -45,7 +48,13 @@ impl TspLibData {
             cities,
             dimension,
             raw_distances,
+            distance_type,
         }
+    }
+
+    pub fn with_distance_type(mut self, dt: DistanceType) -> Self {
+        self.distance_type = dt;
+        self
     }
 
     pub fn cities(&self) -> &[KDPoint] {
@@ -84,7 +93,7 @@ impl TspLibData {
                     .collect();
                 Ok(DistanceMatrix::new(n, dists.clone(), city_table))
             }
-            None => Ok(distance_matrix::from_cities(&self.cities)),
+            None => Ok(distance_matrix::build(&self.cities, self.distance_type)),
         }
     }
 }
@@ -165,6 +174,11 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
         return Err("ATSP (asymmetric TSP) is not supported".to_string());
     }
 
+    let distance_type: DistanceType = metadata
+        .get("EDGE_WEIGHT_TYPE")
+        .and_then(|v| v.trim().parse::<DistanceType>().ok())
+        .unwrap_or_default();
+
     let dimension: usize = metadata
         .get("DIMENSION")
         .and_then(|v| v.trim().parse().ok())
@@ -212,6 +226,7 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
         cities,
         dimension,
         raw_distances,
+        distance_type,
     );
 
     Ok(dt)
@@ -567,6 +582,24 @@ mod tests {
         assert!((dm.distance_between(1, 2).unwrap() - 1.0).abs() < 1e-3);
         assert!((dm.distance_between(1, 3).unwrap() - 2.0).abs() < 1e-3);
         assert!((dm.distance_between(2, 3).unwrap() - 3.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_process_lines_geo_distance_type() {
+        let cursor = "NAME: geo_case\nEDGE_WEIGHT_TYPE: GEO\nNODE_COORD_SECTION\n1 16.47 96.10\n2 23.70 96.99\nEOF\n".as_bytes();
+        let reader = BufReader::new(cursor);
+        let res = process_lines(reader);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().distance_type, DistanceType::Geo);
+    }
+
+    #[test]
+    fn test_process_lines_unknown_type_falls_back_to_euc2d() {
+        let cursor = "NAME: att_case\nEDGE_WEIGHT_TYPE: ATT\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n".as_bytes();
+        let reader = BufReader::new(cursor);
+        let res = process_lines(reader);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().distance_type, DistanceType::Euc2D);
     }
 
     #[test]
