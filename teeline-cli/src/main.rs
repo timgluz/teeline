@@ -12,6 +12,7 @@ use teeline::tsp::{
     pipeline::{PipelineStage, run_pipeline},
     tsplib,
 };
+use teeline::DistanceType;
 use tracing_subscriber::EnvFilter;
 
 // ---------------------------------------------------------------------------
@@ -230,6 +231,10 @@ fn tuning_args() -> Vec<Arg> {
             .value_name("FILE_PATH")
             .help("path to .opt.tour file; overlays optimal route and prints gap")
             .required(false),
+        Arg::new("distance_type")
+            .long("distance-type")
+            .help("override distance formula: euc_2d, geo (default: from file header)")
+            .required(false),
     ]
 }
 
@@ -335,6 +340,18 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
         read_tsp_data_from_file(Path::new(input_file_path.as_str()))
     } else {
         read_tsp_data_from_stdin()
+    };
+
+    let tsp_data = if let Some(dt_str) = args.get_one::<String>("distance_type") {
+        match dt_str.parse::<DistanceType>() {
+            Ok(dt) => tsp_data.with_distance_type(dt),
+            Err(e) => {
+                eprintln!("error: --distance-type: {e}");
+                std::process::exit(1);
+            }
+        }
+    } else {
+        tsp_data
     };
 
     tracing::info!(name = %tsp_data.name, comment = %tsp_data.comment,

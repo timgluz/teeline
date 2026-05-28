@@ -117,6 +117,30 @@ fn test_tour_length_with_unknown_city_does_not_panic() {
     let _ = dm.tour_length(&[0, 99, 1]); // must not panic
 }
 
+/// burma14.tsp declares EDGE_WEIGHT_TYPE: GEO; verify distance_type is parsed and
+/// that GEO distances are in a realistic range (hundreds of km, not Euclidean ~1.66).
+#[test]
+fn test_burma14_geo_distance_matrix() {
+    let path = std::path::Path::new("data/tsplib/burma14.tsp");
+    let tsp_data = teeline::tsp::tsplib::read_from_file(path).expect("burma14 not found");
+
+    assert_eq!(tsp_data.distance_type, teeline::DistanceType::Geo);
+
+    let dm = tsp_data.distance_matrix().expect("distance matrix");
+
+    // Cities 1=(16.47, 96.10) and 2=(16.47, 94.44) share the same latitude.
+    // Euclidean distance would be ~1.66; GEO distance should be much larger (hundreds of km).
+    let geo_d = dm.distance_between(1, 2).expect("distance between city 1 and 2");
+    assert!(
+        geo_d > 100.0,
+        "GEO distance should be > 100 km, got {geo_d}"
+    );
+    assert!(
+        geo_d < 300.0,
+        "GEO distance should be < 300 km, got {geo_d}"
+    );
+}
+
 /// tour_length_by_pos must return the same result as tour_length for a valid path.
 #[test]
 fn test_tour_length_by_pos_matches_tour_length() {
