@@ -54,11 +54,33 @@
 use std::collections::HashMap;
 
 use super::kdtree::KDPoint;
-use super::{CityTable, NearestResult};
+use super::{CityTable, DistanceType, NearestResult};
+
+fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    use std::f64::consts::PI;
+    fn to_rad(x: f32) -> f64 {
+        let deg = x.trunc() as f64;
+        let min = (x - x.trunc()) as f64;
+        PI * (deg + 5.0 * min / 3.0) / 180.0
+    }
+    let lat1 = to_rad(p1.coords[0]);
+    let lon1 = to_rad(p1.coords[1]);
+    let lat2 = to_rad(p2.coords[0]);
+    let lon2 = to_rad(p2.coords[1]);
+    let q1 = (lon1 - lon2).cos();
+    let q2 = (lat1 - lat2).cos();
+    let q3 = (lat1 + lat2).cos();
+    const RRR: f64 = 6378.388;
+    (RRR * (0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)).acos() + 1.0).floor() as f32
+}
 
 // to have similar builder as kdtree
 pub fn from_cities(cities: &[KDPoint]) -> DistanceMatrix {
     DistanceMatrix::from_cities(cities).unwrap()
+}
+
+pub fn build(cities: &[KDPoint], dt: DistanceType) -> DistanceMatrix {
+    DistanceMatrix::build(cities, dt).unwrap()
 }
 
 #[derive(Debug, Clone)]
@@ -94,6 +116,10 @@ impl DistanceMatrix {
 
     // assumes that cities are already sorted by id and ids are incrementally crowing
     pub fn from_cities(cities: &[KDPoint]) -> Result<Self, &'static str> {
+        Self::build(cities, DistanceType::Euc2D)
+    }
+
+    pub fn build(cities: &[KDPoint], distance_type: DistanceType) -> Result<Self, &'static str> {
         let n = cities.len();
         if n < 2 {
             return Err("distance matrix requires at least 2 points");
@@ -108,7 +134,11 @@ impl DistanceMatrix {
             city_table.insert(i, *pt1);
 
             for pt2 in cities.iter().take(i) {
-                distances.push(pt1.distance(pt2));
+                let d = match distance_type {
+                    DistanceType::Euc2D => pt1.distance(pt2),
+                    DistanceType::Geo => geo_distance(pt1, pt2),
+                };
+                distances.push(d);
             }
         }
 
@@ -400,6 +430,15 @@ mod tests {
 
         let res5 = dm.nearest(&cities[4], 2);
         assert_eq!(cities[0].id, res5.point.id);
+    }
+
+    #[test]
+    fn test_geo_distance_known_pair() {
+        // Issue #127 reference pair: cities A=(16.47, 96.10) & B=(23.70, 96.99)
+        // TSPLIB FAQ great-circle formula (trunc-based, full-precision PI) yields 837.
+        let a = KDPoint::new_with_id(1, &[16.47, 96.10]);
+        let b = KDPoint::new_with_id(2, &[23.70, 96.99]);
+        assert_eq!(geo_distance(&a, &b), 837.0);
     }
 
     // Regression: nearest must work when city IDs are 1-based (as in TSPLIB files like berlin52).

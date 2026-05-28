@@ -108,6 +108,28 @@ impl Solvers {
 }
 
 // ---------------------------------------------------------------------------
+// Distance type — describes how inter-city distances are computed
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DistanceType {
+    #[default]
+    Euc2D,
+    Geo,
+}
+
+impl FromStr for DistanceType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_uppercase().as_str() {
+            "EUC_2D" | "EUC2D" => Ok(DistanceType::Euc2D),
+            "GEO" => Ok(DistanceType::Geo),
+            other => Err(format!("unsupported distance type: {other}")),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Solver catalogue — single source of truth for the `solvers` subcommand
 // ---------------------------------------------------------------------------
 
