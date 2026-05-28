@@ -65,7 +65,7 @@ fn build_evaluator(distances: &DistanceMatrix) -> PathEvaluator {
     Rc::new(move |path: &Path| dm.tour_length(path))
 }
 
-#[allow(clippy::only_used_in_recursion)]
+#[allow(clippy::only_used_in_recursion, clippy::too_many_arguments)]
 fn backtrack(
     evaluate_fn: &PathEvaluator,
     distances: &DistanceMatrix,
