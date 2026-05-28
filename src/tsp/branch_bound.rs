@@ -177,19 +177,64 @@ fn construct_candidates(
     best_distance: f32,
     distances: &DistanceMatrix,
 ) -> Path {
-    let mut candidates: Path = vec![];
-
-    for city_id in unvisited_cities.iter() {
-        let next_distance = distances
-            .distance_between(path[k - 1], *city_id)
-            .expect("city ids in path must be in distance matrix");
-        if best_distance > running_cost + next_distance {
-            candidates.push(*city_id);
-        }
+    if unvisited_cities.is_empty() {
+        return vec![];
     }
 
-    candidates.sort();
-    candidates
+    // MST of {start_city} ∪ unvisited is a lower bound on the minimum cost of
+    // completing the tour from any candidate through the remaining cities back
+    // to the start. The node set is identical for all candidates (see plan),
+    // so the MST is computed once and reused.
+    let start_city = path[0];
+    let mst_nodes: Vec<usize> = std::iter::once(start_city)
+        .chain(unvisited_cities.iter().copied())
+        .collect();
+    let mst = prim_mst(&mst_nodes, distances);
+
+    // Score each candidate by its lower bound, then sort ascending so the most
+    // promising branches are explored first (tightens best_distance faster).
+    let mut scored: Vec<(f32, usize)> = unvisited_cities
+        .iter()
+        .filter_map(|&city_id| {
+            let next_dist = distances
+                .distance_between(path[k - 1], city_id)
+                .expect("city ids in path must be in distance matrix");
+            let lb = running_cost + next_dist + mst;
+            if best_distance > lb { Some((lb, city_id)) } else { None }
+        })
+        .collect();
+    scored.sort_by(|a, b| a.0.total_cmp(&b.0));
+    scored.into_iter().map(|(_, id)| id).collect()
+}
+
+fn prim_mst(city_ids: &[usize], distances: &DistanceMatrix) -> f32 {
+    let n = city_ids.len();
+    if n <= 1 {
+        return 0.0;
+    }
+    let mut in_tree = vec![false; n];
+    let mut min_key = vec![f32::MAX; n];
+    min_key[0] = 0.0;
+    let mut total = 0.0;
+    for _ in 0..n {
+        let u = (0..n)
+            .filter(|&i| !in_tree[i])
+            .min_by(|&a, &b| min_key[a].total_cmp(&min_key[b]))
+            .unwrap();
+        in_tree[u] = true;
+        total += min_key[u];
+        for v in 0..n {
+            if !in_tree[v] {
+                let d = distances
+                    .distance_between(city_ids[u], city_ids[v])
+                    .expect("city ids in MST must be in distance matrix");
+                if d < min_key[v] {
+                    min_key[v] = d;
+                }
+            }
+        }
+    }
+    total
 }
 
 fn make_move(
@@ -320,5 +365,20 @@ mod tests {
             with_seed.total,
             without_seed.total
         );
+    }
+
+    #[test]
+    fn test_prim_mst_triangle() {
+        // 3 cities: right triangle with legs 3 and 4. MST picks the two shorter
+        // edges (3+4=7) and excludes the hypotenuse (5). Uses 1-indexed IDs to
+        // avoid UNVISITED_NODE=0 collision with city ID 0 from build_points.
+        let cities: Vec<kdtree::KDPoint> = [
+            [0.0f32, 0.0], [3.0, 0.0], [0.0, 4.0],
+        ].iter().enumerate()
+         .map(|(i, c)| kdtree::KDPoint::new_with_id(i + 1, c))
+         .collect();
+        let dm = distance_matrix::from_cities(&cities);
+        let mst = prim_mst(&[1, 2, 3], &dm);
+        assert!((mst - 7.0).abs() < 1e-3, "MST of 3-4-5 triangle should be 7, got {mst}");
     }
 }
