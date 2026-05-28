@@ -7,6 +7,11 @@ use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
 
+// NOTE: build_points() assigns 0-indexed city IDs, so this sentinel collides
+// with city ID 0 in unit tests. Currently harmless because the algorithm uses
+// positional indexing (path[k]) and never compares slots to UNVISITED_NODE
+// except in the progress-reporting filter (which may silently drop city 0 from
+// progress updates). TSPLIB files are 1-indexed, so no production impact.
 const UNVISITED_NODE: usize = 0;
 
 type UniqSet = HashSet<usize>;
@@ -39,6 +44,7 @@ pub fn solve(
     let fitness_fn = build_evaluator(distances);
     let (best_path, _best_distance) = backtrack(
         &fitness_fn,
+        distances,
         &mut open_path,
         &unvisited_cities,
         1,
@@ -62,6 +68,7 @@ fn build_evaluator(distances: &DistanceMatrix) -> PathEvaluator {
 #[allow(clippy::only_used_in_recursion)]
 fn backtrack(
     evaluate_fn: &PathEvaluator,
+    distances: &DistanceMatrix,
     path: &mut Path,
     unvisited_cities: &UniqSet,
     k: usize,
@@ -90,7 +97,7 @@ fn backtrack(
         unvisited_cities,
         running_cost,
         best_distance,
-        evaluate_fn,
+        distances,
     );
 
     for candidate in candidates.iter() {
@@ -110,13 +117,16 @@ fn backtrack(
         }
 
         let prev_city = path[k - 1];
-        let next_distance = evaluate_fn(&vec![prev_city, *candidate]);
+        let next_distance = distances
+            .distance_between(prev_city, *candidate)
+            .expect("city ids in path must be in distance matrix");
 
         let mut next_cities = unvisited_cities.clone();
         next_cities.remove(candidate);
 
         let (sub_res, sub_dist) = backtrack(
             evaluate_fn,
+            distances,
             path,
             &next_cities,
             k + 1,
@@ -148,12 +158,14 @@ fn construct_candidates(
     unvisited_cities: &UniqSet,
     running_cost: f32,
     best_distance: f32,
-    evaluate_fn: &PathEvaluator,
+    distances: &DistanceMatrix,
 ) -> Path {
     let mut candidates: Path = vec![];
 
     for city_id in unvisited_cities.iter() {
-        let next_distance = evaluate_fn(&vec![path[k - 1], *city_id]);
+        let next_distance = distances
+            .distance_between(path[k - 1], *city_id)
+            .expect("city ids in path must be in distance matrix");
         if best_distance > running_cost + next_distance {
             candidates.push(*city_id);
         }
@@ -231,6 +243,41 @@ mod tests {
             "B&B tour {} should match BHK tour {}",
             bb_tour.total,
             bhk_tour.total
+        );
+    }
+
+    #[test]
+    fn test_solve_matches_bhk_on_tsp8() {
+        // Uses 1-indexed city IDs (matching TSPLIB convention) to avoid the
+        // UNVISITED_NODE=0 sentinel colliding with city ID 0 from build_points.
+        // Points are arranged so the sorted-ID sequential tour crosses itself —
+        // B&B must find the same optimal as BHK, not just return input order.
+        let coords: &[&[f32]] = &[
+            &[0.0, 0.0],
+            &[3.0, 1.0],
+            &[1.0, 3.0],
+            &[4.0, 4.0],
+            &[2.0, 0.5],
+            &[0.5, 2.0],
+            &[3.5, 2.5],
+            &[1.5, 4.0],
+        ];
+        let cities: Vec<kdtree::KDPoint> = coords
+            .iter()
+            .enumerate()
+            .map(|(i, c)| kdtree::KDPoint::new_with_id(i + 1, c))
+            .collect();
+        let dm = distance_matrix::from_cities(&cities);
+        let problem = TspProblem::new(cities, dm);
+
+        let bb = solve(&problem, &HeuristicOptions::default(), None, None);
+        let bhk = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+
+        assert!(
+            (bb.total - bhk.total).abs() < 1e-3,
+            "B&B tour {:.3} should match BHK optimal {:.3}",
+            bb.total,
+            bhk.total
         );
     }
 }

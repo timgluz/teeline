@@ -156,7 +156,12 @@ fn read_optimal_route(opt: &DPTable, dm: &DistanceMatrix, n: usize, best_val: f3
 }
 
 fn approx(x1: f32, x2: f32) -> bool {
-    (x1 - x2).abs() < f32::EPSILON
+    // f32::EPSILON (~1.2e-7) is the gap between 1.0 and the next f32, not a usable
+    // tolerance for sums of distances. Accumulated rounding over N f32 additions
+    // reaches ~N * ULP(result), which for tour costs ~10-3000 is ~1e-5 to ~3e-4.
+    let diff = (x1 - x2).abs();
+    let scale = x1.abs().max(x2.abs()).max(1.0);
+    diff <= scale * 1e-4
 }
 
 fn show_table(opt: &DPTable) {
@@ -220,6 +225,36 @@ mod tests {
             (solution.total - 4.0).abs() < 1e-3,
             "expected tour length ~4.0, got {}",
             solution.total
+        );
+    }
+
+    #[test]
+    fn test_route_reconstruction_on_larger_instance() {
+        // Regression: read_optimal_route used f32::EPSILON as the comparison
+        // tolerance, which is far too tight for summed f32 distances on 8+ cities.
+        // Accumulated rounding reaches ~1e-6 >> f32::EPSILON, causing the loop
+        // to leave positions as 0, producing repeated cities in the route.
+        let coords: &[&[f32]] = &[
+            &[0.0, 0.0], &[3.0, 1.0], &[1.0, 3.0], &[4.0, 4.0],
+            &[2.0, 0.5], &[0.5, 2.0], &[3.5, 2.5], &[1.5, 4.0],
+        ];
+        let cities: Vec<kdtree::KDPoint> = coords
+            .iter()
+            .enumerate()
+            .map(|(i, c)| kdtree::KDPoint::new_with_id(i + 1, c))
+            .collect();
+        let dm = distance_matrix::from_cities(&cities);
+        let problem = TspProblem::new(cities, dm);
+
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
+
+        let mut route = solution.route().to_vec();
+        route.sort();
+        assert_eq!(
+            route,
+            vec![1, 2, 3, 4, 5, 6, 7, 8],
+            "BHK must visit every city exactly once; got {:?}",
+            solution.route()
         );
     }
 
