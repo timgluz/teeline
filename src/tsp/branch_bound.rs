@@ -22,7 +22,7 @@ pub fn solve(
     problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    _init_tour: Option<&[usize]>,
+    init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
@@ -41,22 +41,39 @@ pub fn solve(
 
     let unvisited_cities: UniqSet = route.route().iter().skip(1).copied().collect();
 
+    // Seed the upper bound from the provided heuristic tour so the very first
+    // descent prunes aggressively. Without this, the bound starts at f32::MAX
+    // and proof-of-optimality requires exhausting nearly all branches.
+    let initial_upper_bound = init_tour
+        .map(|t| distances.tour_length(t))
+        .unwrap_or(f32::MAX);
+
     let fitness_fn = build_evaluator(distances);
-    let (best_path, _best_distance) = backtrack(
+    let (best_path, best_distance) = backtrack(
         &fitness_fn,
         distances,
         &mut open_path,
         &unvisited_cities,
         1,
         0.0,
-        f32::MAX,
+        initial_upper_bound,
         progress_tx,
     );
 
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&best_path, cities, distances)
+
+    // If backtracking found no strictly better tour than the seed, best_path is
+    // still the partial scratch buffer. Return the seed tour as the result.
+    let result_path = if best_distance < initial_upper_bound {
+        best_path
+    } else if let Some(t) = init_tour {
+        t.to_vec()
+    } else {
+        best_path
+    };
+    Solution::from_parts(&result_path, cities, distances)
 }
 
 fn build_evaluator(distances: &DistanceMatrix) -> PathEvaluator {
@@ -278,6 +295,30 @@ mod tests {
             "B&B tour {:.3} should match BHK optimal {:.3}",
             bb.total,
             bhk.total
+        );
+    }
+
+    #[test]
+    fn test_solve_with_init_tour_finds_same_optimal() {
+        // When a good init_tour is provided the upper bound is seeded tightly,
+        // pruning more branches early. The result must still be the exact optimal.
+        let problem = tsp5_problem();
+        let without_seed = solve(&problem, &HeuristicOptions::default(), None, None);
+
+        // Use the unseeded result as the init_tour for the second run.
+        let seed_route = without_seed.route().to_vec();
+        let with_seed = solve(
+            &problem,
+            &HeuristicOptions::default(),
+            None,
+            Some(&seed_route),
+        );
+
+        assert!(
+            (with_seed.total - without_seed.total).abs() < 1e-3,
+            "seeded B&B {:.3} should equal unseeded {:.3}",
+            with_seed.total,
+            without_seed.total
         );
     }
 }
