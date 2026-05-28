@@ -121,7 +121,7 @@ fn test_tour_length_with_unknown_city_does_not_panic() {
 /// that GEO distances are in a realistic range (hundreds of km, not Euclidean ~1.66).
 #[test]
 fn test_burma14_geo_distance_matrix() {
-    let path = std::path::Path::new("data/tsplib/burma14.tsp");
+    let path = std::path::Path::new("tests/fixtures/burma14.tsp");
     let tsp_data = teeline::tsp::tsplib::read_from_file(path).expect("burma14 not found");
 
     assert_eq!(tsp_data.distance_type, teeline::DistanceType::Geo);
