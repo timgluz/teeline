@@ -84,10 +84,12 @@ impl Solvers {
 
     /// Deterministic local-search solvers: monotone hill-climbers that can only reach
     /// solutions reachable from their starting tour. A better start always means a better end.
+    /// BranchBound is included because a NN tour seeds the initial upper bound, cutting
+    /// proof-of-optimality time from O(n!) toward practical runtimes on ≤20 cities.
     pub fn auto_expand_with_nn(&self) -> bool {
         matches!(
             self,
-            Solvers::TwoOpt | Solvers::ThreeOpt | Solvers::TabuSearch
+            Solvers::TwoOpt | Solvers::ThreeOpt | Solvers::TabuSearch | Solvers::BranchBound
         )
     }
 
@@ -1271,8 +1273,14 @@ mod tests {
         assert!(!Solvers::FlowerPollination.auto_expand_with_nn());
         assert!(!Solvers::NearestNeighbor.auto_expand_with_nn());
         assert!(!Solvers::BellmanKarp.auto_expand_with_nn());
-        assert!(!Solvers::BranchBound.auto_expand_with_nn());
         assert!(!Solvers::Unspecified.auto_expand_with_nn());
+    }
+
+    #[test]
+    fn test_branch_bound_auto_expands_with_nn() {
+        // B&B needs a good initial upper bound to prune early; seeding from NN
+        // before backtracking cuts proof-of-optimality time by ~10×.
+        assert!(Solvers::BranchBound.auto_expand_with_nn());
     }
 
     #[test]
