@@ -89,7 +89,7 @@ jobs:
 
   # Build and packages all the platform-specific things
   build-local-artifacts:
-    name: build-local-artifacts (${{ join(matrix.targets, ', ') }})
+    name: build-local-artifacts
     # Let the initial task tell us to not run (currently very blunt)
     needs:
       - plan
@@ -327,3 +327,218 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
+
+  # --- Qt platform builds (issue #119) ---
+  # These jobs run in parallel with the cargo-dist platform builds, then
+  # upload their artifacts to the same GitHub Release after 'host' creates it.
+
+  build-qt-linux:
+    needs:
+      - plan
+    if: ${{ needs.plan.outputs.publishing == 'true' }}
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      QT_VERSION: '6.11.0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          target: desktop
+          arch: gcc_64
+          cache: true
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev libfuse2
+      - name: Build teeline-qt
+        run: cargo build --release --locked -p teeline-qt
+      - name: Download linuxdeploy
+        run: |
+          wget -nv https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget -nv https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-qt-x86_64.AppImage
+      - name: Create AppDir
+        run: |
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp target/release/teeline-qt AppDir/usr/bin/
+          cat > AppDir/teeline-qt.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=Teeline Qt
+          Exec=teeline-qt
+          Icon=teeline-qt
+          Categories=Science;Education;
+          DESKTOP
+          cp AppDir/teeline-qt.desktop AppDir/usr/share/applications/
+          # Generate a 256×256 placeholder icon using Python stdlib (no extra deps)
+          python3 - << 'PYEOF'
+          import struct, zlib
+          def png_chunk(name, data):
+              crc = zlib.crc32(name + data) & 0xffffffff
+              return struct.pack('>I', len(data)) + name + data + struct.pack('>I', crc)
+          w, h = 256, 256
+          sig = b'\x89PNG\r\n\x1a\n'
+          ihdr = png_chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+          row = b'\x00' + b'\x2a\x82\xda' * w   # filter byte + blue RGB
+          idat = png_chunk(b'IDAT', zlib.compress(row * h))
+          iend = png_chunk(b'IEND', b'')
+          with open('AppDir/usr/share/icons/hicolor/256x256/apps/teeline-qt.png', 'wb') as f:
+              f.write(sig + ihdr + idat + iend)
+          PYEOF
+      - name: Package AppImage
+        env:
+          QMLPATHS: ${{ github.workspace }}/teeline-qt/src
+          LD_LIBRARY_PATH: ${{ env.QT_ROOT_DIR }}/lib
+        run: |
+          ./linuxdeploy-x86_64.AppImage --appdir=AppDir --plugin qt --output appimage
+          # linuxdeploy names the file using the desktop entry Name + arch
+          mv Teeline_Qt-x86_64.AppImage "teeline-qt-${{ needs.plan.outputs.tag }}-linux-x86_64.AppImage"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qt-linux
+          path: teeline-qt-*-linux-x86_64.AppImage
+          if-no-files-found: error
+
+  build-qt-windows:
+    needs:
+      - plan
+    if: ${{ needs.plan.outputs.publishing == 'true' }}
+    runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      QT_VERSION: '6.11.0'
+    steps:
+      - name: Configure long paths
+        run: git config --global core.longpaths true
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Build teeline-qt
+        run: cargo build --release --locked -p teeline-qt
+      - name: Deploy Qt dependencies
+        shell: pwsh
+        run: |
+          $windeployqt = "${{ env.QT_ROOT_DIR }}\bin\windeployqt.exe"
+          & $windeployqt --release --compiler-runtime --qmldir teeline-qt\src --dir deploy target\release\teeline-qt.exe
+          Copy-Item target\release\teeline-qt.exe deploy\
+      - name: Package zip
+        shell: pwsh
+        run: |
+          $tag = "${{ needs.plan.outputs.tag }}"
+          $name = "teeline-qt-${tag}-windows-x64"
+          Rename-Item deploy $name
+          Compress-Archive -Path $name -DestinationPath "${name}.zip"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qt-windows
+          path: teeline-qt-*-windows-x64.zip
+          if-no-files-found: error
+
+  build-qt-macos:
+    needs:
+      - plan
+    if: ${{ needs.plan.outputs.publishing == 'true' }}
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      QT_VERSION: '6.11.0'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: mac
+          target: desktop
+          arch: clang_64
+          cache: true
+      - name: Build teeline-qt
+        run: cargo build --release --locked -p teeline-qt
+      - name: Create .app bundle
+        run: |
+          mkdir -p TeelineQt.app/Contents/MacOS
+          mkdir -p TeelineQt.app/Contents/Resources
+          cp target/release/teeline-qt TeelineQt.app/Contents/MacOS/
+          cat > TeelineQt.app/Contents/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>teeline-qt</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.timgluz.teeline-qt</string>
+            <key>CFBundleName</key>
+            <string>TeelineQt</string>
+            <key>CFBundleDisplayName</key>
+            <string>Teeline Qt</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+            <key>NSPrincipalClass</key>
+            <string>NSApplication</string>
+          </dict>
+          </plist>
+          EOF
+      - name: Deploy Qt frameworks and create DMG
+        run: |
+          macdeployqt TeelineQt.app -always-overwrite -qmldir=teeline-qt/src
+          codesign --force --deep -s - TeelineQt.app
+          hdiutil create \
+            -volname "Teeline Qt" \
+            -srcfolder TeelineQt.app \
+            -ov -format UDZO \
+            "teeline-qt-${{ needs.plan.outputs.tag }}-macos-arm64.dmg"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qt-macos
+          path: teeline-qt-*-macos-arm64.dmg
+          if-no-files-found: error
+
+  upload-qt-artifacts:
+    needs:
+      - plan
+      - host
+      - build-qt-linux
+      - build-qt-windows
+      - build-qt-macos
+    if: ${{ always() && needs.host.result == 'success' && needs.build-qt-linux.result == 'success' && needs.build-qt-windows.result == 'success' && needs.build-qt-macos.result == 'success' }}
+    runs-on: ubuntu-22.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: qt-linux
+          path: artifacts/
+      - uses: actions/download-artifact@v8
+        with:
+          name: qt-windows
+          path: artifacts/
+      - uses: actions/download-artifact@v8
+        with:
+          name: qt-macos
+          path: artifacts/
+      - name: Attach Qt artifacts to GitHub Release
+        run: gh release upload "${{ needs.plan.outputs.tag }}" artifacts/* --repo "${{ github.repository }}"
