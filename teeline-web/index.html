@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Teeline TSP Solver</title>
+  </head>
+  <body>
+    <header class="container">
+      <h1>Teeline TSP Solver</h1>
+    </header>
+
+    <main class="container">
+      <nav aria-label="Solver steps">
+        <ol class="stepper" role="list">
+          <li class="stepper-step stepper-step--active" aria-current="step">
+            <span class="stepper-number">1</span>
+            <span class="stepper-label">Load Data</span>
+          </li>
+          <li class="stepper-step">
+            <span class="stepper-number">2</span>
+            <span class="stepper-label">Configure</span>
+          </li>
+          <li class="stepper-step">
+            <span class="stepper-number">3</span>
+            <span class="stepper-label">Solve</span>
+          </li>
+          <li class="stepper-step">
+            <span class="stepper-number">4</span>
+            <span class="stepper-label">Results</span>
+          </li>
+        </ol>
+      </nav>
+
+      <section id="step-content">
+        <p>Select a step above to begin.</p>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

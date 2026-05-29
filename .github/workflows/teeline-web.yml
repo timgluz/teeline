@@ -1,0 +1,38 @@
+name: teeline-web
+
+on:
+  push:
+    branches: [ master ]
+    paths: [ 'teeline-web/**' ]
+  pull_request:
+    branches: [ master ]
+    paths: [ 'teeline-web/**' ]
+
+defaults:
+  run:
+    working-directory: teeline-web
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: teeline-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (tsc)
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

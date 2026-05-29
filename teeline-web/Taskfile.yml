@@ -1,0 +1,49 @@
+version: '3'
+
+tasks:
+  dev:
+    desc: Start Vite dev server at http://localhost:5173
+    cmds:
+      - npm run dev
+
+  build:
+    desc: Type-check and build production bundle to dist/
+    cmds:
+      - npm run build
+
+  preview:
+    desc: Serve the production dist/ locally (after build)
+    cmds:
+      - npm run preview
+
+  test:
+    desc: Run vitest test suite (node environment)
+    cmds:
+      - npm test
+
+  test:watch:
+    desc: Run vitest in watch mode
+    cmds:
+      - npx vitest
+
+  lint:
+    desc: Type-check with tsc (no emit)
+    cmds:
+      - npx tsc --noEmit
+
+  deploy:preview:
+    desc: Build and deploy to CF Pages preview (current branch)
+    cmds:
+      - npm run build
+      - npx wrangler pages deploy dist/
+
+  deploy:release:
+    desc: Build and deploy to CF Pages production (master branch)
+    cmds:
+      - npm run build
+      - npx wrangler pages deploy dist/ --branch master
+
+  clean:
+    desc: Remove dist/ build output
+    cmds:
+      - rm -rf dist/
