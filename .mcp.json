@@ -4,6 +4,10 @@
       "command": "git-kb",
       "args": ["mcp"]
     },
+    "cloudflare-api": {
+      "type": "http",
+      "url": "https://mcp.cloudflare.com/mcp"
+    },
     "qtcreator": {
       "type": "sse",
       "url": "http://127.0.0.1:3001/sse",

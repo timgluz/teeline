@@ -1365,7 +1365,7 @@ dependencies = [
 [[package]]
 name = "qtbridge"
 version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?branch=dev#66583b7be5f7060feb27790741996ce350836091"
+source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
 dependencies = [
  "qtbridge-build-common",
  "qtbridge-gen",
@@ -1377,7 +1377,7 @@ dependencies = [
 [[package]]
 name = "qtbridge-build-common"
 version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?branch=dev#66583b7be5f7060feb27790741996ce350836091"
+source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
 dependencies = [
  "cc",
 ]
@@ -1385,7 +1385,7 @@ dependencies = [
 [[package]]
 name = "qtbridge-gen"
 version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?branch=dev#66583b7be5f7060feb27790741996ce350836091"
+source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
 dependencies = [
  "proc-macro2",
  "qtbridge-build-common",
@@ -1398,7 +1398,7 @@ dependencies = [
 [[package]]
 name = "qtbridge-gen-common"
 version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?branch=dev#66583b7be5f7060feb27790741996ce350836091"
+source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
 dependencies = [
  "proc-macro2",
  "qtbridge-build-common",
@@ -1409,7 +1409,7 @@ dependencies = [
 [[package]]
 name = "qtbridge-interfaces"
 version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?branch=dev#66583b7be5f7060feb27790741996ce350836091"
+source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -1421,7 +1421,7 @@ dependencies = [
 [[package]]
 name = "qtbridge-runtime"
 version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?branch=dev#66583b7be5f7060feb27790741996ce350836091"
+source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
 dependencies = [
  "cxx",
  "cxx-build",
@@ -1432,7 +1432,7 @@ dependencies = [
 [[package]]
 name = "qtbridge-type-lib"
 version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?branch=dev#66583b7be5f7060feb27790741996ce350836091"
+source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
 dependencies = [
  "cxx",
  "cxx-build",
