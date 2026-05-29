@@ -1,0 +1,32 @@
+/* PicoCSS 2.x has no built-in stepper — minimal custom layout */
+.stepper {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--pico-spacing) 0;
+  gap: calc(var(--pico-spacing) * 1.5);
+}
+
+.stepper-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--pico-muted-color);
+  font-size: 0.875rem;
+}
+
+.stepper-step--active {
+  color: var(--pico-primary);
+  font-weight: bold;
+}
+
+.stepper-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  flex-shrink: 0;
+}
