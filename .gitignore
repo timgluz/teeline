@@ -11,3 +11,6 @@ docs/superpowers/
 
 # env files
 .env*
+
+# teeline-web
+teeline-web/dist/
