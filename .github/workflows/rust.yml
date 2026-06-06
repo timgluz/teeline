@@ -50,7 +50,7 @@ jobs:
     - name: Add wasm32-wasip2 target
       run: rustup target add wasm32-wasip2
     - name: Build WASM component
-      run: cd teeline-wasm && cargo component build
+      run: cd teeline-wasm && cargo component build --target wasm32-wasip2
     - name: Upload WASM artifact
       uses: actions/upload-artifact@v4
       with:
