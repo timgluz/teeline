@@ -22,10 +22,17 @@ interface types {
         total: f32,
         route: list<u32>,
     }
+
+    record parsed-problem {
+        name: string,
+        comment: string,
+        distance-type: string,
+        cities: list<city>,
+    }
 }
 
 world solver {
-    use types.{city, solve-options, solution};
+    use types.{city, solve-options, solution, parsed-problem};
 
     export solve: func(
         solver: string,
@@ -38,4 +45,8 @@ world solver {
         input: string,
         options: solve-options,
     ) -> result<solution, string>;
+
+    export parse: func(
+        input: string,
+    ) -> result<parsed-problem, string>;
 }

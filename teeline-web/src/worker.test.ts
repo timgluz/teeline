@@ -3,10 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('teeline-wasm', () => ({
   solve: vi.fn(),
   parseAndSolve: vi.fn(),
+  parse: vi.fn(),
 }))
 
-import { solve, parseAndSolve } from 'teeline-wasm'
-import { handleMessage, type ParseAndSolveRequest } from './worker'
+import { solve, parseAndSolve, parse } from 'teeline-wasm'
+import { handleMessage, type ParseAndSolveRequest, type ParseRequest } from './worker'
 import { type SolveRequest } from './worker'
 
 const mockSolution = { total: 42.0, route: new Uint32Array([0, 1, 2]) }
@@ -73,6 +74,38 @@ describe('handleMessage — parse-and-solve', () => {
     expect(res.type).toBe('error')
     if (res.type === 'error') {
       expect(res.message).toContain('bad TSPLIB input')
+    }
+  })
+})
+
+describe('handleMessage — parse', () => {
+  const mockProblem = {
+    name: 'berlin52',
+    comment: 'test',
+    distanceType: 'EUC_2D',
+    cities: [{ id: 0, x: 1.0, y: 2.0 }],
+  }
+
+  it('calls parse and returns ParseResult', () => {
+    vi.mocked(parse).mockReturnValue(mockProblem)
+    const req: ParseRequest = { type: 'parse', input: 'NAME: berlin52\n' }
+    const res = handleMessage(req)
+    expect(parse).toHaveBeenCalledWith('NAME: berlin52\n')
+    expect(res.type).toBe('parsed')
+    if (res.type === 'parsed') {
+      expect(res.problem.name).toBe('berlin52')
+      expect(res.problem.distanceType).toBe('EUC_2D')
+      expect(res.problem.cities).toHaveLength(1)
+    }
+  })
+
+  it('returns SolveError when parse throws', () => {
+    vi.mocked(parse).mockImplementation(() => { throw new Error('bad input') })
+    const req: ParseRequest = { type: 'parse', input: '' }
+    const res = handleMessage(req)
+    expect(res.type).toBe('error')
+    if (res.type === 'error') {
+      expect(res.message).toContain('bad input')
     }
   })
 })

@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::Guest;
-use bindings::teeline::solver::types::{City, Solution, SolveOptions};
+use bindings::teeline::solver::types::{City, ParsedProblem, Solution, SolveOptions};
 use teeline::tsp::{
     AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
     distance_matrix::DistanceMatrix, kdtree::KDPoint,
@@ -56,6 +56,10 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
     }
 }
 
+fn kd_to_city(c: &KDPoint) -> City {
+    City { id: c.id as u32, x: c.x(), y: c.y() }
+}
+
 fn solve_with_cities(
     solver: &str,
     kd_cities: Vec<KDPoint>,
@@ -86,6 +90,30 @@ impl Guest for Component {
             .map(|c| KDPoint::new_with_id(c.id as usize, &[c.x, c.y]))
             .collect();
         solve_with_cities(&solver, kd_cities, &options)
+    }
+
+    fn parse(input: String) -> Result<ParsedProblem, String> {
+        if input.trim_start().starts_with('[') {
+            let kd_cities = teeline::tsp::tsplib::parse_json_cities(&input)?;
+            Ok(ParsedProblem {
+                name: String::new(),
+                comment: String::new(),
+                distance_type: String::new(),
+                cities: kd_cities.iter().map(kd_to_city).collect(),
+            })
+        } else {
+            let data = teeline::tsp::tsplib::read_from_str(&input)?;
+            let dt = match data.distance_type {
+                teeline::tsp::DistanceType::Euc2D => "EUC_2D",
+                teeline::tsp::DistanceType::Geo => "GEO",
+            };
+            Ok(ParsedProblem {
+                name: data.name.clone(),
+                comment: data.comment.clone(),
+                distance_type: dt.to_string(),
+                cities: data.cities().iter().map(kd_to_city).collect(),
+            })
+        }
     }
 
     fn parse_and_solve(
