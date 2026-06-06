@@ -18,16 +18,8 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: true
-    - name: Install cargo-component
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-component
-    - name: Add wasm32-wasip2 target
-      run: rustup target add wasm32-wasip2
     - name: Build
       run: cargo build -p teeline -p teeline-cli --verbose
-    - name: Build WASM component
-      run: cargo component build --manifest-path teeline-wasm/Cargo.toml
     - name: Run tests
       run: cargo test -p teeline -p teeline-cli --verbose
     - name: Run e2e tests (BATS)
@@ -44,6 +36,28 @@ jobs:
         files: lcov.info
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: Install cargo-component
+      uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-component
+    - name: Add wasm32-wasip2 target
+      run: rustup target add wasm32-wasip2
+    - name: Build WASM component
+      run: cd teeline-wasm && cargo component build --target wasm32-wasip2
+    - name: Upload WASM artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: teeline-wasm-debug
+        path: target/wasm32-wasip2/debug/teeline_wasm.wasm
+    - name: Run wasm_component integration tests
+      run: cargo test -p teeline-wasm --test wasm_component
 
   build-qt:
     runs-on: ubuntu-latest

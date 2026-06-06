@@ -16,3 +16,7 @@ world = "solver"
 [dependencies]
 wit-bindgen-rt = { version = "0.44.0", features = ["bitflags"] }
 teeline = { path = "..", default-features = false, features = ["json"] }
+
+[dev-dependencies]
+wasmtime = { version = "36", features = ["component-model"] }
+wasmtime-wasi = "36"

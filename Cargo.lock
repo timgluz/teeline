@@ -1826,11 +1826,10 @@ dependencies = [
  "rand 0.9.4",
  "regex",
  "serde",
+ "serde_json",
  "toml",
  "tracing",
  "tracing-subscriber",
- "wasmtime",
- "wasmtime-wasi",
 ]
 
 [[package]]
@@ -1857,6 +1856,8 @@ name = "teeline-wasm"
 version = "0.1.0"
 dependencies = [
  "teeline",
+ "wasmtime",
+ "wasmtime-wasi",
  "wit-bindgen-rt",
 ]
 
