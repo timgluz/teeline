@@ -28,8 +28,11 @@ export function initUpload(parseFile: (input: string) => Promise<ParsedProblem>)
   const inputOpt      = document.getElementById('input-opt') as HTMLInputElement
   const btnReplaceOpt = document.getElementById('btn-replace-opt')!
 
-  const metaLine  = document.getElementById('metadata-line') as HTMLElement
-  const errorLine = document.getElementById('error-line') as HTMLElement
+  const metaLine   = document.getElementById('metadata-line') as HTMLElement
+  const errorLine  = document.getElementById('error-line') as HTMLElement
+  const btnContinue = document.getElementById('btn-continue') as HTMLButtonElement
+  const step01     = document.getElementById('step-01') as HTMLElement
+  const step02     = document.getElementById('step-02') as HTMLElement
 
   // ---- TSP zone state transitions ----
 
@@ -41,6 +44,7 @@ export function initUpload(parseFile: (input: string) => Promise<ParsedProblem>)
     metaLine.textContent = formatMetadata(parsed)
     metaLine.hidden = false
     errorLine.hidden = true
+    btnContinue.hidden = false
     advanceStepper()
   }
 
@@ -51,8 +55,14 @@ export function initUpload(parseFile: (input: string) => Promise<ParsedProblem>)
     zoneTsp.classList.remove('drop-zone--loaded')
     metaLine.hidden = true
     errorLine.hidden = true
+    btnContinue.hidden = true
     resetStepper()
   }
+
+  btnContinue.addEventListener('click', () => {
+    step01.hidden = true
+    step02.hidden = false
+  })
 
   function showError(msg: string): void {
     errorLine.textContent = `Error: ${msg}`

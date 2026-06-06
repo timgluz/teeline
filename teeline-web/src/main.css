@@ -131,3 +131,10 @@
 }
 
 .example-buttons button { margin: 0; }
+
+/* ---- Step navigation ---- */
+.step-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--pico-spacing);
+}
