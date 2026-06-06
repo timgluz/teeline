@@ -32,4 +32,10 @@ world solver {
         cities: list<city>,
         options: solve-options,
     ) -> result<solution, string>;
+
+    export parse-and-solve: func(
+        solver: string,
+        input: string,
+        options: solve-options,
+    ) -> result<solution, string>;
 }
