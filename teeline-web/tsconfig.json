@@ -21,8 +21,5 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "paths": {
-    "teeline-wasm": ["../teeline-wasm/js-bindings/teeline_wasm"]
-  },
   "include": ["src"]
 }
