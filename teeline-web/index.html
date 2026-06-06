@@ -33,8 +33,61 @@
       </nav>
 
       <section id="step-content">
-        <p>Select a step above to begin.</p>
-      </section>
+
+        <!-- Step 01: Load Data -->
+        <section id="step-01" class="step-panel" aria-labelledby="step-01-heading">
+          <h2 id="step-01-heading">Load Data</h2>
+
+          <div class="drop-zones">
+
+            <!-- Required .tsp zone -->
+            <div id="zone-tsp" class="drop-zone drop-zone--required"
+                 role="region" aria-label="TSP problem file (.tsp)">
+              <div id="zone-tsp-idle" class="drop-zone__idle">
+                <p class="drop-zone__hint">Drag a <strong>.tsp</strong> file here</p>
+                <p class="drop-zone__or"><small>or</small></p>
+                <button type="button" class="outline" id="btn-browse-tsp">Browse…</button>
+                <input id="input-tsp" type="file" accept=".tsp" hidden aria-hidden="true" />
+              </div>
+              <div id="zone-tsp-chip" class="drop-zone__chip" hidden>
+                <span class="chip-icon" aria-hidden="true">✓</span>
+                <span class="chip-name" id="tsp-chip-name"></span>
+                <button type="button" class="outline secondary chip-replace"
+                        id="btn-replace-tsp">replace</button>
+              </div>
+            </div>
+
+            <!-- Optional .opt.tour zone -->
+            <div id="zone-opt" class="drop-zone drop-zone--optional"
+                 role="region" aria-label="Optimal tour file (.opt.tour, optional)">
+              <div id="zone-opt-idle" class="drop-zone__idle">
+                <p class="drop-zone__hint">Drag a <strong>.opt.tour</strong> file here</p>
+                <p class="drop-zone__hint-secondary"><small>optional reference tour</small></p>
+              </div>
+              <div id="zone-opt-chip" class="drop-zone__chip" hidden>
+                <span class="chip-icon" aria-hidden="true">✓</span>
+                <span class="chip-name" id="opt-chip-name"></span>
+                <button type="button" class="outline secondary chip-replace"
+                        id="btn-replace-opt">replace</button>
+              </div>
+            </div>
+
+          </div><!-- /.drop-zones -->
+
+          <p id="metadata-line" class="metadata-line" hidden></p>
+          <p id="error-line" class="upload-error" hidden></p>
+
+          <fieldset>
+            <legend>Example datasets</legend>
+            <div class="example-buttons">
+              <button type="button" class="outline secondary" data-example="berlin52">berlin52</button>
+              <button type="button" class="outline secondary" data-example="burma14">burma14</button>
+              <button type="button" class="outline secondary" data-example="ulysses22">ulysses22</button>
+            </div>
+          </fieldset>
+        </section>
+
+      </section><!-- /#step-content -->
     </main>
 
     <script type="module" src="/src/main.ts"></script>
