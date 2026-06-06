@@ -30,3 +30,111 @@
   border: 2px solid currentColor;
   flex-shrink: 0;
 }
+
+/* ---- Stepper: done state (step 01 fills orange when file loaded) ---- */
+.stepper-step--done {
+  color: var(--pico-color-orange-500, #e67e22);
+}
+
+.stepper-step--done .stepper-number {
+  background-color: var(--pico-color-orange-500, #e67e22);
+  border-color: var(--pico-color-orange-500, #e67e22);
+  color: #fff;
+}
+
+/* ---- Drop zone grid ---- */
+.drop-zones {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--pico-spacing);
+  margin-bottom: var(--pico-spacing);
+}
+
+@media (max-width: 48em) {
+  .drop-zones { grid-template-columns: 1fr; }
+}
+
+.drop-zone {
+  border: 2px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  padding: var(--pico-spacing);
+  min-height: 9rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.drop-zone--required { border-style: solid; }
+.drop-zone--optional { border-style: dashed; }
+
+.drop-zone--dragover {
+  border-color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 8%, transparent);
+}
+
+.drop-zone--loaded {
+  border-color: var(--pico-color-jade-500, #2a9d8f);
+}
+
+.drop-zone__idle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.drop-zone__hint { margin: 0; }
+.drop-zone__or   { margin: 0; color: var(--pico-muted-color); }
+.drop-zone__hint-secondary { margin: 0.25rem 0 0; color: var(--pico-muted-color); }
+
+/* ---- File chip (success state inside zone) ---- */
+.drop-zone__chip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chip-icon  { font-size: 1.25rem; color: var(--pico-color-jade-500, #2a9d8f); }
+.chip-name  { font-weight: 600; word-break: break-all; }
+.chip-replace {
+  padding: 0.2rem 0.6rem;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* ---- Metadata + error lines ---- */
+.metadata-line {
+  color: var(--pico-muted-color);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+.upload-error {
+  color: var(--pico-del-color, #c0392b);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0;
+}
+
+/* ---- Example dataset buttons ---- */
+.example-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.example-buttons button { margin: 0; }
+
+/* ---- Step navigation ---- */
+.step-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--pico-spacing);
+}
