@@ -4,7 +4,7 @@ use wasmtime_wasi::{WasiCtxBuilder, WasiCtxView, WasiView};
 
 wasmtime::component::bindgen!({
     world: "solver",
-    path: "teeline-wasm/wit",
+    path: "wit",
 });
 
 struct HostState {
@@ -28,9 +28,12 @@ fn make_engine() -> Engine {
 }
 
 fn load_component(engine: &Engine) -> Component {
-    let path = "target/wasm32-wasip1/debug/teeline_wasm.wasm";
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../target/wasm32-wasip2/debug/teeline_wasm.wasm"
+    );
     Component::from_file(engine, path).expect(
-        "WASM component not found — run: cargo component build --manifest-path teeline-wasm/Cargo.toml",
+        "WASM component not found — run: cd teeline-wasm && cargo component build",
     )
 }
 
@@ -92,7 +95,6 @@ fn default_options() -> crate::teeline::solver::types::SolveOptions {
 fn assert_valid_tour(solution: &crate::teeline::solver::types::Solution, n_cities: usize) {
     assert_eq!(solution.route.len(), n_cities, "tour must visit all cities");
     assert!(solution.total > 0.0, "tour distance must be positive");
-    // Check all IDs are distinct (independent of 0-based vs 1-based ID space)
     let mut sorted: Vec<u32> = solution.route.clone();
     sorted.sort_unstable();
     sorted.dedup();
@@ -202,7 +204,11 @@ fn five_cities_json() -> String {
 
 #[test]
 fn test_parse_and_solve_tsplib_berlin52() {
-    let input = std::fs::read_to_string("tests/fixtures/berlin52.tsp").expect("berlin52.tsp missing");
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/berlin52.tsp"
+    ))
+    .expect("berlin52.tsp missing");
     let solution = run_parse_and_solve("nn", &input);
     assert_valid_tour(&solution, 52);
 }

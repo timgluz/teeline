@@ -30,10 +30,6 @@ toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-[dev-dependencies]
-wasmtime = { version = "36", features = ["component-model"] }
-wasmtime-wasi = "36"
-
 # The profile that 'dist' will build with
 [profile.dist]
 inherits = "release"
