@@ -291,3 +291,64 @@ fn test_parse_and_solve_invalid_json_returns_err() {
         .unwrap();
     assert!(result.is_err(), "invalid JSON must return Err");
 }
+
+// ── parse integration tests ────────────────────────────────────────────────────
+
+fn run_parse(input: &str) -> crate::teeline::solver::types::ParsedProblem {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    instance
+        .call_parse(&mut store, input)
+        .unwrap()
+        .unwrap_or_else(|e| panic!("parse returned error: {e}"))
+}
+
+#[test]
+fn test_parse_tsplib_berlin52() {
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/berlin52.tsp"
+    ))
+    .expect("berlin52.tsp missing");
+    let p = run_parse(&input);
+    assert_eq!(p.cities.len(), 52);
+    assert_eq!(p.name, "berlin52");
+    assert_eq!(p.distance_type, "EUC_2D");
+}
+
+#[test]
+fn test_parse_tsplib_burma14() {
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/burma14.tsp"
+    ))
+    .expect("burma14.tsp missing");
+    let p = run_parse(&input);
+    assert_eq!(p.cities.len(), 14);
+    assert_eq!(p.name, "burma14");
+    assert_eq!(p.distance_type, "GEO");
+}
+
+#[test]
+fn test_parse_json_5_cities() {
+    let p = run_parse(&five_cities_json());
+    assert_eq!(p.cities.len(), 5);
+    assert_eq!(p.name, "");
+    assert_eq!(p.distance_type, "");
+}
+
+#[test]
+fn test_parse_empty_input_returns_err() {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let result = instance.call_parse(&mut store, "").unwrap();
+    assert!(result.is_err(), "empty input must return Err");
+}

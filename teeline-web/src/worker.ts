@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { solve, parseAndSolve } from 'teeline-wasm'
+import { solve, parseAndSolve, parse, type ParsedProblem } from 'teeline-wasm'
 import { defaultSolveOptions, type SolveOptions } from './solver-options'
 
 export interface SolveRequest {
@@ -17,9 +17,19 @@ export interface ParseAndSolveRequest {
   options: Partial<SolveOptions>
 }
 
+export interface ParseRequest {
+  type: 'parse'
+  input: string
+}
+
 export interface SolveResult {
   type: 'result'
   solution: { total: number; route: number[] }
+}
+
+export interface ParseResult {
+  type: 'parsed'
+  problem: ParsedProblem
 }
 
 export interface SolveError {
@@ -27,11 +37,16 @@ export interface SolveError {
   message: string
 }
 
-type WorkerRequest = SolveRequest | ParseAndSolveRequest
+type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest
+type WorkerResponse = SolveResult | ParseResult | SolveError
 
-export function handleMessage(data: WorkerRequest): SolveResult | SolveError {
-  const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...data.options }
+export function handleMessage(data: WorkerRequest): WorkerResponse {
   try {
+    if (data.type === 'parse') {
+      const problem = parse(data.input)
+      return { type: 'parsed', problem }
+    }
+    const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...data.options }
     let solution: ReturnType<typeof solve>
     if (data.type === 'solve') {
       solution = solve(data.solver, data.cities, mergedOptions)
