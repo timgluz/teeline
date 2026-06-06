@@ -11,8 +11,10 @@
     "deploy": "npm run build && wrangler pages deploy dist/"
   },
   "dependencies": {
+    "@bytecodealliance/preview2-shim": "^0.17.9",
     "@picocss/pico": "2.1.1",
-    "htmx.org": "2.0.10"
+    "htmx.org": "2.0.10",
+    "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
     "typescript": "6.0.3",
