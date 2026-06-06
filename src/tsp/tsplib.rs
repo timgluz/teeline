@@ -700,7 +700,7 @@ mod tests {
 
     #[test]
     fn test_read_from_str_burma14() {
-        let input = std::fs::read_to_string("data/tsplib/burma14.tsp")
+        let input = std::fs::read_to_string("tests/fixtures/burma14.tsp")
             .expect("burma14.tsp missing");
         let dt = read_from_str(&input).unwrap();
         assert_eq!(14, dt.len());
@@ -709,7 +709,7 @@ mod tests {
 
     #[test]
     fn test_read_from_str_berlin52() {
-        let input = std::fs::read_to_string("data/tsplib/berlin52.tsp")
+        let input = std::fs::read_to_string("tests/fixtures/berlin52.tsp")
             .expect("berlin52.tsp missing");
         let dt = read_from_str(&input).unwrap();
         assert_eq!(52, dt.len());

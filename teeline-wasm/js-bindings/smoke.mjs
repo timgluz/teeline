@@ -27,9 +27,11 @@ const jsonInput = JSON.stringify(cities);
 const jsonResult = parseAndSolve('nn', jsonInput, options);
 console.assert(typeof jsonResult.total === 'number' && jsonResult.total > 0, 'JSON: positive distance');
 console.assert(jsonResult.route.length === 5, 'JSON: visits all 5 cities');
+const jsonSorted = [...jsonResult.route].sort((a, b) => a - b);
+console.assert(new Set(jsonSorted).size === 5, 'JSON: each city visited exactly once');
 console.log('parseAndSolve(JSON) smoke PASSED — route:', jsonResult.route);
 
-// parseAndSolve — TSPLIB input
+// parseAndSolve — TSPLIB input (note: TSPLIB IDs are 1-based)
 const tsplibInput = `NAME: mini
 NODE_COORD_SECTION
 0 565.0 575.0
@@ -42,4 +44,5 @@ EOF
 const tsplibResult = parseAndSolve('nn', tsplibInput, options);
 console.assert(typeof tsplibResult.total === 'number' && tsplibResult.total > 0, 'TSPLIB: positive distance');
 console.assert(tsplibResult.route.length === 5, 'TSPLIB: visits all 5 cities');
+console.assert(new Set([...tsplibResult.route]).size === 5, 'TSPLIB: each city visited exactly once');
 console.log('parseAndSolve(TSPLIB) smoke PASSED — route:', tsplibResult.route);

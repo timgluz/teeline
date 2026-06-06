@@ -202,7 +202,7 @@ fn five_cities_json() -> String {
 
 #[test]
 fn test_parse_and_solve_tsplib_berlin52() {
-    let input = std::fs::read_to_string("data/tsplib/berlin52.tsp").expect("berlin52.tsp missing");
+    let input = std::fs::read_to_string("tests/fixtures/berlin52.tsp").expect("berlin52.tsp missing");
     let solution = run_parse_and_solve("nn", &input);
     assert_valid_tour(&solution, 52);
 }
