@@ -24,6 +24,8 @@ export function initUpload(parseFile: (input: string) => Promise<ParsedProblem>)
   const optIdle       = document.getElementById('zone-opt-idle')!
   const optChip       = document.getElementById('zone-opt-chip') as HTMLElement
   const optChipName   = document.getElementById('opt-chip-name')!
+  const btnBrowseOpt  = document.getElementById('btn-browse-opt')!
+  const inputOpt      = document.getElementById('input-opt') as HTMLInputElement
   const btnReplaceOpt = document.getElementById('btn-replace-opt')!
 
   const metaLine  = document.getElementById('metadata-line') as HTMLElement
@@ -108,18 +110,30 @@ export function initUpload(parseFile: (input: string) => Promise<ParsedProblem>)
 
   // ---- Wire opt.tour zone (store only — no parse needed) ----
 
-  setupDragDrop(zoneOpt, (filename) => {
+  function showOptLoaded(filename: string): void {
     optChipName.textContent = filename
     optIdle.hidden = true
     optChip.hidden = false
     zoneOpt.classList.add('drop-zone--loaded')
-  })
-  btnReplaceOpt.addEventListener('click', () => {
+  }
+
+  function showOptIdle(): void {
     optIdle.hidden = false
     optChip.hidden = true
     optChipName.textContent = ''
     zoneOpt.classList.remove('drop-zone--loaded')
+  }
+
+  setupDragDrop(zoneOpt, showOptLoaded)
+
+  btnBrowseOpt.addEventListener('click', () => inputOpt.click())
+  inputOpt.addEventListener('change', (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    showOptLoaded(file.name)
+    inputOpt.value = ''
   })
+  btnReplaceOpt.addEventListener('click', showOptIdle)
 
   // ---- Wire example dataset buttons ----
 

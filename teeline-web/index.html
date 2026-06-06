@@ -62,6 +62,9 @@
                  role="region" aria-label="Optimal tour file (.opt.tour, optional)">
               <div id="zone-opt-idle" class="drop-zone__idle">
                 <p class="drop-zone__hint">Drag a <strong>.opt.tour</strong> file here</p>
+                <p class="drop-zone__or"><small>or</small></p>
+                <button type="button" class="outline" id="btn-browse-opt">Browse…</button>
+                <input id="input-opt" type="file" accept=".opt.tour" hidden aria-hidden="true" />
                 <p class="drop-zone__hint-secondary"><small>optional reference tour</small></p>
               </div>
               <div id="zone-opt-chip" class="drop-zone__chip" hidden>
