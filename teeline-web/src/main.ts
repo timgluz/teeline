@@ -1,8 +1,10 @@
 import 'htmx.org'
 import '@picocss/pico/css/pico.min.css'
 import './main.css'
+import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
-import type { SolveResult, SolveError } from './worker'
+import type { SolveResult, SolveError, ParseResult } from './worker'
+import { initUpload } from './upload'
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
@@ -32,10 +34,29 @@ export function runSolver(
   })
 }
 
+export function parseFile(input: string): Promise<ParsedProblem> {
+  return new Promise((resolve, reject) => {
+    const handler = (e: MessageEvent<ParseResult | SolveError>) => {
+      worker.removeEventListener('message', handler)
+      if (e.data.type === 'parsed') {
+        resolve(e.data.problem)
+      } else if (e.data.type === 'error') {
+        reject(new Error(e.data.message))
+      }
+    }
+    worker.addEventListener('message', handler)
+    worker.postMessage({ type: 'parse', input })
+  })
+}
+
 // Expose for browser console smoke test and HTMX scripts
 declare global {
   interface Window {
     runSolver: typeof runSolver
+    parseFile: typeof parseFile
   }
 }
 window.runSolver = runSolver
+window.parseFile = parseFile
+
+initUpload(parseFile)
