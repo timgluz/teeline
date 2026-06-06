@@ -92,10 +92,11 @@ fn default_options() -> crate::teeline::solver::types::SolveOptions {
 fn assert_valid_tour(solution: &crate::teeline::solver::types::Solution, n_cities: usize) {
     assert_eq!(solution.route.len(), n_cities, "tour must visit all cities");
     assert!(solution.total > 0.0, "tour distance must be positive");
+    // Check all IDs are distinct (independent of 0-based vs 1-based ID space)
     let mut sorted: Vec<u32> = solution.route.clone();
     sorted.sort_unstable();
-    let expected: Vec<u32> = (0..n_cities as u32).collect();
-    assert_eq!(sorted, expected, "each city must be visited exactly once");
+    sorted.dedup();
+    assert_eq!(sorted.len(), n_cities, "each city must be visited exactly once");
 }
 
 fn run_solver(solver_name: &str) {
@@ -178,4 +179,109 @@ fn unknown_solver_returns_err() {
         "unknown solver must return Err, got {:?}",
         result.ok()
     );
+}
+
+// ── parse_and_solve integration tests ─────────────────────────────────────────
+
+fn run_parse_and_solve(solver: &str, input: &str) -> crate::teeline::solver::types::Solution {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let result = instance
+        .call_parse_and_solve(&mut store, solver, input, default_options())
+        .unwrap();
+    result.unwrap_or_else(|e| panic!("parse_and_solve returned error: {e}"))
+}
+
+fn five_cities_json() -> String {
+    r#"[{"id":0,"x":565.0,"y":575.0},{"id":1,"x":25.0,"y":185.0},{"id":2,"x":345.0,"y":750.0},{"id":3,"x":945.0,"y":685.0},{"id":4,"x":845.0,"y":655.0}]"#.to_string()
+}
+
+#[test]
+fn test_parse_and_solve_tsplib_berlin52() {
+    let input = std::fs::read_to_string("tests/fixtures/berlin52.tsp").expect("berlin52.tsp missing");
+    let solution = run_parse_and_solve("nn", &input);
+    assert_valid_tour(&solution, 52);
+}
+
+#[test]
+fn test_parse_and_solve_json_5_cities() {
+    let solution = run_parse_and_solve("nn", &five_cities_json());
+    assert_valid_tour(&solution, 5);
+}
+
+#[test]
+fn test_parse_and_solve_json_leading_whitespace() {
+    let input = format!("  \n{}", five_cities_json());
+    let solution = run_parse_and_solve("nn", &input);
+    assert_valid_tour(&solution, 5);
+}
+
+#[test]
+fn test_parse_and_solve_one_city_json_returns_err() {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let result = instance
+        .call_parse_and_solve(
+            &mut store,
+            "nn",
+            r#"[{"id":0,"x":1.0,"y":2.0}]"#,
+            default_options(),
+        )
+        .unwrap();
+    assert!(result.is_err(), "single city must return Err");
+}
+
+#[test]
+fn test_parse_and_solve_bad_solver_returns_err() {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let result = instance
+        .call_parse_and_solve(&mut store, "bogus", &five_cities_json(), default_options())
+        .unwrap();
+    assert!(result.is_err(), "unknown solver must return Err");
+}
+
+#[test]
+fn test_parse_and_solve_empty_input_returns_err() {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let result = instance
+        .call_parse_and_solve(&mut store, "nn", "", default_options())
+        .unwrap();
+    assert!(result.is_err(), "empty input must return Err");
+}
+
+#[test]
+fn test_parse_and_solve_invalid_json_returns_err() {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let result = instance
+        .call_parse_and_solve(
+            &mut store,
+            "nn",
+            r#"[{"id":0,"x":"bad","y":1.0}]"#,
+            default_options(),
+        )
+        .unwrap();
+    assert!(result.is_err(), "invalid JSON must return Err");
 }

@@ -115,6 +115,30 @@ pub fn read_from_stdin() -> Result<TspLibData, String> {
     process_lines(reader.lock())
 }
 
+pub fn read_from_str(input: &str) -> Result<TspLibData, String> {
+    let cursor = std::io::Cursor::new(input.as_bytes());
+    process_lines(BufReader::new(cursor))
+}
+
+#[cfg(feature = "json")]
+pub fn parse_json_cities(input: &str) -> Result<Vec<super::KDPoint>, String> {
+    #[derive(serde::Deserialize)]
+    struct CityRecord {
+        id: usize,
+        x: f32,
+        y: f32,
+    }
+    let records: Vec<CityRecord> =
+        serde_json::from_str(input).map_err(|e| format!("JSON parse error: {e}"))?;
+    if records.len() < 2 {
+        return Err("need at least 2 cities".into());
+    }
+    Ok(records
+        .into_iter()
+        .map(|c| super::KDPoint::new_with_id(c.id, &[c.x, c.y]))
+        .collect())
+}
+
 fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
     let mut metadata: HashMap<String, String> = HashMap::new();
     let mut cities: Vec<KDPoint> = vec![];
@@ -621,5 +645,80 @@ mod tests {
         // Cities come from DISPLAY_DATA_SECTION, not grid
         assert_eq!(3, dt.len());
         assert_eq!(Some(10.0), dt.cities()[0].get(0));
+    }
+
+    // ── parse_json_cities tests ───────────────────────────────────────────────
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn test_parse_json_cities_valid() {
+        let json = r#"[{"id":0,"x":1.0,"y":2.0},{"id":1,"x":3.0,"y":4.0},{"id":2,"x":5.0,"y":6.0}]"#;
+        let cities = parse_json_cities(json).unwrap();
+        assert_eq!(3, cities.len());
+        assert_eq!(0, cities[0].id);
+        assert_eq!(Some(1.0), cities[0].get(0));
+        assert_eq!(2, cities[2].id);
+    }
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn test_parse_json_cities_one_city() {
+        let json = r#"[{"id":0,"x":1.0,"y":2.0}]"#;
+        let err = parse_json_cities(json).unwrap_err();
+        assert!(err.contains("2"), "expected '2' in error, got: {err}");
+    }
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn test_parse_json_cities_empty_array() {
+        let err = parse_json_cities("[]").unwrap_err();
+        assert!(!err.is_empty());
+    }
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn test_parse_json_cities_bad_type() {
+        let json = r#"[{"id":0,"x":"nope","y":1.0}]"#;
+        assert!(parse_json_cities(json).is_err());
+    }
+
+    // ── read_from_str tests ───────────────────────────────────────────────────
+
+    #[test]
+    fn test_read_from_str_minimal() {
+        let input = "NAME: mini\nNODE_COORD_SECTION\n1 1.0 2.0\n2 3.0 4.0\nEOF\n";
+        let dt = read_from_str(input).unwrap();
+        assert_eq!(2, dt.len());
+        assert_eq!(1, dt.cities()[0].id);
+        assert_eq!(2, dt.cities()[1].id);
+    }
+
+    #[test]
+    fn test_read_from_str_empty() {
+        assert!(read_from_str("").is_err());
+    }
+
+    #[test]
+    fn test_read_from_str_burma14() {
+        let input = std::fs::read_to_string("tests/fixtures/burma14.tsp")
+            .expect("burma14.tsp missing");
+        let dt = read_from_str(&input).unwrap();
+        assert_eq!(14, dt.len());
+        assert_eq!("burma14", dt.name);
+    }
+
+    #[test]
+    fn test_read_from_str_berlin52() {
+        let input = std::fs::read_to_string("tests/fixtures/berlin52.tsp")
+            .expect("berlin52.tsp missing");
+        let dt = read_from_str(&input).unwrap();
+        assert_eq!(52, dt.len());
+    }
+
+    #[test]
+    fn test_read_from_str_atsp_rejected() {
+        let input = "NAME: a\nTYPE: ATSP\nDIMENSION: 2\nEDGE_WEIGHT_TYPE: EXPLICIT\nEDGE_WEIGHT_FORMAT: FULL_MATRIX\nEDGE_WEIGHT_SECTION\n0 1\n1 0\nEOF\n";
+        let err = read_from_str(input).unwrap_err();
+        assert!(err.contains("ATSP"), "expected ATSP in error, got: {err}");
     }
 }

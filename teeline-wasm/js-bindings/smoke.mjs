@@ -19,4 +19,30 @@ console.assert(typeof result.total === 'number' && result.total > 0, 'positive t
 console.assert(result.route.length === 5, 'visits all 5 cities');
 const sorted = [...result.route].sort((a, b) => a - b);
 console.assert(JSON.stringify(sorted) === '[0,1,2,3,4]', 'each city once');
-console.log('JS smoke test PASSED — route:', result.route, 'distance:', result.total.toFixed(2));
+console.log('solve smoke PASSED — route:', result.route, 'distance:', result.total.toFixed(2));
+
+// parseAndSolve — JSON input
+import { parseAndSolve } from './teeline_wasm.js';
+const jsonInput = JSON.stringify(cities);
+const jsonResult = parseAndSolve('nn', jsonInput, options);
+console.assert(typeof jsonResult.total === 'number' && jsonResult.total > 0, 'JSON: positive distance');
+console.assert(jsonResult.route.length === 5, 'JSON: visits all 5 cities');
+const jsonSorted = [...jsonResult.route].sort((a, b) => a - b);
+console.assert(new Set(jsonSorted).size === 5, 'JSON: each city visited exactly once');
+console.log('parseAndSolve(JSON) smoke PASSED — route:', jsonResult.route);
+
+// parseAndSolve — TSPLIB input (note: TSPLIB IDs are 1-based)
+const tsplibInput = `NAME: mini
+NODE_COORD_SECTION
+0 565.0 575.0
+1 25.0 185.0
+2 345.0 750.0
+3 945.0 685.0
+4 845.0 655.0
+EOF
+`;
+const tsplibResult = parseAndSolve('nn', tsplibInput, options);
+console.assert(typeof tsplibResult.total === 'number' && tsplibResult.total > 0, 'TSPLIB: positive distance');
+console.assert(tsplibResult.route.length === 5, 'TSPLIB: visits all 5 cities');
+console.assert(new Set([...tsplibResult.route]).size === 5, 'TSPLIB: each city visited exactly once');
+console.log('parseAndSolve(TSPLIB) smoke PASSED — route:', tsplibResult.route);
