@@ -6264,6 +6264,100 @@ function solve(arg0, arg1, arg2) {
   return retCopy.val;
   
 }
+let exports1ParseAndSolve;
+
+function parseAndSolve(arg0, arg1, arg2) {
+  
+  var encodeRes = _utf8AllocateAndEncode(arg0, realloc1, memory0);
+  var ptr0= encodeRes.ptr;
+  var len0 = encodeRes.len;
+  
+  
+  var encodeRes = _utf8AllocateAndEncode(arg1, realloc1, memory0);
+  var ptr1= encodeRes.ptr;
+  var len1 = encodeRes.len;
+  
+  var {epochs: v2_0, platooEpochs: v2_1, coolingRate: v2_2, maxTemperature: v2_3, minTemperature: v2_4, mutationProbability: v2_5, nElite: v2_6, nNearest: v2_7 } = arg2;
+  _debugLog('[iface="parse-and-solve", function="parse-and-solve"][Instruction::CallWasm] enter', {
+    funcName: 'parse-and-solve',
+    paramCount: 12,
+    async: false,
+    postReturn: true,
+  });
+  const hostProvided = false;
+  
+  const [task, _wasm_call_currentTaskID] = createNewCurrentTask({
+    componentIdx: 0,
+    isAsync: false,
+    isManualAsync: false,
+    entryFnName: 'exports1ParseAndSolve',
+    getCallbackFn: () => null,
+    callbackFnName: 'null',
+    errHandling: 'throw-result-err',
+    callingWasmExport: true,
+  });
+  
+  const started = task.enterSync();
+  task.setReturnMemoryIdx(0);
+  task.setReturnMemory(memory0);
+  let ret =   _withGlobalCurrentTaskMeta({
+    taskID: task.id(),
+    componentIdx: task.componentIdx(),
+    fn: () => exports1ParseAndSolve(ptr0, len0, ptr1, len1, toUint32(v2_0), toUint32(v2_1), +v2_2, +v2_3, +v2_4, +v2_5, toUint32(v2_6), toUint32(v2_7)),
+  });
+  
+  let variant5;
+  switch (dataView(memory0).getUint8(ret + 0, true)) {
+    case 0: {
+      var ptr3 = dataView(memory0).getUint32(ret + 8, true);
+      var len3 = dataView(memory0).getUint32(ret + 12, true);
+      var result3 = new Uint32Array(memory0.buffer.slice(ptr3, ptr3 + len3 * 4));
+      variant5= {
+        tag: 'ok',
+        val: {
+          total: dataView(memory0).getFloat32(ret + 4, true),
+          route: result3,
+        }
+      };
+      break;
+    }
+    case 1: {
+      var ptr4 = dataView(memory0).getUint32(ret + 4, true);
+      var len4 = dataView(memory0).getUint32(ret + 8, true);
+      var result4 = TEXT_DECODER_UTF8.decode(new Uint8Array(memory0.buffer, ptr4, len4));
+      variant5= {
+        tag: 'err',
+        val: result4
+      };
+      break;
+    }
+    default: {
+      throw new TypeError('invalid variant discriminant for expected');
+    }
+  }
+  _debugLog('[iface="parse-and-solve", function="parse-and-solve"][Instruction::Return]', {
+    funcName: 'parse-and-solve',
+    paramCount: 1,
+    async: false,
+    postReturn: true
+  });
+  const retCopy = variant5;
+  task.resolve([retCopy.val]);
+  
+  let cstate = getOrCreateAsyncState(0);
+  cstate.mayLeave = false;
+  postReturn0(ret);
+  cstate.mayLeave = true;
+  task.exit();
+  
+  
+  
+  if (typeof retCopy === 'object' && retCopy.tag === 'err') {
+    throw new ComponentError(retCopy.val);
+  }
+  return retCopy.val;
+  
+}
 let trampoline0 = _trampoline0.manuallyAsync ? new WebAssembly.Suspending(_lowerImportBackwardsCompat.bind(
 null,
 {
@@ -7329,15 +7423,16 @@ const $init = (() => {
       realloc1Async = exports1.cabi_realloc;
     }
     
-    postReturn0 = exports1.cabi_post_solve;
+    postReturn0 = exports1['cabi_post_parse-and-solve'];
     
     try {
-      postReturn0Async = WebAssembly.promising(exports1.cabi_post_solve);
+      postReturn0Async = WebAssembly.promising(exports1['cabi_post_parse-and-solve']);
     } catch(err) {
-      postReturn0Async = exports1.cabi_post_solve;
+      postReturn0Async = exports1['cabi_post_parse-and-solve'];
     }
     
     exports1Solve = exports1.solve;
+    exports1ParseAndSolve = exports1['parse-and-solve'];
   })();
   let promise, resolve, reject;
   function runNext (value) {
@@ -7364,4 +7459,4 @@ const $init = (() => {
 
 await $init;
 
-export { solve,  }
+export { parseAndSolve, solve,  }
