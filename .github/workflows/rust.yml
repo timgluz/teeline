@@ -27,7 +27,7 @@ jobs:
     - name: Build
       run: cargo build -p teeline -p teeline-cli --verbose
     - name: Build WASM component
-      run: cd teeline-wasm && cargo component build
+      run: cargo component build --manifest-path teeline-wasm/Cargo.toml
     - name: Run tests
       run: cargo test -p teeline -p teeline-cli --verbose
     - name: Run e2e tests (BATS)
