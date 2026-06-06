@@ -16,11 +16,16 @@ keywords = ["tsp", "optimization"]
 name = "teeline"
 path = "src/lib.rs"
 
+[features]
+default = []
+json = ["dep:serde_json"]
+
 [dependencies]
 clap = "4.6.1"
 rand = "0.9"
 regex = "1.12.3"
 serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
 toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
