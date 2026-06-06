@@ -19,5 +19,6 @@ declare module 'teeline-wasm' {
     route: Uint32Array
   }
   export function solve(solver: string, cities: Array<City>, options: SolveOptions): Solution
+  export function parseAndSolve(solver: string, input: string, options: SolveOptions): Solution
   export type Result<T, E> = { tag: 'ok'; val: T } | { tag: 'err'; val: E }
 }

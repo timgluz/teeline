@@ -1,12 +1,19 @@
 /// <reference lib="webworker" />
 
-import { solve } from 'teeline-wasm'
+import { solve, parseAndSolve } from 'teeline-wasm'
 import { defaultSolveOptions, type SolveOptions } from './solver-options'
 
 export interface SolveRequest {
   type: 'solve'
   solver: string
   cities: Array<{ id: number; x: number; y: number }>
+  options: Partial<SolveOptions>
+}
+
+export interface ParseAndSolveRequest {
+  type: 'parse-and-solve'
+  solver: string
+  input: string
   options: Partial<SolveOptions>
 }
 
@@ -20,27 +27,35 @@ export interface SolveError {
   message: string
 }
 
-self.onmessage = (e: MessageEvent<SolveRequest>) => {
-  const { type, solver, cities, options } = e.data
-  if (type !== 'solve') return
+type WorkerRequest = SolveRequest | ParseAndSolveRequest
 
-  const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...options }
-
+export function handleMessage(data: WorkerRequest): SolveResult | SolveError {
+  const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...data.options }
   try {
-    const solution = solve(solver, cities, mergedOptions)
-    const result: SolveResult = {
+    let solution: ReturnType<typeof solve>
+    if (data.type === 'solve') {
+      solution = solve(data.solver, data.cities, mergedOptions)
+    } else {
+      solution = parseAndSolve(data.solver, data.input, mergedOptions)
+    }
+    return {
       type: 'result',
       solution: {
         total: solution.total,
         route: Array.from(solution.route),  // Uint32Array → plain number[]
       },
     }
-    self.postMessage(result)
   } catch (err) {
-    const error: SolveError = {
+    return {
       type: 'error',
       message: err instanceof Error ? err.message : String(err),
     }
-    self.postMessage(error)
+  }
+}
+
+// Only register in Web Worker context (not during Vitest runs)
+if (typeof DedicatedWorkerGlobalScope !== 'undefined' && self instanceof DedicatedWorkerGlobalScope) {
+  self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+    self.postMessage(handleMessage(e.data))
   }
 }
