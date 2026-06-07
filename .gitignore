@@ -14,3 +14,5 @@ docs/superpowers/
 
 # teeline-web
 teeline-web/dist/
+node_modules/
+.playwright-mcp/
