@@ -361,7 +361,7 @@ fn test_list_algorithms_fields_non_empty() {
 // ── compare tests ─────────────────────────────────────────────────────────────
 
 #[test]
-fn test_compare_happy_path() {
+fn test_compare_tsplib_input() {
     let results = run_compare(&["nn", "2opt"], FIVE_CITIES_TSPLIB);
     assert_eq!(results.len(), 2);
     assert_eq!(results[0].algorithm, "nn");
