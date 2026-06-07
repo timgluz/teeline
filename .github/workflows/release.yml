@@ -545,13 +545,15 @@ jobs:
 
   publish-wassette:
     needs: [plan]
-    if: needs.plan.outputs.publishing == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.plan.outputs.publishing == 'true'
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -572,10 +574,6 @@ jobs:
             --release
           cp target/wasm32-wasip2/release/teeline_wasm.wasm teeline-solver-wassette.wasm
 
-      - name: Resolve version tag
-        id: version
-        run: echo "tag=${GITHUB_REF_NAME:-manual}" >> "$GITHUB_OUTPUT"
-
       - name: Install ORAS
         uses: oras-project/setup-oras@v1
 
@@ -592,9 +590,8 @@ jobs:
             --artifact-type application/wasm \
             teeline-solver-wassette.wasm:application/wasm
 
-          VERSION="${{ steps.version.outputs.tag }}"
-          if [[ "$VERSION" != "manual" && "$VERSION" != "" ]]; then
-            oras push "ghcr.io/timgluz/teeline/wassette:${VERSION}" \
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            oras push "ghcr.io/timgluz/teeline/wassette:${GITHUB_REF_NAME}" \
               --artifact-type application/wasm \
               teeline-solver-wassette.wasm:application/wasm
           fi
