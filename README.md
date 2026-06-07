@@ -13,6 +13,7 @@ It is a work in progress. It already implements all algorithms typically covered
 | [teeline-cli](teeline-cli/README.md) | Command-line solver — reads TSPLIB files, prints the best tour found |
 | [teeline-qt](teeline-qt/README.md) | Qt 6 desktop GUI with live solver visualization and a pipeline builder |
 | [teeline-wasm](teeline-wasm/README.md) | WebAssembly Component Model build — callable from JS, Python, Go, and Rust |
+| [teeline-web](teeline-web/README.md) | Browser-based solver at [tspsolver.com](https://tspsolver.com) — upload a `.tsp` file, configure a solver, and download the optimised tour |
 
 The `teeline` crate at the root is the pure solver library shared by all three.
 
