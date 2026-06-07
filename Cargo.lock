@@ -295,17 +295,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codespan-reporting"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af491d569909a7e4dee0ad7db7f5341fef5c614d5b8ec8cf765732aba3cff681"
-dependencies = [
- "serde",
- "termcolor",
- "unicode-width",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -518,68 +507,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cxx"
-version = "1.0.194"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "747d8437319e3a2f43d93b341c137927ca70c0f5dabeea7a005a73665e247c7e"
-dependencies = [
- "cc",
- "cxx-build",
- "cxxbridge-cmd",
- "cxxbridge-flags",
- "cxxbridge-macro",
- "foldhash 0.2.0",
- "link-cplusplus",
-]
-
-[[package]]
-name = "cxx-build"
-version = "1.0.194"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0f4697d190a142477b16aef7da8a99bfdc41e7e8b1687583c0d23a79c7afc1e"
-dependencies = [
- "cc",
- "codespan-reporting",
- "indexmap",
- "proc-macro2",
- "quote",
- "scratch",
- "syn",
-]
-
-[[package]]
-name = "cxxbridge-cmd"
-version = "1.0.194"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0956799fa8678d4c50eed028f2de1c0552ae183c76e976cf7ca8c4e36a7c328"
-dependencies = [
- "clap",
- "codespan-reporting",
- "indexmap",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "cxxbridge-flags"
-version = "1.0.194"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23384a836ab4f0ad98ace7e3955ad2de39de42378ab487dc28d3990392cb283a"
-
-[[package]]
-name = "cxxbridge-macro"
-version = "1.0.194"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6acc6b5822b9526adfb4fc377b67128fdd60aac757cc4a741a6278603f763cf"
-dependencies = [
- "indexmap",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "debugid"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -701,12 +628,6 @@ name = "foldhash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
-
-[[package]]
-name = "foldhash"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "form_urlencoded"
@@ -861,7 +782,7 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
- "foldhash 0.1.5",
+ "foldhash",
  "serde",
 ]
 
@@ -1147,35 +1068,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "link-cplusplus"
-version = "1.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f78c730aaa7d0b9336a299029ea49f9ee53b0ed06e9202e8cb7db9bae7b8c82"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "linkme"
-version = "0.3.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e83272d46373fb8decca684579ac3e7c8f3d71d4cc3aa693df8759e260ae41cf"
-dependencies = [
- "linkme-impl",
-]
-
-[[package]]
-name = "linkme-impl"
-version = "0.3.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32d59e20403c7d08fe62b4376edfe5c7fb2ef1e6b1465379686d0f21c8df444b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1360,85 +1252,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "qtbridge"
-version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
-dependencies = [
- "qtbridge-build-common",
- "qtbridge-gen",
- "qtbridge-interfaces",
- "qtbridge-runtime",
- "qtbridge-type-lib",
-]
-
-[[package]]
-name = "qtbridge-build-common"
-version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
-dependencies = [
- "cc",
-]
-
-[[package]]
-name = "qtbridge-gen"
-version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
-dependencies = [
- "proc-macro2",
- "qtbridge-build-common",
- "qtbridge-gen-common",
- "qtbridge-type-lib",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "qtbridge-gen-common"
-version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
-dependencies = [
- "proc-macro2",
- "qtbridge-build-common",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "qtbridge-interfaces"
-version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
-dependencies = [
- "cxx",
- "cxx-build",
- "qtbridge-build-common",
- "qtbridge-runtime",
- "qtbridge-type-lib",
-]
-
-[[package]]
-name = "qtbridge-runtime"
-version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
-dependencies = [
- "cxx",
- "cxx-build",
- "qtbridge-build-common",
- "qtbridge-type-lib",
-]
-
-[[package]]
-name = "qtbridge-type-lib"
-version = "0.1.5"
-source = "git+https://github.com/qt/qtbridge-rust?rev=66583b7be5f7060feb27790741996ce350836091#66583b7be5f7060feb27790741996ce350836091"
-dependencies = [
- "cxx",
- "cxx-build",
- "linkme",
- "qtbridge-build-common",
- "qtbridge-gen-common",
 ]
 
 [[package]]
@@ -1644,12 +1457,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b39cdef0fa800fc44525c84ccb54a029961a8215f9619753635a9c0d2538d46d"
 
 [[package]]
-name = "scratch"
-version = "1.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d68f2ec51b097e4c1a75b681a8bec621909b5e91f15bb7b840c4f2f7b01148b2"
-
-[[package]]
 name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1840,15 +1647,6 @@ dependencies = [
  "teeline",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "teeline-qt"
-version = "0.1.0"
-dependencies = [
- "qtbridge",
- "serde_json",
- "teeline",
 ]
 
 [[package]]
