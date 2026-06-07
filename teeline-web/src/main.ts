@@ -66,17 +66,6 @@ window.parseFile = parseFile
 let parsedProblem: ParsedProblem | null = null
 let optTourRoute: number[] | null = null
 
-// ---- Upload ----
-
-initUpload(
-  parseFile,
-  (p) => { parsedProblem = p },
-  (route) => {
-    optTourRoute = route.length > 0 ? route : null
-    updateOptRoute(optTourRoute)
-  },
-)
-
 // ---- Results (init before solver config so showRunning is ready) ----
 
 initResults(
@@ -89,7 +78,7 @@ initResults(
 
 // ---- Solver config ----
 
-initSolverConfig(
+const solverConfig = initSolverConfig(
   () => parsedProblem !== null,
   (solver, options) => {
     if (!parsedProblem) return
@@ -122,5 +111,16 @@ initSolverConfig(
         overlay.hidden = true
         console.error('Solver error:', err)
       })
+  },
+)
+
+// ---- Upload (after solverConfig so refresh is available) ----
+
+initUpload(
+  parseFile,
+  (p) => { parsedProblem = p; solverConfig.refresh() },
+  (route) => {
+    optTourRoute = route.length > 0 ? route : null
+    updateOptRoute(optTourRoute)
   },
 )
