@@ -10,7 +10,10 @@ export function exampleUrl(name: string): string {
   return `/examples/${name}.tsp`
 }
 
-export function initUpload(parseFile: (input: string) => Promise<ParsedProblem>): void {
+export function initUpload(
+  parseFile: (input: string) => Promise<ParsedProblem>,
+  onProblemLoaded?: (problem: ParsedProblem) => void,
+): void {
   // DOM elements — all pre-built in index.html
   const zoneTsp       = document.getElementById('zone-tsp')!
   const tspIdle       = document.getElementById('zone-tsp-idle')!
@@ -76,6 +79,7 @@ export function initUpload(parseFile: (input: string) => Promise<ParsedProblem>)
     try {
       const parsed = await parseFile(text)
       showTspLoaded(filename, parsed)
+      onProblemLoaded?.(parsed)
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err))
     }

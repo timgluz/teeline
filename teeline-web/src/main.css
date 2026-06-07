@@ -138,3 +138,118 @@
   justify-content: flex-end;
   margin-top: var(--pico-spacing);
 }
+
+/* ---- Solver quick-pick pills ---- */
+.solver-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: var(--pico-spacing);
+}
+
+.pill {
+  margin: 0;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.pill--active {
+  background-color: var(--pico-primary);
+  border-color: var(--pico-primary);
+  color: var(--pico-primary-inverse);
+}
+
+#solver-select {
+  margin: 0;
+  height: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+/* ---- Solver config panel ---- */
+.config-panel {
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  padding: var(--pico-spacing);
+  margin-bottom: var(--pico-spacing);
+  min-height: 5rem;
+}
+
+.solver-kind-badge {
+  font-size: 0.8rem;
+  color: var(--pico-muted-color);
+  margin: 0 0 var(--pico-spacing) 0;
+}
+
+.config-no-params {
+  margin: 0;
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem var(--pico-spacing);
+  align-items: center;
+}
+
+.config-grid label {
+  margin: 0;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.config-grid input[type="number"] {
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  height: auto;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 36em) {
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Precondition checklist ---- */
+.checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--pico-spacing) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--pico-muted-color);
+  font-size: 0.95rem;
+}
+
+.checklist-item::before {
+  content: '○';
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.checklist-item--met {
+  color: var(--pico-color-jade-500, #2a9d8f);
+}
+
+.checklist-item--met::before {
+  content: '✓';
+}
+
+.checklist-item--optional {
+  font-style: italic;
+}
+
+.checklist-item--optional::after {
+  content: ' (optional)';
+  font-size: 0.8rem;
+  color: var(--pico-muted-color);
+}
