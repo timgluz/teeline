@@ -224,8 +224,8 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Install Rust wasm32-wasip2 target
-        run: rustup target add wasm32-wasip2
+      - name: Install Rust wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
       - name: Install cargo-component
         uses: taiki-e/install-action@v2
         with:
@@ -234,7 +234,7 @@ jobs:
         run: cargo component build --manifest-path teeline-wasm/Cargo.toml --release
       - name: Package WASM artifact
         run: |
-          WASM_FILE=$(find target/wasm32-wasip2/release -name "*.wasm" | head -1)
+          WASM_FILE=$(find target/wasm32-wasip1/release -name "*.wasm" | head -1)
           mkdir -p target/distrib
           cp "$WASM_FILE" target/distrib/teeline-solver.wasm
       - name: Upload WASM artifact
@@ -357,7 +357,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev libfuse2
       - name: Build teeline-qt
-        run: cargo build --release --locked -p teeline-qt
+        run: cargo build --release --manifest-path teeline-qt/Cargo.toml
       - name: Download linuxdeploy
         run: |
           wget -nv https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -431,7 +431,7 @@ jobs:
           arch: win64_msvc2022_64
           cache: true
       - name: Build teeline-qt
-        run: cargo build --release --locked -p teeline-qt
+        run: cargo build --release --manifest-path teeline-qt/Cargo.toml
       - name: Deploy Qt dependencies
         shell: pwsh
         run: |
@@ -473,7 +473,7 @@ jobs:
           arch: clang_64
           cache: true
       - name: Build teeline-qt
-        run: cargo build --release --locked -p teeline-qt
+        run: cargo build --release --manifest-path teeline-qt/Cargo.toml
       - name: Create .app bundle
         run: |
           mkdir -p TeelineQt.app/Contents/MacOS
