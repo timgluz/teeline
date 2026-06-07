@@ -181,7 +181,7 @@ impl Guest for Component {
                     .into_iter()
                     .map(|algo| CompareResult {
                         algorithm: algo,
-                        solution: Err(format!("parse error: {}", e)),
+                        solution: Err(e.clone()),
                     })
                     .collect();
             }
