@@ -224,8 +224,8 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-      - name: Install Rust wasm32-wasip2 target
-        run: rustup target add wasm32-wasip2
+      - name: Install Rust wasm32-wasip1 target
+        run: rustup target add wasm32-wasip1
       - name: Install cargo-component
         uses: taiki-e/install-action@v2
         with:
@@ -234,7 +234,7 @@ jobs:
         run: cargo component build --manifest-path teeline-wasm/Cargo.toml --release
       - name: Package WASM artifact
         run: |
-          WASM_FILE=$(find target/wasm32-wasip2/release -name "*.wasm" | head -1)
+          WASM_FILE=$(find target/wasm32-wasip1/release -name "*.wasm" | head -1)
           mkdir -p target/distrib
           cp "$WASM_FILE" target/distrib/teeline-solver.wasm
       - name: Upload WASM artifact
