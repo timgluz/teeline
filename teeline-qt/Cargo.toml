@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "teeline-qt"
 version = "0.1.0"
