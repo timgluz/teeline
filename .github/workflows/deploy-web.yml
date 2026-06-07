@@ -4,6 +4,7 @@ on:
   push:
     branches: [master]
     paths: ['teeline-web/**']
+  workflow_dispatch:
 
 permissions:
   contents: read
