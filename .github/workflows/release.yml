@@ -234,9 +234,8 @@ jobs:
         run: cargo component build --manifest-path teeline-wasm/Cargo.toml --release
       - name: Package WASM artifact
         run: |
-          WASM_FILE=$(find target/wasm32-wasip1/release -name "*.wasm" | head -1)
           mkdir -p target/distrib
-          cp "$WASM_FILE" target/distrib/teeline-solver.wasm
+          cp target/wasm32-wasip1/release/teeline_wasm.wasm target/distrib/teeline-solver.wasm
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v7
         with:
