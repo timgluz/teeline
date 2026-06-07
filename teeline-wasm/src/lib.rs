@@ -73,6 +73,7 @@ fn solve_with_cities(
         DistanceMatrix::from_cities(&kd_cities).map_err(|e| format!("distance matrix: {e}"))?;
     let problem = TspProblem::new(kd_cities, distances);
     let opts = build_opts(solver_id, options);
+    let start = std::time::Instant::now();
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         teeline::tsp::solve_problem(solver_id, &problem, &opts)
     }))
@@ -80,6 +81,7 @@ fn solve_with_cities(
     .map(|s| Solution {
         total: s.total,
         route: s.route().iter().map(|&id| id as u32).collect(),
+        duration_ms: start.elapsed().as_millis() as u32,
     })
 }
 
