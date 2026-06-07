@@ -34,7 +34,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Transpile WASM to JS bindings (jco)
-        run: npx --yes @bytecodealliance/jco@1.20.0 transpile ../teeline-wasm/teeline-solver.wasm -o ../teeline-wasm/js-bindings
+        run: npx --yes @bytecodealliance/jco@1.20.0 transpile ../teeline-wasm/teeline-solver.wasm --name teeline_wasm -o ../teeline-wasm/js-bindings
 
       - name: Install dependencies
         run: npm ci
