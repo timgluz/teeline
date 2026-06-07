@@ -6,6 +6,7 @@ import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult } from './worker'
 import { initUpload } from './upload'
 import { initSolverConfig } from './solver-form'
+import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
@@ -60,22 +61,66 @@ declare global {
 window.runSolver = runSolver
 window.parseFile = parseFile
 
-let parsedProblem: import('teeline-wasm').ParsedProblem | null = null
+// ---- App state ----
 
-initUpload(parseFile, (p) => {
-  parsedProblem = p
-})
+let parsedProblem: ParsedProblem | null = null
+let optTourRoute: number[] | null = null
+
+// ---- Upload ----
+
+initUpload(
+  parseFile,
+  (p) => { parsedProblem = p },
+  (route) => {
+    optTourRoute = route.length > 0 ? route : null
+    updateOptRoute(optTourRoute)
+  },
+)
+
+// ---- Results (init before solver config so showRunning is ready) ----
+
+initResults(
+  [],          // cities injected per-run via showResult; updated below
+  () => optTourRoute,
+  () => {
+    // "try another solver" — solver-form re-shows step-02 via its own stepper logic
+  },
+)
+
+// ---- Solver config ----
 
 initSolverConfig(
   () => parsedProblem !== null,
   (solver, options) => {
     if (!parsedProblem) return
-    const step03 = document.getElementById('step-03') as HTMLElement
-    const step04 = document.getElementById('step-04') as HTMLElement
-    step03.hidden = true
-    step04.hidden = false
-    runSolver(solver, parsedProblem.cities, options).catch((err: Error) => {
-      console.error('Solver error:', err)
-    })
+
+    // Re-init results with current cities so renderTour has the right data
+    initResults(
+      parsedProblem.cities,
+      () => optTourRoute,
+      () => {
+        const step04 = document.getElementById('step-04') as HTMLElement
+        const step02 = document.getElementById('step-02') as HTMLElement
+        step04.hidden = true
+        step02.hidden = false
+      },
+    )
+
+    showRunning()
+
+    const start = Date.now()
+    runSolver(solver, parsedProblem.cities, options)
+      .then((result) => {
+        const runtime = Date.now() - start
+        const optTotal = optTourRoute
+          ? computeRouteLength(optTourRoute, parsedProblem!.cities)
+          : undefined
+        showResult({ solver, total: result.total, optTotal, runtime, route: result.route })
+      })
+      .catch((err: Error) => {
+        const overlay = document.getElementById('solving-overlay') as HTMLElement
+        overlay.hidden = true
+        console.error('Solver error:', err)
+      })
   },
 )

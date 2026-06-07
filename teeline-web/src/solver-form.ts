@@ -140,8 +140,11 @@ export function initSolverConfig(
 
   btnRun.addEventListener('click', () => {
     if (!selectedAlias || !isProblemLoaded()) return
-    onSolverReady(selectedAlias, { ...currentOptions })
+    const step04 = document.getElementById('step-04') as HTMLElement
+    step03.hidden = true
+    step04.hidden = false
     advanceStepper(3)
+    onSolverReady(selectedAlias, { ...currentOptions })
   })
 }
 
