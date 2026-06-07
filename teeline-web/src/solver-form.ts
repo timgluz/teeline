@@ -4,15 +4,13 @@ import { defaultSolveOptions, type SolveOptions } from './solver-options'
 export function initSolverConfig(
   isProblemLoaded: () => boolean,
   onSolverReady: (solver: string, options: SolveOptions) => void,
-): void {
-  const step02        = document.getElementById('step-02') as HTMLElement
-  const step03        = document.getElementById('step-03') as HTMLElement
-  const solverSelect  = document.getElementById('solver-select') as HTMLSelectElement
-  const configPanel   = document.getElementById('config-panel') as HTMLElement
-  const btnToSolve    = document.getElementById('btn-to-solve') as HTMLButtonElement
-  const btnRun        = document.getElementById('btn-run') as HTMLButtonElement
-  const checkProblem  = document.getElementById('check-problem') as HTMLElement
-  const checkSolver   = document.getElementById('check-solver') as HTMLElement
+): { refresh: () => void } {
+  const step02       = document.getElementById('step-02') as HTMLElement
+  const solverSelect = document.getElementById('solver-select') as HTMLSelectElement
+  const configPanel  = document.getElementById('config-panel') as HTMLElement
+  const btnRun       = document.getElementById('btn-run') as HTMLButtonElement
+  const checkProblem = document.getElementById('check-problem') as HTMLElement
+  const checkSolver  = document.getElementById('check-solver') as HTMLElement
 
   let selectedAlias: string | null = null
   let currentOptions: SolveOptions = defaultSolveOptions()
@@ -127,22 +125,19 @@ export function initSolverConfig(
     if (solverSelect.value) selectSolver(solverSelect.value)
   })
 
-  // ---- Step 02 → Step 03 ----
-
-  btnToSolve.addEventListener('click', () => {
-    step02.hidden = true
-    step03.hidden = false
-    advanceStepper(2)
-    updateChecklist()
-  })
-
   // ---- Run ----
 
   btnRun.addEventListener('click', () => {
     if (!selectedAlias || !isProblemLoaded()) return
+    const step04 = document.getElementById('step-04') as HTMLElement
+    step02.hidden = true
+    step04.hidden = false
+    advanceStepper(2)
     onSolverReady(selectedAlias, { ...currentOptions })
-    advanceStepper(3)
   })
+
+  updateChecklist()
+  return { refresh: updateChecklist }
 }
 
 // ---- Stepper helpers ----

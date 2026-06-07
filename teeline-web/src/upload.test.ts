@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatMetadata, exampleUrl } from './upload'
+import { formatMetadata, exampleUrl, parseOptTour } from './upload'
 import type { ParsedProblem } from 'teeline-wasm'
 
 const cities = (n: number) =>
@@ -32,6 +32,33 @@ describe('formatMetadata', () => {
     expect(formatMetadata(makeProblem({ distanceType: 'GEO', cities: cities(22) }))).toBe(
       'parsed: 22 cities · GEO',
     )
+  })
+})
+
+describe('parseOptTour', () => {
+  const minimal = `NAME : test\nTOUR_SECTION\n1\n3\n2\n-1\nEOF\n`
+
+  it('extracts city IDs from TOUR_SECTION until -1', () => {
+    expect(parseOptTour(minimal)).toEqual([1, 3, 2])
+  })
+
+  it('handles leading and trailing whitespace on each line', () => {
+    const text = `TOUR_SECTION\n  1  \n  49  \n  32  \n-1\n`
+    expect(parseOptTour(text)).toEqual([1, 49, 32])
+  })
+
+  it('skips all header lines before TOUR_SECTION', () => {
+    const text = `NAME : berlin52\nTYPE : TOUR\nDIMENSION : 3\nTOUR_SECTION\n7\n5\n9\n-1\n`
+    expect(parseOptTour(text)).toEqual([7, 5, 9])
+  })
+
+  it('returns empty array when TOUR_SECTION is absent', () => {
+    expect(parseOptTour('NAME : foo\n1\n2\n3\n')).toEqual([])
+  })
+
+  it('stops before EOF line', () => {
+    const text = `TOUR_SECTION\n1\n2\n-1\nEOF\n`
+    expect(parseOptTour(text)).toEqual([1, 2])
   })
 })
 

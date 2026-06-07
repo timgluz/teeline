@@ -253,3 +253,99 @@
   font-size: 0.8rem;
   color: var(--pico-muted-color);
 }
+
+/* ---- Step-actions spread (space-between) ---- */
+.step-actions--spread {
+  justify-content: space-between;
+}
+
+/* ---- Tour SVG canvas ---- */
+.tour-figure {
+  position: relative;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  margin: 0 0 var(--pico-spacing) 0;
+  overflow: hidden;
+  background: var(--pico-card-background-color, #fff);
+}
+
+.tour-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* SVG element styles (no class= needed on the SVG namespace elements) */
+.tour-svg polyline.tour-solver {
+  fill: none;
+  stroke: var(--pico-color-orange-500, #e67e22);
+  stroke-width: 1.5;
+}
+
+.tour-svg polyline.tour-optimal {
+  fill: none;
+  stroke: #555;
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.tour-svg circle.city-dot {
+  fill: var(--pico-color-orange-500, #e67e22);
+}
+
+.tour-svg .legend-solver {
+  font-size: 11px;
+  fill: var(--pico-color-orange-500, #e67e22);
+}
+
+.tour-svg .legend-optimal {
+  font-size: 11px;
+  fill: #555;
+}
+
+/* ---- Solving overlay ---- */
+.solving-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--pico-background-color, #fff) 85%, transparent);
+}
+
+.solving-overlay p {
+  font-size: 1.25rem;
+  color: var(--pico-color-orange-500, #e67e22);
+  font-weight: bold;
+  margin: 0;
+}
+
+/* ---- Results table ---- */
+.results-table {
+  width: 100%;
+  margin-bottom: var(--pico-spacing);
+}
+
+/* ---- Run history ---- */
+.run-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--pico-spacing) 0;
+}
+
+.run-history-item {
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--pico-border-radius);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.run-history-item:hover {
+  background: color-mix(in srgb, var(--pico-primary) 8%, transparent);
+}
+
+.run-history-item:empty::before {
+  content: 'No runs yet.';
+  color: var(--pico-muted-color);
+}

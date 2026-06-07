@@ -10,9 +10,25 @@ export function exampleUrl(name: string): string {
   return `/examples/${name}.tsp`
 }
 
+export function parseOptTour(text: string): number[] {
+  const lines = text.split('\n')
+  let inSection = false
+  const route: number[] = []
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (line === 'TOUR_SECTION') { inSection = true; continue }
+    if (!inSection) continue
+    const n = parseInt(line, 10)
+    if (isNaN(n) || n < 0) break
+    route.push(n)
+  }
+  return route
+}
+
 export function initUpload(
   parseFile: (input: string) => Promise<ParsedProblem>,
   onProblemLoaded?: (problem: ParsedProblem) => void,
+  onOptTourLoaded?: (route: number[]) => void,
 ): void {
   // DOM elements — all pre-built in index.html
   const zoneTsp       = document.getElementById('zone-tsp')!
@@ -122,7 +138,7 @@ export function initUpload(
   })
   btnReplaceTsp.addEventListener('click', showTspIdle)
 
-  // ---- Wire opt.tour zone (store only — no parse needed) ----
+  // ---- Wire opt.tour zone ----
 
   function showOptLoaded(filename: string): void {
     optChipName.textContent = filename
@@ -136,15 +152,24 @@ export function initUpload(
     optChip.hidden = true
     optChipName.textContent = ''
     zoneOpt.classList.remove('drop-zone--loaded')
+    onOptTourLoaded?.([])
   }
 
-  setupDragDrop(zoneOpt, showOptLoaded)
+  function loadOptText(filename: string, text: string): void {
+    const route = parseOptTour(text)
+    showOptLoaded(filename)
+    onOptTourLoaded?.(route)
+  }
+
+  setupDragDrop(zoneOpt, loadOptText)
 
   btnBrowseOpt.addEventListener('click', () => inputOpt.click())
   inputOpt.addEventListener('change', (e) => {
     const file = (e.target as HTMLInputElement).files?.[0]
     if (!file) return
-    showOptLoaded(file.name)
+    const reader = new FileReader()
+    reader.onload = () => loadOptText(file.name, reader.result as string)
+    reader.readAsText(file)
     inputOpt.value = ''
   })
   btnReplaceOpt.addEventListener('click', showOptIdle)
