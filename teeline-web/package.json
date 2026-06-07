@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && node scripts/copy-wasm.mjs",
+    "build:check": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "deploy": "npm run build && wrangler pages deploy dist/"
