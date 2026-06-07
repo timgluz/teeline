@@ -5,6 +5,9 @@ on:
     branches: [master]
     paths: ['teeline-web/**']
 
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: teeline-web
@@ -21,6 +24,16 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: teeline-web/package-lock.json
+
+      - name: Download WASM component from latest release
+        run: |
+          mkdir -p ../teeline-wasm/js-bindings
+          gh release download --latest --pattern 'teeline-solver.wasm' --output ../teeline-wasm/teeline-solver.wasm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Transpile WASM to JS bindings (jco)
+        run: npx --yes jco@1.19.0 transpile ../teeline-wasm/teeline-solver.wasm -o ../teeline-wasm/js-bindings
 
       - name: Install dependencies
         run: npm ci
