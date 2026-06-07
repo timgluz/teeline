@@ -12,6 +12,9 @@ docs/superpowers/
 # env files
 .env*
 
+# teeline-qt
+teeline-qt/target/
+
 # teeline-web
 teeline-web/dist/
 node_modules/

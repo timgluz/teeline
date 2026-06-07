@@ -292,6 +292,121 @@ fn test_parse_and_solve_invalid_json_returns_err() {
     assert!(result.is_err(), "invalid JSON must return Err");
 }
 
+// ── list_algorithms and compare helpers ───────────────────────────────────────
+
+const FIVE_CITIES_TSPLIB: &str = "NAME: test\n\
+TYPE: TSP\n\
+DIMENSION: 5\n\
+EDGE_WEIGHT_TYPE: EUC_2D\n\
+NODE_COORD_SECTION\n\
+1 565.0 575.0\n\
+2 25.0 185.0\n\
+3 345.0 750.0\n\
+4 945.0 685.0\n\
+5 845.0 655.0\n\
+EOF\n";
+
+fn run_list_algorithms() -> Vec<crate::teeline::solver::types::AlgorithmInfo> {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    instance.call_list_algorithms(&mut store).unwrap()
+}
+
+fn run_compare(
+    algorithms: &[&str],
+    input: &str,
+) -> Vec<crate::teeline::solver::types::CompareResult> {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let algos: Vec<String> = algorithms.iter().map(|&s| s.to_string()).collect();
+    instance
+        .call_compare(&mut store, &algos, input, default_options())
+        .unwrap()
+}
+
+// ── list_algorithms tests ─────────────────────────────────────────────────────
+
+#[test]
+fn test_list_algorithms_returns_all_solvers() {
+    let algorithms = run_list_algorithms();
+    assert_eq!(algorithms.len(), 13, "expected 13 solvers");
+    let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
+    for expected_id in &[
+        "nn", "2opt", "3opt", "sa", "ga", "pso", "cs", "fpa",
+        "tabu_search", "stochastic_hill", "shuffle", "bhk", "branch_bound",
+    ] {
+        assert!(ids.contains(expected_id), "missing algorithm id: {}", expected_id);
+    }
+}
+
+#[test]
+fn test_list_algorithms_fields_non_empty() {
+    let algorithms = run_list_algorithms();
+    for algo in &algorithms {
+        assert!(!algo.id.is_empty(),             "id empty for {:?}", algo.name);
+        assert!(!algo.name.is_empty(),           "name empty for {}", algo.id);
+        assert!(!algo.description.is_empty(),    "description empty for {}", algo.id);
+        assert!(!algo.recommendation.is_empty(), "recommendation empty for {}", algo.id);
+    }
+}
+
+// ── compare tests ─────────────────────────────────────────────────────────────
+
+#[test]
+fn test_compare_tsplib_input() {
+    let results = run_compare(&["nn", "2opt"], FIVE_CITIES_TSPLIB);
+    assert_eq!(results.len(), 2);
+    assert_eq!(results[0].algorithm, "nn");
+    assert_eq!(results[1].algorithm, "2opt");
+    for r in &results {
+        let sol = r.solution.as_ref().expect("solver should succeed");
+        assert_valid_tour(sol, 5);
+    }
+}
+
+#[test]
+fn test_compare_preserves_algorithm_order() {
+    let results = run_compare(&["sa", "nn", "ga"], FIVE_CITIES_TSPLIB);
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0].algorithm, "sa");
+    assert_eq!(results[1].algorithm, "nn");
+    assert_eq!(results[2].algorithm, "ga");
+}
+
+#[test]
+fn test_compare_unknown_algorithm_returns_error_entry() {
+    let results = run_compare(&["nn", "does_not_exist"], FIVE_CITIES_TSPLIB);
+    assert_eq!(results.len(), 2);
+    assert!(results[0].solution.is_ok(),  "nn should succeed");
+    assert!(results[1].solution.is_err(), "unknown solver should return error entry");
+}
+
+#[test]
+fn test_compare_invalid_input_all_error_entries() {
+    let results = run_compare(&["nn", "2opt"], "not valid tsplib or json");
+    assert_eq!(results.len(), 2);
+    assert!(results[0].solution.is_err(), "should return parse error for nn");
+    assert!(results[1].solution.is_err(), "should return parse error for 2opt");
+}
+
+#[test]
+fn test_compare_json_input() {
+    let results = run_compare(&["nn", "2opt"], &five_cities_json());
+    assert_eq!(results.len(), 2);
+    for r in &results {
+        let sol = r.solution.as_ref().expect("solver should succeed with JSON input");
+        assert_valid_tour(sol, 5);
+    }
+}
+
 // ── parse integration tests ────────────────────────────────────────────────────
 
 fn run_parse(input: &str) -> crate::teeline::solver::types::ParsedProblem {

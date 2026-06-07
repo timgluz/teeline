@@ -43,6 +43,7 @@ on:
   push:
     tags:
       - '**[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
 
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do
@@ -541,3 +542,56 @@ jobs:
           path: artifacts/
       - name: Attach Qt artifacts to GitHub Release
         run: gh release upload "${{ needs.plan.outputs.tag }}" artifacts/* --repo "${{ github.repository }}"
+
+  publish-wassette:
+    needs: [plan]
+    if: needs.plan.outputs.publishing == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Add wasm32-wasip2 target
+        run: rustup target add wasm32-wasip2
+
+      - name: Install cargo-component
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
+
+      - name: Build wasip2 component
+        run: |
+          cargo component build \
+            --manifest-path teeline-wasm/Cargo.toml \
+            --target wasm32-wasip2 \
+            --release
+          cp target/wasm32-wasip2/release/teeline_wasm.wasm teeline-solver-wassette.wasm
+
+      - name: Install ORAS
+        uses: oras-project/setup-oras@v1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        run: |
+          oras push ghcr.io/timgluz/teeline/wassette:latest \
+            --artifact-type application/wasm \
+            teeline-solver-wassette.wasm:application/wasm
+
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            oras push "ghcr.io/timgluz/teeline/wassette:${GITHUB_REF_NAME}" \
+              --artifact-type application/wasm \
+              teeline-solver-wassette.wasm:application/wasm
+          fi
