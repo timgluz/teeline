@@ -7,6 +7,7 @@ import type { SolveResult, SolveError, ParseResult } from './worker'
 import { initUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
+import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
@@ -92,6 +93,7 @@ const solverConfig = initSolverConfig(
         const step02 = document.getElementById('step-02') as HTMLElement
         step04.hidden = true
         step02.hidden = false
+        ;(document.getElementById('download-actions') as HTMLElement).hidden = true
       },
     )
 
@@ -104,7 +106,9 @@ const solverConfig = initSolverConfig(
         const optTotal = optTourRoute
           ? computeRouteLength(optTourRoute, parsedProblem!.cities)
           : undefined
-        showResult({ solver, total: result.total, optTotal, runtime, route: result.route })
+        const record = { solver, total: result.total, optTotal, runtime, route: result.route }
+        showResult(record)
+        showDownloadButtons(record, parsedProblem!)
       })
       .catch((err: Error) => {
         const overlay = document.getElementById('solving-overlay') as HTMLElement
@@ -124,3 +128,28 @@ initUpload(
     updateOptRoute(optTourRoute)
   },
 )
+
+// ---- Download wiring ----
+
+function showDownloadButtons(record: import('./results').RunRecord, problem: ParsedProblem): void {
+  const actions = document.getElementById('download-actions') as HTMLElement
+  actions.hidden = false
+
+  const { name, cities } = problem
+  const { route } = record
+  const svgEl = document.getElementById('tour-svg') as unknown as SVGSVGElement
+  const ts = Date.now()
+  const sessionId = crypto.randomUUID()
+
+  document.getElementById('btn-download-tour')!.onclick = () =>
+    triggerDownload(buildTourText(name, route), `${sessionId}.tour`, 'text/plain')
+
+  document.getElementById('btn-download-csv')!.onclick = () =>
+    triggerDownload(buildCsvText(route, cities), `${sessionId}.csv`, 'text/csv')
+
+  document.getElementById('btn-download-json')!.onclick = () =>
+    triggerDownload(buildJsonText(name, record, cities, ts), `${sessionId}.json`, 'application/json')
+
+  document.getElementById('btn-download-svg')!.onclick = () =>
+    triggerDownload(serializeSvg(svgEl), `${sessionId}.svg`, 'image/svg+xml')
+}
