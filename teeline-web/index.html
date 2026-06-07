@@ -94,10 +94,48 @@
           </div>
         </section>
 
-        <!-- Step 02: Configure (placeholder — issue #124) -->
+        <!-- Step 02: Configure -->
         <section id="step-02" class="step-panel" aria-labelledby="step-02-heading" hidden>
-          <h2 id="step-02-heading">Configure</h2>
-          <p class="muted">Solver configuration coming soon.</p>
+          <h2 id="step-02-heading">Configure Solver</h2>
+
+          <div class="solver-pills">
+            <button type="button" class="pill outline secondary" data-solver="nn" aria-current="false">NN</button>
+            <button type="button" class="pill outline secondary" data-solver="2opt" aria-current="false">2-opt</button>
+            <button type="button" class="pill outline secondary" data-solver="sa" aria-current="false">SA</button>
+            <button type="button" class="pill outline secondary" data-solver="ga" aria-current="false">GA</button>
+            <select id="solver-select" aria-label="All solvers">
+              <option value="">All solvers…</option>
+            </select>
+          </div>
+
+          <div id="config-panel" class="config-panel">
+            <p class="muted">Select a solver above to see its options.</p>
+          </div>
+
+          <div class="step-actions">
+            <button type="button" id="btn-to-solve">Continue →</button>
+          </div>
+        </section>
+
+        <!-- Step 03: Solve -->
+        <section id="step-03" class="step-panel" aria-labelledby="step-03-heading" hidden>
+          <h2 id="step-03-heading">Ready to Solve</h2>
+
+          <ul class="checklist" id="precondition-list" role="list">
+            <li class="checklist-item" id="check-problem">problem file loaded</li>
+            <li class="checklist-item" id="check-solver">solver selected</li>
+            <li class="checklist-item checklist-item--optional" id="check-optimal">optimal route (optional)</li>
+          </ul>
+
+          <div class="step-actions">
+            <button type="button" id="btn-run" disabled>Run Solver</button>
+          </div>
+        </section>
+
+        <!-- Step 04: Results (placeholder) -->
+        <section id="step-04" class="step-panel" aria-labelledby="step-04-heading" hidden>
+          <h2 id="step-04-heading">Results</h2>
+          <p class="muted">Tour results will appear here.</p>
         </section>
 
       </section><!-- /#step-content -->

@@ -5,6 +5,7 @@ import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult } from './worker'
 import { initUpload } from './upload'
+import { initSolverConfig } from './solver-form'
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
@@ -59,4 +60,22 @@ declare global {
 window.runSolver = runSolver
 window.parseFile = parseFile
 
-initUpload(parseFile)
+let parsedProblem: import('teeline-wasm').ParsedProblem | null = null
+
+initUpload(parseFile, (p) => {
+  parsedProblem = p
+})
+
+initSolverConfig(
+  () => parsedProblem !== null,
+  (solver, options) => {
+    if (!parsedProblem) return
+    const step03 = document.getElementById('step-03') as HTMLElement
+    const step04 = document.getElementById('step-04') as HTMLElement
+    step03.hidden = true
+    step04.hidden = false
+    runSolver(solver, parsedProblem.cities, options).catch((err: Error) => {
+      console.error('Solver error:', err)
+    })
+  },
+)
