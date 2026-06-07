@@ -228,44 +228,55 @@
         >
           <h2 id="step-04-heading">Results</h2>
 
-          <figure class="tour-figure">
-            <div id="solving-overlay" class="solving-overlay" hidden>
-              <p>Solving…</p>
+          <div class="step-04-body">
+            <figure class="tour-figure">
+              <div id="solving-overlay" class="solving-overlay" hidden>
+                <p>Solving…</p>
+              </div>
+              <svg
+                id="tour-svg"
+                class="tour-svg"
+                viewBox="0 0 600 400"
+                role="img"
+                aria-label="TSP tour map"
+              ></svg>
+            </figure>
+
+            <div class="step-04-sidebar">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th>Tour length</th>
+                    <th>Gap vs optimal</th>
+                    <th>Runtime</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td id="result-total">—</td>
+                    <td id="result-gap">—</td>
+                    <td id="result-runtime">—</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <section aria-labelledby="run-history-heading">
+                <h3 id="run-history-heading">Run history</h3>
+                <ol
+                  id="run-history-list"
+                  class="run-history-list"
+                  aria-label="Previous runs"
+                ></ol>
+              </section>
             </div>
-            <svg
-              id="tour-svg"
-              class="tour-svg"
-              viewBox="0 0 600 400"
-              role="img"
-              aria-label="TSP tour map"
-            ></svg>
-          </figure>
+          </div>
 
-          <table class="results-table">
-            <thead>
-              <tr>
-                <th>Tour length</th>
-                <th>Gap vs optimal</th>
-                <th>Runtime</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td id="result-total">—</td>
-                <td id="result-gap">—</td>
-                <td id="result-runtime">—</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <section aria-labelledby="run-history-heading">
-            <h3 id="run-history-heading">Run history</h3>
-            <ol
-              id="run-history-list"
-              class="run-history-list"
-              aria-label="Previous runs"
-            ></ol>
-          </section>
+          <div id="download-actions" class="download-actions" hidden>
+            <button type="button" id="btn-download-tour" class="outline secondary">⬇ .tour</button>
+            <button type="button" id="btn-download-csv"  class="outline secondary">⬇ .csv</button>
+            <button type="button" id="btn-download-json" class="outline secondary">⬇ .json</button>
+            <button type="button" id="btn-download-svg"  class="outline secondary">⬇ .svg</button>
+          </div>
 
           <div class="step-actions step-actions--spread">
             <button type="button" id="btn-try-again" class="outline secondary">

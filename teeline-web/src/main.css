@@ -349,3 +349,40 @@
   content: 'No runs yet.';
   color: var(--pico-muted-color);
 }
+
+/* ---- Download actions ---- */
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: var(--pico-spacing);
+}
+
+/* ---- Step 04 desktop 2-col layout ---- */
+@media (min-width: 1024px) {
+  .step-04-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--pico-spacing);
+    align-items: start;
+  }
+}
+
+/* ---- Phone (PicoCSS xs: <576px) overrides ---- */
+@media (max-width: 576px) {
+  .stepper-label {
+    display: none;
+  }
+
+  #btn-run {
+    width: 100%;
+  }
+
+  .download-actions {
+    flex-direction: column;
+  }
+
+  .results-table {
+    font-size: 0.85rem;
+  }
+}
