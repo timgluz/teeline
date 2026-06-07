@@ -75,6 +75,6 @@ jobs:
         version: '6.11.*'
         cache: true
     - name: Build teeline-qt
-      run: cargo build -p teeline-qt 2>&1
+      run: cargo build --manifest-path teeline-qt/Cargo.toml 2>&1
       env:
         RUST_LOG: debug
