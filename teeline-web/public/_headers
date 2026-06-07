@@ -1,6 +1,7 @@
 /assets/*.wasm
   Content-Type: application/wasm
 
-# SPA fallback — all unmatched paths return index.html
+# Security headers
 /*
   X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
