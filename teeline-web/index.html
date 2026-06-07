@@ -29,49 +29,91 @@
       </nav>
 
       <section id="step-content">
-
         <!-- Step 01: Load Data -->
-        <section id="step-01" class="step-panel" aria-labelledby="step-01-heading">
+        <section
+          id="step-01"
+          class="step-panel"
+          aria-labelledby="step-01-heading"
+        >
           <h2 id="step-01-heading">Load Data</h2>
 
           <div class="drop-zones">
-
             <!-- Required .tsp zone -->
-            <div id="zone-tsp" class="drop-zone drop-zone--required"
-                 role="region" aria-label="TSP problem file (.tsp)">
+            <div
+              id="zone-tsp"
+              class="drop-zone drop-zone--required"
+              role="region"
+              aria-label="TSP problem file (.tsp)"
+            >
               <div id="zone-tsp-idle" class="drop-zone__idle">
-                <p class="drop-zone__hint">Drag a <strong>.tsp</strong> file here</p>
+                <p class="drop-zone__hint">
+                  Drag a <strong>.tsp</strong> file here
+                </p>
                 <p class="drop-zone__or"><small>or</small></p>
-                <button type="button" class="outline" id="btn-browse-tsp">Browse…</button>
-                <input id="input-tsp" type="file" accept=".tsp" hidden aria-hidden="true" />
+                <button type="button" class="outline" id="btn-browse-tsp">
+                  Browse…
+                </button>
+                <input
+                  id="input-tsp"
+                  type="file"
+                  accept=".tsp"
+                  hidden
+                  aria-hidden="true"
+                />
               </div>
               <div id="zone-tsp-chip" class="drop-zone__chip" hidden>
                 <span class="chip-icon" aria-hidden="true">✓</span>
                 <span class="chip-name" id="tsp-chip-name"></span>
-                <button type="button" class="outline secondary chip-replace"
-                        id="btn-replace-tsp">replace</button>
+                <button
+                  type="button"
+                  class="outline secondary chip-replace"
+                  id="btn-replace-tsp"
+                >
+                  replace
+                </button>
               </div>
             </div>
 
             <!-- Optional .opt.tour zone -->
-            <div id="zone-opt" class="drop-zone drop-zone--optional"
-                 role="region" aria-label="Optimal tour file (.opt.tour, optional)">
+            <div
+              id="zone-opt"
+              class="drop-zone drop-zone--optional"
+              role="region"
+              aria-label="Optimal tour file (.opt.tour, optional)"
+            >
               <div id="zone-opt-idle" class="drop-zone__idle">
-                <p class="drop-zone__hint">Drag a <strong>.opt.tour</strong> file here</p>
+                <p class="drop-zone__hint">
+                  Drag a <strong>.opt.tour</strong> file here
+                </p>
                 <p class="drop-zone__or"><small>or</small></p>
-                <button type="button" class="outline" id="btn-browse-opt">Browse…</button>
-                <input id="input-opt" type="file" accept=".opt.tour" hidden aria-hidden="true" />
-                <p class="drop-zone__hint-secondary"><small>optional reference tour</small></p>
+                <button type="button" class="outline" id="btn-browse-opt">
+                  Browse…
+                </button>
+                <input
+                  id="input-opt"
+                  type="file"
+                  accept=".opt.tour"
+                  hidden
+                  aria-hidden="true"
+                />
+                <p class="drop-zone__hint-secondary">
+                  <small>optional reference tour</small>
+                </p>
               </div>
               <div id="zone-opt-chip" class="drop-zone__chip" hidden>
                 <span class="chip-icon" aria-hidden="true">✓</span>
                 <span class="chip-name" id="opt-chip-name"></span>
-                <button type="button" class="outline secondary chip-replace"
-                        id="btn-replace-opt">replace</button>
+                <button
+                  type="button"
+                  class="outline secondary chip-replace"
+                  id="btn-replace-opt"
+                >
+                  replace
+                </button>
               </div>
             </div>
-
-          </div><!-- /.drop-zones -->
+          </div>
+          <!-- /.drop-zones -->
 
           <p id="metadata-line" class="metadata-line" hidden></p>
           <p id="error-line" class="upload-error" hidden></p>
@@ -79,9 +121,27 @@
           <fieldset>
             <legend>Example datasets</legend>
             <div class="example-buttons">
-              <button type="button" class="outline secondary" data-example="berlin52">berlin52</button>
-              <button type="button" class="outline secondary" data-example="burma14">burma14</button>
-              <button type="button" class="outline secondary" data-example="ulysses22">ulysses22</button>
+              <button
+                type="button"
+                class="outline secondary"
+                data-example="berlin52"
+              >
+                berlin52
+              </button>
+              <button
+                type="button"
+                class="outline secondary"
+                data-example="burma14"
+              >
+                burma14
+              </button>
+              <button
+                type="button"
+                class="outline secondary"
+                data-example="ulysses22"
+              >
+                ulysses22
+              </button>
             </div>
           </fieldset>
 
@@ -91,14 +151,47 @@
         </section>
 
         <!-- Step 02: Configure -->
-        <section id="step-02" class="step-panel" aria-labelledby="step-02-heading" hidden>
+        <section
+          id="step-02"
+          class="step-panel"
+          aria-labelledby="step-02-heading"
+          hidden
+        >
           <h2 id="step-02-heading">Configure Solver</h2>
 
           <div class="solver-pills">
-            <button type="button" class="pill outline secondary" data-solver="nn" aria-current="false">NN</button>
-            <button type="button" class="pill outline secondary" data-solver="2opt" aria-current="false">2-opt</button>
-            <button type="button" class="pill outline secondary" data-solver="sa" aria-current="false">SA</button>
-            <button type="button" class="pill outline secondary" data-solver="ga" aria-current="false">GA</button>
+            <button
+              type="button"
+              class="pill outline secondary"
+              data-solver="nn"
+              aria-current="false"
+            >
+              NN
+            </button>
+            <button
+              type="button"
+              class="pill outline secondary"
+              data-solver="2opt"
+              aria-current="false"
+            >
+              2-opt
+            </button>
+            <button
+              type="button"
+              class="pill outline secondary"
+              data-solver="sa"
+              aria-current="false"
+            >
+              SA
+            </button>
+            <button
+              type="button"
+              class="pill outline secondary"
+              data-solver="ga"
+              aria-current="false"
+            >
+              GA
+            </button>
             <select id="solver-select" aria-label="All solvers">
               <option value="">All solvers…</option>
             </select>
@@ -109,9 +202,16 @@
           </div>
 
           <ul class="checklist" id="precondition-list" role="list">
-            <li class="checklist-item" id="check-problem">problem file loaded</li>
+            <li class="checklist-item" id="check-problem">
+              problem file loaded
+            </li>
             <li class="checklist-item" id="check-solver">solver selected</li>
-            <li class="checklist-item checklist-item--optional" id="check-optimal">optimal route (optional)</li>
+            <li
+              class="checklist-item checklist-item--optional"
+              id="check-optimal"
+            >
+              optimal route (optional)
+            </li>
           </ul>
 
           <div class="step-actions">
@@ -120,20 +220,34 @@
         </section>
 
         <!-- Step 04: Results -->
-        <section id="step-04" class="step-panel" aria-labelledby="step-04-heading" hidden>
+        <section
+          id="step-04"
+          class="step-panel"
+          aria-labelledby="step-04-heading"
+          hidden
+        >
           <h2 id="step-04-heading">Results</h2>
 
           <figure class="tour-figure">
             <div id="solving-overlay" class="solving-overlay" hidden>
               <p>Solving…</p>
             </div>
-            <svg id="tour-svg" class="tour-svg" viewBox="0 0 600 400"
-                 role="img" aria-label="TSP tour map"></svg>
+            <svg
+              id="tour-svg"
+              class="tour-svg"
+              viewBox="0 0 600 400"
+              role="img"
+              aria-label="TSP tour map"
+            ></svg>
           </figure>
 
           <table class="results-table">
             <thead>
-              <tr><th>Tour length</th><th>Gap vs optimal</th><th>Runtime</th></tr>
+              <tr>
+                <th>Tour length</th>
+                <th>Gap vs optimal</th>
+                <th>Runtime</th>
+              </tr>
             </thead>
             <tbody>
               <tr>
@@ -146,17 +260,24 @@
 
           <section aria-labelledby="run-history-heading">
             <h3 id="run-history-heading">Run history</h3>
-            <ol id="run-history-list" class="run-history-list" aria-label="Previous runs"></ol>
+            <ol
+              id="run-history-list"
+              class="run-history-list"
+              aria-label="Previous runs"
+            ></ol>
           </section>
 
           <div class="step-actions step-actions--spread">
-            <button type="button" id="btn-try-again" class="outline secondary">↻ try another solver</button>
+            <button type="button" id="btn-try-again" class="outline secondary">
+              ↻ try another solver
+            </button>
           </div>
         </section>
-
-      </section><!-- /#step-content -->
+      </section>
+      <!-- /#step-content -->
     </main>
 
     <script type="module" src="/src/main.ts"></script>
+    <script src="/src/sentry.js"></script>
   </body>
 </html>
