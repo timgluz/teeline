@@ -139,16 +139,17 @@ function showDownloadButtons(record: import('./results').RunRecord, problem: Par
   const { route } = record
   const svgEl = document.getElementById('tour-svg') as unknown as SVGSVGElement
   const ts = Date.now()
+  const sessionId = crypto.randomUUID()
 
   document.getElementById('btn-download-tour')!.onclick = () =>
-    triggerDownload(buildTourText(name, route), `${name}.tour`, 'text/plain')
+    triggerDownload(buildTourText(name, route), `${sessionId}.tour`, 'text/plain')
 
   document.getElementById('btn-download-csv')!.onclick = () =>
-    triggerDownload(buildCsvText(route, cities), `${name}.csv`, 'text/csv')
+    triggerDownload(buildCsvText(route, cities), `${sessionId}.csv`, 'text/csv')
 
   document.getElementById('btn-download-json')!.onclick = () =>
-    triggerDownload(buildJsonText(name, record, cities, ts), `${name}.json`, 'application/json')
+    triggerDownload(buildJsonText(name, record, cities, ts), `${sessionId}.json`, 'application/json')
 
   document.getElementById('btn-download-svg')!.onclick = () =>
-    triggerDownload(serializeSvg(svgEl), `${name}.svg`, 'image/svg+xml')
+    triggerDownload(serializeSvg(svgEl), `${sessionId}.svg`, 'image/svg+xml')
 }
