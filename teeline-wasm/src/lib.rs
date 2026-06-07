@@ -2,7 +2,7 @@
 mod bindings;
 
 use bindings::Guest;
-use bindings::teeline::solver::types::{AlgorithmInfo, City, ParsedProblem, Solution, SolveOptions};
+use bindings::teeline::solver::types::{AlgorithmInfo, City, CompareResult, ParsedProblem, Solution, SolveOptions};
 use teeline::tsp::{
     AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
     distance_matrix::DistanceMatrix, kdtree::KDPoint,
@@ -58,6 +58,15 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
 
 fn kd_to_city(c: &KDPoint) -> City {
     City { id: c.id as u32, x: c.x(), y: c.y() }
+}
+
+fn parse_input_to_kd(input: &str) -> Result<Vec<KDPoint>, String> {
+    if input.trim_start().starts_with('[') {
+        teeline::tsp::tsplib::parse_json_cities(input)
+    } else {
+        let data = teeline::tsp::tsplib::read_from_str(input)?;
+        Ok(data.cities().to_vec())
+    }
 }
 
 fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
@@ -156,13 +165,38 @@ impl Guest for Component {
         input: String,
         options: SolveOptions,
     ) -> Result<Solution, String> {
-        let kd_cities = if input.trim_start().starts_with('[') {
-            teeline::tsp::tsplib::parse_json_cities(&input)?
-        } else {
-            let data = teeline::tsp::tsplib::read_from_str(&input)?;
-            data.cities().to_vec()
-        };
+        let kd_cities = parse_input_to_kd(&input)?;
         solve_with_cities(&solver, kd_cities, &options)
+    }
+
+    fn compare(
+        algorithms: Vec<String>,
+        input: String,
+        options: SolveOptions,
+    ) -> Vec<CompareResult> {
+        let kd_cities = match parse_input_to_kd(&input) {
+            Ok(c) => c,
+            Err(e) => {
+                return algorithms
+                    .into_iter()
+                    .map(|algo| CompareResult {
+                        algorithm: algo,
+                        solution: Err(format!("parse error: {}", e)),
+                    })
+                    .collect();
+            }
+        };
+
+        algorithms
+            .into_iter()
+            .map(|algo| {
+                let sol = solve_with_cities(&algo, kd_cities.clone(), &options);
+                CompareResult {
+                    algorithm: algo,
+                    solution: sol,
+                }
+            })
+            .collect()
     }
 }
 
