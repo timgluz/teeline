@@ -304,6 +304,8 @@ const result = solve('sa', cities, options);
 
 See **[docs/wasm.md](docs/wasm.md)** for the full interface reference, build instructions, and working examples in JavaScript, Python, Go, and Rust.
 
+The component can also be loaded as a native MCP tool inside Claude via [Wassette](https://microsoft.github.io/wassette/latest/) — paste a `.tsp` file, ask Claude to list algorithms, pick one, and get a tour back without leaving the chat. See **[docs/wassette.md](docs/wassette.md)** for setup.
+
 ---
 
 ## Comparing against a known-optimal tour
