@@ -21,6 +21,7 @@ interface types {
     record solution {
         total: f32,
         route: list<u32>,
+        duration-ms: u32,
     }
 
     record parsed-problem {
@@ -29,10 +30,22 @@ interface types {
         distance-type: string,
         cities: list<city>,
     }
+
+    record algorithm-info {
+        id: string,
+        name: string,
+        description: string,
+        recommendation: string,
+    }
+
+    record compare-result {
+        algorithm: string,
+        solution: result<solution, string>,
+    }
 }
 
 world solver {
-    use types.{city, solve-options, solution, parsed-problem};
+    use types.{city, solve-options, solution, parsed-problem, algorithm-info, compare-result};
 
     export solve: func(
         solver: string,
@@ -49,4 +62,12 @@ world solver {
     export parse: func(
         input: string,
     ) -> result<parsed-problem, string>;
+
+    export list-algorithms: func() -> list<algorithm-info>;
+
+    export compare: func(
+        algorithms: list<string>,
+        input: string,
+        options: solve-options,
+    ) -> list<compare-result>;
 }
