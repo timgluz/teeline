@@ -22,6 +22,22 @@ jobs:
           cache: 'npm'
           cache-dependency-path: teeline-web/package-lock.json
 
+      - name: Install Rust wasm32-wasip2 target
+        run: rustup target add wasm32-wasip2
+        working-directory: .
+
+      - name: Install cargo-component
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
+
+      - name: Build teeline-wasm
+        run: cargo component build --manifest-path teeline-wasm/Cargo.toml --release
+        working-directory: .
+
+      - name: Transpile WASM to JS bindings (jco)
+        run: npx --yes jco@1.19.0 transpile ../target/wasm32-wasip2/release/teeline_wasm.wasm -o ../teeline-wasm/js-bindings
+
       - name: Install dependencies
         run: npm ci
 
