@@ -28,7 +28,7 @@ jobs:
       - name: Download WASM component from latest release
         run: |
           mkdir -p ../teeline-wasm/js-bindings
-          gh release download --latest --pattern 'teeline-solver.wasm' --output ../teeline-wasm/teeline-solver.wasm
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern 'teeline-solver.wasm' --output ../teeline-wasm/teeline-solver.wasm "$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName')"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
