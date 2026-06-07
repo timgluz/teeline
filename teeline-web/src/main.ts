@@ -5,7 +5,7 @@ import './main.css'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult } from './worker'
-import { initUpload } from './upload'
+import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
@@ -129,6 +129,21 @@ initUpload(
     updateOptRoute(optTourRoute)
   },
 )
+
+// ---- Reset / new dataset ----
+
+function resetToStep01(): void {
+  parsedProblem = null
+  optTourRoute = null
+  resetUpload()
+  ;(document.getElementById('step-01') as HTMLElement).hidden = false
+  ;(document.getElementById('step-02') as HTMLElement).hidden = true
+  ;(document.getElementById('step-04') as HTMLElement).hidden = true
+  ;(document.getElementById('download-actions') as HTMLElement).hidden = true
+}
+
+document.getElementById('btn-change-file')!.addEventListener('click', resetToStep01)
+document.getElementById('btn-new-dataset')!.addEventListener('click', resetToStep01)
 
 // ---- Download wiring ----
 

@@ -25,6 +25,12 @@ export function parseOptTour(text: string): number[] {
   return route
 }
 
+let _resetFn: (() => void) | null = null
+
+export function resetUpload(): void {
+  _resetFn?.()
+}
+
 export function initUpload(
   parseFile: (input: string) => Promise<ParsedProblem>,
   onProblemLoaded?: (problem: ParsedProblem) => void,
@@ -173,6 +179,9 @@ export function initUpload(
     inputOpt.value = ''
   })
   btnReplaceOpt.addEventListener('click', showOptIdle)
+
+  // ---- Register module-level reset ----
+  _resetFn = () => { showTspIdle(); showOptIdle() }
 
   // ---- Wire example dataset buttons ----
 
