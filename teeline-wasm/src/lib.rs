@@ -92,13 +92,13 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
     .to_string()
 }
 
-fn kind_for(alias: &str) -> String {
-    match alias {
-        "bhk" | "branch_bound"  => "exact",
-        "nn"                    => "constructive",
-        "2opt" | "3opt"         => "local-search",
-        "shuffle"               => "utility",
-        _                       => "metaheuristic",
+fn kind_for(solver: Solvers) -> String {
+    match solver {
+        Solvers::BellmanKarp | Solvers::BranchBound       => "exact",
+        Solvers::NearestNeighbor                           => "constructive",
+        Solvers::TwoOpt | Solvers::ThreeOpt                => "local-search",
+        Solvers::RandomShuffle                             => "utility",
+        _                                                  => "metaheuristic",
     }
     .to_string()
 }
@@ -151,29 +151,31 @@ fn mutation_param() -> ParamSpec {
     pf("mutationProbability", "Mutation probability", 0.0, 1.0, 0.001)
 }
 
-fn params_for_solver(alias: &str) -> Vec<ParamSpec> {
-    match alias {
-        "sa" => {
+fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
+    match solver {
+        Solvers::SimulatedAnnealing => {
             let mut v = shared_heuristic_params();
             v.push(pf("coolingRate",    "Cooling rate",    0.00001, 0.9999, 0.00001));
             v.push(pf_min("maxTemperature", "Max temperature", 0.01,  1.0));
             v.push(pf_min("minTemperature", "Min temperature", 0.0,   0.001));
             v
         }
-        "ga" => {
+        Solvers::GeneticAlgorithm => {
             let mut v = shared_heuristic_params();
             v.push(mutation_param());
             v.push(pi("nElite", "Elite count", 1.0));
             v
         }
-        "cs" | "fpa" => {
+        Solvers::CuckooSearch | Solvers::FlowerPollination => {
             let mut v = shared_heuristic_params();
             v.push(mutation_param());
             v
         }
-        "2opt" | "3opt" | "pso" | "tabu_search" | "stochastic_hill" => {
-            shared_heuristic_params()
-        }
+        Solvers::TwoOpt
+        | Solvers::ThreeOpt
+        | Solvers::ParticleSwarmOptimization
+        | Solvers::TabuSearch
+        | Solvers::StochasticHill => shared_heuristic_params(),
         _ => vec![],
     }
 }
@@ -204,6 +206,8 @@ fn solve_with_cities(
 }
 
 impl Guest for Component {
+    // env! is a compile-time macro: the version is baked into the binary from Cargo.toml
+    // at build time — no environment variable is read at WASM runtime.
     fn get_version() -> String {
         env!("CARGO_PKG_VERSION").to_string()
     }
@@ -211,13 +215,17 @@ impl Guest for Component {
     fn list_algorithms() -> Vec<AlgorithmInfo> {
         teeline::tsp::list_solvers()
             .iter()
-            .map(|info| AlgorithmInfo {
-                id: info.alias.to_string(),
-                name: info.name.to_string(),
-                description: format!("{} ({})", info.desc, info.complexity),
-                recommendation: recommendation_for(info),
-                kind: kind_for(info.alias),
-                params: params_for_solver(info.alias),
+            .map(|info| {
+                let solver = teeline::tsp::find_solver(info.alias)
+                    .expect("list_solvers returned unregistered alias");
+                AlgorithmInfo {
+                    id: info.alias.to_string(),
+                    name: info.name.to_string(),
+                    description: format!("{} ({})", info.desc, info.complexity),
+                    recommendation: recommendation_for(info),
+                    kind: kind_for(solver),
+                    params: params_for_solver(solver),
+                }
             })
             .collect()
     }
