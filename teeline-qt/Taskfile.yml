@@ -1,0 +1,81 @@
+version: '3'
+
+vars:
+  QT_PREFIX: "{{.HOME}}/Qt/6.11.1/gcc_64"
+  BIN: "./target/debug/teeline-qt"
+  BIN_RELEASE: "./target/release/teeline-qt"
+
+env:
+  PATH: "{{.QT_PREFIX}}/bin:{{.PATH}}"
+  LD_LIBRARY_PATH: "{{.QT_PREFIX}}/lib:{{.LD_LIBRARY_PATH}}"
+
+tasks:
+  build:
+    desc: Compile debug binary (requires Qt 6 at ~/Qt/6.11.1/gcc_64)
+    cmds:
+      - cargo build
+
+  build:release:
+    desc: Compile optimised binary
+    cmds:
+      - cargo build --release
+
+  run:
+    desc: Run the Qt app (debug build)
+    deps: [build]
+    cmds:
+      - "{{.BIN}}"
+
+  run:release:
+    desc: Run the Qt app (release build)
+    deps: [build:release]
+    cmds:
+      - "{{.BIN_RELEASE}}"
+
+  run:berlin52:
+    desc: Launch the app pre-loaded with berlin52.tsp
+    deps: [build]
+    cmds:
+      - "{{.BIN}} ../data/tsplib/berlin52.tsp"
+
+  test:
+    desc: Run teeline library tests (Qt app has no unit tests of its own)
+    cmds:
+      - cargo test --manifest-path ../Cargo.toml
+
+  check:
+    desc: Type-check without producing a binary
+    cmds:
+      - cargo check
+
+  lint:
+    desc: Run Clippy (warnings are errors)
+    cmds:
+      - cargo clippy -- -D warnings
+
+  lint:fix:
+    desc: Apply automatic Clippy fixes
+    cmds:
+      - cargo clippy --fix -- -D warnings
+
+  fmt:
+    desc: Format code with rustfmt
+    cmds:
+      - cargo fmt
+
+  fmt:check:
+    desc: Check formatting without modifying files
+    cmds:
+      - cargo fmt -- --check
+
+  ci:
+    desc: Run check + lint + fmt:check (mirrors CI steps)
+    cmds:
+      - task: check
+      - task: lint
+      - task: fmt:check
+
+  clean:
+    desc: Remove build artefacts
+    cmds:
+      - cargo clean
