@@ -8,6 +8,7 @@ use qtbridge::{QObjectHolder, invoke_method, qobject_impl};
 use teeline::tsp::{
     self, AppOptions, GAOptions, CSOptions, FPAOptions, HeuristicOptions, SAOptions,
     Solvers, TspProblem,
+    kdtree::KDPoint,
     pipeline::{PipelineStage, run_pipeline},
     progress::ProgressMessage,
     tsplib,
@@ -21,6 +22,8 @@ pub struct SolverEngine {
     elapsed_ms: i32,
     tour_json: String,
     solvers_json: String,
+    opt_tour_route_json: String,
+    comparison_json: String,
 }
 
 impl Default for SolverEngine {
@@ -33,6 +36,8 @@ impl Default for SolverEngine {
             elapsed_ms: 0,
             tour_json: "[]".to_string(),
             solvers_json: build_solvers_json(),
+            opt_tour_route_json: "[]".to_string(),
+            comparison_json: String::new(),
         }
     }
 }
@@ -55,21 +60,25 @@ fn build_solvers_json() -> String {
 
 #[qobject_impl(Singleton)]
 impl SolverEngine {
-    qproperty!("selectedSolver", Member = selected_solver, Write = set_selected_solver, Notify = "selectedSolverChanged");
-    qproperty!("running",        Member = running,         Write = set_running,         Notify = "runningChanged");
-    qproperty!("bestCost",       Member = best_cost,       Write = set_best_cost,       Notify = "bestCostChanged");
-    qproperty!("iteration",      Member = iteration,       Write = set_iteration,       Notify = "iterationChanged");
-    qproperty!("elapsedMs",      Member = elapsed_ms,      Write = set_elapsed_ms,      Notify = "elapsedMsChanged");
-    qproperty!("tourJson",       Member = tour_json,       Write = set_tour_json,       Notify = "tourJsonChanged");
-    qproperty!("solversJson",    Member = solvers_json,    Write = set_solvers_json,    Notify = "solversJsonChanged");
+    qproperty!("selectedSolver",    Member = selected_solver,    Write = set_selected_solver,    Notify = "selectedSolverChanged");
+    qproperty!("running",           Member = running,            Write = set_running,            Notify = "runningChanged");
+    qproperty!("bestCost",          Member = best_cost,          Write = set_best_cost,          Notify = "bestCostChanged");
+    qproperty!("iteration",         Member = iteration,          Write = set_iteration,          Notify = "iterationChanged");
+    qproperty!("elapsedMs",         Member = elapsed_ms,         Write = set_elapsed_ms,         Notify = "elapsedMsChanged");
+    qproperty!("tourJson",          Member = tour_json,          Write = set_tour_json,          Notify = "tourJsonChanged");
+    qproperty!("solversJson",       Member = solvers_json,       Write = set_solvers_json,       Notify = "solversJsonChanged");
+    qproperty!("optTourRouteJson",  Member = opt_tour_route_json, Write = set_opt_tour_route_json, Notify = "optTourRouteJsonChanged");
+    qproperty!("comparisonJson",    Member = comparison_json,    Write = set_comparison_json,    Notify = "comparisonJsonChanged");
 
-    fn set_selected_solver(&mut self, v: String)  { self.selected_solver = v;  self.selected_solver_changed(); }
-    fn set_running(&mut self, v: bool)             { self.running = v;           self.running_changed(); }
-    fn set_best_cost(&mut self, v: f32)            { self.best_cost = v;         self.best_cost_changed(); }
-    fn set_iteration(&mut self, v: i32)            { self.iteration = v;         self.iteration_changed(); }
-    fn set_elapsed_ms(&mut self, v: i32)           { self.elapsed_ms = v;        self.elapsed_ms_changed(); }
-    fn set_tour_json(&mut self, v: String)         { self.tour_json = v;         self.tour_json_changed(); }
-    fn set_solvers_json(&mut self, v: String)      { self.solvers_json = v;      self.solvers_json_changed(); }
+    fn set_selected_solver(&mut self, v: String)      { self.selected_solver = v;      self.selected_solver_changed(); }
+    fn set_running(&mut self, v: bool)                { self.running = v;               self.running_changed(); }
+    fn set_best_cost(&mut self, v: f32)               { self.best_cost = v;             self.best_cost_changed(); }
+    fn set_iteration(&mut self, v: i32)               { self.iteration = v;             self.iteration_changed(); }
+    fn set_elapsed_ms(&mut self, v: i32)              { self.elapsed_ms = v;            self.elapsed_ms_changed(); }
+    fn set_tour_json(&mut self, v: String)            { self.tour_json = v;             self.tour_json_changed(); }
+    fn set_solvers_json(&mut self, v: String)         { self.solvers_json = v;          self.solvers_json_changed(); }
+    fn set_opt_tour_route_json(&mut self, v: String)  { self.opt_tour_route_json = v;   self.opt_tour_route_json_changed(); }
+    fn set_comparison_json(&mut self, v: String)      { self.comparison_json = v;       self.comparison_json_changed(); }
 
     #[qsignal] fn selected_solver_changed(&self);
     #[qsignal] fn running_changed(&self);
@@ -78,6 +87,8 @@ impl SolverEngine {
     #[qsignal] fn elapsed_ms_changed(&self);
     #[qsignal] fn tour_json_changed(&self);
     #[qsignal] fn solvers_json_changed(&self);
+    #[qsignal] fn opt_tour_route_json_changed(&self);
+    #[qsignal] fn comparison_json_changed(&self);
 
     #[qslot]
     fn select_solver(&mut self, alias: String) {
@@ -122,6 +133,12 @@ impl SolverEngine {
         self.set_running(false);
     }
 
+    /// Called on the Qt main thread when comparison stats are ready.
+    #[qslot]
+    fn on_comparison_ready(&mut self, comparison_json: String) {
+        self.set_comparison_json(comparison_json);
+    }
+
     /// Run a JSON-described pipeline: `[{"solver":"nn"},{"solver":"2opt"},...]`.
     #[qslot]
     fn run_pipeline_stages(&mut self, file_path: String, stages_json: String) {
@@ -130,9 +147,12 @@ impl SolverEngine {
         self.set_iteration(0);
         self.set_elapsed_ms(0);
         self.set_tour_json("[]".to_string());
+        self.set_comparison_json(String::new());
 
         let inv_progress = self.get_qml_method_invoker();
         let inv_done = self.get_qml_method_invoker();
+        let inv_cmp = self.get_qml_method_invoker();
+        let opt_json = self.opt_tour_route_json.clone();
 
         std::thread::spawn(move || {
             let stage_specs: Vec<serde_json::Value> =
@@ -200,6 +220,10 @@ impl SolverEngine {
                     let tour = route_to_json(solution.route());
                     let ms = start.elapsed().as_millis() as i32;
                     invoke_method!(inv_done, "onSolveDone", tour, solution.total, ms, String::new());
+                    let comp_json = make_comparison_json(&opt_json, solution.route(), &problem.cities);
+                    if !comp_json.is_empty() {
+                        invoke_method!(inv_cmp, "onComparisonReady", comp_json);
+                    }
                 }
                 Err(e) => {
                     invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
@@ -216,10 +240,13 @@ impl SolverEngine {
         self.set_iteration(0);
         self.set_elapsed_ms(0);
         self.set_tour_json("[]".to_string());
+        self.set_comparison_json(String::new());
 
         let inv_progress = self.get_qml_method_invoker();
         let inv_done = self.get_qml_method_invoker();
+        let inv_cmp = self.get_qml_method_invoker();
         let alias = self.selected_solver.clone();
+        let opt_json = self.opt_tour_route_json.clone();
 
         std::thread::spawn(move || {
             let solver = match Solvers::from_str(&alias) {
@@ -274,6 +301,10 @@ impl SolverEngine {
                     let tour = route_to_json(solution.route());
                     let ms = start.elapsed().as_millis() as i32;
                     invoke_method!(inv_done, "onSolveDone", tour, solution.total, ms, String::new());
+                    let comp_json = make_comparison_json(&opt_json, solution.route(), &problem.cities);
+                    if !comp_json.is_empty() {
+                        invoke_method!(inv_cmp, "onComparisonReady", comp_json);
+                    }
                 }
                 Err(e) => {
                     invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
@@ -363,6 +394,21 @@ fn build_app_options(alias: &str, json: &str) -> AppOptions {
             ..AppOptions::default()
         },
     }
+}
+
+fn make_comparison_json(opt_json: &str, solver: &[usize], cities: &[KDPoint]) -> String {
+    if opt_json == "[]" || opt_json.is_empty() { return String::new(); }
+    let opt: Vec<usize> = serde_json::from_str(opt_json).unwrap_or_default();
+    if opt.is_empty() { return String::new(); }
+    let s = teeline::tsp::compare_tours(solver, &opt, cities);
+    serde_json::to_string(&json!({
+        "optimalCost": s.optimal_cost,
+        "solverCost":  s.solver_cost,
+        "gapPct":      s.gap_pct,
+        "sharedEdges": s.shared_edges,
+        "solverOnlyEdges": s.solver_only_edges,
+        "optimalOnlyEdges": s.optimal_only_edges
+    })).unwrap_or_default()
 }
 
 fn route_to_json(route: &[usize]) -> String {

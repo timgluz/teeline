@@ -171,6 +171,30 @@ ApplicationWindow {
                 }
             }
 
+            // Optimal tour row
+            RowLayout {
+                visible: FileLoader.isLoaded
+                Layout.fillWidth: true
+                spacing: 12
+
+                Text { text: "Optimal tour:"; color: theme.textMuted; font.pixelSize: 12 }
+                Text {
+                    visible: FileLoader.hasOptTour
+                    text: "✓  " + FileLoader.optTourFilePath.split("/").pop()
+                          + "  (" + FileLoader.optTourCost.toFixed(2) + ")"
+                    color: theme.accentGreen; font.pixelSize: 13
+                }
+                Text {
+                    visible: !FileLoader.hasOptTour
+                    text: "not loaded  (optional)"
+                    color: theme.textMuted; font.pixelSize: 12; font.italic: true
+                }
+                Button {
+                    text: FileLoader.hasOptTour ? "Replace…" : "Browse…"
+                    onClicked: optTourDialog.open()
+                }
+            }
+
             // Recent files (persisted via Rust/FileLoader)
             ColumnLayout {
                 id: recentSection
@@ -219,6 +243,13 @@ ApplicationWindow {
             onAccepted: FileLoader.loadFile(selectedFile)
         }
 
+        FileDialog {
+            id: optTourDialog
+            title: "Open optimal tour file"
+            nameFilters: ["Optimal tour files (*.opt.tour)", "All files (*)"]
+            onAccepted: FileLoader.loadOptTour(selectedFile)
+        }
+
     }
 
     // ── Solver metadata — populated from Rust backend at startup (issue #118) ──
@@ -233,6 +264,8 @@ ApplicationWindow {
         signal pipelineRequested()
 
         background: Rectangle { color: theme.bgApp }
+
+        Binding { target: SolverEngine; property: "optTourRouteJson"; value: FileLoader.optTourRouteJson }
 
         property int selectedIdx: -1
         property var selectedSolver: selectedIdx >= 0 ? root.solverList[selectedIdx] : null
@@ -1091,6 +1124,8 @@ ApplicationWindow {
 
         background: Rectangle { color: theme.bgDeep }
 
+        property var compData: SolverEngine.comparisonJson.length > 0 ? JSON.parse(SolverEngine.comparisonJson) : null
+
         // ── Tour canvas ────────────────────────────────────────────────────
         Canvas {
             id: tourCanvas
@@ -1147,6 +1182,31 @@ ApplicationWindow {
                     }
                 }
 
+                // Optimal tour overlay (dashed gray)
+                if (FileLoader.hasOptTour) {
+                    var optRaw = FileLoader.optTourRouteJson
+                    if (optRaw && optRaw !== "[]") {
+                        var optTour = JSON.parse(optRaw)
+                        if (optTour.length > 1) {
+                            ctx.strokeStyle = "#888888"
+                            ctx.lineWidth = 1.0
+                            ctx.globalAlpha = 0.45
+                            ctx.setLineDash([6, 4])
+                            ctx.beginPath()
+                            var op0 = pos[optTour[0]]
+                            if (op0) ctx.moveTo(op0.x, op0.y)
+                            for (var k = 1; k < optTour.length; k++) {
+                                var op = pos[optTour[k]]
+                                if (op) ctx.lineTo(op.x, op.y)
+                            }
+                            if (op0) ctx.lineTo(op0.x, op0.y)
+                            ctx.stroke()
+                            ctx.setLineDash([])
+                            ctx.globalAlpha = 1.0
+                        }
+                    }
+                }
+
                 // City dots
                 ctx.fillStyle = theme.accent
                 for (var i = 0; i < ids.length; i++) {
@@ -1164,6 +1224,7 @@ ApplicationWindow {
             Connections {
                 target: FileLoader
                 function onCitiesJsonChanged() { tourCanvas.rebuild(); tourCanvas.requestPaint() }
+                function onOptTourRouteJsonChanged() { tourCanvas.requestPaint() }
             }
         }
 
@@ -1213,6 +1274,24 @@ ApplicationWindow {
                             return (ms / 1000).toFixed(1) + " s"
                         }
                         color: theme.textPrimary; font.pixelSize: 13
+                    }
+                }
+                RowLayout {
+                    visible: compData !== null && !SolverEngine.running
+                    spacing: 12
+                    Text { text: "Optimal"; color: theme.textDim; font.pixelSize: 11 }
+                    Text {
+                        text: compData ? compData.optimalCost.toFixed(2) : "—"
+                        color: theme.textMuted; font.pixelSize: 13
+                    }
+                }
+                RowLayout {
+                    visible: compData !== null && !SolverEngine.running
+                    spacing: 12
+                    Text { text: "Gap"; color: theme.textDim; font.pixelSize: 11 }
+                    Text {
+                        text: compData ? "+" + compData.gapPct.toFixed(2) + "%" : "—"
+                        color: theme.warnOrange; font.pixelSize: 14; font.bold: true
                     }
                 }
 
@@ -1268,6 +1347,13 @@ ApplicationWindow {
                     color: theme.accentGreen
                     font.pixelSize: 15
                     font.bold: true
+                }
+
+                Text {
+                    visible: !SolverEngine.running && compData !== null
+                    text: "Gap: +" + (compData ? compData.gapPct.toFixed(2) : "0.00") + "%"
+                    color: theme.warnOrange
+                    font.pixelSize: 13
                 }
 
                 Button {

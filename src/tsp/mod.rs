@@ -1,5 +1,7 @@
 pub mod bellman_karp;
 pub mod branch_bound;
+pub mod comparison;
+pub use comparison::{compare_tours, tour_cost, ComparisonStats};
 pub mod convert;
 pub mod cuckoo_search;
 pub mod distance_matrix;
