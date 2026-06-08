@@ -386,6 +386,19 @@ task bench:berlin52      # compare all approximate solvers on berlin52 (release 
 task build:wasm          # build the WebAssembly component
 ```
 
+The `qt:` namespace proxies into `teeline-qt/Taskfile.yml` (requires Qt 6 at `~/Qt/6.11.1/gcc_64`):
+
+```bash
+task qt:build            # compile teeline-qt debug binary
+task qt:run              # build and launch the Qt desktop app
+task qt:run:berlin52     # launch pre-loaded with berlin52.tsp
+task qt:check            # type-check without producing a binary
+task qt:lint             # clippy for the Qt crate
+task qt:ci               # check + lint + fmt:check
+```
+
+You can also run these directly from the `teeline-qt/` directory without the `qt:` prefix.
+
 ### Releasing
 
 Releases are automated via [cargo-dist](https://axodotdev.github.io/cargo-dist/). To cut a new release:

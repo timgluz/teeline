@@ -10,11 +10,39 @@ Qt 6 / QML desktop GUI for the Teeline TSP solver. Provides live visualization o
 ## Build
 
 ```bash
-cargo build -p teeline-qt          # debug
-cargo build -p teeline-qt --release  # optimised
+# from the teeline-qt/ directory
+cargo build           # debug
+cargo build --release # optimised
+
+# from the repo root (uses the manifest path)
+cargo build --manifest-path teeline-qt/Cargo.toml
 ```
 
 Or open `teeline-qt/` in Qt Creator and build from there.
+
+## Tasks
+
+A [`Taskfile.yml`](Taskfile.yml) is included with common workflows. Install [go-task](https://taskfile.dev/installation/), then from `teeline-qt/`:
+
+```bash
+task build            # compile debug binary
+task run              # build and launch the app
+task run:berlin52     # launch pre-loaded with berlin52.tsp
+task run:release      # build release binary and launch
+task check            # type-check without producing a binary
+task lint             # clippy (warnings are errors)
+task fmt              # auto-format with rustfmt
+task ci               # check + lint + fmt:check (mirrors CI)
+task clean            # remove build artefacts
+```
+
+From the **repo root** the same tasks are available under the `qt:` namespace:
+
+```bash
+task qt:build
+task qt:run
+task qt:run:berlin52
+```
 
 ## Features
 
