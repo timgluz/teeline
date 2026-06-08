@@ -2,7 +2,9 @@
 mod bindings;
 
 use bindings::Guest;
-use bindings::teeline::solver::types::{AlgorithmInfo, City, CompareResult, ParsedProblem, Solution, SolveOptions};
+use bindings::teeline::solver::types::{
+    AlgorithmInfo, City, CompareResult, ParamSpec, ParsedProblem, Solution, SolveOptions,
+};
 use teeline::tsp::{
     AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
     distance_matrix::DistanceMatrix, kdtree::KDPoint,
@@ -90,6 +92,94 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
     .to_string()
 }
 
+fn kind_for(solver: Solvers) -> String {
+    match solver {
+        Solvers::BellmanKarp | Solvers::BranchBound       => "exact",
+        Solvers::NearestNeighbor                           => "constructive",
+        Solvers::TwoOpt | Solvers::ThreeOpt                => "local-search",
+        Solvers::RandomShuffle                             => "utility",
+        _                                                  => "metaheuristic",
+    }
+    .to_string()
+}
+
+fn pf(key: &str, label: &str, min: f32, max: f32, step: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "float".to_string(),
+        min: Some(min),
+        max: Some(max),
+        step: Some(step),
+        description: String::new(),
+    }
+}
+
+fn pf_min(key: &str, label: &str, min: f32, step: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "float".to_string(),
+        min: Some(min),
+        max: None,
+        step: Some(step),
+        description: String::new(),
+    }
+}
+
+fn pi(key: &str, label: &str, min: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "int".to_string(),
+        min: Some(min),
+        max: None,
+        step: None,
+        description: String::new(),
+    }
+}
+
+fn shared_heuristic_params() -> Vec<ParamSpec> {
+    vec![
+        pi("epochs",       "Epochs",              1.0),
+        pi("platooEpochs", "Plateau epochs",       0.0),
+        pi("nNearest",     "Nearest neighbours",   1.0),
+    ]
+}
+
+fn mutation_param() -> ParamSpec {
+    pf("mutationProbability", "Mutation probability", 0.0, 1.0, 0.001)
+}
+
+fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
+    match solver {
+        Solvers::SimulatedAnnealing => {
+            let mut v = shared_heuristic_params();
+            v.push(pf("coolingRate",    "Cooling rate",    0.00001, 0.9999, 0.00001));
+            v.push(pf_min("maxTemperature", "Max temperature", 0.01,  1.0));
+            v.push(pf_min("minTemperature", "Min temperature", 0.0,   0.001));
+            v
+        }
+        Solvers::GeneticAlgorithm => {
+            let mut v = shared_heuristic_params();
+            v.push(mutation_param());
+            v.push(pi("nElite", "Elite count", 1.0));
+            v
+        }
+        Solvers::CuckooSearch | Solvers::FlowerPollination => {
+            let mut v = shared_heuristic_params();
+            v.push(mutation_param());
+            v
+        }
+        Solvers::TwoOpt
+        | Solvers::ThreeOpt
+        | Solvers::ParticleSwarmOptimization
+        | Solvers::TabuSearch
+        | Solvers::StochasticHill => shared_heuristic_params(),
+        _ => vec![],
+    }
+}
+
 fn solve_with_cities(
     solver: &str,
     kd_cities: Vec<KDPoint>,
@@ -116,14 +206,26 @@ fn solve_with_cities(
 }
 
 impl Guest for Component {
+    // env! is a compile-time macro: the version is baked into the binary from Cargo.toml
+    // at build time — no environment variable is read at WASM runtime.
+    fn get_version() -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
+
     fn list_algorithms() -> Vec<AlgorithmInfo> {
         teeline::tsp::list_solvers()
             .iter()
-            .map(|info| AlgorithmInfo {
-                id: info.alias.to_string(),
-                name: info.name.to_string(),
-                description: format!("{} ({})", info.desc, info.complexity),
-                recommendation: recommendation_for(info),
+            .map(|info| {
+                let solver = teeline::tsp::find_solver(info.alias)
+                    .expect("list_solvers returned unregistered alias");
+                AlgorithmInfo {
+                    id: info.alias.to_string(),
+                    name: info.name.to_string(),
+                    description: format!("{} ({})", info.desc, info.complexity),
+                    recommendation: recommendation_for(info),
+                    kind: kind_for(solver),
+                    params: params_for_solver(solver),
+                }
             })
             .collect()
     }

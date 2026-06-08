@@ -4,7 +4,7 @@ import '@picocss/pico/css/pico.min.css'
 import './main.css'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
-import type { SolveResult, SolveError, ParseResult } from './worker'
+import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage } from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
@@ -67,6 +67,15 @@ window.parseFile = parseFile
 
 let parsedProblem: ParsedProblem | null = null
 let optTourRoute: number[] | null = null
+let solverConfig: ReturnType<typeof initSolverConfig> | null = null
+
+// ---- Footer status helpers ----
+
+function setWasmStatus(state: 'loading' | 'ready' | 'error'): void {
+  const dot = document.getElementById('wasm-status')
+  if (!dot) return
+  dot.className = `status-dot status-dot--${state}`
+}
 
 // ---- Results (init before solver config so showRunning is ready) ----
 
@@ -78,57 +87,95 @@ initResults(
   },
 )
 
-// ---- Solver config ----
+// ---- WASM init: wait for worker-ready, then fetch algorithm list + version ----
 
-const solverConfig = initSolverConfig(
-  () => parsedProblem !== null,
-  (solver, options) => {
-    if (!parsedProblem) return
+setWasmStatus('loading')
+const versionEl = document.getElementById('wasm-version')
+if (versionEl) versionEl.textContent = 'Connecting…'
 
-    // Re-init results with current cities so renderTour has the right data
-    initResults(
-      parsedProblem.cities,
-      () => optTourRoute,
-      () => {
-        const step04 = document.getElementById('step-04') as HTMLElement
-        const step02 = document.getElementById('step-02') as HTMLElement
-        step04.hidden = true
-        step02.hidden = false
-        ;(document.getElementById('download-actions') as HTMLElement).hidden = true
+worker.addEventListener('error', () => {
+  setWasmStatus('error')
+  if (versionEl) versionEl.textContent = 'WASM failed to load — try refreshing the page'
+})
+
+let gotAlgorithms = false
+let gotVersion = false
+
+worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMessage | AlgorithmsResult | VersionResult>) {
+  const data = e.data
+
+  if (data.type === 'worker-ready') {
+    // WASM is fully initialised — safe to call listAlgorithms / getVersion now
+    worker.postMessage({ type: 'list-algorithms' })
+    worker.postMessage({ type: 'get-version' })
+    return
+  }
+
+  if (data.type === 'algorithms') {
+    solverConfig = initSolverConfig(
+      data.algorithms,
+      () => parsedProblem !== null,
+      (solver, options) => {
+        if (!parsedProblem) return
+
+        // Re-init results with current cities so renderTour has the right data
+        initResults(
+          parsedProblem.cities,
+          () => optTourRoute,
+          () => {
+            const step04 = document.getElementById('step-04') as HTMLElement
+            const step02 = document.getElementById('step-02') as HTMLElement
+            step04.hidden = true
+            step02.hidden = false
+            ;(document.getElementById('download-actions') as HTMLElement).hidden = true
+          },
+        )
+
+        showRunning()
+
+        const start = Date.now()
+        runSolver(solver, parsedProblem.cities, options)
+          .then((result) => {
+            const runtime = Date.now() - start
+            const optTotal = optTourRoute
+              ? computeRouteLength(optTourRoute, parsedProblem!.cities)
+              : undefined
+            const record = { solver, total: result.total, optTotal, runtime, route: result.route }
+            showResult(record)
+            showDownloadButtons(record, parsedProblem!)
+          })
+          .catch((err: Error) => {
+            const overlay = document.getElementById('solving-overlay') as HTMLElement
+            overlay.hidden = true
+            console.error('Solver error:', err)
+          })
       },
     )
 
-    showRunning()
+    // Upload depends on solverConfig.refresh — must be wired after solverConfig exists
+    initUpload(
+      parseFile,
+      (p) => { parsedProblem = p; solverConfig!.refresh() },
+      (route) => {
+        optTourRoute = route.length > 0 ? route : null
+        updateOptRoute(optTourRoute)
+      },
+    )
 
-    const start = Date.now()
-    runSolver(solver, parsedProblem.cities, options)
-      .then((result) => {
-        const runtime = Date.now() - start
-        const optTotal = optTourRoute
-          ? computeRouteLength(optTourRoute, parsedProblem!.cities)
-          : undefined
-        const record = { solver, total: result.total, optTotal, runtime, route: result.route }
-        showResult(record)
-        showDownloadButtons(record, parsedProblem!)
-      })
-      .catch((err: Error) => {
-        const overlay = document.getElementById('solving-overlay') as HTMLElement
-        overlay.hidden = true
-        console.error('Solver error:', err)
-      })
-  },
-)
+    setWasmStatus('ready')
+    gotAlgorithms = true
+  }
 
-// ---- Upload (after solverConfig so refresh is available) ----
+  if (data.type === 'version') {
+    const versionEl = document.getElementById('wasm-version')
+    if (versionEl) versionEl.textContent = `teeline-solver ${data.version}`
+    gotVersion = true
+  }
 
-initUpload(
-  parseFile,
-  (p) => { parsedProblem = p; solverConfig.refresh() },
-  (route) => {
-    optTourRoute = route.length > 0 ? route : null
-    updateOptRoute(optTourRoute)
-  },
-)
+  if (gotAlgorithms && gotVersion) {
+    worker.removeEventListener('message', onInit)
+  }
+})
 
 // ---- Reset / new dataset ----
 

@@ -1,7 +1,8 @@
-import { SOLVERS, solverByAlias, paramsFor } from './solver-config'
+import type { AlgorithmInfo } from './wasm-types'
 import { defaultSolveOptions, type SolveOptions } from './solver-options'
 
 export function initSolverConfig(
+  algorithms: AlgorithmInfo[],
   isProblemLoaded: () => boolean,
   onSolverReady: (solver: string, options: SolveOptions) => void,
 ): { refresh: () => void } {
@@ -12,52 +13,50 @@ export function initSolverConfig(
   const checkProblem = document.getElementById('check-problem') as HTMLElement
   const checkSolver  = document.getElementById('check-solver') as HTMLElement
 
-  let selectedAlias: string | null = null
+  let selectedId: string | null = null
   let currentOptions: SolveOptions = defaultSolveOptions()
 
   // ---- Populate dropdown ----
 
-  for (const s of SOLVERS) {
+  for (const s of algorithms) {
     const opt = document.createElement('option')
-    opt.value = s.alias
-    opt.textContent = `${s.name} (${s.alias})`
+    opt.value = s.id
+    opt.textContent = `${s.name} (${s.id})`
     solverSelect.appendChild(opt)
   }
 
   // ---- Solver selection ----
 
-  function selectSolver(alias: string): void {
-    selectedAlias = alias
+  function selectSolver(id: string): void {
+    selectedId = id
     currentOptions = defaultSolveOptions()
-    renderConfigPanel(alias)
-    highlightActivePill(alias)
-    solverSelect.value = alias
+    renderConfigPanel(id)
+    highlightActivePill(id)
+    solverSelect.value = id
     updateChecklist()
   }
 
-  function highlightActivePill(alias: string): void {
+  function highlightActivePill(id: string): void {
     document.querySelectorAll<HTMLButtonElement>('.pill[data-solver]').forEach((btn) => {
-      btn.classList.toggle('pill--active', btn.dataset.solver === alias)
-      btn.ariaCurrent = btn.dataset.solver === alias ? 'true' : 'false'
+      btn.classList.toggle('pill--active', btn.dataset.solver === id)
+      btn.ariaCurrent = btn.dataset.solver === id ? 'true' : 'false'
     })
   }
 
   // ---- Config panel rendering ----
 
-  function renderConfigPanel(alias: string): void {
-    const solver = solverByAlias(alias)
-    const params = paramsFor(alias)
-
+  function renderConfigPanel(id: string): void {
+    const solver = algorithms.find((a) => a.id === id)
     configPanel.innerHTML = ''
 
     if (!solver) return
 
-    const kind = document.createElement('p')
-    kind.className = 'solver-kind-badge'
-    kind.textContent = `${solver.kind} · ${solver.description}`
-    configPanel.appendChild(kind)
+    const kindBadge = document.createElement('p')
+    kindBadge.className = 'solver-kind-badge'
+    kindBadge.textContent = `${solver.kind} · ${solver.description}`
+    configPanel.appendChild(kindBadge)
 
-    if (params.length === 0) {
+    if (solver.params.length === 0) {
       const hint = document.createElement('p')
       hint.className = 'muted config-no-params'
       hint.textContent = 'No configurable options for this solver.'
@@ -68,7 +67,7 @@ export function initSolverConfig(
     const grid = document.createElement('div')
     grid.className = 'config-grid'
 
-    for (const param of params) {
+    for (const param of solver.params) {
       const label = document.createElement('label')
       label.htmlFor = `param-${param.key}`
       label.textContent = param.label
@@ -77,11 +76,11 @@ export function initSolverConfig(
       input.type = 'number'
       input.id = `param-${param.key}`
       input.name = param.key
-      input.value = String(currentOptions[param.key])
+      input.value = String(currentOptions[param.key as keyof SolveOptions])
       if (param.min !== undefined) input.min = String(param.min)
       if (param.max !== undefined) input.max = String(param.max)
       if (param.step !== undefined) input.step = String(param.step)
-      else if (param.type === 'int') input.step = '1'
+      else if (param.valueType === 'int') input.step = '1'
       if (param.description) input.title = param.description
 
       input.addEventListener('input', () => {
@@ -102,7 +101,7 @@ export function initSolverConfig(
 
   function updateChecklist(): void {
     const problemMet = isProblemLoaded()
-    const solverMet  = selectedAlias !== null
+    const solverMet  = selectedId !== null
 
     checkProblem.classList.toggle('checklist-item--met', problemMet)
     checkSolver.classList.toggle('checklist-item--met', solverMet)
@@ -114,8 +113,8 @@ export function initSolverConfig(
 
   document.querySelectorAll<HTMLButtonElement>('.pill[data-solver]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const alias = btn.dataset.solver!
-      selectSolver(alias)
+      const id = btn.dataset.solver!
+      selectSolver(id)
     })
   })
 
@@ -128,12 +127,12 @@ export function initSolverConfig(
   // ---- Run ----
 
   btnRun.addEventListener('click', () => {
-    if (!selectedAlias || !isProblemLoaded()) return
+    if (!selectedId || !isProblemLoaded()) return
     const step04 = document.getElementById('step-04') as HTMLElement
     step02.hidden = true
     step04.hidden = false
     advanceStepper(2)
-    onSolverReady(selectedAlias, { ...currentOptions })
+    onSolverReady(selectedId, { ...currentOptions })
   })
 
   updateChecklist()

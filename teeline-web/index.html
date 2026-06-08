@@ -4,10 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Teeline TSP Solver</title>
-    <script
-      src="https://js-de.sentry-cdn.com/ec76cc3371026e1e4feb8ececea14aee.min.js"
-      crossorigin="anonymous"
-    ></script>
   </head>
   <body>
     <header class="container">
@@ -317,6 +313,11 @@
       </section>
       <!-- /#step-content -->
     </main>
+
+    <footer id="app-footer" class="container">
+      <span id="wasm-status" class="status-dot status-dot--loading"></span>
+      <span id="wasm-version">Connecting…</span>
+    </footer>
 
     <script type="module" src="/src/main.ts"></script>
   </body>

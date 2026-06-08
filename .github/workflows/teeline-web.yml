@@ -25,6 +25,22 @@ jobs:
           cache: 'npm'
           cache-dependency-path: teeline-web/package-lock.json
 
+      - name: Install Rust toolchain + wasm target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Install cargo-component
+        run: cargo install cargo-component --locked
+
+      - name: Build WASM component
+        working-directory: teeline-wasm
+        run: cargo component build --target wasm32-wasip1
+
+      - name: Transpile WASM to JS bindings (jco)
+        working-directory: teeline-web
+        run: npx --yes @bytecodealliance/jco@1.20.0 transpile ../target/wasm32-wasip1/debug/teeline_wasm.wasm --name teeline_wasm -o ../teeline-wasm/js-bindings
+
       - name: Install dependencies
         run: npm ci
 
