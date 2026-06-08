@@ -246,7 +246,7 @@ ApplicationWindow {
         FileDialog {
             id: optTourDialog
             title: "Open optimal tour file"
-            nameFilters: ["Optimal tour files (*.opt.tour)", "All files (*)"]
+            nameFilters: ["Tour files (*.tour *.opt.tour)", "All files (*)"]
             onAccepted: FileLoader.loadOptTour(selectedFile)
         }
 
