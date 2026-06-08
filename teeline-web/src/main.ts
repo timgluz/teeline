@@ -4,7 +4,7 @@ import '@picocss/pico/css/pico.min.css'
 import './main.css'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
-import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult } from './worker'
+import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage } from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
@@ -87,24 +87,30 @@ initResults(
   },
 )
 
-// ---- WASM init: fetch algorithm list + version, then wire solver form + upload ----
+// ---- WASM init: wait for worker-ready, then fetch algorithm list + version ----
 
 setWasmStatus('loading')
-
-worker.postMessage({ type: 'list-algorithms' })
-worker.postMessage({ type: 'get-version' })
+const versionEl = document.getElementById('wasm-version')
+if (versionEl) versionEl.textContent = 'Connecting…'
 
 worker.addEventListener('error', () => {
   setWasmStatus('error')
-  const versionEl = document.getElementById('wasm-version')
   if (versionEl) versionEl.textContent = 'WASM failed to load — try refreshing the page'
 })
 
 let gotAlgorithms = false
 let gotVersion = false
 
-worker.addEventListener('message', function onInit(e: MessageEvent<AlgorithmsResult | VersionResult>) {
+worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMessage | AlgorithmsResult | VersionResult>) {
   const data = e.data
+
+  if (data.type === 'worker-ready') {
+    // WASM is fully initialised — safe to call listAlgorithms / getVersion now
+    worker.postMessage({ type: 'list-algorithms' })
+    worker.postMessage({ type: 'get-version' })
+    return
+  }
+
   if (data.type === 'algorithms') {
     solverConfig = initSolverConfig(
       data.algorithms,

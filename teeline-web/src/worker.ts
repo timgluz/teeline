@@ -56,8 +56,12 @@ export interface SolveError {
   message: string
 }
 
+export interface WorkerReadyMessage {
+  type: 'worker-ready'
+}
+
 type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest
-type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError
+type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError | WorkerReadyMessage
 
 export function handleMessage(data: WorkerRequest): WorkerResponse {
   try {
@@ -95,6 +99,9 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
 
 // Only register in Web Worker context (not during Vitest runs)
 if (typeof DedicatedWorkerGlobalScope !== 'undefined' && self instanceof DedicatedWorkerGlobalScope) {
+  // Signal readiness BEFORE registering onmessage so main.ts knows WASM is
+  // initialized and won't send messages that deadlock the jco task scheduler.
+  self.postMessage({ type: 'worker-ready' } satisfies WorkerReadyMessage)
   self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     self.postMessage(handleMessage(e.data))
   }
