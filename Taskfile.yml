@@ -11,26 +11,6 @@ tasks:
     cmds:
       - cargo build -p teeline-cli --release
 
-  build:qt:
-    desc: Compile teeline-qt (requires Qt 6 at ~/Qt/6.11.1/gcc_64)
-    vars:
-      QT_PREFIX: "{{.HOME}}/Qt/6.11.1/gcc_64"
-    env:
-      PATH: "{{.QT_PREFIX}}/bin:{{.PATH}}"
-      LD_LIBRARY_PATH: "{{.QT_PREFIX}}/lib:{{.LD_LIBRARY_PATH}}"
-    cmds:
-      - cargo build -p teeline-qt
-
-  run:qt:
-    desc: Run teeline-qt (requires Qt 6 at ~/Qt/6.11.1/gcc_64)
-    vars:
-      QT_PREFIX: "{{.HOME}}/Qt/6.11.1/gcc_64"
-    env:
-      PATH: "{{.QT_PREFIX}}/bin:{{.PATH}}"
-      LD_LIBRARY_PATH: "{{.QT_PREFIX}}/lib:{{.LD_LIBRARY_PATH}}"
-    cmds:
-      - ./target/debug/teeline-qt
-
   build:wasm:
     desc: Build WASM component (requires cargo-component and wasm32-wasip2 target)
     cmds:
