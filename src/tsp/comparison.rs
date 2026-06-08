@@ -113,10 +113,10 @@ mod tests {
     fn compare_berlin52_optimal_against_itself() {
         use crate::tsp::{opt_tour, tsplib};
 
-        let tsp = tsplib::read_from_file(Path::new("data/tsplib/berlin52.tsp"))
-            .expect("berlin52.tsp must exist in data/tsplib/");
-        let opt = opt_tour::read_from_file(Path::new("data/tsplib/berlin52.opt.tour"))
-            .expect("berlin52.opt.tour must exist in data/tsplib/");
+        let tsp = tsplib::read_from_file(Path::new("tests/fixtures/berlin52.tsp"))
+            .expect("berlin52.tsp must exist in tests/fixtures/");
+        let opt = opt_tour::read_from_file(Path::new("tests/fixtures/berlin52.opt.tour"))
+            .expect("berlin52.opt.tour must exist in tests/fixtures/");
         let cities = tsp.cities();
 
         // Same route as both solver and optimal: gap must be exactly 0
