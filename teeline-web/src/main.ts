@@ -96,7 +96,12 @@ worker.postMessage({ type: 'get-version' })
 
 worker.addEventListener('error', () => {
   setWasmStatus('error')
+  const versionEl = document.getElementById('wasm-version')
+  if (versionEl) versionEl.textContent = 'WASM failed to load — try refreshing the page'
 })
+
+let gotAlgorithms = false
+let gotVersion = false
 
 worker.addEventListener('message', function onInit(e: MessageEvent<AlgorithmsResult | VersionResult>) {
   const data = e.data
@@ -152,11 +157,17 @@ worker.addEventListener('message', function onInit(e: MessageEvent<AlgorithmsRes
     )
 
     setWasmStatus('ready')
+    gotAlgorithms = true
   }
 
   if (data.type === 'version') {
     const versionEl = document.getElementById('wasm-version')
     if (versionEl) versionEl.textContent = `teeline-solver ${data.version}`
+    gotVersion = true
+  }
+
+  if (gotAlgorithms && gotVersion) {
+    worker.removeEventListener('message', onInit)
   }
 })
 

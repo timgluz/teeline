@@ -115,6 +115,18 @@ fn pf(key: &str, label: &str, min: f32, max: f32, step: f32) -> ParamSpec {
     }
 }
 
+fn pf_min(key: &str, label: &str, min: f32, step: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "float".to_string(),
+        min: Some(min),
+        max: None,
+        step: Some(step),
+        description: String::new(),
+    }
+}
+
 fn pi(key: &str, label: &str, min: f32) -> ParamSpec {
     ParamSpec {
         key: key.to_string(),
@@ -144,8 +156,8 @@ fn params_for_solver(alias: &str) -> Vec<ParamSpec> {
         "sa" => {
             let mut v = shared_heuristic_params();
             v.push(pf("coolingRate",    "Cooling rate",    0.00001, 0.9999, 0.00001));
-            v.push(pf("maxTemperature", "Max temperature", 0.01,    f32::MAX, 1.0));
-            v.push(pf("minTemperature", "Min temperature", 0.0,     f32::MAX, 0.001));
+            v.push(pf_min("maxTemperature", "Max temperature", 0.01,  1.0));
+            v.push(pf_min("minTemperature", "Min temperature", 0.0,   0.001));
             v
         }
         "ga" => {
