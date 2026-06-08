@@ -2,7 +2,9 @@
 mod bindings;
 
 use bindings::Guest;
-use bindings::teeline::solver::types::{AlgorithmInfo, City, CompareResult, ParsedProblem, Solution, SolveOptions};
+use bindings::teeline::solver::types::{
+    AlgorithmInfo, City, CompareResult, ParamSpec, ParsedProblem, Solution, SolveOptions,
+};
 use teeline::tsp::{
     AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
     distance_matrix::DistanceMatrix, kdtree::KDPoint,
@@ -90,6 +92,80 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
     .to_string()
 }
 
+fn kind_for(alias: &str) -> String {
+    match alias {
+        "bhk" | "branch_bound"  => "exact",
+        "nn"                    => "constructive",
+        "2opt" | "3opt"         => "local-search",
+        "shuffle"               => "utility",
+        _                       => "metaheuristic",
+    }
+    .to_string()
+}
+
+fn pf(key: &str, label: &str, min: f32, max: f32, step: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "float".to_string(),
+        min: Some(min),
+        max: Some(max),
+        step: Some(step),
+        description: String::new(),
+    }
+}
+
+fn pi(key: &str, label: &str, min: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "int".to_string(),
+        min: Some(min),
+        max: None,
+        step: None,
+        description: String::new(),
+    }
+}
+
+fn shared_heuristic_params() -> Vec<ParamSpec> {
+    vec![
+        pi("epochs",       "Epochs",              1.0),
+        pi("platooEpochs", "Plateau epochs",       0.0),
+        pi("nNearest",     "Nearest neighbours",   1.0),
+    ]
+}
+
+fn mutation_param() -> ParamSpec {
+    pf("mutationProbability", "Mutation probability", 0.0, 1.0, 0.001)
+}
+
+fn params_for_solver(alias: &str) -> Vec<ParamSpec> {
+    match alias {
+        "sa" => {
+            let mut v = shared_heuristic_params();
+            v.push(pf("coolingRate",    "Cooling rate",    0.00001, 0.9999, 0.00001));
+            v.push(pf("maxTemperature", "Max temperature", 0.01,    f32::MAX, 1.0));
+            v.push(pf("minTemperature", "Min temperature", 0.0,     f32::MAX, 0.001));
+            v
+        }
+        "ga" => {
+            let mut v = shared_heuristic_params();
+            v.push(mutation_param());
+            v.push(pi("nElite", "Elite count", 1.0));
+            v
+        }
+        "cs" | "fpa" => {
+            let mut v = shared_heuristic_params();
+            v.push(mutation_param());
+            v
+        }
+        "2opt" | "3opt" | "pso" | "tabu_search" | "stochastic_hill" => {
+            shared_heuristic_params()
+        }
+        _ => vec![],
+    }
+}
+
 fn solve_with_cities(
     solver: &str,
     kd_cities: Vec<KDPoint>,
@@ -116,6 +192,10 @@ fn solve_with_cities(
 }
 
 impl Guest for Component {
+    fn get_version() -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
+
     fn list_algorithms() -> Vec<AlgorithmInfo> {
         teeline::tsp::list_solvers()
             .iter()
@@ -124,6 +204,8 @@ impl Guest for Component {
                 name: info.name.to_string(),
                 description: format!("{} ({})", info.desc, info.complexity),
                 recommendation: recommendation_for(info),
+                kind: kind_for(info.alias),
+                params: params_for_solver(info.alias),
             })
             .collect()
     }

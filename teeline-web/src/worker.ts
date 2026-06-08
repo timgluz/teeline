@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
-import { solve, parseAndSolve, parse, type ParsedProblem } from 'teeline-wasm'
+import { solve, parseAndSolve, parse, listAlgorithms, getVersion, type ParsedProblem } from 'teeline-wasm'
+import type { AlgorithmInfo } from 'teeline-wasm'
 import { defaultSolveOptions, type SolveOptions } from './solver-options'
 
 export interface SolveRequest {
@@ -22,6 +23,14 @@ export interface ParseRequest {
   input: string
 }
 
+export interface ListAlgorithmsRequest {
+  type: 'list-algorithms'
+}
+
+export interface GetVersionRequest {
+  type: 'get-version'
+}
+
 export interface SolveResult {
   type: 'result'
   solution: { total: number; route: number[] }
@@ -32,19 +41,35 @@ export interface ParseResult {
   problem: ParsedProblem
 }
 
+export interface AlgorithmsResult {
+  type: 'algorithms'
+  algorithms: AlgorithmInfo[]
+}
+
+export interface VersionResult {
+  type: 'version'
+  version: string
+}
+
 export interface SolveError {
   type: 'error'
   message: string
 }
 
-type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest
-type WorkerResponse = SolveResult | ParseResult | SolveError
+type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest
+type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError
 
 export function handleMessage(data: WorkerRequest): WorkerResponse {
   try {
     if (data.type === 'parse') {
       const problem = parse(data.input)
       return { type: 'parsed', problem }
+    }
+    if (data.type === 'list-algorithms') {
+      return { type: 'algorithms', algorithms: listAlgorithms() }
+    }
+    if (data.type === 'get-version') {
+      return { type: 'version', version: getVersion() }
     }
     const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...data.options }
     let solution: ReturnType<typeof solve>

@@ -467,3 +467,112 @@ fn test_parse_empty_input_returns_err() {
     let result = instance.call_parse(&mut store, "").unwrap();
     assert!(result.is_err(), "empty input must return Err");
 }
+
+// ── get-version tests ─────────────────────────────────────────────────────────
+
+fn run_get_version() -> String {
+    let engine = make_engine();
+    let component = load_component(&engine);
+    let mut linker: Linker<HostState> = Linker::new(&engine);
+    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+    let mut store = make_store(&engine);
+    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    instance.call_get_version(&mut store).unwrap()
+}
+
+#[test]
+fn test_get_version_returns_non_empty() {
+    let version = run_get_version();
+    assert!(!version.is_empty(), "version string must not be empty");
+}
+
+// ── list_algorithms extended field tests ─────────────────────────────────────
+
+#[test]
+fn test_list_algorithms_kind_fields_present() {
+    let algorithms = run_list_algorithms();
+    let valid_kinds = ["exact", "constructive", "local-search", "metaheuristic", "utility"];
+    for algo in &algorithms {
+        assert!(
+            valid_kinds.contains(&algo.kind.as_str()),
+            "unexpected kind '{}' for solver '{}'",
+            algo.kind, algo.id
+        );
+    }
+}
+
+#[test]
+fn test_list_algorithms_sa_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let sa = algorithms.iter().find(|a| a.id == "sa").expect("sa missing");
+    assert_eq!(sa.kind, "metaheuristic");
+    let keys: Vec<&str> = sa.params.iter().map(|p| p.key.as_str()).collect();
+    assert!(keys.contains(&"coolingRate"),    "sa must have coolingRate param");
+    assert!(keys.contains(&"maxTemperature"), "sa must have maxTemperature param");
+    assert!(keys.contains(&"minTemperature"), "sa must have minTemperature param");
+    assert!(keys.contains(&"epochs"),         "sa must have epochs param");
+    let cr = sa.params.iter().find(|p| p.key == "coolingRate").unwrap();
+    assert_eq!(cr.value_type, "float", "coolingRate must be float type");
+}
+
+#[test]
+fn test_list_algorithms_nn_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let nn = algorithms.iter().find(|a| a.id == "nn").expect("nn missing");
+    assert_eq!(nn.kind, "constructive");
+    assert!(nn.params.is_empty(), "nn must have no configurable params");
+}
+
+#[test]
+fn test_list_algorithms_bhk_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let bhk = algorithms.iter().find(|a| a.id == "bhk").expect("bhk missing");
+    assert_eq!(bhk.kind, "exact");
+    assert!(bhk.params.is_empty(), "bhk must have no configurable params");
+}
+
+#[test]
+fn test_list_algorithms_two_opt_kind() {
+    let algorithms = run_list_algorithms();
+    let two_opt = algorithms.iter().find(|a| a.id == "2opt").expect("2opt missing");
+    assert_eq!(two_opt.kind, "local-search");
+    assert!(!two_opt.params.is_empty(), "2opt must have heuristic params");
+}
+
+#[test]
+fn test_list_algorithms_shuffle_kind() {
+    let algorithms = run_list_algorithms();
+    let shuffle = algorithms.iter().find(|a| a.id == "shuffle").expect("shuffle missing");
+    assert_eq!(shuffle.kind, "utility");
+}
+
+const VALID_SOLVE_OPTIONS_KEYS: &[&str] = &[
+    "epochs", "platooEpochs", "coolingRate", "maxTemperature",
+    "minTemperature", "mutationProbability", "nElite", "nNearest",
+];
+
+#[test]
+fn test_list_algorithms_all_param_keys_are_valid_solve_options_fields() {
+    let algorithms = run_list_algorithms();
+    for algo in &algorithms {
+        for param in &algo.params {
+            assert!(
+                VALID_SOLVE_OPTIONS_KEYS.contains(&param.key.as_str()),
+                "solver '{}' has unknown param key '{}' — must be a valid SolveOptions field",
+                algo.id, param.key
+            );
+        }
+    }
+}
+
+#[test]
+fn test_list_algorithms_ga_params() {
+    let algorithms = run_list_algorithms();
+    let ga = algorithms.iter().find(|a| a.id == "ga").expect("ga missing");
+    assert_eq!(ga.kind, "metaheuristic");
+    let keys: Vec<&str> = ga.params.iter().map(|p| p.key.as_str()).collect();
+    assert!(keys.contains(&"mutationProbability"), "ga must have mutationProbability");
+    assert!(keys.contains(&"nElite"),             "ga must have nElite");
+    let n_elite = ga.params.iter().find(|p| p.key == "nElite").unwrap();
+    assert_eq!(n_elite.value_type, "int", "nElite must be int type");
+}

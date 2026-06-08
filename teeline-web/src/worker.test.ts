@@ -4,13 +4,30 @@ vi.mock('teeline-wasm', () => ({
   solve: vi.fn(),
   parseAndSolve: vi.fn(),
   parse: vi.fn(),
+  listAlgorithms: vi.fn(),
+  getVersion: vi.fn(),
 }))
 
-import { solve, parseAndSolve, parse } from 'teeline-wasm'
-import { handleMessage, type ParseAndSolveRequest, type ParseRequest } from './worker'
-import { type SolveRequest } from './worker'
+import { solve, parseAndSolve, parse, listAlgorithms, getVersion } from 'teeline-wasm'
+import {
+  handleMessage,
+  type ParseAndSolveRequest,
+  type ParseRequest,
+  type SolveRequest,
+  type ListAlgorithmsRequest,
+  type GetVersionRequest,
+} from './worker'
 
 const mockSolution = { total: 42.0, route: new Uint32Array([0, 1, 2]) }
+
+const mockAlgorithm = {
+  id: 'nn',
+  name: 'Nearest Neighbor',
+  description: 'Greedy (O(n log n))',
+  recommendation: 'Fastest',
+  kind: 'constructive',
+  params: [],
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -106,6 +123,54 @@ describe('handleMessage — parse', () => {
     expect(res.type).toBe('error')
     if (res.type === 'error') {
       expect(res.message).toContain('bad input')
+    }
+  })
+})
+
+describe('handleMessage — list-algorithms', () => {
+  it('calls listAlgorithms and returns AlgorithmsResult', () => {
+    vi.mocked(listAlgorithms).mockReturnValue([mockAlgorithm])
+    const req: ListAlgorithmsRequest = { type: 'list-algorithms' }
+    const res = handleMessage(req)
+    expect(listAlgorithms).toHaveBeenCalledOnce()
+    expect(res.type).toBe('algorithms')
+    if (res.type === 'algorithms') {
+      expect(res.algorithms).toHaveLength(1)
+      expect(res.algorithms[0].id).toBe('nn')
+      expect(res.algorithms[0].kind).toBe('constructive')
+    }
+  })
+
+  it('returns SolveError when listAlgorithms throws', () => {
+    vi.mocked(listAlgorithms).mockImplementation(() => { throw new Error('wasm init failed') })
+    const req: ListAlgorithmsRequest = { type: 'list-algorithms' }
+    const res = handleMessage(req)
+    expect(res.type).toBe('error')
+    if (res.type === 'error') {
+      expect(res.message).toContain('wasm init failed')
+    }
+  })
+})
+
+describe('handleMessage — get-version', () => {
+  it('calls getVersion and returns VersionResult', () => {
+    vi.mocked(getVersion).mockReturnValue('0.1.0')
+    const req: GetVersionRequest = { type: 'get-version' }
+    const res = handleMessage(req)
+    expect(getVersion).toHaveBeenCalledOnce()
+    expect(res.type).toBe('version')
+    if (res.type === 'version') {
+      expect(res.version).toBe('0.1.0')
+    }
+  })
+
+  it('returns SolveError when getVersion throws', () => {
+    vi.mocked(getVersion).mockImplementation(() => { throw new Error('version unavailable') })
+    const req: GetVersionRequest = { type: 'get-version' }
+    const res = handleMessage(req)
+    expect(res.type).toBe('error')
+    if (res.type === 'error') {
+      expect(res.message).toContain('version unavailable')
     }
   })
 })

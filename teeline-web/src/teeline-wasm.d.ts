@@ -24,8 +24,27 @@ declare module 'teeline-wasm' {
     distanceType: string
     cities: Array<City>
   }
+  export interface ParamSpec {
+    key: string
+    label: string
+    valueType: string
+    min?: number
+    max?: number
+    step?: number
+    description: string
+  }
+  export interface AlgorithmInfo {
+    id: string
+    name: string
+    description: string
+    recommendation: string
+    kind: string
+    params: Array<ParamSpec>
+  }
   export function solve(solver: string, cities: Array<City>, options: SolveOptions): Solution
   export function parseAndSolve(solver: string, input: string, options: SolveOptions): Solution
   export function parse(input: string): ParsedProblem
+  export function listAlgorithms(): Array<AlgorithmInfo>
+  export function getVersion(): string
   export type Result<T, E> = { tag: 'ok'; val: T } | { tag: 'err'; val: E }
 }

@@ -31,11 +31,23 @@ interface types {
         cities: list<city>,
     }
 
-    record algorithm-info {
-        id: string,
-        name: string,
+    record param-spec {
+        key:         string,
+        label:       string,
+        value-type:  string,
+        min:         option<f32>,
+        max:         option<f32>,
+        step:        option<f32>,
         description: string,
+    }
+
+    record algorithm-info {
+        id:             string,
+        name:           string,
+        description:    string,
         recommendation: string,
+        kind:           string,
+        params:         list<param-spec>,
     }
 
     record compare-result {
@@ -64,6 +76,8 @@ world solver {
     ) -> result<parsed-problem, string>;
 
     export list-algorithms: func() -> list<algorithm-info>;
+
+    export get-version: func() -> string;
 
     export compare: func(
         algorithms: list<string>,
