@@ -3,6 +3,7 @@ version: "3"
 includes:
   qt:
     taskfile: ./teeline-qt/Taskfile.yml
+    dir: ./teeline-qt
 
 tasks:
   build:
