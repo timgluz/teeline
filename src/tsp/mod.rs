@@ -41,6 +41,7 @@ pub enum Solvers {
     BranchBound,
     CuckooSearch,
     FlowerPollination,
+    LinKernighan,
     NearestNeighbor,
     GeneticAlgorithm,
     ParticleSwarmOptimization,
@@ -63,6 +64,8 @@ impl Solvers {
             "cuckoo_search",
             "fpa",
             "flower_pollination",
+            "lk",
+            "lin_kernighan",
             "nearest_neighbor",
             "nn",
             "genetic_algorithm",
@@ -92,7 +95,11 @@ impl Solvers {
     pub fn auto_expand_with_nn(&self) -> bool {
         matches!(
             self,
-            Solvers::TwoOpt | Solvers::ThreeOpt | Solvers::TabuSearch | Solvers::BranchBound
+            Solvers::TwoOpt
+                | Solvers::ThreeOpt
+                | Solvers::TabuSearch
+                | Solvers::BranchBound
+                | Solvers::LinKernighan
         )
     }
 
@@ -197,6 +204,11 @@ impl Solvers {
                 alias: Some("fpa"),
                 kind: SolverKind::Heuristic,
             },
+            SolverMeta {
+                name: "lin_kernighan",
+                alias: Some("lk"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta { name: "stochastic_hill", alias: None, kind: SolverKind::Heuristic },
             SolverMeta {
                 name: "random_shuffle",
@@ -221,7 +233,7 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 13] = [
+static SOLVER_LIST: [SolverInfo; 14] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
@@ -252,6 +264,9 @@ static SOLVER_LIST: [SolverInfo; 13] = [
     SolverInfo { name: "Flower Pollination",    alias: "fpa",             category: "Metaheuristic",
                  desc: "Global L\u{00e9}vy-flight toward best tour; local \u{03b5}-scaled cross-pollination.",
                  complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Lin-Kernighan",         alias: "lk",              category: "Local Search",
+                 desc: "Iterated LK heuristic with double-bridge kicks and gain-criterion move selection.",
+                 complexity: "O(epochs \u{00b7} n\u{00b2})", has_options: true, exact: false },
     SolverInfo { name: "Stochastic Hill Climb", alias: "stochastic_hill", category: "Metaheuristic",
                  desc: "Random-restart hill climbing to escape local optima.",
                  complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
@@ -276,6 +291,7 @@ impl FromStr for Solvers {
             "branch_bound" => Ok(Solvers::BranchBound),
             "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
+            "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
@@ -941,6 +957,10 @@ pub fn solve_with_context(
             let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
             flower_pollination::solve(problem, &fpa, tx, init_tour)
         }
+        Solvers::LinKernighan => {
+            let lk = opts.lk.as_ref().cloned().unwrap_or_default();
+            lin_kernighan::solve(problem, &lk, tx, init_tour)
+        }
         Solvers::NearestNeighbor => nearest_neighbor::solve(problem, &h, tx, init_tour),
         Solvers::GeneticAlgorithm => {
             let ga = opts.ga.as_ref().cloned().unwrap_or_default();
@@ -1417,6 +1437,13 @@ mod tests {
         let problem = TspProblem::new(cities, dm);
         let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
+    }
+
+    #[test]
+    fn lk_solver_can_be_parsed_from_string() {
+        use std::str::FromStr;
+        assert!(Solvers::from_str("lk").is_ok());
+        assert!(Solvers::from_str("lin_kernighan").is_ok());
     }
 
     #[test]
