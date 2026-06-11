@@ -60,6 +60,46 @@ fn apply_2opt_at(tour: &mut Vec<usize>, pos: &mut Vec<usize>, i: usize, j: usize
     }
 }
 
+fn find_2opt_lk(
+    tour: &[usize],
+    pos: &[usize],
+    candidates: &[Vec<usize>],
+    dm: &DistanceMatrix,
+) -> Option<(usize, usize)> {
+    let n = tour.len();
+    // Iterate over each consecutive (non-wrapping) forward edge (t1, t2).
+    // Wrap-around closing edges are implicitly covered when scanning from
+    // other positions, so skipping i+1==n avoids spurious wrap-around gains.
+    for i in 0..n - 1 {
+        let t1 = tour[i];
+        let t2 = tour[i + 1];
+        let g0 = d(dm, t1, t2);
+        for &t3 in &candidates[t2] {
+            if d(dm, t2, t3) >= g0 {
+                break; // LK gain criterion: no further candidate can improve
+            }
+            let pos_t3 = pos[t3];
+            if pos_t3 == i || pos_t3 == i + 1 {
+                continue; // same edge — skip
+            }
+            let t4 = tour[(pos_t3 + 1) % n];
+            let gain = g0 - d(dm, t2, t3) + d(dm, t3, t4) - d(dm, t4, t1);
+            if gain > 1e-6 {
+                // Reverse the segment between t2's position and t3.
+                let (lo, hi) = if pos_t3 > i {
+                    (i + 1, pos_t3)
+                } else {
+                    (pos_t3 + 1, i)
+                };
+                if lo < hi {
+                    return Some((lo, hi));
+                }
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +188,43 @@ mod tests {
         for (rank, &city) in tour.iter().enumerate() {
             assert_eq!(pos[city], rank);
         }
+    }
+
+    #[test]
+    fn find_2opt_lk_improves_bad_tour() {
+        // 4 cities in a square: optimal tour cost = 4.0, crossed tour cost = 2+2*sqrt(2)
+        // city 0:(0,0), 1:(1,0), 2:(1,1), 3:(0,1)
+        // bad tour: 0->1->3->2->0 (crosses)
+        let pts: Vec<KDPoint> = vec![
+            KDPoint { id: 0, coords: [0.0, 0.0] },
+            KDPoint { id: 1, coords: [1.0, 0.0] },
+            KDPoint { id: 2, coords: [1.0, 1.0] },
+            KDPoint { id: 3, coords: [0.0, 1.0] },
+        ];
+        let dm = distance_matrix::from_cities(&pts);
+        let candidates = build_candidates(&pts, &dm, 3);
+        let mut tour = vec![0usize, 1, 3, 2];
+        let mut pos = make_pos(&tour);
+        let before = tour_distance(&tour, &dm);
+        let found = find_2opt_lk(&tour, &pos, &candidates, &dm);
+        assert!(found.is_some(), "must find an improvement in a crossed tour");
+        let (i, j) = found.unwrap();
+        apply_2opt_at(&mut tour, &mut pos, i, j);
+        let after = tour_distance(&tour, &dm);
+        assert!(after < before, "tour must improve: before={before} after={after}");
+    }
+
+    #[test]
+    fn find_2opt_lk_returns_none_for_optimal_tour() {
+        // straight line 0-1-2-3: already optimal for this topology
+        let pts: Vec<KDPoint> = (0..4)
+            .map(|i| KDPoint { id: i, coords: [i as f32, 0.0] })
+            .collect();
+        let dm = distance_matrix::from_cities(&pts);
+        let candidates = build_candidates(&pts, &dm, 3);
+        let tour = vec![0usize, 1, 2, 3];
+        let pos = make_pos(&tour);
+        let found = find_2opt_lk(&tour, &pos, &candidates, &dm);
+        assert!(found.is_none(), "optimal linear tour must not improve");
     }
 }
