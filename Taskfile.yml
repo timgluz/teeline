@@ -19,7 +19,7 @@ tasks:
   build:wasm:
     desc: Build WASM component (requires cargo-component and wasm32-wasip2 target)
     cmds:
-      - cargo component build --manifest-path teeline-wasm/Cargo.toml
+      - cargo component build --manifest-path teeline-wasm/Cargo.toml --target wasm32-wasip2
 
   test:
     desc: Run all unit and integration tests
