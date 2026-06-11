@@ -240,7 +240,7 @@ fn tuning_args() -> Vec<Arg> {
             .required(false),
         Arg::new("max_depth")
             .long("max-depth")
-            .help("LK: max segment depth for Lin-Kernighan move selection")
+            .help("LK: reserved for future depth-k backtracking extension (not yet active)")
             .value_name("N")
             .action(ArgAction::Set)
             .required(false),

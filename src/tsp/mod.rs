@@ -265,7 +265,7 @@ static SOLVER_LIST: [SolverInfo; 14] = [
                  desc: "Global L\u{00e9}vy-flight toward best tour; local \u{03b5}-scaled cross-pollination.",
                  complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
     SolverInfo { name: "Lin-Kernighan",         alias: "lk",              category: "Local Search",
-                 desc: "Iterated LK heuristic with double-bridge kicks and gain-criterion move selection.",
+                 desc: "Lin-Kernighan style ILS: 2-opt with candidate lists + double-bridge kicks.",
                  complexity: "O(epochs \u{00b7} n\u{00b2})", has_options: true, exact: false },
     SolverInfo { name: "Stochastic Hill Climb", alias: "stochastic_hill", category: "Metaheuristic",
                  desc: "Random-restart hill climbing to escape local optima.",
@@ -1484,8 +1484,8 @@ mod tests {
             .arg(Arg::new("platoo_epochs").long("platoo_epochs").action(ArgAction::Set))
             .arg(Arg::new("n_nearest").long("n_nearest").action(ArgAction::Set))
             .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
-            .arg(Arg::new("max_depth").long("max_depth").action(ArgAction::Set));
-        let args = cmd.get_matches_from(["t", "--max_depth", "3"]);
+            .arg(Arg::new("max_depth").long("max-depth").action(ArgAction::Set));  // hyphen matches production CLI
+        let args = cmd.get_matches_from(["t", "--max-depth", "3"]);  // hyphen matches production CLI
         let opts = LKOptions::from_cli(&args).unwrap();
         assert_eq!(opts.max_depth, 3);
     }

@@ -56,8 +56,13 @@ pub fn solve(
         nearest_neighbor::solve(problem, &nn_opts, None, None).route().to_vec()
     };
 
-    let mut best_pos = make_pos(&best_tour);
-    lk_pass(&mut best_tour, &mut best_pos, &candidates, &dm);
+    if best_tour.len() < 4 {
+        return Solution::new(&best_tour, problem);
+    }
+
+    let mut init_pos = make_pos(&best_tour);
+    lk_pass(&mut best_tour, &mut init_pos, &candidates, &dm);
+    drop(init_pos);
     let mut best_dist = tour_distance(&best_tour, &dm);
     send_progress(progress_tx, &best_tour, best_dist);
 
@@ -71,7 +76,6 @@ pub fn solve(
         if dist < best_dist {
             best_tour = candidate;
             best_dist = dist;
-            best_pos = make_pos(&best_tour);
             platoo = 0;
             send_progress(progress_tx, &best_tour, best_dist);
         } else {
@@ -81,9 +85,6 @@ pub fn solve(
             }
         }
     }
-
-    // suppress unused variable warning from best_pos after last assignment
-    let _ = best_pos;
 
     Solution::new(&best_tour, problem)
 }
@@ -120,6 +121,7 @@ fn find_2opt_lk(
     dm: &DistanceMatrix,
 ) -> Option<(usize, usize)> {
     let n = tour.len();
+    if n < 4 { return None; }
     // Iterate over each consecutive (non-wrapping) forward edge (t1, t2).
     // Wrap-around closing edges are implicitly covered when scanning from
     // other positions, so skipping i+1==n avoids spurious wrap-around gains.
@@ -354,6 +356,21 @@ mod tests {
         let mut pos = make_pos(&tour);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm);
         assert!(!improved, "lk_pass must return false when tour is already optimal");
+    }
+
+    #[test]
+    fn find_2opt_lk_returns_none_for_tiny_tour() {
+        let pts: Vec<KDPoint> = (0..3)
+            .map(|i| KDPoint { id: i, coords: [i as f32, 0.0] })
+            .collect();
+        let dm = distance_matrix::from_cities(&pts);
+        let cands = build_candidates(&pts, &dm, 2);
+        let tour = vec![0usize, 1, 2];
+        let pos = make_pos(&tour);
+        assert!(
+            find_2opt_lk(&tour, &pos, &cands, &dm).is_none(),
+            "tiny tour (n=3) must return None without panicking"
+        );
     }
 
     #[test]
