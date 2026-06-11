@@ -30,7 +30,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::mpsc;
 
-pub const VERSION: &str = "0.6.1";
+pub const VERSION: &str = "1.0.1";
 pub const AUTHOR: &str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
