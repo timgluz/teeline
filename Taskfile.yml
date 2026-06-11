@@ -19,7 +19,7 @@ tasks:
   build:wasm:
     desc: Build WASM component (requires cargo-component and wasm32-wasip2 target)
     cmds:
-      - cargo component build --manifest-path teeline-wasm/Cargo.toml
+      - cargo component build --manifest-path teeline-wasm/Cargo.toml --target wasm32-wasip2
 
   test:
     desc: Run all unit and integration tests
@@ -68,7 +68,7 @@ tasks:
   run:
     desc: Run solver (e.g. task run -- solve nn -i tests/fixtures/berlin52.tsp)
     cmds:
-      - cargo run -- {{.CLI_ARGS}}
+      - cargo run -p teeline-cli -- {{.CLI_ARGS}}
 
   bench:berlin52:
     desc: Run approximate solvers on berlin52 and compare tour lengths (optimal 7542)

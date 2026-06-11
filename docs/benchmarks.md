@@ -10,8 +10,8 @@ The known optimal tour cost is **7 544.37** (from `berlin52.opt.tour`).
 | CPU | AMD Ryzen 7 PRO 4750U (16 threads) |
 | RAM | 32 GB |
 | OS | Linux |
-| Binary | `target/release/bin` (release build, `cargo build --release`) |
-| Teeline version | 0.6.1 |
+| Binary | `target/release/teeline` (release build, `cargo build --release -p teeline-cli`) |
+| Teeline version | 1.0.1 |
 | Hard timeout | 3 minutes per run |
 | Benchmark date | 2026-05-15 |
 
@@ -42,6 +42,8 @@ representative, not as a guarantee.
 | **Cuckoo Search** | default (`--epochs=10000 --n_nearest=25`) | 7 877.84 | +4.4 % | 0.72 s | 100 % | 7.9 MB |
 | **Flower Pollination (FPA)** | default (`--epochs=10000 --n_nearest=25`) | 8 867.93 | +17.5 % | 0.53 s | 100 % | 7.2 MB |
 | **Flower Pollination (FPA)** | `--epochs=10000 --n_nearest=50` | 8 950.21 | +18.6 % | 1.13 s | 99 % | 7.2 MB |
+| **Lin-Kernighan (ILS)** | default (`--epochs=100 --n_nearest=5`) | 8 146.28 | +8.0 % | 0.02 s | 82 % | 6.5 MB |
+| **Lin-Kernighan (ILS)** | `--epochs=1000 --n_nearest=10` | 8 128.86 | +7.7 % | 0.03 s | 85 % | 6.4 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 

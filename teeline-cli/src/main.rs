@@ -33,7 +33,7 @@ impl<'a> CliArgsProvider<'a> {
 
 impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
-        use teeline::tsp::{CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions};
+        use teeline::tsp::{CSOptions, FPAOptions, GAOptions, HeuristicOptions, LKOptions, SAOptions};
         match self.solver {
             Solvers::SimulatedAnnealing => {
                 base.sa = Some(SAOptions::from_cli(self.args)?);
@@ -46,6 +46,9 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
             }
             Solvers::FlowerPollination => {
                 base.fpa = Some(FPAOptions::from_cli(self.args)?);
+            }
+            Solvers::LinKernighan => {
+                base.lk = Some(LKOptions::from_cli(self.args)?);
             }
             _ => {
                 base.heuristic = Some(HeuristicOptions::from_cli(self.args)?);
@@ -74,7 +77,7 @@ fn main() {
 
     let solve_cmd = Command::new("solve")
         .about(
-            "Solve a TSP instance. Deterministic solvers (2opt, 3opt, tabu) auto-expand to \
+            "Solve a TSP instance. Deterministic solvers (2opt, 3opt, tabu, lk) auto-expand to \
                 pipeline(nn, solver); stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill) \
                 auto-expand to pipeline(shuffle, solver).",
         )
@@ -234,6 +237,12 @@ fn tuning_args() -> Vec<Arg> {
         Arg::new("distance_type")
             .long("distance-type")
             .help("override distance formula: euc_2d, geo (default: from file header)")
+            .required(false),
+        Arg::new("max_depth")
+            .long("max-depth")
+            .help("LK: reserved for future depth-k backtracking extension (not yet active)")
+            .value_name("N")
+            .action(ArgAction::Set)
             .required(false),
     ]
 }

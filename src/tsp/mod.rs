@@ -6,6 +6,7 @@ pub mod convert;
 pub mod cuckoo_search;
 pub mod distance_matrix;
 pub mod flower_pollination;
+pub mod lin_kernighan;
 pub mod genetic_algorithm;
 pub mod kdtree;
 pub mod nearest_neighbor;
@@ -29,7 +30,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::mpsc;
 
-pub const VERSION: &str = "0.6.1";
+pub const VERSION: &str = "1.0.1";
 pub const AUTHOR: &str = "Timo Sulg <timo@sulg.dev>";
 
 use std::str::FromStr;
@@ -40,6 +41,7 @@ pub enum Solvers {
     BranchBound,
     CuckooSearch,
     FlowerPollination,
+    LinKernighan,
     NearestNeighbor,
     GeneticAlgorithm,
     ParticleSwarmOptimization,
@@ -62,6 +64,8 @@ impl Solvers {
             "cuckoo_search",
             "fpa",
             "flower_pollination",
+            "lk",
+            "lin_kernighan",
             "nearest_neighbor",
             "nn",
             "genetic_algorithm",
@@ -91,7 +95,11 @@ impl Solvers {
     pub fn auto_expand_with_nn(&self) -> bool {
         matches!(
             self,
-            Solvers::TwoOpt | Solvers::ThreeOpt | Solvers::TabuSearch | Solvers::BranchBound
+            Solvers::TwoOpt
+                | Solvers::ThreeOpt
+                | Solvers::TabuSearch
+                | Solvers::BranchBound
+                | Solvers::LinKernighan
         )
     }
 
@@ -196,6 +204,11 @@ impl Solvers {
                 alias: Some("fpa"),
                 kind: SolverKind::Heuristic,
             },
+            SolverMeta {
+                name: "lin_kernighan",
+                alias: Some("lk"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta { name: "stochastic_hill", alias: None, kind: SolverKind::Heuristic },
             SolverMeta {
                 name: "random_shuffle",
@@ -220,7 +233,7 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 13] = [
+static SOLVER_LIST: [SolverInfo; 14] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
@@ -251,6 +264,9 @@ static SOLVER_LIST: [SolverInfo; 13] = [
     SolverInfo { name: "Flower Pollination",    alias: "fpa",             category: "Metaheuristic",
                  desc: "Global L\u{00e9}vy-flight toward best tour; local \u{03b5}-scaled cross-pollination.",
                  complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Lin-Kernighan",         alias: "lk",              category: "Local Search",
+                 desc: "Lin-Kernighan style ILS: 2-opt with candidate lists + double-bridge kicks.",
+                 complexity: "O(epochs \u{00b7} n\u{00b2})", has_options: true, exact: false },
     SolverInfo { name: "Stochastic Hill Climb", alias: "stochastic_hill", category: "Metaheuristic",
                  desc: "Random-restart hill climbing to escape local optima.",
                  complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
@@ -275,6 +291,7 @@ impl FromStr for Solvers {
             "branch_bound" => Ok(Solvers::BranchBound),
             "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
+            "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
@@ -771,6 +788,93 @@ impl FPAOptions {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct LKOptions {
+    pub heuristic: HeuristicOptions,
+    pub max_depth: usize,
+}
+
+impl Default for LKOptions {
+    fn default() -> Self {
+        LKOptions {
+            heuristic: HeuristicOptions {
+                epochs: 100,
+                platoo_epochs: 10,
+                n_nearest: 5,
+                verbose: false,
+            },
+            max_depth: 5,
+        }
+    }
+}
+
+impl LKOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        self.heuristic.validate()?;
+        if self.max_depth == 0 {
+            return Err("max_depth must be >= 1".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut lk = LKOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    lk.heuristic.epochs = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "platoo_epochs" => {
+                    lk.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
+                        format!("config: `platoo_epochs` must be an integer, got {v}")
+                    })? as usize;
+                }
+                "n_nearest" => {
+                    lk.heuristic.n_nearest = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "verbose" => {
+                    lk.heuristic.verbose = v
+                        .as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                "max_depth" => {
+                    lk.max_depth = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `max_depth` must be an integer, got {v}"))?
+                        as usize;
+                }
+                other => {
+                    return Err(format!(
+                        "config: unknown field `{other}` in [lk] — valid: epochs, platoo_epochs, n_nearest, verbose, max_depth"
+                    ));
+                }
+            }
+        }
+        lk.validate()?;
+        Ok(lk)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut lk = LKOptions {
+            heuristic: HeuristicOptions::from_cli(args)?,
+            ..LKOptions::default()
+        };
+        if let Some(v) = args.get_one::<String>("max_depth") {
+            lk.max_depth = v
+                .parse::<usize>()
+                .map_err(|_| format!("--max-depth: invalid integer `{v}`"))?;
+        }
+        lk.validate()?;
+        Ok(lk)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // AppOptions — pure config shell; no runtime state
 // ---------------------------------------------------------------------------
@@ -783,6 +887,7 @@ pub struct AppOptions {
     pub ga: Option<GAOptions>,
     pub cs: Option<CSOptions>,
     pub fpa: Option<FPAOptions>,
+    pub lk: Option<LKOptions>,
     pub heuristic: Option<HeuristicOptions>,
 }
 
@@ -851,6 +956,10 @@ pub fn solve_with_context(
         Solvers::FlowerPollination => {
             let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
             flower_pollination::solve(problem, &fpa, tx, init_tour)
+        }
+        Solvers::LinKernighan => {
+            let lk = opts.lk.as_ref().cloned().unwrap_or_default();
+            lin_kernighan::solve(problem, &lk, tx, init_tour)
         }
         Solvers::NearestNeighbor => nearest_neighbor::solve(problem, &h, tx, init_tour),
         Solvers::GeneticAlgorithm => {
@@ -1089,6 +1198,7 @@ mod tests {
             ga: None,
             cs: None,
             fpa: None,
+            lk: None,
             heuristic: None,
         };
         drop(a);
@@ -1327,5 +1437,56 @@ mod tests {
         let problem = TspProblem::new(cities, dm);
         let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
+    }
+
+    #[test]
+    fn lk_solver_can_be_parsed_from_string() {
+        use std::str::FromStr;
+        assert!(Solvers::from_str("lk").is_ok());
+        assert!(Solvers::from_str("lin_kernighan").is_ok());
+    }
+
+    #[test]
+    fn lk_options_default_is_valid() {
+        LKOptions::default().validate().expect("default LKOptions must be valid");
+    }
+
+    #[test]
+    fn lk_options_validate_rejects_zero_n_nearest() {
+        let opts = LKOptions {
+            heuristic: HeuristicOptions { n_nearest: 0, ..HeuristicOptions::default() },
+            max_depth: 5,
+        };
+        assert!(opts.validate().is_err(), "n_nearest=0 must be rejected");
+    }
+
+    #[test]
+    fn lk_options_validate_rejects_zero_max_depth() {
+        let opts = LKOptions { max_depth: 0, ..LKOptions::default() };
+        assert!(opts.validate().is_err(), "max_depth=0 must be rejected");
+    }
+
+    #[test]
+    fn lk_options_from_toml_parses_all_fields() {
+        let t: toml::Table =
+            toml::from_str("epochs=50\nn_nearest=7\nmax_depth=3").unwrap();
+        let opts = LKOptions::from_toml(&t).unwrap();
+        assert_eq!(opts.heuristic.epochs, 50);
+        assert_eq!(opts.heuristic.n_nearest, 7);
+        assert_eq!(opts.max_depth, 3);
+    }
+
+    #[test]
+    fn lk_options_from_cli_parses_max_depth() {
+        use clap::{Arg, ArgAction, Command};
+        let cmd = Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(Arg::new("platoo_epochs").long("platoo_epochs").action(ArgAction::Set))
+            .arg(Arg::new("n_nearest").long("n_nearest").action(ArgAction::Set))
+            .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
+            .arg(Arg::new("max_depth").long("max-depth").action(ArgAction::Set));  // hyphen matches production CLI
+        let args = cmd.get_matches_from(["t", "--max-depth", "3"]);  // hyphen matches production CLI
+        let opts = LKOptions::from_cli(&args).unwrap();
+        assert_eq!(opts.max_depth, 3);
     }
 }

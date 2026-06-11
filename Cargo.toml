@@ -5,7 +5,7 @@ resolver = "2"
 
 [package]
 name = "teeline"
-version = "1.0.0"
+version = "1.0.1"
 authors = ["Timo Sulg <timgluz@gmail.com>"]
 edition = "2024"
 repository = "https://github.com/timgluz/teeline"
