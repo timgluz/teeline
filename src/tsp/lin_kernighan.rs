@@ -100,6 +100,25 @@ fn find_2opt_lk(
     None
 }
 
+fn lk_pass(
+    tour: &mut Vec<usize>,
+    pos: &mut Vec<usize>,
+    candidates: &[Vec<usize>],
+    dm: &DistanceMatrix,
+) -> bool {
+    let mut improved = false;
+    loop {
+        match find_2opt_lk(tour, pos, candidates, dm) {
+            Some((i, j)) => {
+                apply_2opt_at(tour, pos, i, j);
+                improved = true;
+            }
+            None => break,
+        }
+    }
+    improved
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,5 +245,37 @@ mod tests {
         let pos = make_pos(&tour);
         let found = find_2opt_lk(&tour, &pos, &candidates, &dm);
         assert!(found.is_none(), "optimal linear tour must not improve");
+    }
+
+    #[test]
+    fn lk_pass_improves_crossed_tour() {
+        let pts: Vec<KDPoint> = vec![
+            KDPoint { id: 0, coords: [0.0, 0.0] },
+            KDPoint { id: 1, coords: [1.0, 0.0] },
+            KDPoint { id: 2, coords: [1.0, 1.0] },
+            KDPoint { id: 3, coords: [0.0, 1.0] },
+        ];
+        let dm = distance_matrix::from_cities(&pts);
+        let cands = build_candidates(&pts, &dm, 3);
+        let mut tour = vec![0usize, 1, 3, 2]; // crossed
+        let mut pos = make_pos(&tour);
+        let before = tour_distance(&tour, &dm);
+        let improved = lk_pass(&mut tour, &mut pos, &cands, &dm);
+        let after = tour_distance(&tour, &dm);
+        assert!(improved, "lk_pass must return true when it improved");
+        assert!(after < before, "tour must be shorter: before={before} after={after}");
+    }
+
+    #[test]
+    fn lk_pass_returns_false_for_optimal_tour() {
+        let pts: Vec<KDPoint> = (0..4)
+            .map(|i| KDPoint { id: i, coords: [i as f32, 0.0] })
+            .collect();
+        let dm = distance_matrix::from_cities(&pts);
+        let cands = build_candidates(&pts, &dm, 3);
+        let mut tour = vec![0usize, 1, 2, 3];
+        let mut pos = make_pos(&tour);
+        let improved = lk_pass(&mut tour, &mut pos, &cands, &dm);
+        assert!(!improved, "lk_pass must return false when tour is already optimal");
     }
 }
