@@ -1,7 +1,9 @@
 use crate::tsp::{
-    distance_matrix::DistanceMatrix,
+    distance_matrix::{self, DistanceMatrix},
     kdtree::KDPoint,
-    Solution, LKOptions, TspProblem,
+    nearest_neighbor,
+    route::Route,
+    HeuristicOptions, Solution, LKOptions, TspProblem,
 };
 use std::sync::mpsc;
 use crate::tsp::progress::ProgressMessage;
@@ -10,21 +12,27 @@ use rand::Rng;
 pub(crate) fn build_candidates(cities: &[KDPoint], dm: &DistanceMatrix, k: usize) -> Vec<Vec<usize>> {
     let n = cities.len();
     let k = k.min(n.saturating_sub(1));
-    cities
-        .iter()
-        .map(|city| {
-            let mut others: Vec<(usize, f32)> = cities
-                .iter()
-                .filter(|c| c.id != city.id)
-                .map(|c| {
-                    let dist = dm.distance_between(city.id, c.id).unwrap_or(f32::MAX);
-                    (c.id, dist)
-                })
-                .collect();
-            others.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-            others.into_iter().take(k).map(|(id, _)| id).collect()
-        })
-        .collect()
+    let max_id = cities.iter().map(|c| c.id).max().unwrap_or(0);
+    let mut candidates = vec![Vec::new(); max_id + 1];
+    for city in cities {
+        let mut others: Vec<(usize, f32)> = cities
+            .iter()
+            .filter(|c| c.id != city.id)
+            .map(|c| {
+                let dist = dm.distance_between(city.id, c.id).unwrap_or(f32::MAX);
+                (c.id, dist)
+            })
+            .collect();
+        others.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        candidates[city.id] = others.into_iter().take(k).map(|(id, _)| id).collect();
+    }
+    candidates
+}
+
+fn send_progress(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize], dist: f32) {
+    if let Some(tx) = tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(path), dist));
+    }
 }
 
 pub fn solve(
@@ -33,7 +41,51 @@ pub fn solve(
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
 ) -> Solution {
-    todo!()
+    let dm = distance_matrix::from_cities(&problem.cities);
+    let k = opts.heuristic.n_nearest;
+    let candidates = build_candidates(&problem.cities, &dm, k);
+
+    // seed initial tour
+    let mut best_tour: Vec<usize> = if let Some(t) = init_tour {
+        t.to_vec()
+    } else {
+        let nn_opts = HeuristicOptions {
+            epochs: 1,
+            ..HeuristicOptions::default()
+        };
+        nearest_neighbor::solve(problem, &nn_opts, None, None).route().to_vec()
+    };
+
+    let mut best_pos = make_pos(&best_tour);
+    lk_pass(&mut best_tour, &mut best_pos, &candidates, &dm);
+    let mut best_dist = tour_distance(&best_tour, &dm);
+    send_progress(progress_tx, &best_tour, best_dist);
+
+    let mut rng = rand::rng();
+    let mut platoo = 0usize;
+    for _ in 0..opts.heuristic.epochs {
+        let mut candidate = double_bridge(&best_tour, &mut rng);
+        let mut cand_pos = make_pos(&candidate);
+        lk_pass(&mut candidate, &mut cand_pos, &candidates, &dm);
+        let dist = tour_distance(&candidate, &dm);
+        if dist < best_dist {
+            best_tour = candidate;
+            best_dist = dist;
+            best_pos = make_pos(&best_tour);
+            platoo = 0;
+            send_progress(progress_tx, &best_tour, best_dist);
+        } else {
+            platoo += 1;
+            if platoo >= opts.heuristic.platoo_epochs {
+                break;
+            }
+        }
+    }
+
+    // suppress unused variable warning from best_pos after last assignment
+    let _ = best_pos;
+
+    Solution::new(&best_tour, problem)
 }
 
 fn d(dm: &DistanceMatrix, a: usize, b: usize) -> f32 {
@@ -76,25 +128,33 @@ fn find_2opt_lk(
         let t2 = tour[i + 1];
         let g0 = d(dm, t1, t2);
         for &t3 in &candidates[t2] {
+            // LK bound: candidates are sorted by distance from t2.
+            // If d(t2,t3) >= g0, the added edge (t2,t3) alone would cost more
+            // than the removed edge (t1,t2), so no gain is possible.
             if d(dm, t2, t3) >= g0 {
-                break; // LK gain criterion: no further candidate can improve
+                break; // no candidate further in the sorted list can help
             }
             let pos_t3 = pos[t3];
             if pos_t3 == i || pos_t3 == i + 1 {
                 continue; // same edge — skip
             }
+            // Reversal of [lo..=hi] removes edges (t1,t2) and (t3,t4)
+            // and adds edges (t1,t3) and (t2,t4).
+            let (lo, hi) = if pos_t3 > i {
+                (i + 1, pos_t3)
+            } else {
+                (pos_t3 + 1, i)
+            };
+            if lo >= hi {
+                continue;
+            }
+            // t4 is the city immediately after t3 in the original tour direction.
+            // This edge (t3,t4) is removed by the reversal.
             let t4 = tour[(pos_t3 + 1) % n];
-            let gain = g0 - d(dm, t2, t3) + d(dm, t3, t4) - d(dm, t4, t1);
+            // Correct 2-opt gain: remove (t1,t2)+(t3,t4), add (t1,t3)+(t2,t4)
+            let gain = g0 + d(dm, t3, t4) - d(dm, t1, t3) - d(dm, t2, t4);
             if gain > 1e-6 {
-                // Reverse the segment between t2's position and t3.
-                let (lo, hi) = if pos_t3 > i {
-                    (i + 1, pos_t3)
-                } else {
-                    (pos_t3 + 1, i)
-                };
-                if lo < hi {
-                    return Some((lo, hi));
-                }
+                return Some((lo, hi));
             }
         }
     }
@@ -324,5 +384,21 @@ mod tests {
         let tour: Vec<usize> = (0..7).collect();
         let result = double_bridge(&tour, &mut rng);
         assert_eq!(result, tour, "tours with < 8 cities must be returned unchanged");
+    }
+
+    #[test]
+    fn solve_reduces_distance_on_berlin52() {
+        use std::path::Path;
+        let data = crate::tsp::tsplib::read_from_file(Path::new("tests/fixtures/berlin52.tsp"))
+            .expect("berlin52.tsp must be readable");
+        let cities = data.cities().to_vec();
+        let dm = distance_matrix::from_cities(&cities);
+        let problem = crate::tsp::TspProblem::new(cities, dm);
+        let mut opts = LKOptions::default();
+        opts.heuristic.epochs = 5; // fast test
+        let sol = solve(&problem, &opts, None, None);
+        // NN on berlin52 gives ~8980; any reasonable LK should beat NN
+        assert!(sol.total < 9000.0, "LK should beat NN: got {}", sol.total);
+        assert_eq!(sol.route().len(), 52);
     }
 }
