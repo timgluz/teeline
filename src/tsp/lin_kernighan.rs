@@ -5,6 +5,7 @@ use crate::tsp::{
 };
 use std::sync::mpsc;
 use crate::tsp::progress::ProgressMessage;
+use rand::Rng;
 
 pub(crate) fn build_candidates(cities: &[KDPoint], dm: &DistanceMatrix, k: usize) -> Vec<Vec<usize>> {
     let n = cities.len();
@@ -117,6 +118,22 @@ fn lk_pass(
         }
     }
     improved
+}
+
+pub(crate) fn double_bridge(tour: &[usize], rng: &mut impl Rng) -> Vec<usize> {
+    let n = tour.len();
+    if n < 8 {
+        return tour.to_vec();
+    }
+    let p1 = 1 + rng.random_range(0..n / 4);
+    let p2 = p1 + 1 + rng.random_range(0..n / 4);
+    let p3 = p2 + 1 + rng.random_range(0..n / 4);
+    let mut result = Vec::with_capacity(n);
+    result.extend_from_slice(&tour[0..p1]);
+    result.extend_from_slice(&tour[p2..p3]);
+    result.extend_from_slice(&tour[p1..p2]);
+    result.extend_from_slice(&tour[p3..n]);
+    result
 }
 
 #[cfg(test)]
@@ -277,5 +294,35 @@ mod tests {
         let mut pos = make_pos(&tour);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm);
         assert!(!improved, "lk_pass must return false when tour is already optimal");
+    }
+
+    #[test]
+    fn double_bridge_produces_valid_permutation() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+        let tour: Vec<usize> = (0..10).collect();
+        let result = double_bridge(&tour, &mut rng);
+        assert_eq!(result.len(), 10, "length must be preserved");
+        let mut sorted = result.clone();
+        sorted.sort();
+        assert_eq!(sorted, tour, "same cities, different order");
+    }
+
+    #[test]
+    fn double_bridge_differs_from_original() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+        let tour: Vec<usize> = (0..10).collect();
+        let result = double_bridge(&tour, &mut rng);
+        assert_ne!(result, tour, "result must differ from original");
+    }
+
+    #[test]
+    fn double_bridge_returns_original_for_small_tour() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(0);
+        let tour: Vec<usize> = (0..7).collect();
+        let result = double_bridge(&tour, &mut rng);
+        assert_eq!(result, tour, "tours with < 8 cities must be returned unchanged");
     }
 }
