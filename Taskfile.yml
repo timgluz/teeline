@@ -68,7 +68,7 @@ tasks:
   run:
     desc: Run solver (e.g. task run -- solve nn -i tests/fixtures/berlin52.tsp)
     cmds:
-      - cargo run -- {{.CLI_ARGS}}
+      - cargo run -p teeline-cli -- {{.CLI_ARGS}}
 
   bench:berlin52:
     desc: Run approximate solvers on berlin52 and compare tour lengths (optimal 7542)

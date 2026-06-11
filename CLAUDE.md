@@ -9,9 +9,13 @@ Teeline is a Traveling Salesman Problem (TSP) solver written in Rust. It reads c
 ## Commands
 
 ```bash
-# Build
-cargo build           # debug
-cargo build --release # optimized
+# Build (CLI binary is in teeline-cli workspace member)
+cargo build -p teeline-cli           # debug
+cargo build -p teeline-cli --release # optimized
+
+# Or use Taskfile tasks
+task build          # debug
+task build:release  # optimized
 
 # Run all tests
 cargo test
@@ -19,9 +23,9 @@ cargo test
 # Run a specific test
 cargo test test_coords_from_text_only_ints
 
-# Run (debug binary)
+# Run (debug binary is target/debug/teeline, release is target/release/teeline)
 cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
-./target/debug/teeline solve two_opt -i ./data/tsplib/berlin52.tsp
+./target/debug/teeline solve lk -i ./data/tsplib/berlin52.tsp
 ./target/debug/teeline --help
 ./target/debug/teeline solve --help
 ./target/debug/teeline convert --help
@@ -63,6 +67,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | `particle_swarm.rs` | Discrete PSO (velocity-capped, linearly decaying inertia, NN-seeded) | `pso` |
 | `cuckoo_search.rs` | Cuckoo Search via Lévy flights (k random 2-opt reversals, Bernoulli nest abandonment) | `cs` |
 | `flower_pollination.rs` | Flower Pollination Algorithm (global Lévy-flight toward gbest; local ε-scaled cross-pollination) | `fpa` |
+| `lin_kernighan.rs` | Lin-Kernighan style ILS: candidate-list 2-opt + double-bridge kicks | `lk` |
 
 **Tests:**
 - Unit tests live inline in each source file (`#[cfg(test)]`)
@@ -71,10 +76,10 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 ## Important Notes
 
-- The binary is named `bin` (not `teeline`) — set by `[[bin]] name = "bin"` in `Cargo.toml`.
+- The CLI binary is produced by the `teeline-cli` workspace member (`cargo build -p teeline-cli`). The binary is named `teeline` (at `target/debug/teeline` and `target/release/teeline`). Any older `target/release/bin` is a stale artifact from before the workspace split — ignore it.
 - `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity — don't use them on datasets larger than ~30 cities.
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
-- `bin convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
+- `teeline convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
 - `download_data.sh` fetches benchmark datasets.
 
 ## GitKB
