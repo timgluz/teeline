@@ -6,6 +6,7 @@ pub mod convert;
 pub mod cuckoo_search;
 pub mod distance_matrix;
 pub mod flower_pollination;
+pub mod lin_kernighan;
 pub mod genetic_algorithm;
 pub mod kdtree;
 pub mod nearest_neighbor;
