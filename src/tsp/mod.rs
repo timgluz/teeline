@@ -771,6 +771,93 @@ impl FPAOptions {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub struct LKOptions {
+    pub heuristic: HeuristicOptions,
+    pub max_depth: usize,
+}
+
+impl Default for LKOptions {
+    fn default() -> Self {
+        LKOptions {
+            heuristic: HeuristicOptions {
+                epochs: 100,
+                platoo_epochs: 10,
+                n_nearest: 5,
+                verbose: false,
+            },
+            max_depth: 5,
+        }
+    }
+}
+
+impl LKOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        self.heuristic.validate()?;
+        if self.max_depth == 0 {
+            return Err("max_depth must be >= 1".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut lk = LKOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    lk.heuristic.epochs = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "platoo_epochs" => {
+                    lk.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
+                        format!("config: `platoo_epochs` must be an integer, got {v}")
+                    })? as usize;
+                }
+                "n_nearest" => {
+                    lk.heuristic.n_nearest = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "verbose" => {
+                    lk.heuristic.verbose = v
+                        .as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                "max_depth" => {
+                    lk.max_depth = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `max_depth` must be an integer, got {v}"))?
+                        as usize;
+                }
+                other => {
+                    return Err(format!(
+                        "config: unknown field `{other}` in [lk] — valid: epochs, platoo_epochs, n_nearest, verbose, max_depth"
+                    ));
+                }
+            }
+        }
+        lk.validate()?;
+        Ok(lk)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut lk = LKOptions {
+            heuristic: HeuristicOptions::from_cli(args)?,
+            ..LKOptions::default()
+        };
+        if let Some(v) = args.get_one::<String>("max_depth") {
+            lk.max_depth = v
+                .parse::<usize>()
+                .map_err(|_| format!("--max-depth: invalid integer `{v}`"))?;
+        }
+        lk.validate()?;
+        Ok(lk)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // AppOptions — pure config shell; no runtime state
 // ---------------------------------------------------------------------------
@@ -783,6 +870,7 @@ pub struct AppOptions {
     pub ga: Option<GAOptions>,
     pub cs: Option<CSOptions>,
     pub fpa: Option<FPAOptions>,
+    pub lk: Option<LKOptions>,
     pub heuristic: Option<HeuristicOptions>,
 }
 
@@ -1089,6 +1177,7 @@ mod tests {
             ga: None,
             cs: None,
             fpa: None,
+            lk: None,
             heuristic: None,
         };
         drop(a);
@@ -1327,5 +1416,49 @@ mod tests {
         let problem = TspProblem::new(cities, dm);
         let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
+    }
+
+    #[test]
+    fn lk_options_default_is_valid() {
+        LKOptions::default().validate().expect("default LKOptions must be valid");
+    }
+
+    #[test]
+    fn lk_options_validate_rejects_zero_n_nearest() {
+        let opts = LKOptions {
+            heuristic: HeuristicOptions { n_nearest: 0, ..HeuristicOptions::default() },
+            max_depth: 5,
+        };
+        assert!(opts.validate().is_err(), "n_nearest=0 must be rejected");
+    }
+
+    #[test]
+    fn lk_options_validate_rejects_zero_max_depth() {
+        let opts = LKOptions { max_depth: 0, ..LKOptions::default() };
+        assert!(opts.validate().is_err(), "max_depth=0 must be rejected");
+    }
+
+    #[test]
+    fn lk_options_from_toml_parses_all_fields() {
+        let t: toml::Table =
+            toml::from_str("epochs=50\nn_nearest=7\nmax_depth=3").unwrap();
+        let opts = LKOptions::from_toml(&t).unwrap();
+        assert_eq!(opts.heuristic.epochs, 50);
+        assert_eq!(opts.heuristic.n_nearest, 7);
+        assert_eq!(opts.max_depth, 3);
+    }
+
+    #[test]
+    fn lk_options_from_cli_parses_max_depth() {
+        use clap::{Arg, ArgAction, Command};
+        let cmd = Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(Arg::new("platoo_epochs").long("platoo_epochs").action(ArgAction::Set))
+            .arg(Arg::new("n_nearest").long("n_nearest").action(ArgAction::Set))
+            .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
+            .arg(Arg::new("max_depth").long("max_depth").action(ArgAction::Set));
+        let args = cmd.get_matches_from(["t", "--max_depth", "3"]);
+        let opts = LKOptions::from_cli(&args).unwrap();
+        assert_eq!(opts.max_depth, 3);
     }
 }
