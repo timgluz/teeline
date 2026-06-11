@@ -107,7 +107,7 @@ fn tour_distance(tour: &[usize], dm: &DistanceMatrix) -> f32 {
     (0..n).map(|i| d(dm, tour[i], tour[(i + 1) % n])).sum()
 }
 
-fn apply_2opt_at(tour: &mut Vec<usize>, pos: &mut Vec<usize>, i: usize, j: usize) {
+fn apply_2opt_at(tour: &mut [usize], pos: &mut [usize], i: usize, j: usize) {
     tour[i..=j].reverse();
     for rank in i..=j {
         pos[tour[rank]] = rank;
@@ -164,20 +164,15 @@ fn find_2opt_lk(
 }
 
 fn lk_pass(
-    tour: &mut Vec<usize>,
-    pos: &mut Vec<usize>,
+    tour: &mut [usize],
+    pos: &mut [usize],
     candidates: &[Vec<usize>],
     dm: &DistanceMatrix,
 ) -> bool {
     let mut improved = false;
-    loop {
-        match find_2opt_lk(tour, pos, candidates, dm) {
-            Some((i, j)) => {
-                apply_2opt_at(tour, pos, i, j);
-                improved = true;
-            }
-            None => break,
-        }
+    while let Some((i, j)) = find_2opt_lk(tour, pos, candidates, dm) {
+        apply_2opt_at(tour, pos, i, j);
+        improved = true;
     }
     improved
 }
