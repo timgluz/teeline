@@ -44,6 +44,7 @@ representative, not as a guarantee.
 | **Flower Pollination (FPA)** | `--epochs=10000 --n_nearest=50` | 8 950.21 | +18.6 % | 1.13 s | 99 % | 7.2 MB |
 | **Lin-Kernighan (ILS)** | default (`--epochs=100 --n_nearest=5`) | 8 146.28 | +8.0 % | 0.02 s | 82 % | 6.5 MB |
 | **Lin-Kernighan (ILS)** | `--epochs=1000 --n_nearest=10` | 8 128.86 | +7.7 % | 0.03 s | 85 % | 6.4 MB |
+| **Or-opt** | default (NN seed, best-improvement) | 8 097.48 | +7.3 % | 0.03 s | 93 % | 6.6 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 
@@ -75,8 +76,9 @@ Gap from optimal
   3%  3-opt (0.3 s)              ← best overall
   4%  CS (0.72 s)
   7%  SA (0.34 s)
+  7%  Or-opt (0.03 s)            ← best value for time in local search
   8%  GA/10k (3.2 s)  ← high variance; see note
- 11%  Stochastic Hill/10k (0.02 s)  ← best value for time
+ 11%  Stochastic Hill/10k (0.02 s)
  15%  PSO/50p (1.42 s)
  17%  PSO/default (0.84 s)
  18%  FPA/default (0.53 s)
@@ -120,6 +122,12 @@ generations to build good crossover material regardless of seeding quality.
 **Stochastic Hill** at 10 000 epochs is the best "instant" solver: 11 % gap in 20 ms. Oddly,
 more epochs hurts here (22 % at 100 000) because restarts can scatter away from a good local
 optimum already found.
+
+**Or-opt** achieves +7.3 % in 0.03 s — tying SA quality at a fraction of the cost — by relocating
+segments of 1–3 cities rather than reversing segments like 2-opt does. Because the two methods
+explore different neighbourhoods, they find different local optima: Or-opt beats 2-opt on this
+instance (7.3 % vs 24.2 %) with the same NN seed. Combining them via `pipeline(nn, 2opt, or_opt)`
+gives deeper local optima than either alone, at the cost of running both passes.
 
 **Nearest Neighbour** and **2-opt** complete in ≤ 10 ms and are useful as fast constructors
 whose output can seed another solver. All stochastic solvers are expected to beat NN quality (+19 %)
