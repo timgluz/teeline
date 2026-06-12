@@ -341,11 +341,12 @@ fn run_compare(
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 15, "expected 15 solvers");
+    assert_eq!(algorithms.len(), 16, "expected 16 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "nn", "2opt", "3opt", "sa", "ga", "pso", "cs", "fpa",
         "tabu_search", "stochastic_hill", "shuffle", "bhk", "branch_bound", "lk", "or_opt",
+        "christofides",
     ] {
         assert!(ids.contains(expected_id), "missing algorithm id: {}", expected_id);
     }

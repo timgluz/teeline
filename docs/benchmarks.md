@@ -45,6 +45,7 @@ representative, not as a guarantee.
 | **Lin-Kernighan (ILS)** | default (`--epochs=100 --n_nearest=5`) | 8 146.28 | +8.0 % | 0.02 s | 82 % | 6.5 MB |
 | **Lin-Kernighan (ILS)** | `--epochs=1000 --n_nearest=10` | 8 128.86 | +7.7 % | 0.03 s | 85 % | 6.4 MB |
 | **Or-opt** | default (NN seed, best-improvement) | 8 097.48 | +7.3 % | 0.03 s | 93 % | 6.6 MB |
+| **Christofides** | default (MST + greedy matching) | 8 707.66 | +15.4 % | < 0.01 s | 50 % | 6.5 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 
@@ -77,6 +78,7 @@ Gap from optimal
   4%  CS (0.72 s)
   7%  SA (0.34 s)
   7%  Or-opt (0.03 s)            ← best value for time in local search
+ 15%  Christofides (<0.01 s)    ← only solver with a proven ≤1.5× bound
   8%  GA/10k (3.2 s)  ← high variance; see note
  11%  Stochastic Hill/10k (0.02 s)
  15%  PSO/50p (1.42 s)
@@ -122,6 +124,8 @@ generations to build good crossover material regardless of seeding quality.
 **Stochastic Hill** at 10 000 epochs is the best "instant" solver: 11 % gap in 20 ms. Oddly,
 more epochs hurts here (22 % at 100 000) because restarts can scatter away from a good local
 optimum already found.
+
+**Christofides** achieves +15.4 % in under 10 ms — slower than Or-opt in quality, but uniquely valuable: it is the **only solver with a proven ≤1.5× approximation guarantee** on EUC_2D instances. Its deterministic construction also makes it the best warm-start for Lin-Kernighan: `pipeline(christofides, lk)` reaches 8156 (+8.1 %), tighter than either solver alone, in about 40 ms.
 
 **Or-opt** achieves +7.3 % in 0.03 s — tying SA quality at a fraction of the cost — by relocating
 segments of 1–3 cities rather than reversing segments like 2-opt does. Because the two methods
