@@ -1384,6 +1384,7 @@ mod tests {
         assert!(Solvers::TwoOpt.auto_expand_with_nn());
         assert!(Solvers::ThreeOpt.auto_expand_with_nn());
         assert!(Solvers::TabuSearch.auto_expand_with_nn());
+        assert!(Solvers::OrOpt.auto_expand_with_nn());
     }
 
     #[test]

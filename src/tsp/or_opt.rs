@@ -41,9 +41,11 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
     }
 
-    while let Some((delta, i, j, seg_len, reversed)) = find_best_move(&path, distances) {
+    while let Some(best) = find_best_move(&path, distances) {
+        let (_, i, j, seg_len, reversed) = best;
+
         #[cfg(debug_assertions)]
-        let old_len = distances.tour_length(&path);
+        let (old_len, expected_delta) = (distances.tour_length(&path), best.0);
 
         apply_relocation(&mut path, i, seg_len, j, reversed);
 
@@ -51,8 +53,8 @@ pub fn solve(
         {
             let new_len = distances.tour_length(&path);
             debug_assert!(
-                (new_len - (old_len + delta)).abs() < 1.0,
-                "or-opt delta mismatch: expected Δ={delta:.3}, got {:.3} (old={old_len:.3} new={new_len:.3})",
+                (new_len - (old_len + expected_delta)).abs() < 1.0,
+                "or-opt delta mismatch: expected Δ={expected_delta:.3}, got {:.3} (old={old_len:.3} new={new_len:.3})",
                 new_len - old_len
             );
         }
@@ -90,16 +92,16 @@ fn find_best_move(
         }
 
         for i in 0..n {
-            // Skip segments that wrap the array boundary; they would require
-            // special index arithmetic and are already covered when the same
-            // cities appear at earlier positions in other iterations.
+            // Segments that wrap the array boundary are not considered (at most
+            // one Or-2 and two Or-3 wrap-around cases per pass). Their exclusion
+            // has negligible impact on quality in practice.
             if i + seg_len > n {
                 continue;
             }
 
             let prev = if i == 0 { n - 1 } else { i - 1 };
-            let after_seg = i + seg_len; // always < n here (no wrap)
-            let after_seg = if after_seg == n { 0 } else { after_seg };
+            // after_seg may equal n for the last non-wrapping segment; wrap to 0.
+            let after_seg = (i + seg_len) % n;
 
             let a = path[prev];
             let first_seg = path[i];
