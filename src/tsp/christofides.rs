@@ -6,21 +6,9 @@ use super::{HeuristicOptions, Solution, TspProblem};
 
 /// Christofides approximation algorithm for the metric TSP.
 ///
-/// Produces a tour guaranteed to be within **1.5× the optimal length** when the
-/// distance matrix satisfies the triangle inequality (EUC_2D instances do; arbitrary
-/// FULL_MATRIX instances may not — the algorithm still produces a valid tour, but the
-/// bound no longer applies).
-///
-/// The six steps of the algorithm:
-/// 1. Build a minimum spanning tree (Prim's, O(n²)).
-/// 2. Find all odd-degree vertices in the MST (handshaking lemma: always an even count).
-/// 3. Compute a minimum-weight perfect matching on the odd-degree set (greedy approximation).
-/// 4. Form a multigraph: MST edges ∪ matching edges.
-/// 5. Find an Eulerian circuit in the multigraph (Hierholzer's algorithm).
-/// 6. Shortcut repeated cities to obtain a Hamiltonian tour.
-///
-/// All intermediate work uses **position indices** (0..n into `problem.cities`);
-/// city IDs are only materialised in the final output step.
+/// Guarantees a tour within **1.5× the optimal length** when the distance matrix satisfies
+/// the triangle inequality (EUC_2D). All intermediate work uses position indices (0..n);
+/// city IDs are only materialised in the final step. See `docs/algorithms/christofides.md`.
 pub fn solve(
     problem: &TspProblem,
     _opts: &HeuristicOptions,
