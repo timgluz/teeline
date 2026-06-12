@@ -1,5 +1,6 @@
 pub mod bellman_karp;
 pub mod branch_bound;
+pub mod christofides;
 pub mod comparison;
 pub use comparison::{compare_tours, tour_cost, ComparisonStats};
 pub mod convert;
@@ -40,6 +41,7 @@ use std::str::FromStr;
 pub enum Solvers {
     BellmanKarp,
     BranchBound,
+    Christofides,
     CuckooSearch,
     FlowerPollination,
     LinKernighan,
@@ -62,6 +64,8 @@ impl Solvers {
             "bellman_karp",
             "bhk",
             "branch_bound",
+            "christofides",
+            "chr",
             "cs",
             "cuckoo_search",
             "fpa",
@@ -184,6 +188,10 @@ impl Solvers {
         &[
             SolverMeta { name: "bellman_karp", alias: Some("bhk"), kind: SolverKind::Exact },
             SolverMeta { name: "branch_bound", alias: None, kind: SolverKind::Exact },
+            // SolverKind::Heuristic is the CLI-facing kind; the WASM-facing SolverInfo uses
+            // category: "Approximation" to expose the distinction to the UI. The two registries
+            // serve different audiences and intentionally diverge here.
+            SolverMeta { name: "christofides", alias: Some("chr"), kind: SolverKind::Heuristic },
             SolverMeta { name: "nearest_neighbor", alias: Some("nn"), kind: SolverKind::Heuristic },
             SolverMeta { name: "two_opt", alias: Some("2opt"), kind: SolverKind::Heuristic },
             SolverMeta { name: "three_opt", alias: Some("3opt"), kind: SolverKind::Heuristic },
@@ -239,13 +247,16 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 15] = [
+static SOLVER_LIST: [SolverInfo; 16] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
     SolverInfo { name: "Branch & Bound",        alias: "branch_bound",    category: "Exact",
                  desc: "Exact branch-and-bound with lower-bound pruning.",
                  complexity: "O(n!)", has_options: false, exact: true },
+    SolverInfo { name: "Christofides",          alias: "christofides",    category: "Approximation",
+                 desc: "\u{2264}1.5\u{00d7} approximation via MST + greedy matching + Eulerian shortcut (EUC_2D only).",
+                 complexity: "O(n\u{00b2})", has_options: false, exact: false },
     SolverInfo { name: "Nearest Neighbor",      alias: "nn",              category: "Constructive",
                  desc: "Greedy heuristic: always visit the nearest unvisited city.",
                  complexity: "O(n\u{00b2})", has_options: false, exact: false },
@@ -298,6 +309,7 @@ impl FromStr for Solvers {
         match s {
             "bhk" | "bellman_karp" => Ok(Solvers::BellmanKarp),
             "branch_bound" => Ok(Solvers::BranchBound),
+            "christofides" | "chr" => Ok(Solvers::Christofides),
             "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
             "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
@@ -959,6 +971,7 @@ pub fn solve_with_context(
     let solution = match solver {
         Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour),
         Solvers::BranchBound => branch_bound::solve(problem, &h, tx, init_tour),
+        Solvers::Christofides => christofides::solve(problem, &h, tx, init_tour),
         Solvers::CuckooSearch => {
             let cs = opts.cs.as_ref().cloned().unwrap_or_default();
             cuckoo_search::solve(problem, &cs, tx, init_tour)

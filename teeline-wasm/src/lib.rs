@@ -87,6 +87,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "stochastic_hill" => "Simple baseline; fast on small datasets",
         "tabu_search"     => "Avoids cycling; good for medium-sized datasets",
         "shuffle"         => "Baseline only; never produces good tours on its own",
+        "christofides"    => "Only solver with a proven \u{2264}1.5\u{00d7} bound; ideal warm-start for pipeline(christofides,lk)",
         _                 => info.category,
     }
     .to_string()
@@ -95,7 +96,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
 fn kind_for(solver: Solvers) -> String {
     match solver {
         Solvers::BellmanKarp | Solvers::BranchBound       => "exact",
-        Solvers::NearestNeighbor                           => "constructive",
+        Solvers::NearestNeighbor | Solvers::Christofides   => "constructive",
         Solvers::TwoOpt | Solvers::ThreeOpt                => "local-search",
         Solvers::RandomShuffle                             => "utility",
         _                                                  => "metaheuristic",

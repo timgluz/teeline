@@ -341,11 +341,12 @@ fn run_compare(
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 15, "expected 15 solvers");
+    assert_eq!(algorithms.len(), 16, "expected 16 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "nn", "2opt", "3opt", "sa", "ga", "pso", "cs", "fpa",
         "tabu_search", "stochastic_hill", "shuffle", "bhk", "branch_bound", "lk", "or_opt",
+        "christofides",
     ] {
         assert!(ids.contains(expected_id), "missing algorithm id: {}", expected_id);
     }
@@ -567,6 +568,26 @@ fn test_list_algorithms_all_param_keys_are_valid_solve_options_fields() {
             );
         }
     }
+}
+
+#[test]
+fn test_list_algorithms_christofides_kind_and_recommendation() {
+    let algorithms = run_list_algorithms();
+    let chr = algorithms.iter().find(|a| a.id == "christofides").expect("christofides missing");
+    assert_eq!(chr.kind, "constructive", "christofides must be 'constructive'");
+    assert!(
+        chr.params.is_empty(),
+        "christofides must have no configurable params"
+    );
+    assert!(
+        chr.recommendation.len() > 20,
+        "christofides recommendation must be a real description, not a bare category name; got: '{}'",
+        chr.recommendation
+    );
+    assert_ne!(
+        chr.recommendation, "Approximation",
+        "recommendation must not be the bare category name"
+    );
 }
 
 #[test]
