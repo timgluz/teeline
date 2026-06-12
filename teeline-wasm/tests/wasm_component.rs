@@ -571,6 +571,26 @@ fn test_list_algorithms_all_param_keys_are_valid_solve_options_fields() {
 }
 
 #[test]
+fn test_list_algorithms_christofides_kind_and_recommendation() {
+    let algorithms = run_list_algorithms();
+    let chr = algorithms.iter().find(|a| a.id == "christofides").expect("christofides missing");
+    assert_eq!(chr.kind, "constructive", "christofides must be 'constructive'");
+    assert!(
+        chr.params.is_empty(),
+        "christofides must have no configurable params"
+    );
+    assert!(
+        chr.recommendation.len() > 20,
+        "christofides recommendation must be a real description, not a bare category name; got: '{}'",
+        chr.recommendation
+    );
+    assert_ne!(
+        chr.recommendation, "Approximation",
+        "recommendation must not be the bare category name"
+    );
+}
+
+#[test]
 fn test_list_algorithms_ga_params() {
     let algorithms = run_list_algorithms();
     let ga = algorithms.iter().find(|a| a.id == "ga").expect("ga missing");

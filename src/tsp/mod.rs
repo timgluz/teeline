@@ -188,6 +188,9 @@ impl Solvers {
         &[
             SolverMeta { name: "bellman_karp", alias: Some("bhk"), kind: SolverKind::Exact },
             SolverMeta { name: "branch_bound", alias: None, kind: SolverKind::Exact },
+            // SolverKind::Heuristic is the CLI-facing kind; the WASM-facing SolverInfo uses
+            // category: "Approximation" to expose the distinction to the UI. The two registries
+            // serve different audiences and intentionally diverge here.
             SolverMeta { name: "christofides", alias: Some("chr"), kind: SolverKind::Heuristic },
             SolverMeta { name: "nearest_neighbor", alias: Some("nn"), kind: SolverKind::Heuristic },
             SolverMeta { name: "two_opt", alias: Some("2opt"), kind: SolverKind::Heuristic },

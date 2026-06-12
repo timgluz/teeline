@@ -3,7 +3,6 @@ use std::sync::mpsc;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
-use crate::tsp::kdtree::KDPoint;
 
 /// Christofides approximation algorithm for the metric TSP.
 ///
@@ -43,7 +42,7 @@ pub fn solve(
     }
 
     // Step 1: Minimum Spanning Tree via Prim's.
-    let mst_edges = prim_mst(n, cities, distances);
+    let mst_edges = prim_mst(n, distances);
 
     // Emit a placeholder progress update so the viz window doesn't appear frozen.
     if let Some(tx) = progress_tx {
@@ -56,7 +55,7 @@ pub fn solve(
     debug_assert!(odd.len().is_multiple_of(2), "handshaking lemma: odd-degree count must be even");
 
     // Step 3: Greedy minimum-weight perfect matching on odd-degree nodes.
-    let matching = greedy_matching(&odd, cities, distances, n);
+    let matching = greedy_matching(&odd, distances, n);
 
     // Step 4: Build multigraph (MST edges ∪ matching edges).
     let mut adj = build_multigraph(n, &mst_edges, &matching);
@@ -82,7 +81,7 @@ pub fn solve(
 // ---------------------------------------------------------------------------
 
 /// Returns MST edges as `(pos_a, pos_b)` position-index pairs.
-fn prim_mst(n: usize, cities: &[KDPoint], distances: &super::distance_matrix::DistanceMatrix) -> Vec<(usize, usize)> {
+fn prim_mst(n: usize, distances: &super::distance_matrix::DistanceMatrix) -> Vec<(usize, usize)> {
     let mut in_mst = vec![false; n];
     let mut key = vec![f32::MAX; n];   // minimum edge weight to bring each vertex into the tree
     let mut parent = vec![usize::MAX; n];
@@ -106,7 +105,7 @@ fn prim_mst(n: usize, cities: &[KDPoint], distances: &super::distance_matrix::Di
         for v in 0..n {
             if !in_mst[v] {
                 let d = distances
-                    .distance_between(cities[u].id, cities[v].id)
+                    .distance_by_pos(u, v)
                     .expect("city IDs are valid — distance matrix was built from the same cities");
                 if d < key[v] {
                     key[v] = d;
@@ -143,7 +142,6 @@ fn odd_degree_nodes(mst_edges: &[(usize, usize)], n: usize) -> Vec<usize> {
 /// sized to `n` even though only `odd.len()` positions are relevant.
 fn greedy_matching(
     odd: &[usize],
-    cities: &[KDPoint],
     distances: &super::distance_matrix::DistanceMatrix,
     n: usize,
 ) -> Vec<(usize, usize)> {
@@ -152,7 +150,7 @@ fn greedy_matching(
     for i in 0..k {
         for j in i + 1..k {
             let d = distances
-                .distance_between(cities[odd[i]].id, cities[odd[j]].id)
+                .distance_by_pos(odd[i], odd[j])
                 .expect("city IDs are valid");
             pairs.push((d, odd[i], odd[j]));
         }
@@ -198,6 +196,9 @@ fn build_multigraph(
 ///
 /// Correctness relies on the multigraph being connected and all vertices having
 /// even degree — both guaranteed by the Christofides construction.
+///
+/// `start` must be non-isolated (degree ≥ 1). This is guaranteed by the n≥4
+/// guard in `solve()` and the connected MST.
 fn hierholzer(adj: &mut [Vec<usize>], start: usize) -> Vec<usize> {
     let mut stack = vec![start];
     let mut circuit = Vec::new();
@@ -268,7 +269,7 @@ mod tests {
     fn prim_mst_has_n_minus_1_edges() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.]]);
         let n = problem.cities.len();
-        let edges = prim_mst(n, &problem.cities, &problem.distances);
+        let edges = prim_mst(n, &problem.distances);
         assert_eq!(edges.len(), n - 1, "MST must have exactly n-1 edges");
         // All positions reachable
         let mut reachable = vec![false; n];
@@ -286,15 +287,10 @@ mod tests {
         // Optimal MST is the chain itself; weight = 4.0.
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.], [4., 0.]]);
         let n = problem.cities.len();
-        let edges = prim_mst(n, &problem.cities, &problem.distances);
+        let edges = prim_mst(n, &problem.distances);
         let weight: f32 = edges
             .iter()
-            .map(|&(u, v)| {
-                problem
-                    .distances
-                    .distance_between(problem.cities[u].id, problem.cities[v].id)
-                    .unwrap()
-            })
+            .map(|&(u, v)| problem.distances.distance_by_pos(u, v).unwrap())
             .sum();
         assert!((weight - 4.0).abs() < 1e-3, "chain MST weight must be 4.0, got {weight}");
     }
@@ -305,9 +301,7 @@ mod tests {
 
     #[test]
     fn odd_degree_count_is_even() {
-        // Star at position 1 + one more branch: degrees are 1,3,1,1,1 → odd: {0,1,2,3,4} = 5? No.
-        // Let's use a known MST: (0-1), (1-2), (1-3) → degrees: 0→1, 1→3, 2→1, 3→1.
-        // Odd: {0,1,2,3} → count = 4, even. ✓
+        // MST: (0-1), (1-2), (1-3) → degrees: 0→1, 1→3, 2→1, 3→1 → odd: {0,1,2,3} = 4, even.
         let mst = vec![(0, 1), (1, 2), (1, 3)];
         let odd = odd_degree_nodes(&mst, 4);
         assert_eq!(odd.len() % 2, 0, "odd-degree count must be even (handshaking lemma)");
@@ -329,13 +323,13 @@ mod tests {
 
     #[test]
     fn greedy_matching_covers_all_odd_nodes() {
-        // 5-node star+chain: MST has odd nodes {0,1,3,4} (see planning notes)
+        // 5-node layout; verify each odd-degree node appears exactly once in the matching.
         let problem =
             make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
-        let mst = prim_mst(n, &problem.cities, &problem.distances);
+        let mst = prim_mst(n, &problem.distances);
         let odd = odd_degree_nodes(&mst, n);
-        let matching = greedy_matching(&odd, &problem.cities, &problem.distances, n);
+        let matching = greedy_matching(&odd, &problem.distances, n);
 
         // Each odd-degree position must appear exactly once in the matching.
         let mut count = vec![0u32; n];
@@ -357,9 +351,9 @@ mod tests {
         let problem =
             make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
-        let mst = prim_mst(n, &problem.cities, &problem.distances);
+        let mst = prim_mst(n, &problem.distances);
         let odd = odd_degree_nodes(&mst, n);
-        let matching = greedy_matching(&odd, &problem.cities, &problem.distances, n);
+        let matching = greedy_matching(&odd, &problem.distances, n);
         let total_edges = mst.len() + matching.len();
         let mut adj = build_multigraph(n, &mst, &matching);
         let circuit = hierholzer(&mut adj, 0);

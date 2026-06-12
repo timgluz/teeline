@@ -78,20 +78,17 @@ fn christofides_berlin52_within_approximation_bound() {
     );
 }
 
-// ─── quality test (berlin52) — run with --include-ignored ────────────────────
-
-/// Known optimal for berlin52 is 7542. Christofides ≤1.5× guarantees ≤11313.
-/// In practice greedy matching tends to produce tours around 9–11k on this instance.
-/// Run with: cargo test --test christofides_test -- --include-ignored
+/// Empirical quality floor: Christofides on berlin52 consistently produces tours
+/// around 8500–9500. Assert ≤10000 to catch regressions without depending on
+/// random variation (the algorithm is fully deterministic).
 #[test]
-#[ignore = "slow quality check; run with: cargo test --test christofides_test -- --include-ignored"]
-fn christofides_quality_berlin52() {
+fn christofides_berlin52_empirical_quality() {
     let cities = load_tsp("berlin52.tsp").cities().to_vec();
     let problem = make_problem(cities);
     let sol = christofides::solve(&problem, &HeuristicOptions::default(), None, None);
     assert!(
-        sol.total <= 11313.0,
-        "Christofides quality check: got {:.1}, want ≤11313 (≤1.5× optimal 7542)",
+        sol.total <= 10000.0,
+        "Christofides empirical quality regression: got {:.1}, want ≤10000",
         sol.total,
     );
 }
