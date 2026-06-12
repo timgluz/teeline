@@ -11,6 +11,7 @@ pub mod genetic_algorithm;
 pub mod kdtree;
 pub mod nearest_neighbor;
 pub mod opt_tour;
+pub mod or_opt;
 pub mod particle_swarm;
 pub mod pipeline;
 pub mod probability;
@@ -44,6 +45,7 @@ pub enum Solvers {
     LinKernighan,
     NearestNeighbor,
     GeneticAlgorithm,
+    OrOpt,
     ParticleSwarmOptimization,
     RandomShuffle,
     SimulatedAnnealing,
@@ -80,6 +82,8 @@ impl Solvers {
             "tabu_search",
             "three_opt",
             "3opt",
+            "or_opt",
+            "or-opt",
             "two_opt",
             "2opt",
             "classic",
@@ -100,6 +104,7 @@ impl Solvers {
                 | Solvers::TabuSearch
                 | Solvers::BranchBound
                 | Solvers::LinKernighan
+                | Solvers::OrOpt
         )
     }
 
@@ -209,6 +214,7 @@ impl Solvers {
                 alias: Some("lk"),
                 kind: SolverKind::Heuristic,
             },
+            SolverMeta { name: "or_opt", alias: Some("or-opt"), kind: SolverKind::Heuristic },
             SolverMeta { name: "stochastic_hill", alias: None, kind: SolverKind::Heuristic },
             SolverMeta {
                 name: "random_shuffle",
@@ -233,7 +239,7 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 14] = [
+static SOLVER_LIST: [SolverInfo; 15] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
@@ -267,6 +273,9 @@ static SOLVER_LIST: [SolverInfo; 14] = [
     SolverInfo { name: "Lin-Kernighan",         alias: "lk",              category: "Local Search",
                  desc: "Lin-Kernighan style ILS: 2-opt with candidate lists + double-bridge kicks.",
                  complexity: "O(epochs \u{00b7} n\u{00b2})", has_options: true, exact: false },
+    SolverInfo { name: "Or-opt",                alias: "or_opt",          category: "Local Search",
+                 desc: "Relocates segments of 1\u{2013}3 cities to better positions (best-improvement).",
+                 complexity: "O(n\u{00b2}) / pass", has_options: false, exact: false },
     SolverInfo { name: "Stochastic Hill Climb", alias: "stochastic_hill", category: "Metaheuristic",
                  desc: "Random-restart hill climbing to escape local optima.",
                  complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
@@ -299,6 +308,7 @@ impl FromStr for Solvers {
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),
+            "or_opt" | "or-opt" => Ok(Solvers::OrOpt),
             "3opt" | "three_opt" => Ok(Solvers::ThreeOpt),
             "2opt" | "two_opt" => Ok(Solvers::TwoOpt),
             // Presets are handled at the CLI layer (main.rs::resolve_preset), not here.
@@ -974,6 +984,7 @@ pub fn solve_with_context(
         }
         Solvers::StochasticHill => stochastic_hill::solve(problem, &h, tx, init_tour),
         Solvers::TabuSearch => tabu_search::solve(problem, &h, tx, init_tour),
+        Solvers::OrOpt => or_opt::solve(problem, &h, tx, init_tour),
         Solvers::ThreeOpt => three_opt::solve(problem, &h, tx, init_tour),
         Solvers::TwoOpt => two_opt::solve(problem, &h, tx, init_tour),
         Solvers::Unspecified => return Err("solver not specified".to_string()),
@@ -1373,6 +1384,7 @@ mod tests {
         assert!(Solvers::TwoOpt.auto_expand_with_nn());
         assert!(Solvers::ThreeOpt.auto_expand_with_nn());
         assert!(Solvers::TabuSearch.auto_expand_with_nn());
+        assert!(Solvers::OrOpt.auto_expand_with_nn());
     }
 
     #[test]
