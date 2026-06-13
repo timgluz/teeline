@@ -7,6 +7,7 @@ pub mod convert;
 pub mod cuckoo_search;
 pub mod distance_matrix;
 pub mod flower_pollination;
+pub mod fourier;
 pub mod lin_kernighan;
 pub mod genetic_algorithm;
 pub mod gravitational_search;
@@ -45,6 +46,7 @@ pub enum Solvers {
     Christofides,
     CuckooSearch,
     FlowerPollination,
+    Fourier,
     LinKernighan,
     NearestNeighbor,
     GeneticAlgorithm,
@@ -72,6 +74,7 @@ impl Solvers {
             "cuckoo_search",
             "fpa",
             "flower_pollination",
+            "fourier",
             "lk",
             "lin_kernighan",
             "nearest_neighbor",
@@ -129,6 +132,7 @@ impl Solvers {
                 | Solvers::ParticleSwarmOptimization
                 | Solvers::CuckooSearch
                 | Solvers::FlowerPollination
+                | Solvers::Fourier
         )
     }
 }
@@ -227,6 +231,7 @@ impl Solvers {
                 alias: Some("fpa"),
                 kind: SolverKind::Heuristic,
             },
+            SolverMeta { name: "fourier", alias: Some("fourier"), kind: SolverKind::Heuristic },
             SolverMeta {
                 name: "lin_kernighan",
                 alias: Some("lk"),
@@ -257,7 +262,7 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 17] = [
+static SOLVER_LIST: [SolverInfo; 18] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
@@ -267,6 +272,9 @@ static SOLVER_LIST: [SolverInfo; 17] = [
     SolverInfo { name: "Christofides",          alias: "christofides",    category: "Approximation",
                  desc: "\u{2264}1.5\u{00d7} approximation via MST + greedy matching + Eulerian shortcut (EUC_2D only).",
                  complexity: "O(n\u{00b2})", has_options: false, exact: false },
+    SolverInfo { name: "Fourier",               alias: "fourier",         category: "Constructive",
+                 desc: "Closed-curve Fourier-basis gradient descent with argsort decode.",
+                 complexity: "O(K\u{00b7}epochs\u{00b7}n\u{00b7}M)", has_options: true, exact: false },
     SolverInfo { name: "Nearest Neighbor",      alias: "nn",              category: "Constructive",
                  desc: "Greedy heuristic: always visit the nearest unvisited city.",
                  complexity: "O(n\u{00b2})", has_options: false, exact: false },
@@ -325,6 +333,7 @@ impl FromStr for Solvers {
             "christofides" | "chr" => Ok(Solvers::Christofides),
             "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
+            "fourier" => Ok(Solvers::Fourier),
             "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
@@ -912,6 +921,112 @@ impl LKOptions {
 }
 
 // ---------------------------------------------------------------------------
+// FourierOptions
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct FourierOptions {
+    pub k_max: usize,       // max Fourier mode, default 4
+    pub m: usize,           // curve sampling resolution, default 200
+    pub lambda: f64,        // initial tension weight, default 0.05
+    pub lambda_decay: f64,  // tension decay multiplier per k_active stage, default 0.5
+    pub lr: f64,            // gradient learning rate, default 0.05
+    pub epochs: usize,      // gradient steps per k_active stage, default 400
+}
+
+impl Default for FourierOptions {
+    fn default() -> Self {
+        FourierOptions {
+            k_max: 4,
+            m: 200,
+            lambda: 0.05,
+            lambda_decay: 0.5,
+            lr: 0.05,
+            epochs: 400,
+        }
+    }
+}
+
+impl FourierOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.k_max == 0 {
+            return Err("k_max must be >= 1".to_string());
+        }
+        if self.m < 2 {
+            return Err("m must be >= 2".to_string());
+        }
+        if self.lambda <= 0.0 {
+            return Err("lambda must be > 0".to_string());
+        }
+        if self.lambda_decay <= 0.0 || self.lambda_decay >= 1.0 {
+            return Err("lambda_decay must be in (0, 1)".to_string());
+        }
+        if self.lr <= 0.0 {
+            return Err("lr must be > 0".to_string());
+        }
+        if self.epochs == 0 {
+            return Err("epochs must be >= 1".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut f = FourierOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "k_max" => {
+                    f.k_max = v.as_integer()
+                        .ok_or_else(|| format!("config: `k_max` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "m" => {
+                    f.m = v.as_integer()
+                        .ok_or_else(|| format!("config: `m` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "lambda" => {
+                    f.lambda = v.as_float()
+                        .or_else(|| v.as_integer().map(|i| i as f64))
+                        .ok_or_else(|| format!("config: `lambda` must be a float, got {v}"))?;
+                }
+                "lambda_decay" => {
+                    f.lambda_decay = v.as_float()
+                        .or_else(|| v.as_integer().map(|i| i as f64))
+                        .ok_or_else(|| format!("config: `lambda_decay` must be a float, got {v}"))?;
+                }
+                "lr" => {
+                    f.lr = v.as_float()
+                        .or_else(|| v.as_integer().map(|i| i as f64))
+                        .ok_or_else(|| format!("config: `lr` must be a float, got {v}"))?;
+                }
+                "epochs" => {
+                    f.epochs = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
+                        as usize;
+                }
+                other => {
+                    return Err(format!(
+                        "config: unknown field `{other}` in [fourier] — valid: k_max, m, lambda, lambda_decay, lr, epochs"
+                    ));
+                }
+            }
+        }
+        f.validate()?;
+        Ok(f)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut f = FourierOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            f.epochs = v.parse::<usize>()
+                .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
+        }
+        f.validate()?;
+        Ok(f)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // AppOptions — pure config shell; no runtime state
 // ---------------------------------------------------------------------------
 
@@ -924,6 +1039,7 @@ pub struct AppOptions {
     pub cs: Option<CSOptions>,
     pub fpa: Option<FPAOptions>,
     pub lk: Option<LKOptions>,
+    pub fourier: Option<FourierOptions>,
     pub heuristic: Option<HeuristicOptions>,
 }
 
@@ -993,6 +1109,10 @@ pub fn solve_with_context(
         Solvers::FlowerPollination => {
             let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
             flower_pollination::solve(problem, &fpa, tx, init_tour)
+        }
+        Solvers::Fourier => {
+            let f = opts.fourier.as_ref().cloned().unwrap_or_default();
+            fourier::solve(problem, &f, tx, init_tour)
         }
         Solvers::LinKernighan => {
             let lk = opts.lk.as_ref().cloned().unwrap_or_default();
@@ -1238,6 +1358,7 @@ mod tests {
             cs: None,
             fpa: None,
             lk: None,
+            fourier: None,
             heuristic: None,
         };
         drop(a);
@@ -1443,6 +1564,7 @@ mod tests {
         assert!(Solvers::ParticleSwarmOptimization.auto_expand_with_shuffle());
         assert!(Solvers::CuckooSearch.auto_expand_with_shuffle());
         assert!(Solvers::FlowerPollination.auto_expand_with_shuffle());
+        assert!(Solvers::Fourier.auto_expand_with_shuffle());
         assert!(Solvers::GravitationalSearch.auto_expand_with_shuffle());
     }
 

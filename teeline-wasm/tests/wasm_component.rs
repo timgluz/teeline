@@ -1,3 +1,4 @@
+use std::sync::OnceLock;
 use wasmtime::component::{Component, Linker};
 use wasmtime::{Config, Engine, Store};
 use wasmtime_wasi::{WasiCtxBuilder, WasiCtxView, WasiView};
@@ -21,61 +22,74 @@ impl WasiView for HostState {
     }
 }
 
-fn make_engine() -> Engine {
-    let mut config = Config::new();
-    config.wasm_component_model(true);
-    Engine::new(&config).unwrap()
+// ── Shared WASM runtime ───────────────────────────────────────────────────────
+//
+// Engine (JIT compiler) and Component (compiled WASM binary) are expensive to
+// create — each one JIT-compiles the full WASM binary. Both are Send + Sync in
+// wasmtime and safe to share across test threads. Linker (WASI bindings table)
+// is cheap but also safe to share.
+//
+// Sharing these three means the binary is compiled exactly once regardless of
+// how many tests run in parallel. Each test then only allocates a fresh Store
+// (cheap) and calls instantiate() (fast — links pre-compiled code).
+
+static ENGINE: OnceLock<Engine> = OnceLock::new();
+static COMPONENT: OnceLock<Component> = OnceLock::new();
+static LINKER: OnceLock<Linker<HostState>> = OnceLock::new();
+
+fn shared_engine() -> &'static Engine {
+    ENGINE.get_or_init(|| {
+        let mut config = Config::new();
+        config.wasm_component_model(true);
+        Engine::new(&config).unwrap()
+    })
 }
 
-fn load_component(engine: &Engine) -> Component {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../target/wasm32-wasip2/debug/teeline_wasm.wasm"
-    );
-    Component::from_file(engine, path).expect(
-        "WASM component not found — run: cd teeline-wasm && cargo component build",
-    )
+fn shared_component() -> &'static Component {
+    COMPONENT.get_or_init(|| {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../target/wasm32-wasip2/debug/teeline_wasm.wasm"
+        );
+        Component::from_file(shared_engine(), path).expect(
+            "WASM component not found — run: cargo component build --manifest-path teeline-wasm/Cargo.toml --target wasm32-wasip2",
+        )
+    })
 }
 
-fn make_store(engine: &Engine) -> Store<HostState> {
+fn shared_linker() -> &'static Linker<HostState> {
+    LINKER.get_or_init(|| {
+        let mut linker: Linker<HostState> = Linker::new(shared_engine());
+        wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
+        linker
+    })
+}
+
+/// Create a fresh (Store, Solver) pair for one test invocation.
+/// Store is cheap to allocate; instantiate() links pre-compiled code (~fast).
+fn make_instance() -> (Store<HostState>, Solver) {
     let wasi = WasiCtxBuilder::new().build();
-    Store::new(
-        engine,
+    let mut store = Store::new(
+        shared_engine(),
         HostState {
             table: wasmtime_wasi::ResourceTable::new(),
             wasi,
         },
-    )
+    );
+    let instance = Solver::instantiate(&mut store, shared_component(), shared_linker()).unwrap();
+    (store, instance)
 }
+
+// ── Test data helpers ─────────────────────────────────────────────────────────
 
 fn five_cities() -> Vec<crate::teeline::solver::types::City> {
     use crate::teeline::solver::types::City;
     vec![
-        City {
-            id: 0,
-            x: 565.0,
-            y: 575.0,
-        },
-        City {
-            id: 1,
-            x: 25.0,
-            y: 185.0,
-        },
-        City {
-            id: 2,
-            x: 345.0,
-            y: 750.0,
-        },
-        City {
-            id: 3,
-            x: 945.0,
-            y: 685.0,
-        },
-        City {
-            id: 4,
-            x: 845.0,
-            y: 655.0,
-        },
+        City { id: 0, x: 565.0, y: 575.0 },
+        City { id: 1, x: 25.0,  y: 185.0 },
+        City { id: 2, x: 345.0, y: 750.0 },
+        City { id: 3, x: 945.0, y: 685.0 },
+        City { id: 4, x: 845.0, y: 655.0 },
     ]
 }
 
@@ -101,13 +115,10 @@ fn assert_valid_tour(solution: &crate::teeline::solver::types::Solution, n_citie
     assert_eq!(sorted.len(), n_cities, "each city must be visited exactly once");
 }
 
+// ── Per-call helpers (use shared runtime) ────────────────────────────────────
+
 fn run_solver(solver_name: &str) {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let (mut store, instance) = make_instance();
     let result = instance
         .call_solve(&mut store, solver_name, &five_cities(), default_options())
         .unwrap();
@@ -115,70 +126,87 @@ fn run_solver(solver_name: &str) {
     assert_valid_tour(&solution, 5);
 }
 
-#[test]
-fn test_sa() {
-    run_solver("sa")
+fn run_parse_and_solve(solver: &str, input: &str) -> crate::teeline::solver::types::Solution {
+    let (mut store, instance) = make_instance();
+    let result = instance
+        .call_parse_and_solve(&mut store, solver, input, default_options())
+        .unwrap();
+    result.unwrap_or_else(|e| panic!("parse_and_solve returned error: {e}"))
 }
-#[test]
-fn test_two_opt() {
-    run_solver("two_opt")
+
+fn run_list_algorithms() -> Vec<crate::teeline::solver::types::AlgorithmInfo> {
+    let (mut store, instance) = make_instance();
+    instance.call_list_algorithms(&mut store).unwrap()
 }
-#[test]
-fn test_nearest_neighbor() {
-    run_solver("nn")
+
+fn run_compare(
+    algorithms: &[&str],
+    input: &str,
+) -> Vec<crate::teeline::solver::types::CompareResult> {
+    let (mut store, instance) = make_instance();
+    let algos: Vec<String> = algorithms.iter().map(|&s| s.to_string()).collect();
+    instance
+        .call_compare(&mut store, &algos, input, default_options())
+        .unwrap()
 }
-#[test]
-fn test_genetic_algorithm() {
-    run_solver("ga")
+
+fn run_parse(input: &str) -> crate::teeline::solver::types::ParsedProblem {
+    let (mut store, instance) = make_instance();
+    instance
+        .call_parse(&mut store, input)
+        .unwrap()
+        .unwrap_or_else(|e| panic!("parse returned error: {e}"))
 }
-#[test]
-fn test_particle_swarm() {
-    run_solver("pso")
+
+fn run_get_version() -> String {
+    let (mut store, instance) = make_instance();
+    instance.call_get_version(&mut store).unwrap()
 }
+
+// ── solve tests ───────────────────────────────────────────────────────────────
+
 #[test]
-fn test_cuckoo_search() {
-    run_solver("cs")
-}
+fn test_sa() { run_solver("sa") }
 #[test]
-fn test_flower_pollination() {
-    run_solver("fpa")
-}
+fn test_two_opt() { run_solver("two_opt") }
 #[test]
-fn test_lin_kernighan() {
-    run_solver("lk")
-}
+fn test_nearest_neighbor() { run_solver("nn") }
 #[test]
-fn test_tabu_search() {
-    run_solver("tabu_search")
-}
+fn test_genetic_algorithm() { run_solver("ga") }
 #[test]
-fn test_stochastic_hill() {
-    run_solver("stochastic_hill")
-}
+fn test_particle_swarm() { run_solver("pso") }
 #[test]
-fn test_bellman_karp() {
-    run_solver("bhk")
-}
+fn test_cuckoo_search() { run_solver("cs") }
 #[test]
-fn test_branch_bound() {
-    run_solver("branch_bound")
-}
+fn test_flower_pollination() { run_solver("fpa") }
+#[test]
+fn test_lin_kernighan() { run_solver("lk") }
+#[test]
+fn test_tabu_search() { run_solver("tabu_search") }
+#[test]
+fn test_stochastic_hill() { run_solver("stochastic_hill") }
+#[test]
+fn test_bellman_karp() { run_solver("bhk") }
+#[test]
+fn test_branch_bound() { run_solver("branch_bound") }
+#[test]
+fn test_three_opt() { run_solver("3opt") }
+#[test]
+fn test_or_opt() { run_solver("or_opt") }
+#[test]
+fn test_shuffle() { run_solver("shuffle") }
+#[test]
+fn test_christofides() { run_solver("christofides") }
+#[test]
+fn test_gravitational_search() { run_solver("gsa") }
+#[test]
+fn test_fourier() { run_solver("fourier") }
 
 #[test]
 fn unknown_solver_returns_err() {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let (mut store, instance) = make_instance();
     let result = instance
-        .call_solve(
-            &mut store,
-            "does_not_exist",
-            &five_cities(),
-            default_options(),
-        )
+        .call_solve(&mut store, "does_not_exist", &five_cities(), default_options())
         .unwrap();
     assert!(
         result.is_err(),
@@ -188,23 +216,6 @@ fn unknown_solver_returns_err() {
 }
 
 // ── parse_and_solve integration tests ─────────────────────────────────────────
-
-fn run_parse_and_solve(solver: &str, input: &str) -> crate::teeline::solver::types::Solution {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
-    let result = instance
-        .call_parse_and_solve(&mut store, solver, input, default_options())
-        .unwrap();
-    result.unwrap_or_else(|e| panic!("parse_and_solve returned error: {e}"))
-}
-
-fn five_cities_json() -> String {
-    r#"[{"id":0,"x":565.0,"y":575.0},{"id":1,"x":25.0,"y":185.0},{"id":2,"x":345.0,"y":750.0},{"id":3,"x":945.0,"y":685.0},{"id":4,"x":845.0,"y":655.0}]"#.to_string()
-}
 
 #[test]
 fn test_parse_and_solve_tsplib_berlin52() {
@@ -232,31 +243,16 @@ fn test_parse_and_solve_json_leading_whitespace() {
 
 #[test]
 fn test_parse_and_solve_one_city_json_returns_err() {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let (mut store, instance) = make_instance();
     let result = instance
-        .call_parse_and_solve(
-            &mut store,
-            "nn",
-            r#"[{"id":0,"x":1.0,"y":2.0}]"#,
-            default_options(),
-        )
+        .call_parse_and_solve(&mut store, "nn", r#"[{"id":0,"x":1.0,"y":2.0}]"#, default_options())
         .unwrap();
     assert!(result.is_err(), "single city must return Err");
 }
 
 #[test]
 fn test_parse_and_solve_bad_solver_returns_err() {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let (mut store, instance) = make_instance();
     let result = instance
         .call_parse_and_solve(&mut store, "bogus", &five_cities_json(), default_options())
         .unwrap();
@@ -265,12 +261,7 @@ fn test_parse_and_solve_bad_solver_returns_err() {
 
 #[test]
 fn test_parse_and_solve_empty_input_returns_err() {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let (mut store, instance) = make_instance();
     let result = instance
         .call_parse_and_solve(&mut store, "nn", "", default_options())
         .unwrap();
@@ -279,12 +270,7 @@ fn test_parse_and_solve_empty_input_returns_err() {
 
 #[test]
 fn test_parse_and_solve_invalid_json_returns_err() {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let (mut store, instance) = make_instance();
     let result = instance
         .call_parse_and_solve(
             &mut store,
@@ -298,6 +284,10 @@ fn test_parse_and_solve_invalid_json_returns_err() {
 
 // ── list_algorithms and compare helpers ───────────────────────────────────────
 
+fn five_cities_json() -> String {
+    r#"[{"id":0,"x":565.0,"y":575.0},{"id":1,"x":25.0,"y":185.0},{"id":2,"x":345.0,"y":750.0},{"id":3,"x":945.0,"y":685.0},{"id":4,"x":845.0,"y":655.0}]"#.to_string()
+}
+
 const FIVE_CITIES_TSPLIB: &str = "NAME: test\n\
 TYPE: TSP\n\
 DIMENSION: 5\n\
@@ -310,43 +300,17 @@ NODE_COORD_SECTION\n\
 5 845.0 655.0\n\
 EOF\n";
 
-fn run_list_algorithms() -> Vec<crate::teeline::solver::types::AlgorithmInfo> {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
-    instance.call_list_algorithms(&mut store).unwrap()
-}
-
-fn run_compare(
-    algorithms: &[&str],
-    input: &str,
-) -> Vec<crate::teeline::solver::types::CompareResult> {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
-    let algos: Vec<String> = algorithms.iter().map(|&s| s.to_string()).collect();
-    instance
-        .call_compare(&mut store, &algos, input, default_options())
-        .unwrap()
-}
-
 // ── list_algorithms tests ─────────────────────────────────────────────────────
 
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 17, "expected 17 solvers");
+    assert_eq!(algorithms.len(), 18, "expected 18 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "nn", "2opt", "3opt", "sa", "ga", "gsa", "pso", "cs", "fpa",
         "tabu_search", "stochastic_hill", "shuffle", "bhk", "branch_bound", "lk", "or_opt",
-        "christofides",
+        "christofides", "fourier",
     ] {
         assert!(ids.contains(expected_id), "missing algorithm id: {}", expected_id);
     }
@@ -414,19 +378,6 @@ fn test_compare_json_input() {
 
 // ── parse integration tests ────────────────────────────────────────────────────
 
-fn run_parse(input: &str) -> crate::teeline::solver::types::ParsedProblem {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
-    instance
-        .call_parse(&mut store, input)
-        .unwrap()
-        .unwrap_or_else(|e| panic!("parse returned error: {e}"))
-}
-
 #[test]
 fn test_parse_tsplib_berlin52() {
     let input = std::fs::read_to_string(concat!(
@@ -463,27 +414,12 @@ fn test_parse_json_5_cities() {
 
 #[test]
 fn test_parse_empty_input_returns_err() {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
+    let (mut store, instance) = make_instance();
     let result = instance.call_parse(&mut store, "").unwrap();
     assert!(result.is_err(), "empty input must return Err");
 }
 
 // ── get-version tests ─────────────────────────────────────────────────────────
-
-fn run_get_version() -> String {
-    let engine = make_engine();
-    let component = load_component(&engine);
-    let mut linker: Linker<HostState> = Linker::new(&engine);
-    wasmtime_wasi::p2::add_to_linker_sync(&mut linker).unwrap();
-    let mut store = make_store(&engine);
-    let instance = Solver::instantiate(&mut store, &component, &linker).unwrap();
-    instance.call_get_version(&mut store).unwrap()
-}
 
 #[test]
 fn test_get_version_returns_non_empty() {
@@ -587,6 +523,21 @@ fn test_list_algorithms_christofides_kind_and_recommendation() {
     assert_ne!(
         chr.recommendation, "Approximation",
         "recommendation must not be the bare category name"
+    );
+}
+
+#[test]
+fn test_list_algorithms_fourier_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let f = algorithms.iter().find(|a| a.id == "fourier").expect("fourier missing");
+    assert_eq!(f.kind, "constructive", "fourier must be 'constructive'");
+    assert_eq!(f.params.len(), 1, "fourier must have exactly 1 param (epochs)");
+    assert_eq!(f.params[0].key, "epochs", "fourier param must be 'epochs'");
+    assert_eq!(f.params[0].value_type, "int", "epochs must be int type");
+    assert!(
+        f.recommendation.len() > 20,
+        "fourier recommendation must be a real description; got: '{}'",
+        f.recommendation
     );
 }
 
