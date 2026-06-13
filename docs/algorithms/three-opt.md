@@ -36,4 +36,4 @@ teeline solve 3opt --no-seed -i ./data/tsplib/berlin52.tsp
 ## References
 
 - [3-opt (Wikipedia)](https://en.wikipedia.org/wiki/3-opt)
-- Lin, S. (1965) — *Computer Solutions of the Traveling Salesman Problem*
+- Lin, S. (1965) — "Computer Solutions of the Traveling Salesman Problem", *Bell System Technical Journal*, 44, 2245–2269

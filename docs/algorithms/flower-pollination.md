@@ -43,5 +43,5 @@ teeline solve fpa -i ./data/tsplib/berlin52.tsp --n_nearest=50 --mutation_probab
 
 ## References
 
-- Yang, X.-S. (2012) — *Flower Pollination Algorithm for Global Optimization*
+- Yang, X.-S. (2012) — "Flower Pollination Algorithm for Global Optimization", in *Unconventional Computation and Natural Computation* (UCNC 2012), LNCS 7445, pp. 240–249, Springer
 - [Flower pollination algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Flower_pollination_algorithm)

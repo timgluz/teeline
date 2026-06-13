@@ -42,4 +42,4 @@ teeline solve sa -i ./data/tsplib/berlin52.tsp --cooling_rate=0.003 --max_temper
 
 - *AIMA*, Section 4.1.2 — Simulated Annealing
 - [Simulated annealing (Wikipedia)](https://en.wikipedia.org/wiki/Simulated_annealing)
-- Kirkpatrick, Gelatt & Vecchi (1983) — *Optimization by Simulated Annealing*
+- Kirkpatrick, S., Gelatt, C. D. & Vecchi, M. P. (1983) — "Optimization by Simulated Annealing", *Science*, 220(4598), 671–680. DOI: 10.1126/science.220.4598.671

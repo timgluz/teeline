@@ -38,5 +38,5 @@ teeline solve pso -i ./data/tsplib/berlin52.tsp --n_nearest=50
 ## References
 
 - [Particle swarm optimisation (Wikipedia)](https://en.wikipedia.org/wiki/Particle_swarm_optimization)
-- Kennedy & Eberhart (1995) — *Particle Swarm Optimization*
-- Clerc, M. (2004) — *Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem*
+- Kennedy, J. & Eberhart, R. (1995) — "Particle Swarm Optimization", *Proc. IEEE ICNN'95*, Vol. 4, pp. 1942–1948. DOI: 10.1109/ICNN.1995.488968
+- Clerc, M. (2004) — "Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem", in *New Optimization Techniques in Engineering*, Springer, pp. 219–239

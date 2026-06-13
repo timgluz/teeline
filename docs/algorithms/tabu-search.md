@@ -29,4 +29,4 @@ teeline solve tabu_search -i ./data/tsplib/berlin52.tsp --epochs=500
 
 - [Tabu search (Wikipedia)](https://en.wikipedia.org/wiki/Tabu_search)
 - *Heuristic Search*, Chapter 14.4
-- Glover, F. (1989) — *Tabu Search — Part I*
+- Glover, F. (1989) — "Tabu Search — Part I", *ORSA Journal on Computing*, 1(3), 190–206
