@@ -402,16 +402,30 @@ You can also run these directly from the `teeline-qt/` directory without the `qt
 
 ### Releasing
 
-Releases are automated via [cargo-dist](https://axodotdev.github.io/cargo-dist/). To cut a new release:
+Releases are automated via [cargo-dist](https://axodotdev.github.io/cargo-dist/). Pushing a version tag triggers the `release.yml` workflow which builds native CLI binaries for all five platforms, the WASM component (`teeline-solver.wasm`), and publishes everything to a GitHub Release.
+
+**The `deploy-web` workflow depends on the latest GitHub Release** — it downloads `teeline-solver.wasm` from the release to build teeline-web. Whenever the WASM API changes (new exports, updated solver list), a new release must be cut before the web deploy will succeed.
+
+Steps to cut a release:
 
 ```bash
-# 1. Bump version in teeline-cli/Cargo.toml, commit and push
-# 2. Tag the commit
-git tag v0.2.0
-git push origin v0.2.0
+# 1. Bump version in Cargo.toml (library) and teeline-cli/Cargo.toml — they should match
+#    Edit both files, then:
+cargo check -p teeline-cli   # confirm it compiles
+
+# 2. Commit and push the version bump
+git add Cargo.toml teeline-cli/Cargo.toml Cargo.lock
+git commit -m "chore: bump to vX.Y.Z"
+git push
+
+# 3. Tag and push — this triggers the Release workflow
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
-The `release.yml` workflow triggers, builds native binaries for all five platforms plus the WASM component, and publishes everything to a GitHub Release. You can preview what will be built with:
+The release workflow also publishes the wasip2 WASM component to GHCR (`ghcr.io/timgluz/teeline/wassette`) for the Wassette MCP server.
+
+Preview what will be built without triggering a release:
 
 ```bash
 dist plan
