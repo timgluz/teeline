@@ -13,9 +13,9 @@
 use std::path::Path;
 use teeline::tsp::{
     CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, TspProblem, bellman_karp,
-    branch_bound, cuckoo_search, distance_matrix, flower_pollination, genetic_algorithm, kdtree,
-    nearest_neighbor, particle_swarm, simulated_annealing, stochastic_hill, tabu_search, tsplib,
-    two_opt,
+    branch_bound, cuckoo_search, distance_matrix, flower_pollination, genetic_algorithm,
+    gravitational_search, kdtree, nearest_neighbor, particle_swarm, simulated_annealing,
+    stochastic_hill, tabu_search, tsplib, two_opt,
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -211,6 +211,38 @@ fn particle_swarm_valid_tour_berlin52() {
     assert!(
         is_valid_tour(tour.route(), &cities),
         "PSO tour is not valid on berlin52"
+    );
+}
+
+// ─── gravitational search ─────────────────────────────────────────────────────
+
+#[test]
+fn gravitational_search_valid_tour_berlin52() {
+    let cities = load_berlin52();
+    let tour = gravitational_search::solve(
+        &make_problem(&cities),
+        &stochastic_options(200),
+        None,
+        None,
+    );
+    assert!(
+        is_valid_tour(tour.route(), &cities),
+        "GSA tour is not valid on berlin52"
+    );
+}
+
+#[test]
+fn gravitational_search_valid_tour_small() {
+    let cities = tsp5_cities();
+    let tour = gravitational_search::solve(
+        &make_problem(&cities),
+        &stochastic_options(50),
+        None,
+        None,
+    );
+    assert!(
+        is_valid_tour(tour.route(), &cities),
+        "GSA tour is not valid on 5-city instance"
     );
 }
 

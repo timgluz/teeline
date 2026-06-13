@@ -9,6 +9,7 @@ pub mod distance_matrix;
 pub mod flower_pollination;
 pub mod lin_kernighan;
 pub mod genetic_algorithm;
+pub mod gravitational_search;
 pub mod kdtree;
 pub mod nearest_neighbor;
 pub mod opt_tour;
@@ -47,6 +48,7 @@ pub enum Solvers {
     LinKernighan,
     NearestNeighbor,
     GeneticAlgorithm,
+    GravitationalSearch,
     OrOpt,
     ParticleSwarmOptimization,
     RandomShuffle,
@@ -76,6 +78,8 @@ impl Solvers {
             "nn",
             "genetic_algorithm",
             "ga",
+            "gravitational_search",
+            "gsa",
             "particle_swarm",
             "pso",
             "random_shuffle",
@@ -121,6 +125,7 @@ impl Solvers {
             Solvers::SimulatedAnnealing
                 | Solvers::StochasticHill
                 | Solvers::GeneticAlgorithm
+                | Solvers::GravitationalSearch
                 | Solvers::ParticleSwarmOptimization
                 | Solvers::CuckooSearch
                 | Solvers::FlowerPollination
@@ -205,6 +210,11 @@ impl Solvers {
                 alias: Some("ga"),
                 kind: SolverKind::Heuristic,
             },
+            SolverMeta {
+                name: "gravitational_search",
+                alias: Some("gsa"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta { name: "tabu_search", alias: Some("tabu"), kind: SolverKind::Heuristic },
             SolverMeta {
                 name: "particle_swarm",
@@ -247,7 +257,7 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 16] = [
+static SOLVER_LIST: [SolverInfo; 17] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
@@ -272,6 +282,9 @@ static SOLVER_LIST: [SolverInfo; 16] = [
     SolverInfo { name: "Genetic Algorithm",     alias: "ga",              category: "Metaheuristic",
                  desc: "Evolves a population of tours via crossover and mutation operators.",
                  complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
+    SolverInfo { name: "Gravitational Search",  alias: "gsa",             category: "Metaheuristic",
+                 desc: "Agents (tours) attract each other by mass (fitness); heavier agents pull lighter ones via swap-list velocity.",
+                 complexity: "O(epochs \u{00b7} pop\u{00b2})", has_options: true, exact: false },
     SolverInfo { name: "Particle Swarm",        alias: "pso",             category: "Metaheuristic",
                  desc: "Discrete PSO with velocity-capped particles guided by a global best.",
                  complexity: "O(epochs \u{00b7} swarm \u{00b7} n)", has_options: true, exact: false },
@@ -315,6 +328,7 @@ impl FromStr for Solvers {
             "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
+            "gsa" | "gravitational_search" => Ok(Solvers::GravitationalSearch),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
             "shuffle" | "random_shuffle" => Ok(Solvers::RandomShuffle),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
@@ -989,6 +1003,7 @@ pub fn solve_with_context(
             let ga = opts.ga.as_ref().cloned().unwrap_or_default();
             genetic_algorithm::solve(problem, &ga, tx, init_tour)
         }
+        Solvers::GravitationalSearch => gravitational_search::solve(problem, &h, tx, init_tour),
         Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
         Solvers::RandomShuffle => random_shuffle::solve(problem, &h, tx, init_tour),
         Solvers::SimulatedAnnealing => {
@@ -1428,6 +1443,7 @@ mod tests {
         assert!(Solvers::ParticleSwarmOptimization.auto_expand_with_shuffle());
         assert!(Solvers::CuckooSearch.auto_expand_with_shuffle());
         assert!(Solvers::FlowerPollination.auto_expand_with_shuffle());
+        assert!(Solvers::GravitationalSearch.auto_expand_with_shuffle());
     }
 
     #[test]
