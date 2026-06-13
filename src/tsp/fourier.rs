@@ -1,5 +1,4 @@
 use crate::tsp::{
-    distance_matrix,
     kdtree::KDPoint,
     FourierOptions, Solution, TspProblem,
 };
@@ -14,7 +13,37 @@ pub fn solve(
     _progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _init_tour: Option<&[usize]>,
 ) -> Solution {
-    todo!("fourier solve not yet implemented")
+    let cities = &problem.cities;
+    let n = cities.len();
+    if n < 2 {
+        let tour: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        return Solution::new(&tour, problem);
+    }
+
+    let cities_cx: Vec<Complex<f64>> = cities
+        .iter()
+        .map(|c| Complex::new(c.coords[0] as f64, c.coords[1] as f64))
+        .collect();
+
+    let centroid: Complex<f64> = cities_cx.iter().sum::<Complex<f64>>() / n as f64;
+    let radius = cities_cx.iter().map(|z| (z - centroid).norm()).sum::<f64>() / n as f64;
+
+    let ks = ks_array(opts.k_max);
+    let mut c = init_coefficients(centroid, radius, opts.k_max);
+
+    let basis = compute_basis(&ks, opts.m);
+    let mut lambda = opts.lambda;
+
+    for k_active in 1..=opts.k_max {
+        for _ in 0..opts.epochs {
+            gradient_step(&mut c, &ks, &basis, &cities_cx, lambda, opts.lr, k_active);
+        }
+        lambda *= opts.lambda_decay;
+    }
+
+    let gamma = eval_curve(&c, &ks, opts.m);
+    let tour = decode_tour(&gamma, cities);
+    Solution::new(&tour, problem)
 }
 
 fn ks_array(k_max: usize) -> Vec<i64> {
@@ -67,6 +96,8 @@ fn decode_tour(gamma: &[Complex<f64>], cities: &[KDPoint]) -> Vec<usize> {
 mod tests {
     use super::*;
     use std::f64::consts::PI;
+
+    use crate::tsp::{distance_matrix, TspProblem};
 
     fn circle_cities(n: usize) -> Vec<KDPoint> {
         (0..n)
@@ -149,7 +180,7 @@ mod tests {
 
         // one gradient step with k_active = 1
         let basis = compute_basis(&ks, m);
-        gradient_step(&mut c, &ks, &basis, m, &cities, lambda, lr, 1);
+        gradient_step(&mut c, &ks, &basis, &cities, lambda, lr, 1);
 
         let energy_after = compute_energy(&c, &ks, m, &cities, lambda);
         assert!(
@@ -218,12 +249,12 @@ fn gradient_step(
     c: &mut [Complex<f64>],
     ks: &[i64],
     basis: &[Vec<Complex<f64>>],
-    m: usize,
     cities: &[Complex<f64>],
     lambda: f64,
     lr: f64,
     k_active: usize,
 ) {
+    let m = basis.first().map_or(0, |b| b.len());
     let gamma = eval_curve(c, ks, m);
     let n = cities.len() as f64;
     let mut grad = vec![Complex::new(0.0, 0.0); c.len()];

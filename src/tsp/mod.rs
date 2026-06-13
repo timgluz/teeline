@@ -46,6 +46,7 @@ pub enum Solvers {
     Christofides,
     CuckooSearch,
     FlowerPollination,
+    Fourier,
     LinKernighan,
     NearestNeighbor,
     GeneticAlgorithm,
@@ -73,6 +74,7 @@ impl Solvers {
             "cuckoo_search",
             "fpa",
             "flower_pollination",
+            "fourier",
             "lk",
             "lin_kernighan",
             "nearest_neighbor",
@@ -130,6 +132,7 @@ impl Solvers {
                 | Solvers::ParticleSwarmOptimization
                 | Solvers::CuckooSearch
                 | Solvers::FlowerPollination
+                | Solvers::Fourier
         )
     }
 }
@@ -228,6 +231,7 @@ impl Solvers {
                 alias: Some("fpa"),
                 kind: SolverKind::Heuristic,
             },
+            SolverMeta { name: "fourier", alias: Some("fourier"), kind: SolverKind::Heuristic },
             SolverMeta {
                 name: "lin_kernighan",
                 alias: Some("lk"),
@@ -258,7 +262,7 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 17] = [
+static SOLVER_LIST: [SolverInfo; 18] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
@@ -268,6 +272,9 @@ static SOLVER_LIST: [SolverInfo; 17] = [
     SolverInfo { name: "Christofides",          alias: "christofides",    category: "Approximation",
                  desc: "\u{2264}1.5\u{00d7} approximation via MST + greedy matching + Eulerian shortcut (EUC_2D only).",
                  complexity: "O(n\u{00b2})", has_options: false, exact: false },
+    SolverInfo { name: "Fourier",               alias: "fourier",         category: "Constructive",
+                 desc: "Closed-curve Fourier-basis gradient descent with argsort decode.",
+                 complexity: "O(K\u{00b7}epochs\u{00b7}n\u{00b7}M)", has_options: true, exact: false },
     SolverInfo { name: "Nearest Neighbor",      alias: "nn",              category: "Constructive",
                  desc: "Greedy heuristic: always visit the nearest unvisited city.",
                  complexity: "O(n\u{00b2})", has_options: false, exact: false },
@@ -326,6 +333,7 @@ impl FromStr for Solvers {
             "christofides" | "chr" => Ok(Solvers::Christofides),
             "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
+            "fourier" => Ok(Solvers::Fourier),
             "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
@@ -1102,6 +1110,10 @@ pub fn solve_with_context(
             let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
             flower_pollination::solve(problem, &fpa, tx, init_tour)
         }
+        Solvers::Fourier => {
+            let f = opts.fourier.as_ref().cloned().unwrap_or_default();
+            fourier::solve(problem, &f, tx, init_tour)
+        }
         Solvers::LinKernighan => {
             let lk = opts.lk.as_ref().cloned().unwrap_or_default();
             lin_kernighan::solve(problem, &lk, tx, init_tour)
@@ -1552,6 +1564,7 @@ mod tests {
         assert!(Solvers::ParticleSwarmOptimization.auto_expand_with_shuffle());
         assert!(Solvers::CuckooSearch.auto_expand_with_shuffle());
         assert!(Solvers::FlowerPollination.auto_expand_with_shuffle());
+        assert!(Solvers::Fourier.auto_expand_with_shuffle());
         assert!(Solvers::GravitationalSearch.auto_expand_with_shuffle());
     }
 
