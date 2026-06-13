@@ -1,8 +1,5 @@
 /* ---- Topbar ---- */
 .topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   padding: 0 var(--pico-spacing);
   height: 48px;
   background: var(--pico-card-background-color, #fff);
@@ -10,6 +7,12 @@
   position: sticky;
   top: 0;
   z-index: 100;
+  /* PicoCSS nav handles the flex layout of the inner ul elements */
+}
+
+/* Remove PicoCSS nav's default margin so it fits in 48px */
+.topbar ul {
+  margin-bottom: 0;
 }
 
 .topbar-logo {
@@ -19,93 +22,22 @@
   color: var(--pico-color);
 }
 
-.topbar-links {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.topbar-github {
-  font-size: 0.875rem;
-  color: var(--pico-muted-color);
-  text-decoration: none;
-}
-
-.topbar-github:hover { color: var(--pico-primary); }
-
-/* ---- Algorithms dropdown ---- */
-.topbar-dropdown { position: relative; }
-
-.algo-menu-toggle {
-  background: none;
-  border: none;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.875rem;
-  cursor: pointer;
-  color: var(--pico-primary);
-  font-family: inherit;
-  line-height: 1;
-}
-
-.algo-menu {
-  position: absolute;
+/* Right-align the dropdown under the Algorithms button */
+.topbar details.dropdown > ul {
   right: 0;
-  top: calc(100% + 4px);
-  min-width: 220px;
-  background: var(--pico-card-background-color, #fff);
-  border: 1px solid var(--pico-muted-border-color);
-  border-radius: var(--pico-border-radius);
-  padding: 0.5rem 0;
-  list-style: none;
-  margin: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 200;
-  display: flex;
-  flex-direction: column;
+  left: auto;
 }
 
-.algo-menu[hidden] { display: none; }
-
-.algo-group { padding: 0; }
-
+/* Group headers inside the Algorithms dropdown */
 .algo-group-label {
   display: block;
-  padding: 0.4rem 1rem 0.2rem;
+  padding: 0.5rem 0.75rem 0.1rem;
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--pico-muted-color);
-}
-
-.algo-group ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.algo-group ul li {
-  display: block;
-  width: 100%;
-  margin: 0;
-  padding: 0;
-}
-
-.algo-group ul li a,
-.algo-group ul li span {
-  display: block;
-  padding: 0.3rem 1rem 0.3rem 1.25rem;
-  font-size: 0.875rem;
-  text-decoration: none;
-  color: var(--pico-color);
-  white-space: nowrap;
-}
-
-.algo-group ul li a:hover {
-  background: color-mix(in srgb, var(--pico-primary) 8%, transparent);
-  color: var(--pico-primary);
+  pointer-events: none;
 }
 
 /* ---- Docs two-column layout ---- */

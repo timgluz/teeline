@@ -12,9 +12,10 @@ describe('renderTopbarHtml', () => {
     expect(html).toContain('teeline')
   })
 
-  it('includes Algorithms toggle button', () => {
+  it('includes Algorithms dropdown (details/summary)', () => {
     expect(html).toContain('Algorithms')
-    expect(html).toContain('aria-haspopup')
+    expect(html).toContain('<details')
+    expect(html).toContain('<summary>')
   })
 
   it('includes a link to the fourier solver page', () => {

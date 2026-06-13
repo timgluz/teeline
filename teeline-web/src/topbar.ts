@@ -1,7 +1,8 @@
 import { SOLVER_GROUPS, SOLVER_META, PAGED_SOLVERS } from './solver-groups'
 
 export function renderTopbarHtml(): string {
-  const groupsHtml = SOLVER_GROUPS.map(g => {
+  const dropdownItems = SOLVER_GROUPS.map(g => {
+    const label = `<li class="algo-group-label"><strong>${g.label}</strong></li>`
     const items = g.ids.map(id => {
       const meta = SOLVER_META[id]
       if (!meta) return ''
@@ -10,35 +11,30 @@ export function renderTopbarHtml(): string {
         : `<span>${meta.name}</span>`
       return `<li>${inner}</li>`
     }).join('')
-    return `
-      <li class="algo-group">
-        <span class="algo-group-label">${g.label}</span>
-        <ul>${items}</ul>
-      </li>`
+    return label + items
   }).join('')
 
   return `
     <nav class="topbar" aria-label="Site navigation">
-      <a class="topbar-logo" href="/">teeline</a>
-      <div class="topbar-links">
-        <div class="topbar-dropdown">
-          <button
-            class="algo-menu-toggle"
-            aria-haspopup="menu"
-            aria-expanded="false"
-            aria-controls="algo-menu"
-          >Algorithms ▾</button>
-          <ul class="algo-menu" id="algo-menu" hidden role="menu">
-            ${groupsHtml}
-          </ul>
-        </div>
-        <a
-          class="topbar-github"
-          href="https://github.com/timgluz/teeline"
-          target="_blank"
-          rel="noopener noreferrer"
-        >GitHub ↗</a>
-      </div>
+      <ul>
+        <li><a class="topbar-logo" href="/">teeline</a></li>
+      </ul>
+      <ul>
+        <li>
+          <details class="dropdown">
+            <summary>Algorithms</summary>
+            <ul>
+              ${dropdownItems}
+            </ul>
+          </details>
+        </li>
+        <li>
+          <a href="https://github.com/timgluz/teeline"
+             target="_blank"
+             rel="noopener noreferrer"
+          >GitHub ↗</a>
+        </li>
+      </ul>
     </nav>`
 }
 
@@ -47,20 +43,11 @@ export function initTopbar(containerId = 'topbar'): void {
   if (!el) return
   el.innerHTML = renderTopbarHtml()
 
-  const toggle = el.querySelector<HTMLButtonElement>('.algo-menu-toggle')
-  const menu   = el.querySelector<HTMLElement>('.algo-menu')
-  if (!toggle || !menu) return
-
-  toggle.addEventListener('click', () => {
-    const isOpen = !menu.hidden
-    menu.hidden = isOpen
-    toggle.setAttribute('aria-expanded', String(!isOpen))
-  })
-
+  // Close the dropdown when clicking outside the topbar
   document.addEventListener('click', (e) => {
-    if (!el.contains(e.target as Node)) {
-      menu.hidden = true
-      toggle.setAttribute('aria-expanded', 'false')
+    const details = el.querySelector<HTMLDetailsElement>('details.dropdown')
+    if (details && !el.contains(e.target as Node)) {
+      details.removeAttribute('open')
     }
   })
 }
