@@ -19,4 +19,4 @@ teeline = { path = "..", default-features = false, features = ["json"] }
 
 [dev-dependencies]
 wasmtime = { version = "36", features = ["component-model"] }
-wasmtime-wasi = "36"
+wasmtime-wasi = "45"
