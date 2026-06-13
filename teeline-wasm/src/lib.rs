@@ -81,6 +81,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "3opt"            => "Higher quality than 2-opt; good for <500 cities",
         "sa"              => "Good for escaping local optima; tune cooling-rate",
         "ga"              => "Strong on large instances; tune mutation-probability and n-elite",
+        "gsa"             => "Physics-inspired swarm; good exploration on medium datasets",
         "pso"             => "Good convergence on medium datasets; NN-seeded for fast start",
         "cs"              => "Good exploration; slower convergence than SA",
         "fpa"             => "Balanced global/local search; tune mutation-probability",
@@ -174,6 +175,7 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         }
         Solvers::TwoOpt
         | Solvers::ThreeOpt
+        | Solvers::GravitationalSearch
         | Solvers::ParticleSwarmOptimization
         | Solvers::TabuSearch
         | Solvers::StochasticHill => shared_heuristic_params(),

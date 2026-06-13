@@ -220,13 +220,14 @@ done
 | Particle Swarm | `pso` | heuristic — swarm | [→](docs/algorithms/particle-swarm.md) |
 | Cuckoo Search | `cs` | heuristic — nature-inspired | [→](docs/algorithms/cuckoo-search.md) |
 | Flower Pollination | `fpa` | heuristic — nature-inspired | [→](docs/algorithms/flower-pollination.md) |
+| Gravitational Search | `gsa` | heuristic — swarm / physics | [→](docs/algorithms/gravitational-search.md) |
 
 Exact algorithms find the provably optimal tour but have exponential complexity — do not use on more than ~20 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics.
 
 
 ## Pipeline
 
-Local search algorithms (2-opt, 3-opt, SA, hill climbing, tabu, GA, PSO, CS, FPA) improve an existing tour; they do not construct one from scratch. Starting from a random or sequential tour wastes the early epochs escaping a bad initial state. **Warm-starting from a greedy Nearest Neighbour tour** gives the solver a much better region to refine, typically reducing the optimality gap by several percentage points at no extra tuning cost.
+Local search algorithms (2-opt, 3-opt, SA, hill climbing, tabu, GA, PSO, CS, FPA, GSA) improve an existing tour; they do not construct one from scratch. Starting from a random or sequential tour wastes the early epochs escaping a bad initial state. **Warm-starting from a greedy Nearest Neighbour tour** gives the solver a much better region to refine, typically reducing the optimality gap by several percentage points at no extra tuning cost.
 
 Teeline makes this composable through the pipeline mechanism: solvers are chained in sequence, each stage receiving the best tour from the previous stage as its starting point.
 

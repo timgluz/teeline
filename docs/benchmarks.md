@@ -46,6 +46,7 @@ representative, not as a guarantee.
 | **Lin-Kernighan (ILS)** | `--epochs=1000 --n_nearest=10` | 8 128.86 | +7.7 % | 0.03 s | 85 % | 6.4 MB |
 | **Or-opt** | default (NN seed, best-improvement) | 8 097.48 | +7.3 % | 0.03 s | 93 % | 6.6 MB |
 | **Christofides** | default (MST + greedy matching) | 8 707.66 | +15.4 % | < 0.01 s | 50 % | 6.5 MB |
+| **Gravitational Search (GSA)** | default (`--epochs=10000 --n_nearest=25`, G0=20, α=1, W=0) | ~18 500 | ~+145 % | 1.2 s | 99 % | 7.6 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 

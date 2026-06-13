@@ -70,6 +70,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | `lin_kernighan.rs` | Lin-Kernighan style ILS: candidate-list 2-opt + double-bridge kicks | `lk` |
 | `or_opt.rs` | Or-opt local search: relocates segments of 1–3 cities (best-improvement) | `or_opt` |
 | `christofides.rs` | Christofides ≤1.5× approximation: MST + greedy matching + Eulerian shortcut | `christofides` |
+| `gravitational_search.rs` | Gravitational Search Algorithm (Rashedi 2009): mass-weighted swap-velocity swarm (educational) | `gsa` |
 
 **Tests:**
 - Unit tests live inline in each source file (`#[cfg(test)]`)
