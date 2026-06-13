@@ -47,6 +47,8 @@ representative, not as a guarantee.
 | **Or-opt** | default (NN seed, best-improvement) | 8 097.48 | +7.3 % | 0.03 s | 93 % | 6.6 MB |
 | **Christofides** | default (MST + greedy matching) | 8 707.66 | +15.4 % | < 0.01 s | 50 % | 6.5 MB |
 | **Gravitational Search (GSA)** | default (`--epochs=10000 --n_nearest=25`, G0=20, α=1, W=0) | ~18 500 | ~+145 % | 1.2 s | 99 % | 7.6 MB |
+| **Fourier** | default (`k_max=4, m=200, epochs=400`) | 8 549.14 | +13.3 % | 2.5 s | 99 % | 6.6 MB |
+| **Fourier + 2-opt** | `pipeline(fourier,2opt)` | 7 948.88 | +5.4 % | 1.9 s | 99 % | 6.8 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 

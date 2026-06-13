@@ -6,8 +6,8 @@ use bindings::teeline::solver::types::{
     AlgorithmInfo, City, CompareResult, ParamSpec, ParsedProblem, Solution, SolveOptions,
 };
 use teeline::tsp::{
-    AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
-    distance_matrix::DistanceMatrix, kdtree::KDPoint,
+    AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions,
+    Solvers, TspProblem, distance_matrix::DistanceMatrix, kdtree::KDPoint,
 };
 
 struct Component;
@@ -51,6 +51,13 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::Fourier => AppOptions {
+            fourier: Some(FourierOptions {
+                epochs: o.epochs as usize,
+                ..FourierOptions::default()
+            }),
+            ..AppOptions::default()
+        },
         _ => AppOptions {
             heuristic: Some(heuristic),
             ..AppOptions::default()
@@ -89,6 +96,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "tabu_search"     => "Avoids cycling; good for medium-sized datasets",
         "shuffle"         => "Baseline only; never produces good tours on its own",
         "christofides"    => "Only solver with a proven \u{2264}1.5\u{00d7} bound; ideal warm-start for pipeline(christofides,lk)",
+        "fourier"         => "Constructive Fourier-basis solver; best as warm-start: pipeline(fourier,2opt)",
         _                 => info.category,
     }
     .to_string()
@@ -97,7 +105,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
 fn kind_for(solver: Solvers) -> String {
     match solver {
         Solvers::BellmanKarp | Solvers::BranchBound       => "exact",
-        Solvers::NearestNeighbor | Solvers::Christofides   => "constructive",
+        Solvers::NearestNeighbor | Solvers::Christofides | Solvers::Fourier => "constructive",
         Solvers::TwoOpt | Solvers::ThreeOpt                => "local-search",
         Solvers::RandomShuffle                             => "utility",
         _                                                  => "metaheuristic",
@@ -179,6 +187,7 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         | Solvers::ParticleSwarmOptimization
         | Solvers::TabuSearch
         | Solvers::StochasticHill => shared_heuristic_params(),
+        Solvers::Fourier => vec![pi("epochs", "Gradient steps per stage", 1.0)],
         _ => vec![],
     }
 }

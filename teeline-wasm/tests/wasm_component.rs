@@ -341,12 +341,12 @@ fn run_compare(
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 17, "expected 17 solvers");
+    assert_eq!(algorithms.len(), 18, "expected 18 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "nn", "2opt", "3opt", "sa", "ga", "gsa", "pso", "cs", "fpa",
         "tabu_search", "stochastic_hill", "shuffle", "bhk", "branch_bound", "lk", "or_opt",
-        "christofides",
+        "christofides", "fourier",
     ] {
         assert!(ids.contains(expected_id), "missing algorithm id: {}", expected_id);
     }
@@ -588,6 +588,26 @@ fn test_list_algorithms_christofides_kind_and_recommendation() {
         chr.recommendation, "Approximation",
         "recommendation must not be the bare category name"
     );
+}
+
+#[test]
+fn test_list_algorithms_fourier_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let f = algorithms.iter().find(|a| a.id == "fourier").expect("fourier missing");
+    assert_eq!(f.kind, "constructive", "fourier must be 'constructive'");
+    assert_eq!(f.params.len(), 1, "fourier must have exactly 1 param (epochs)");
+    assert_eq!(f.params[0].key, "epochs", "fourier param must be 'epochs'");
+    assert_eq!(f.params[0].value_type, "int", "epochs must be int type");
+    assert!(
+        f.recommendation.len() > 20,
+        "fourier recommendation must be a real description; got: '{}'",
+        f.recommendation
+    );
+}
+
+#[test]
+fn test_fourier() {
+    run_solver("fourier");
 }
 
 #[test]

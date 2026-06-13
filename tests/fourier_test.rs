@@ -97,12 +97,11 @@ fn fourier_quality_berlin52() {
         is_valid_tour(sol.route(), &cities),
         "quality run must still produce a valid tour"
     );
-    // Fourier is a constructive solver; NN gets ~8981 (+19%). Threshold ≤13000 (~+72%)
-    // catches broken implementations while allowing for the expected constructive-solver range.
-    // Calibrate tighter after benchmarks are collected.
+    // Fourier consistently produces 8549 (+13.3%) on berlin52 with default settings.
+    // Threshold ≤9200 (+21.9%) gives ~7% headroom above observed cost.
     assert!(
-        sol.total <= 13_000.0,
-        "Fourier quality check: got {:.1}, want ≤13000 (constructive baseline; optimal=7542)",
+        sol.total <= 9_200.0,
+        "Fourier quality check: got {:.1}, want ≤9200 (~+21.9% above optimal 7544); typical is ~8549",
         sol.total,
     );
 }
