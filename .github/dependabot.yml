@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Rust workspace (teeline core + teeline-cli + teeline-wasm + teeline-qt)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # teeline-web npm packages
+  - package-ecosystem: "npm"
+    directory: "/teeline-web"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
