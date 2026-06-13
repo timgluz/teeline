@@ -1,1 +1,185 @@
-<!doctype html><html><head><meta charset="UTF-8"><title>Fourier — Teeline</title></head><body><p>placeholder</p></body></html>
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fourier-basis Solver — Teeline</title>
+    <meta name="description" content="Fourier-basis constructive TSP solver: encodes a tour as a closed curve γ(s) and optimises Fourier coefficients via gradient descent. Argsort decode always yields a valid tour." />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <nav class="docs-sidebar" id="algo-sidebar" aria-label="Algorithms"></nav>
+      <main class="docs-main">
+
+        <p class="docs-breadcrumb">
+          <a href="/">teeline</a> › Algorithms › Fourier
+        </p>
+
+        <p class="docs-type-badge">Heuristic · constructive</p>
+        <h1>Fourier-basis Constructive Solver</h1>
+
+        <table class="docs-meta-table">
+          <tr><th>Alias</th><td><code>fourier</code></td></tr>
+          <tr><th>Type</th><td>Heuristic — constructive</td></tr>
+          <tr><th>Complexity</th><td><code>O(K_max · epochs · n · M)</code> per run</td></tr>
+        </table>
+
+        <a class="docs-explainer-cta" href="/algorithms/fourier/explainer">
+          ▶ Open interactive explainer →
+        </a>
+
+        <h2>Description</h2>
+        <p>
+          Encodes a TSP tour as a <strong>closed curve in the complex plane</strong> and
+          optimises the Fourier coefficients of that curve with gradient descent. Decoding
+          is a pure argsort: no penalty, no repair step, and no possibility of producing
+          an invalid tour.
+        </p>
+
+        <h3>Curve representation</h3>
+        <p>The tour is the closed curve</p>
+        <pre><code>γ(s) = Σ_{k=-K}^{K} c_k · exp(2πi · k · s),   s ∈ [0, 1)</code></pre>
+        <p>
+          sampled at <code>M</code> evenly-spaced points <code>s_j = j/M</code>. The
+          <code>2K+1</code> complex coefficients <code>c_k</code> are the only free
+          variables; gradient descent moves them so the curve passes near each city.
+        </p>
+
+        <h3>Energy</h3>
+        <pre><code>E(c) = Σ_i  min_j |city_i − γ(s_j)|²   +   λ Σ_k (2πk)² |c_k|²
+         attraction                              tension</code></pre>
+        <ul>
+          <li><strong>Attraction</strong>: each city pulls its nearest curve sample toward it.</li>
+          <li>
+            <strong>Tension</strong>: a smoothness regulariser that weights high-frequency
+            modes proportionally to their squared Fourier frequency, preventing jagged
+            curves that visit no city cleanly.
+          </li>
+        </ul>
+
+        <h3>Coarse-to-fine optimisation loop</h3>
+        <pre><code>initialise c[0] = centroid, c[1] = radius/2, all others = 0
+λ ← opts.lambda
+
+for k_active = 1 … K_max:
+    basis[k][j] = exp(2πi · ks[k] · j/M)   // pre-computed; constant within stage
+
+    repeat opts.epochs times:
+        γ = eval_curve(c, ks, M)
+        grad = attraction_gradient + tension_gradient
+        for k where |ks[k]| ≤ k_active:
+            c[k] -= (lr / n) * grad[k]
+
+    λ *= lambda_decay</code></pre>
+        <p>
+          Unlocking modes one stage at a time lets the optimiser set the overall loop shape
+          (low modes) before refining local detail (high modes), avoiding the saddle points
+          that occur when all modes compete simultaneously.
+        </p>
+
+        <h3>Decode (always valid)</h3>
+        <pre><code>s_i = argmin_j |city_i − γ(s_j)|     // nearest curve sample per city
+tour = argsort(s_i)                    // sort cities by their curve position</code></pre>
+        <p>
+          The argsort gives <strong>array positions</strong> in <code>cities[]</code>,
+          which are then mapped to their <code>.id</code> fields — the same pattern used
+          by Christofides. This guarantees a valid Hamiltonian tour regardless of
+          convergence quality.
+        </p>
+
+        <h2>Options</h2>
+        <table>
+          <thead>
+            <tr><th>Field</th><th>Default</th><th>Range</th><th>Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>k_max</code></td><td>4</td><td>≥ 1</td><td>Maximum Fourier mode (number of frequency stages)</td></tr>
+            <tr><td><code>m</code></td><td>200</td><td>≥ 2</td><td>Curve sampling resolution (points on γ)</td></tr>
+            <tr><td><code>lambda</code></td><td>0.05</td><td>&gt; 0</td><td>Initial tension weight</td></tr>
+            <tr><td><code>lambda_decay</code></td><td>0.5</td><td>(0, 1)</td><td>Tension multiplier applied at each stage</td></tr>
+            <tr><td><code>lr</code></td><td>0.05</td><td>&gt; 0</td><td>Gradient descent learning rate</td></tr>
+            <tr><td><code>epochs</code></td><td>400</td><td>≥ 1</td><td>Gradient steps per k_active stage</td></tr>
+          </tbody>
+        </table>
+        <p><code>epochs</code> follows the same vocabulary as all other solvers in this codebase.</p>
+
+        <h2>Usage</h2>
+        <pre><code># standalone
+teeline solve fourier -i ./data/tsplib/berlin52.tsp
+
+# as warm-start for 2-opt (recommended)
+teeline pipeline --steps=fourier,2opt -i ./data/tsplib/berlin52.tsp
+
+# as warm-start for LK
+teeline pipeline --steps=fourier,lk -i ./data/tsplib/berlin52.tsp</code></pre>
+
+        <h2>Notes</h2>
+        <ul>
+          <li>
+            <strong><code>init_tour</code> is ignored</strong>: as a purely constructive
+            solver, Fourier does not accept or benefit from a seed tour; the
+            <code>--init-tour</code> pipeline option has no effect on this solver.
+          </li>
+          <li>
+            <strong>f64 internally</strong>: all gradient computation uses <code>f64</code>
+            for numerical stability; coordinates are converted from <code>f32</code> at
+            input and the final tour is <code>Vec&lt;usize&gt;</code> city IDs.
+          </li>
+          <li>
+            <strong>WASM-compatible</strong>: uses <code>num-complex = "0.4"</code>
+            (no_std-compatible, no libm dependency).
+          </li>
+        </ul>
+
+        <h2>Relationship to the Elastic Net</h2>
+        <p>
+          This algorithm is a Fourier-parameterised variant of the
+          <strong>Elastic Net</strong> (Durbin &amp; Willshaw 1987). Both share the same
+          two-term energy (city attraction + curve smoothness/tension) and optimise via
+          gradient descent. The key differences:
+        </p>
+        <table>
+          <thead>
+            <tr><th></th><th>Elastic Net</th><th>This implementation</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Curve representation</td>
+              <td>M explicit node positions</td>
+              <td>2K+1 Fourier coefficients</td>
+            </tr>
+            <tr>
+              <td>Tension term</td>
+              <td>Sum of squared edge lengths</td>
+              <td><code>λ(2πk)²|c_k|²</code> (diagonal in coefficient space)</td>
+            </tr>
+            <tr>
+              <td>Mode schedule</td>
+              <td>Simultaneous + temperature annealing</td>
+              <td>Coarse-to-fine frequency unlocking</td>
+            </tr>
+            <tr>
+              <td>Tour decode</td>
+              <td>Explicit node ordering</td>
+              <td>Argsort of nearest-sample parameter s_i</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>References</h2>
+        <ul>
+          <li>
+            Durbin, R. &amp; Willshaw, D. (1987) — "An analogue approach to the travelling
+            salesman problem using an elastic net method", <em>Nature</em> <strong>326</strong>,
+            689–691. DOI:
+            <a href="https://doi.org/10.1038/326689a0" target="_blank" rel="noopener">10.1038/326689a0</a>
+            (original Elastic Net; this solver is a Fourier-parameterised variant)
+          </li>
+        </ul>
+
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>
