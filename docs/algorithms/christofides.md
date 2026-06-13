@@ -69,5 +69,5 @@ teeline pipeline --steps=christofides,or_opt -i ./data/tsplib/berlin52.tsp
 
 - Christofides, N. (1976) — "Worst-case analysis of a new heuristic for the travelling salesman problem," Carnegie Mellon University report
 - Applegate, D. et al. (2006) — *The Traveling Salesman Problem*, Princeton University Press, Chapter 2
-- Hierholzer, C. & Wiener, C. (1873) — "Ueber die Möglichkeit, einen Linienzug ohne Wiederholung und ohne Unterbrechung zu umfahren", *Mathematische Annalen*
+- Hierholzer, C. & Wiener, C. (1873) — "Ueber die Möglichkeit, einen Linienzug ohne Wiederholung und ohne Unterbrechung zu umfahren", *Mathematische Annalen*, 6(1), 30–32
 - [Christofides algorithm (Wikipedia)](https://en.wikipedia.org/wiki/Christofides_algorithm)

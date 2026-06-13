@@ -23,4 +23,4 @@ teeline solve bellman_karp -i ./data/discopt/tsp_5_1.tsp --verbose
 
 - [Bellman-Held-Karp walkthrough (YouTube)](https://youtu.be/D8aHqaFa8GE)
 - *Algorithms Illuminated, Part 4* — Tim Roughgarden
-- Held, M. & Karp, R. M. (1962) — *A Dynamic Programming Approach to Sequencing Problems*
+- Held, M. & Karp, R. M. (1962) — "A Dynamic Programming Approach to Sequencing Problems", *Journal of the Society for Industrial and Applied Mathematics*, 10(1), 196–210

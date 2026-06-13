@@ -117,6 +117,5 @@ optimise via gradient descent. The key differences:
 ## References
 
 - Durbin, R. & Willshaw, D. (1987) — "An analogue approach to the travelling salesman problem
-  using an elastic net method", *Nature* **326**, 689–691 (original Elastic Net)
-- Meijer, H. & Imai, H. (1992) — "The discrete Fourier transform approach to the travelling
-  salesman problem", *Oper. Res. Lett.* (Fourier-basis parameterisation)
+  using an elastic net method", *Nature* **326**, 689–691. DOI: 10.1038/326689a0
+  (original Elastic Net; this solver is a Fourier-parameterised variant)

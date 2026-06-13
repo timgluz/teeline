@@ -43,5 +43,5 @@ teeline solve cs -i ./data/tsplib/berlin52.tsp --n_nearest=40 --mutation_probabi
 
 ## References
 
-- Yang, X.-S. & Deb, S. (2009) — *Cuckoo Search via Lévy Flights*
+- Yang, X.-S. & Deb, S. (2009) — "Cuckoo Search via Lévy Flights", *Proc. World Congress on Nature & Biologically Inspired Computing (NaBIC 2009)*, IEEE, pp. 210–214
 - [Cuckoo search (Wikipedia)](https://en.wikipedia.org/wiki/Cuckoo_search)
