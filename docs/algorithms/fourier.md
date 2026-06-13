@@ -101,9 +101,22 @@ teeline pipeline --steps=fourier,lk -i ./data/tsplib/berlin52.tsp
   are converted from `f32` at input and the final tour is `Vec<usize>` city IDs.
 - **WASM-compatible**: uses `num-complex = "0.4"` (no_std-compatible, no libm dependency).
 
+## Relationship to the Elastic Net
+
+This algorithm is a Fourier-parameterised variant of the **Elastic Net** (Durbin & Willshaw
+1987). Both share the same two-term energy (city attraction + curve smoothness/tension) and
+optimise via gradient descent. The key differences:
+
+| | Elastic Net | This implementation |
+|---|---|---|
+| Curve representation | M explicit node positions | 2K+1 Fourier coefficients |
+| Tension term | Sum of squared edge lengths | `λ(2πk)²|c_k|²` (diagonal in coefficient space) |
+| Mode schedule | Simultaneous + temperature annealing | Coarse-to-fine frequency unlocking |
+| Tour decode | Explicit node ordering | Argsort of nearest-sample parameter `s_i` |
+
 ## References
 
+- Durbin, R. & Willshaw, D. (1987) — "An analogue approach to the travelling salesman problem
+  using an elastic net method", *Nature* **326**, 689–691 (original Elastic Net)
 - Meijer, H. & Imai, H. (1992) — "The discrete Fourier transform approach to the travelling
-  salesman problem", *Oper. Res. Lett.* (original idea for Fourier-basis TSP)
-- Edelsbrunner, H. & Guibas, L. (1988) — "Topologically sweeping an arrangement" (argsort
-  decode concept in computational geometry)
+  salesman problem", *Oper. Res. Lett.* (Fourier-basis parameterisation)
