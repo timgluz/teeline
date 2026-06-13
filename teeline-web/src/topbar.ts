@@ -7,7 +7,7 @@ export function renderTopbarHtml(): string {
       const meta = SOLVER_META[id]
       if (!meta) return ''
       const inner = PAGED_SOLVERS.has(id)
-        ? `<a href="/algorithms/${id}">${meta.name}</a>`
+        ? `<a href="/algorithms/${id}/">${meta.name}</a>`
         : `<span>${meta.name}</span>`
       return `<li>${inner}</li>`
     }).join('')

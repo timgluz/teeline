@@ -9,7 +9,7 @@ export function renderSidebarHtml(currentId: string | null): string {
       const inner = isCurrent
         ? `<span aria-current="page">${meta.name}</span>`
         : PAGED_SOLVERS.has(id)
-          ? `<a href="/algorithms/${id}">${meta.name}</a>`
+          ? `<a href="/algorithms/${id}/">${meta.name}</a>`
           : `<span>${meta.name}</span>`
       const currentClass = isCurrent ? ' sidebar-item--current' : ''
       return `<li class="sidebar-item${currentClass}">${inner}</li>`

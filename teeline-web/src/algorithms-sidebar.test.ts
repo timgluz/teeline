@@ -12,7 +12,7 @@ describe('renderSidebarHtml', () => {
 
   it('renders fourier as an anchor when not current', () => {
     const html = renderSidebarHtml(null)
-    expect(html).toContain('href="/algorithms/fourier"')
+    expect(html).toContain('href="/algorithms/fourier/"')
   })
 
   it('marks the current solver with aria-current="page"', () => {
@@ -27,13 +27,13 @@ describe('renderSidebarHtml', () => {
 
   it('renders current solver as span (not anchor)', () => {
     const html = renderSidebarHtml('fourier')
-    // When fourier is current, it should NOT have a link to /algorithms/fourier
-    expect(html).not.toContain('href="/algorithms/fourier"')
+    // When fourier is current, it should NOT have a link to /algorithms/fourier/
+    expect(html).not.toContain('href="/algorithms/fourier/"')
   })
 
   it('renders non-paged solvers as plain text (no link)', () => {
     const html = renderSidebarHtml(null)
     // bhk has no docs page yet — should be a span, not an anchor
-    expect(html).not.toContain('href="/algorithms/bhk"')
+    expect(html).not.toContain('href="/algorithms/bhk/"')
   })
 })

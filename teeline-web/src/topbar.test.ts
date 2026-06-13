@@ -19,7 +19,7 @@ describe('renderTopbarHtml', () => {
   })
 
   it('includes a link to the fourier solver page', () => {
-    expect(html).toContain('/algorithms/fourier')
+    expect(html).toContain('/algorithms/fourier/')
   })
 
   it('groups solvers by category', () => {
