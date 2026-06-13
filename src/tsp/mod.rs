@@ -1443,6 +1443,7 @@ mod tests {
         assert!(Solvers::ParticleSwarmOptimization.auto_expand_with_shuffle());
         assert!(Solvers::CuckooSearch.auto_expand_with_shuffle());
         assert!(Solvers::FlowerPollination.auto_expand_with_shuffle());
+        assert!(Solvers::GravitationalSearch.auto_expand_with_shuffle());
     }
 
     #[test]

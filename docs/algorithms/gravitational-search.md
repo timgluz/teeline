@@ -17,7 +17,7 @@ Physics-inspired swarm metaheuristic where each agent is a candidate tour with a
 | Discrete velocity as swap list | TSP has no continuous position space; swap sequences from `swap_sequence(i,j)` approximate the continuous update |
 | Spread-based mass: `m_i = (worst − cost_i) / Σ(worst − cost_j)` | Directly from Rashedi 2009; maps fitness to mass with guaranteed [0,1] range |
 | Uniform-mass fallback when all costs equal | Prevents NaN when the population converges to identical tour costs |
-| Fixed inertia `W = 0.5` | Keeps a prefix of the previous velocity for memory; linear decay added only if benchmarks justify it |
+| Fixed inertia `W = 0.0` | Empirically: carrying stale swap indices across epochs added noise faster than gravity overcame it; inertia disabled after tuning on berlin52 |
 | Fixed Kbest = ⌈N/2⌉ | v1 simplification; v2 follow-up will decay K linearly from N → 1 (full Rashedi fidelity) |
 | Velocity cap at `⌈0.35 · n⌉` swaps | Prevents tour scrambling; same cap as PSO |
 | PSO-style always-accept position | Simplifies update loop; gbest tracked separately |
