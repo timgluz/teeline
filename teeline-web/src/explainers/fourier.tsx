@@ -481,15 +481,15 @@ export default function FourierExplainer() {
 // ---------------------------------------------------------------
 const CSS = `
 .fx-root {
-  --bg: #0d1117;
-  --panel: #11161d;
-  --line: #232b36;
-  --text: #d8dee9;
-  --muted: #7c8aa0;
-  --curve: #5ee6c8;
+  --bg: #ffffff;
+  --panel: #f6f8fa;
+  --line: #d0d7de;
+  --text: #1f2328;
+  --muted: #656d76;
+  --curve: #0969da;
   --city: #f2a154;
   --tour: #e0626b;
-  --accent: #5ee6c8;
+  --accent: #0969da;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -535,7 +535,7 @@ const CSS = `
 .fx-tour { fill: none; stroke: var(--tour); stroke-width: 1.2; stroke-dasharray: 4 3; opacity: 0.85; }
 
 .fx-prose p { margin: 0 0 10px; font-size: 0.92rem; line-height: 1.55; }
-.fx-prose code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; color: var(--accent); background: rgba(94,230,200,0.08); padding: 1px 4px; border-radius: 4px; }
+.fx-prose code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; color: var(--accent); background: rgba(9,105,218,0.08); padding: 1px 4px; border-radius: 4px; }
 .fx-caption { color: var(--muted); font-size: 0.85rem; }
 .fx-note { font-size: 0.85rem; color: var(--muted); border-left: 2px solid var(--line); padding-left: 10px; }
 
@@ -566,7 +566,7 @@ const CSS = `
 }
 .fx-stage-active::before {
   content: ""; position: absolute; inset: 0; width: var(--p, 0%);
-  background: rgba(94,230,200,0.18); transition: width 60ms linear;
+  background: rgba(9,105,218,0.15); transition: width 60ms linear;
 }
 
 .fx-statgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }

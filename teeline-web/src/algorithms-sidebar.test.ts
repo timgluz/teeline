@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { renderSidebarHtml } from './algorithms-sidebar'
 
 describe('renderSidebarHtml', () => {
+  it('wraps output in a ul element', () => {
+    const html = renderSidebarHtml(null)
+    expect(html.trimStart()).toMatch(/^<ul>/)
+  })
+
   it('renders all four solver group labels', () => {
     const html = renderSidebarHtml(null)
     expect(html).toContain('Exact')

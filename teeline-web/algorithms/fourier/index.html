@@ -9,12 +9,18 @@
   <body>
     <div id="topbar"></div>
     <div class="docs-layout">
-      <nav class="docs-sidebar" id="algo-sidebar" aria-label="Algorithms"></nav>
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
       <main class="docs-main">
 
-        <p class="docs-breadcrumb">
-          <a href="/">teeline</a> › Algorithms › Fourier
-        </p>
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Fourier</li>
+          </ul>
+        </nav>
 
         <p class="docs-type-badge">Heuristic · constructive</p>
         <h1>Fourier-basis Constructive Solver</h1>
@@ -25,7 +31,7 @@
           <tr><th>Complexity</th><td><code>O(K_max · epochs · n · M)</code> per run</td></tr>
         </table>
 
-        <a class="docs-explainer-cta" href="/algorithms/fourier/explainer">
+        <a class="docs-explainer-cta" href="/algorithms/fourier/explainer/">
           ▶ Open interactive explainer →
         </a>
 

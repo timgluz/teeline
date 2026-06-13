@@ -1,7 +1,7 @@
 import { SOLVER_GROUPS, SOLVER_META, PAGED_SOLVERS } from './solver-groups'
 
 export function renderSidebarHtml(currentId: string | null): string {
-  return SOLVER_GROUPS.map(g => {
+  const groups = SOLVER_GROUPS.map(g => {
     const items = g.ids.map(id => {
       const meta = SOLVER_META[id]
       if (!meta) return ''
@@ -20,6 +20,7 @@ export function renderSidebarHtml(currentId: string | null): string {
         <ul>${items}</ul>
       </li>`
   }).join('')
+  return `<ul>${groups}</ul>`
 }
 
 export function initSidebar(containerId = 'algo-sidebar'): void {

@@ -49,13 +49,17 @@
 
 .docs-sidebar {
   border-right: 1px solid var(--pico-muted-border-color);
-  padding: 1.5rem 0;
   position: sticky;
   top: 48px;
   height: calc(100vh - 48px);
   overflow-y: auto;
-  list-style: none;
   margin: 0;
+  padding: 0;
+}
+
+/* PicoCSS aside>nav stacks items vertically; suppress its default spacing */
+.docs-sidebar nav {
+  padding: 0.75rem 0;
 }
 
 .docs-main {
@@ -113,19 +117,6 @@
 }
 
 /* ---- Docs content ---- */
-.docs-breadcrumb {
-  font-size: 0.8rem;
-  color: var(--pico-muted-color);
-  margin: 0 0 1.25rem;
-}
-
-.docs-breadcrumb a {
-  color: var(--pico-muted-color);
-  text-decoration: none;
-}
-
-.docs-breadcrumb a:hover { color: var(--pico-primary); }
-
 .docs-type-badge {
   display: inline-block;
   font-size: 0.75rem;
