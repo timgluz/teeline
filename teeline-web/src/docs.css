@@ -1,0 +1,225 @@
+/* ---- Topbar ---- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--pico-spacing);
+  height: 48px;
+  background: var(--pico-card-background-color, #fff);
+  border-bottom: 1px solid var(--pico-muted-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-logo {
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-decoration: none;
+  color: var(--pico-color);
+}
+
+.topbar-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topbar-github {
+  font-size: 0.875rem;
+  color: var(--pico-muted-color);
+  text-decoration: none;
+}
+
+.topbar-github:hover { color: var(--pico-primary); }
+
+/* ---- Algorithms dropdown ---- */
+.topbar-dropdown { position: relative; }
+
+.algo-menu-toggle {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  color: var(--pico-primary);
+  font-family: inherit;
+  line-height: 1;
+}
+
+.algo-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  min-width: 220px;
+  background: var(--pico-card-background-color, #fff);
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  padding: 0.5rem 0;
+  list-style: none;
+  margin: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 200;
+}
+
+.algo-menu[hidden] { display: none; }
+
+.algo-group { padding: 0; }
+
+.algo-group-label {
+  display: block;
+  padding: 0.4rem 1rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pico-muted-color);
+}
+
+.algo-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.algo-group ul li a,
+.algo-group ul li span {
+  display: block;
+  padding: 0.3rem 1rem 0.3rem 1.25rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+  color: var(--pico-color);
+}
+
+.algo-group ul li a:hover {
+  background: color-mix(in srgb, var(--pico-primary) 8%, transparent);
+  color: var(--pico-primary);
+}
+
+/* ---- Docs two-column layout ---- */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: calc(100vh - 48px);
+}
+
+.docs-sidebar {
+  border-right: 1px solid var(--pico-muted-border-color);
+  padding: 1.5rem 0;
+  position: sticky;
+  top: 48px;
+  height: calc(100vh - 48px);
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+}
+
+.docs-main {
+  padding: 2rem 2.5rem;
+  max-width: 800px;
+}
+
+@media (max-width: 768px) {
+  .docs-layout { grid-template-columns: 1fr; }
+  .docs-sidebar { display: none; }
+}
+
+/* ---- Sidebar nav items ---- */
+.sidebar-group {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.25rem 0;
+}
+
+.sidebar-group-label {
+  display: block;
+  padding: 0.4rem 1rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pico-muted-color);
+}
+
+.sidebar-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar-item a,
+.sidebar-item span {
+  display: block;
+  padding: 0.25rem 1rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+  color: var(--pico-color);
+}
+
+.sidebar-item a:hover {
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 6%, transparent);
+}
+
+.sidebar-item--current span {
+  color: var(--pico-primary);
+  font-weight: 600;
+  border-left: 2px solid var(--pico-primary);
+  padding-left: calc(1rem - 2px);
+}
+
+/* ---- Docs content ---- */
+.docs-breadcrumb {
+  font-size: 0.8rem;
+  color: var(--pico-muted-color);
+  margin: 0 0 1.25rem;
+}
+
+.docs-breadcrumb a {
+  color: var(--pico-muted-color);
+  text-decoration: none;
+}
+
+.docs-breadcrumb a:hover { color: var(--pico-primary); }
+
+.docs-type-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--pico-primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.docs-explainer-cta {
+  display: inline-block;
+  padding: 0.6rem 1.25rem;
+  background: var(--pico-primary);
+  color: var(--pico-primary-inverse);
+  border-radius: var(--pico-border-radius);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 1rem 0 2rem;
+}
+
+.docs-explainer-cta:hover { opacity: 0.88; }
+
+.docs-meta-table {
+  border-collapse: collapse;
+  margin-bottom: 1.75rem;
+  font-size: 0.9rem;
+}
+
+.docs-meta-table th,
+.docs-meta-table td {
+  padding: 0.3rem 0;
+  vertical-align: top;
+}
+
+.docs-meta-table th {
+  color: var(--pico-muted-color);
+  font-weight: 500;
+  white-space: nowrap;
+  padding-right: 2rem;
+}
