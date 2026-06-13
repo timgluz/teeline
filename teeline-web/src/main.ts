@@ -2,6 +2,8 @@ import './sentry.js'
 import 'htmx.org'
 import '@picocss/pico/css/pico.min.css'
 import './main.css'
+import './docs.css'
+import { initTopbar } from './topbar'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage } from './worker'
@@ -9,6 +11,8 @@ import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
+
+initTopbar()
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 

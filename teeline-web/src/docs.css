@@ -1,0 +1,160 @@
+/* ---- Topbar ---- */
+.topbar {
+  padding: 0 var(--pico-spacing);
+  height: 48px;
+  background: var(--pico-card-background-color, #fff);
+  border-bottom: 1px solid var(--pico-muted-border-color);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  /* PicoCSS nav handles the flex layout of the inner ul elements */
+}
+
+/* Remove PicoCSS nav's default margin so it fits in 48px */
+.topbar ul {
+  margin-bottom: 0;
+}
+
+.topbar-logo {
+  font-weight: 700;
+  font-size: 1.1rem;
+  text-decoration: none;
+  color: var(--pico-color);
+}
+
+/* Right-align the dropdown under the Algorithms button */
+.topbar details.dropdown > ul {
+  right: 0;
+  left: auto;
+}
+
+/* Group headers inside the Algorithms dropdown */
+.algo-group-label {
+  display: block;
+  padding: 0.5rem 0.75rem 0.1rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pico-muted-color);
+  pointer-events: none;
+}
+
+/* ---- Docs two-column layout ---- */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: calc(100vh - 48px);
+}
+
+.docs-sidebar {
+  border-right: 1px solid var(--pico-muted-border-color);
+  position: sticky;
+  top: 48px;
+  height: calc(100vh - 48px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+}
+
+/* PicoCSS aside>nav stacks items vertically; suppress its default spacing */
+.docs-sidebar nav {
+  padding: 0.75rem 0;
+}
+
+.docs-main {
+  padding: 2rem 2.5rem;
+  max-width: 800px;
+}
+
+@media (max-width: 768px) {
+  .docs-layout { grid-template-columns: 1fr; }
+  .docs-sidebar { display: none; }
+}
+
+/* ---- Sidebar nav items ---- */
+.sidebar-group {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.25rem 0;
+}
+
+.sidebar-group-label {
+  display: block;
+  padding: 0.4rem 1rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pico-muted-color);
+}
+
+.sidebar-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sidebar-item a,
+.sidebar-item span {
+  display: block;
+  padding: 0.25rem 1rem;
+  font-size: 0.875rem;
+  text-decoration: none;
+  color: var(--pico-color);
+}
+
+.sidebar-item a:hover {
+  color: var(--pico-primary);
+  background: color-mix(in srgb, var(--pico-primary) 6%, transparent);
+}
+
+.sidebar-item--current span {
+  color: var(--pico-primary);
+  font-weight: 600;
+  border-left: 2px solid var(--pico-primary);
+  padding-left: calc(1rem - 2px);
+}
+
+/* ---- Docs content ---- */
+.docs-type-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--pico-primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.docs-explainer-cta {
+  display: inline-block;
+  padding: 0.6rem 1.25rem;
+  background: var(--pico-primary);
+  color: var(--pico-primary-inverse);
+  border-radius: var(--pico-border-radius);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin: 1rem 0 2rem;
+}
+
+.docs-explainer-cta:hover { opacity: 0.88; }
+
+.docs-meta-table {
+  border-collapse: collapse;
+  margin-bottom: 1.75rem;
+  font-size: 0.9rem;
+}
+
+.docs-meta-table th,
+.docs-meta-table td {
+  padding: 0.3rem 0;
+  vertical-align: top;
+}
+
+.docs-meta-table th {
+  color: var(--pico-muted-color);
+  font-weight: 500;
+  white-space: nowrap;
+  padding-right: 2rem;
+}
