@@ -5,4 +5,7 @@ import { render, h } from 'preact'
 import FourierExplainer from './fourier'
 
 initTopbar()
-render(h(FourierExplainer, null), document.getElementById('app')!)
+const appEl = document.getElementById('app')
+if (appEl) {
+  render(h(FourierExplainer, null), appEl)
+}

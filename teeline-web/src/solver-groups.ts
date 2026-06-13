@@ -5,7 +5,7 @@ export interface SolverMeta {
 
 export const SOLVER_META: Record<string, SolverMeta> = {
   'bhk':          { id: 'bhk',          name: 'Bellman-Held-Karp' },
-  'b&b':          { id: 'b&b',          name: 'Branch & Bound' },
+  'branch_bound': { id: 'branch_bound', name: 'Branch & Bound' },
   'nn':           { id: 'nn',           name: 'Nearest Neighbor' },
   'fourier':      { id: 'fourier',      name: 'Fourier' },
   'christofides': { id: 'christofides', name: 'Christofides' },
@@ -28,7 +28,7 @@ export interface SolverGroup {
 }
 
 export const SOLVER_GROUPS: SolverGroup[] = [
-  { label: 'Exact',         ids: ['bhk', 'b&b'] },
+  { label: 'Exact',         ids: ['bhk', 'branch_bound'] },
   { label: 'Constructive',  ids: ['nn', 'fourier', 'christofides'] },
   { label: 'Local search',  ids: ['2opt', '3opt', 'or_opt', 'lk'] },
   { label: 'Metaheuristic', ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa'] },

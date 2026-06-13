@@ -24,7 +24,7 @@ export function renderTopbarHtml(): string {
         <div class="topbar-dropdown">
           <button
             class="algo-menu-toggle"
-            aria-haspopup="true"
+            aria-haspopup="menu"
             aria-expanded="false"
             aria-controls="algo-menu"
           >Algorithms ▾</button>
