@@ -36,6 +36,5 @@ export const SOLVER_GROUPS: SolverGroup[] = [
 
 export const PAGED_SOLVERS = new Set<string>([
   'bhk', 'branch_bound', 'nn', 'fourier', 'christofides',
-  '2opt', '3opt', 'or_opt', 'sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa',
-  // lk excluded: no algorithms/lk/docs.md source exists yet
+  '2opt', '3opt', 'or_opt', 'lk', 'sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa',
 ])
