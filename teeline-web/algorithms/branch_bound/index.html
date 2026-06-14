@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Branch and Bound — Teeline</title>
+    <meta name="description" content="Systematic enumeration of candidate tours that prunes any branch whose lower-bound cost already exceeds the best complete tour found so far. Explores the search tree depth-first, backtracking whenever it can prove no improvement is possible below the" />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Branch and Bound</li>
+          </ul>
+        </nav>
+
+                <p class="docs-type-badge">Exact</p>
+                        <h1>Branch and Bound</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>branch_bound</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Exact</td></tr>
+        <tr><td><strong>Complexity</strong></td><td>Exponential worst-case; effective pruning often makes it practical for small instances</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Systematic enumeration of candidate tours that prunes any branch whose lower-bound cost already exceeds the best complete tour found so far. Explores the search tree depth-first, backtracking whenever it can prove no improvement is possible below the current node.</p>
+<p><strong>Do not use on more than ~20 cities</strong> — worst-case complexity is factorial.</p>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> solve branch_bound<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/discopt/tsp_</span>5_1.tsp
+<span class="shj-syn-func">teeline</span> solve branch_bound<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/discopt/tsp_</span>5_1.tsp --verbose</code></pre><h2>References</h2>
+<ul>
+<li><a href="https://www.youtube.com/watch?v=hNs7G1b2iFY&t=5480s">EECS 281: Backtracking and Branch &amp; Bound (YouTube)</a></li>
+<li><a href="https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/">GeeksForGeeks article</a></li>
+</ul>
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

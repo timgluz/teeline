@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bellman–Held–Karp — Teeline</title>
+    <meta name="description" content="Dynamic programming algorithm that solves TSP exactly. It builds up solutions for subsets of cities, combining the optimal sub-tour results to find the globally optimal tour. Returns the provably shortest Hamiltonian circuit." />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Bellman–Held–Karp</li>
+          </ul>
+        </nav>
+
+                <p class="docs-type-badge">Exact</p>
+                        <h1>Bellman–Held–Karp</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>bhk</code>, <code>bellman_karp</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Exact</td></tr>
+        <tr><td><strong>Complexity</strong></td><td>O(2ⁿ · n²) time, O(2ⁿ · n) space</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Dynamic programming algorithm that solves TSP exactly. It builds up solutions for subsets of cities, combining the optimal sub-tour results to find the globally optimal tour. Returns the provably shortest Hamiltonian circuit.</p>
+<p><strong>Do not use on more than ~20 cities</strong> — memory and runtime grow exponentially with city count.</p>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> solve bhk<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/discopt/tsp_</span>5_1.tsp
+<span class="shj-syn-func">teeline</span> solve bellman_karp<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/discopt/tsp_</span>5_1.tsp --verbose</code></pre><h2>References</h2>
+<ul>
+<li><a href="https://youtu.be/D8aHqaFa8GE">Bellman-Held-Karp walkthrough (YouTube)</a></li>
+<li><em>Algorithms Illuminated, Part 4</em> — Tim Roughgarden</li>
+<li>Held, M. &amp; Karp, R. M. (1962) — &quot;A Dynamic Programming Approach to Sequencing Problems&quot;, <em>Journal of the Society for Industrial and Applied Mathematics</em>, 10(1), 196–210</li>
+</ul>
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

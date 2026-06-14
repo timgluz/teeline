@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Or-opt — Teeline</title>
+    <meta name="description" content="Local search algorithm that relocates *segments* of 1, 2, or 3 consecutive cities to a better position elsewhere in the tour. This is a *relocation* move, as opposed to the *reversal* move used by 2-opt and 3-opt — the two strategies find different l" />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Or-opt</li>
+          </ul>
+        </nav>
+
+                <p class="docs-type-badge">Heuristic — local search</p>
+                        <h1>Or-opt</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>or_opt</code>, <code>or-opt</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — local search</td></tr>
+        <tr><td><strong>Auto-seeds from</strong></td><td><code>nn</code> (nearest neighbor)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Local search algorithm that relocates <em>segments</em> of 1, 2, or 3 consecutive cities to a better position elsewhere in the tour. This is a <em>relocation</em> move, as opposed to the <em>reversal</em> move used by 2-opt and 3-opt — the two strategies find different local optima and are complementary.</p>
+<p>Each pass scans all possible relocations across all three segment sizes (Or-1, Or-2, Or-3), applies the single best improving move found, and repeats until no relocation improves the tour (best-improvement strategy). Reversed insertion is also attempted for Or-2 and Or-3 moves.</p>
+<p>Or-opt is a restricted form of 3-opt where one of the three segments is always inserted intact (or reversed) without any further reconnection.</p>
+<p>Auto-expands to <code>pipeline(nn, or_opt)</code>.</p>
+<h3>Move structure</h3>
+<pre><code class="shj-lang-plain">Or-1 — relocate a single city:
+  Before: ... A → [B] → C ... X → Y ...
+  After:  ... A → C ... X → [B] → Y ...
+
+Or-2 — relocate an adjacent pair:
+  Before: ... A → [B → C] → D ... X → Y ...
+  After:  ... A → D ... X → [B → C] → Y ...
+
+Or-3 — relocate a triple:
+  Before: ... A → [B → C → D] → E ... X → Y ...
+  After:  ... A → E ... X → [B → C → D] → Y ...</code></pre><h3>When to use</h3>
+<p>Or-opt works well as a post-processing step after any constructive or metaheuristic solver. Because it catches improvements that 2-opt misses (and vice versa), combining them via the pipeline is more effective than either alone:</p>
+<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> pipeline --steps<span class="shj-syn-oper">=</span>nn,2opt,or_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><h2>Options</h2>
+<table>
+  <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+        <tr><td><code>--epochs</code></td><td>Maximum passes (0 = until convergence)</td><td>0</td></tr>
+  </tbody>
+</table>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># auto-expands to pipeline(nn, or_opt)</span>
+<span class="shj-syn-func">teeline</span> solve or_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># explicit alias</span>
+<span class="shj-syn-func">teeline</span> solve or-opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># skip seeding — start from input city order</span>
+<span class="shj-syn-func">teeline</span> solve or_opt --no-seed<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># combine with 2-opt for deeper local search</span>
+<span class="shj-syn-func">teeline</span> pipeline --steps<span class="shj-syn-oper">=</span>nn,2opt,or_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><h2>References</h2>
+<ul>
+<li>Or, I. (1976) — <em>Traveling Salesman-Type Combinatorial Problems and Their Relation to the Logistics of Regional Blood Banking</em>, Northwestern University dissertation</li>
+<li>Applegate, D. et al. (2006) — <em>The Traveling Salesman Problem</em>, Princeton University Press</li>
+<li><a href="https://en.wikipedia.org/wiki/Or-opt">Or-opt (Wikipedia)</a></li>
+</ul>
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

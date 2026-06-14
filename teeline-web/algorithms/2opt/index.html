@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2-opt — Teeline</title>
+    <meta name="description" content="Local search algorithm that iteratively improves a tour by removing two edges and reconnecting the resulting segments in the only other valid way (reversing the segment between the two removed edges). Repeats until no improving swap exists — a local" />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>2-opt</li>
+          </ul>
+        </nav>
+
+                <p class="docs-type-badge">Heuristic — local search</p>
+                        <h1>2-opt</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>2opt</code>, <code>two_opt</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — local search</td></tr>
+        <tr><td><strong>Auto-seeds from</strong></td><td><code>nn</code> (nearest neighbor)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Local search algorithm that iteratively improves a tour by removing two edges and reconnecting the resulting segments in the only other valid way (reversing the segment between the two removed edges). Repeats until no improving swap exists — a local optimum.</p>
+<p>Auto-expands to <code>pipeline(nn, 2opt)</code>: the nearest-neighbor tour seeds the search so the local optimizer starts in a good region rather than wasting iterations escaping a random tour.</p>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># auto-expands to pipeline(nn, 2opt)</span>
+<span class="shj-syn-func">teeline</span> solve 2opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+<span class="shj-syn-func">teeline</span> solve two_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --verbose
+
+<span class="shj-syn-cmnt"># skip seeding — start from input city order</span>
+<span class="shj-syn-func">teeline</span> solve 2opt --no-seed<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><h2>References</h2>
+<ul>
+<li><a href="https://youtu.be/dYEWqrp-mho">Section 20.4: The 2-OPT Heuristic (YouTube)</a></li>
+<li><a href="https://en.wikipedia.org/wiki/2-opt">2-opt (Wikipedia)</a></li>
+</ul>
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

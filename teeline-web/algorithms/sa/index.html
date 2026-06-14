@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simulated Annealing — Teeline</title>
+    <meta name="description" content="Probabilistic local search inspired by the annealing process in metallurgy. Each iteration proposes a random tour modification. Improvements are always accepted; worsenings are accepted with probability exp(−Δ/T), where T is the current &quot;temperature&quot;" />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Simulated Annealing</li>
+          </ul>
+        </nav>
+
+                <p class="docs-type-badge">Heuristic — local search (stochastic)</p>
+                        <h1>Simulated Annealing</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>sa</code>, <code>simulated_annealing</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — local search (stochastic)</td></tr>
+        <tr><td><strong>Auto-seeds from</strong></td><td><code>shuffle</code> (random tour)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Probabilistic local search inspired by the annealing process in metallurgy. Each iteration proposes a random tour modification. Improvements are always accepted; worsenings are accepted with probability exp(−Δ/T), where T is the current &quot;temperature&quot;. Temperature decreases each step according to the cooling rate, so the algorithm transitions from broad exploration at high temperature to fine-tuned exploitation at low temperature.</p>
+<p>Auto-expands to <code>pipeline(shuffle, sa)</code>. The temperature schedule is calibrated for cold starts — seeding SA from a greedy NN tour constrains early exploration and typically worsens the final result. For a warm-started SA run use the <code>classic</code> preset (<code>nn → 2opt → sa</code>): the 2-opt stage removes edge crossings before SA fine-tunes the result.</p>
+<h2>Options</h2>
+<table>
+  <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+        <tr><td><code>--max_temperature</code></td><td>Starting temperature</td><td>1000.0</td></tr>
+        <tr><td><code>--min_temperature</code></td><td>Stopping temperature</td><td>0.001</td></tr>
+        <tr><td><code>--cooling_rate</code></td><td>Fractional temperature drop per step</td><td>—</td></tr>
+        <tr><td><code>--epochs</code></td><td>Maximum iterations</td><td>—</td></tr>
+  </tbody>
+</table>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># auto-expands to pipeline(shuffle, sa)</span>
+<span class="shj-syn-func">teeline</span> solve sa<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+<span class="shj-syn-func">teeline</span> solve sa<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --verbose
+
+<span class="shj-syn-cmnt"># run SA from input city order (no shuffle)</span>
+<span class="shj-syn-func">teeline</span> solve sa --no-seed<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># warm-start from a 2-opt-refined tour</span>
+<span class="shj-syn-func">teeline</span> solve classic<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># custom temperature schedule</span>
+<span class="shj-syn-func">teeline</span> solve sa<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --cooling_rate<span class="shj-syn-oper">=</span><span class="shj-syn-num">0.003</span> --max_temperature<span class="shj-syn-oper">=</span><span class="shj-syn-num">500.0</span></code></pre><h2>References</h2>
+<ul>
+<li><em>AIMA</em>, Section 4.1.2 — Simulated Annealing</li>
+<li><a href="https://en.wikipedia.org/wiki/Simulated_annealing">Simulated annealing (Wikipedia)</a></li>
+<li>Kirkpatrick, S., Gelatt, C. D. &amp; Vecchi, M. P. (1983) — &quot;Optimization by Simulated Annealing&quot;, <em>Science</em>, 220(4598), 671–680. DOI: 10.1126/science.220.4598.671</li>
+</ul>
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>
