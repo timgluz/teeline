@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
       with:
         submodules: true
     - name: Build
@@ -44,7 +44,7 @@ jobs:
   build-wasm:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: true
     - name: Install cargo-component
@@ -66,7 +66,7 @@ jobs:
   build-qt:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - name: Install build dependencies
       run: sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev
     - name: Install Qt 6
