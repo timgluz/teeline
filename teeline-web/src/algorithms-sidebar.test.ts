@@ -36,9 +36,8 @@ describe('renderSidebarHtml', () => {
     expect(html).not.toContain('href="/algorithms/fourier/"')
   })
 
-  it('renders non-paged solvers as plain text (no link)', () => {
+  it('renders lk as an anchor (has a docs page)', () => {
     const html = renderSidebarHtml(null)
-    // lk has no docs page yet — should be a span, not an anchor
-    expect(html).not.toContain('href="/algorithms/lk/"')
+    expect(html).toContain('href="/algorithms/lk/"')
   })
 })

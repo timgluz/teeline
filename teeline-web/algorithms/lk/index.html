@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lin-Kernighan ILS — Teeline</title>
+    <meta name="description" content="Iterated Local Search (ILS) built around a candidate-list 2-opt move with the Lin-Kernighan gain criterion. Each iteration of the inner loop scans every edge of the tour and tests replacements restricted to a pre-built candidate list of the k nearest" />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Lin-Kernighan ILS</li>
+          </ul>
+        </nav>
+
+                <p class="docs-type-badge">Heuristic — iterated local search</p>
+                        <h1>Lin-Kernighan ILS</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>lk</code>, <code>lin_kernighan</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — iterated local search</td></tr>
+        <tr><td><strong>Auto-seeds from</strong></td><td><code>nn</code> (nearest neighbor)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Iterated Local Search (ILS) built around a candidate-list 2-opt move with the Lin-Kernighan gain criterion. Each iteration of the inner loop scans every edge of the tour and tests replacements restricted to a pre-built candidate list of the <code>k</code> nearest neighbours. The LK gain bound short-circuits the search: when the cheapest candidate edge already costs more than the edge being removed, no profitable swap exists further down the sorted list, so the scan stops early. The inner loop repeats until no improving move remains (a local optimum is reached).</p>
+<p>Once the inner optimizer stalls, a <strong>double-bridge</strong> perturbation kicks the tour out of the current basin of attraction. Double-bridge is a non-sequential 4-opt move that splits the tour at four random cut points and reconnects the four segments in a different order — the resulting tour cannot be reached by any 2-opt or 3-opt move, so it provides a genuinely different starting point for the next optimization pass. The best tour seen across all restarts is kept; a configurable plateau counter terminates early if no improvement is found for <code>platoo_epochs</code> consecutive restarts.</p>
+<p>Auto-expands to <code>pipeline(nn, lk)</code>: the nearest-neighbour tour provides a low-cost starting point, avoiding the wasted restarts that a random seed would require.</p>
+<h2>Options</h2>
+<table>
+  <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+        <tr><td><code>--epochs</code></td><td>Number of ILS restarts</td><td>10 000</td></tr>
+        <tr><td><code>--platoo_epochs</code></td><td>Stop after this many non-improving restarts</td><td>500</td></tr>
+        <tr><td><code>--n_nearest</code></td><td>Candidate list size (k nearest neighbours per city)</td><td>3</td></tr>
+        <tr><td><code>--max_depth</code></td><td>Maximum 2-opt move depth (currently unused in the inner loop)</td><td>5</td></tr>
+  </tbody>
+</table>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># auto-expands to pipeline(nn, lk)</span>
+<span class="shj-syn-func">teeline</span> solve lk<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># verbose output (prints tour distance each improvement)</span>
+<span class="shj-syn-func">teeline</span> solve lk<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --verbose
+
+<span class="shj-syn-cmnt"># skip NN seeding — start from input city order</span>
+<span class="shj-syn-func">teeline</span> solve lk --no-seed<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># wider candidate list and longer run</span>
+<span class="shj-syn-func">teeline</span> solve lk<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --n_nearest<span class="shj-syn-oper">=</span><span class="shj-syn-num">5</span> --epochs<span class="shj-syn-oper">=</span><span class="shj-syn-num">50000</span></code></pre><h2>Benchmark</h2>
+<table>
+  <thead><tr><th>Instance</th><th>Optimal</th><th>This solver</th><th>Gap</th></tr></thead>
+  <tbody>
+        <tr><td>berlin52</td><td>7 542</td><td>~8 100–8 300</td><td>~8–9%</td></tr>
+  </tbody>
+</table>
+<p>The gap reflects the 2-opt depth of the inner optimizer. True LK moves use sequential edge exchanges of depth ≥ 3, which this implementation approximates with the LK gain criterion applied to 2-opt moves. A depth-3 LK pass would reduce the gap to ≈ 1–2% (tracked in GH #184).</p>
+<h2>References</h2>
+<ul>
+<li>Lin, S. &amp; Kernighan, B. W. (1973) — &quot;An Effective Heuristic Algorithm for the Traveling-Salesman Problem&quot;, <em>Operations Research</em>, <strong>21</strong>(2), 498–516. DOI: 10.1287/opre.21.2.498
+(source of the gain criterion and candidate-list restriction used in the inner optimizer)</li>
+<li><a href="https://en.wikipedia.org/wiki/4-opt#Double-bridge_move">4-opt — Double bridge move (Wikipedia)</a></li>
+<li><a href="https://en.wikipedia.org/wiki/Iterated_local_search">Iterated Local Search (Wikipedia)</a></li>
+</ul>
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>
