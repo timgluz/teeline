@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
       with:
         submodules: true
     - name: Build
@@ -35,7 +35,7 @@ jobs:
     - name: Coverage
       run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
     - name: Upload coverage
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v7
       with:
         files: lcov.info
       env:
@@ -44,7 +44,7 @@ jobs:
   build-wasm:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: true
     - name: Install cargo-component
@@ -56,7 +56,7 @@ jobs:
     - name: Build WASM component
       run: cd teeline-wasm && cargo component build --target wasm32-wasip2
     - name: Upload WASM artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: teeline-wasm-debug
         path: target/wasm32-wasip2/debug/teeline_wasm.wasm
@@ -66,7 +66,7 @@ jobs:
   build-qt:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v6
     - name: Install build dependencies
       run: sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev
     - name: Install Qt 6
