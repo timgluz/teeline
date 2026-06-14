@@ -486,58 +486,56 @@ fn run_solvers(args: &ArgMatches) {
         .unwrap_or(false);
 
     if json_mode {
-        let arr: Vec<_> = list_solvers()
-            .iter()
-            .filter(|s| {
-                if only_heuristic {
-                    !s.exact && s.category != "Utility"
-                } else if only_exact {
-                    s.exact
-                } else {
-                    true
-                }
-            })
-            .map(|s| {
-                json!({
-                    "name": s.name,
-                    "alias": s.alias,
-                    "category": s.category,
-                    "complexity": s.complexity,
-                    "has_options": s.has_options,
-                    "exact": s.exact,
-                })
-            })
-            .collect();
-        println!("{}", serde_json::to_string(&arr).unwrap());
-        return;
-    }
-
-    let all = Solvers::all_meta();
-    let filtered = all.iter().filter(|m| {
-        if only_heuristic {
-            m.kind == SolverKind::Heuristic
-        } else if only_exact {
-            m.kind == SolverKind::Exact
-        } else {
-            true
-        }
-    });
-
-    if short {
-        for m in filtered {
-            println!("{}", m.short());
-        }
+        print_solvers_json(only_heuristic, only_exact);
+    } else if short {
+        print_solvers_short(only_heuristic, only_exact);
     } else {
-        println!("{:<22} {:<8} TYPE", "NAME", "ALIAS");
-        for m in filtered {
-            println!("{:<22} {:<8} {}", m.name, m.alias.unwrap_or("—"), m.kind.as_str());
-        }
+        print_solvers_table(only_heuristic, only_exact);
     }
 }
 
 // ---------------------------------------------------------------------------
 // Output helpers
 // ---------------------------------------------------------------------------
+
+fn solver_meta_matches(m: &tsp::SolverMeta, only_heuristic: bool, only_exact: bool) -> bool {
+    if only_heuristic { m.kind == SolverKind::Heuristic }
+    else if only_exact { m.kind == SolverKind::Exact }
+    else { true }
+}
+
+fn print_solvers_table(only_heuristic: bool, only_exact: bool) {
+    println!("{:<22} {:<8} TYPE", "NAME", "ALIAS");
+    for m in Solvers::all_meta().iter().filter(|m| solver_meta_matches(m, only_heuristic, only_exact)) {
+        println!("{:<22} {:<8} {}", m.name, m.alias.unwrap_or("—"), m.kind.as_str());
+    }
+}
+
+fn print_solvers_short(only_heuristic: bool, only_exact: bool) {
+    for m in Solvers::all_meta().iter().filter(|m| solver_meta_matches(m, only_heuristic, only_exact)) {
+        println!("{}", m.short());
+    }
+}
+
+fn print_solvers_json(only_heuristic: bool, only_exact: bool) {
+    let arr: Vec<_> = list_solvers()
+        .iter()
+        .filter(|s| {
+            if only_heuristic { !s.exact && s.category != "Utility" }
+            else if only_exact { s.exact }
+            else { true }
+        })
+        .map(|s| json!({
+            "name": s.name,
+            "alias": s.alias,
+            "category": s.category,
+            "complexity": s.complexity,
+            "has_options": s.has_options,
+            "exact": s.exact,
+        }))
+        .collect();
+    println!("{}", serde_json::to_string(&arr).unwrap());
+}
 
 fn print_solution(tour: &Solution, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };
