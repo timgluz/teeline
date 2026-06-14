@@ -38,7 +38,7 @@ describe('renderSidebarHtml', () => {
 
   it('renders non-paged solvers as plain text (no link)', () => {
     const html = renderSidebarHtml(null)
-    // bhk has no docs page yet — should be a span, not an anchor
-    expect(html).not.toContain('href="/algorithms/bhk/"')
+    // lk has no docs page yet — should be a span, not an anchor
+    expect(html).not.toContain('href="/algorithms/lk/"')
   })
 })

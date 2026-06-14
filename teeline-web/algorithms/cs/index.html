@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cuckoo Search — Teeline</title>
+    <meta name="description" content="Nature-inspired metaheuristic modelling brood parasitism. Uses Lévy-flight-driven 2-opt reversals and per-nest Bernoulli abandonment to balance exploration and exploitation." />
+    <style>[class*=shj-lang-]{white-space:pre;color:#112;text-shadow:none;box-sizing:border-box;background:#fff;border-radius:10px;max-width:min(100%,100vw);margin:10px 0;padding:30px 20px;font:18px/24px Consolas,Courier New,Monaco,Andale Mono,Ubuntu Mono,monospace;box-shadow:0 0 5px #0001}.shj-inline{border-radius:5px;margin:0;padding:2px 5px;display:inline-block}[class*=shj-lang-]::selection{background:#bdf5}[class*=shj-lang-] ::selection{background:#bdf5}[class*=shj-lang-]>div{display:flex;overflow:auto}[class*=shj-lang-]>div :last-child{outline:none;flex:1}.shj-numbers{counter-reset:line;padding-left:5px}.shj-numbers div{padding-right:5px}.shj-numbers div:before{color:#999;content:counter(line);opacity:.5;text-align:right;counter-increment:line;margin-right:5px;display:block}.shj-syn-cmnt{font-style:italic}.shj-syn-err,.shj-syn-kwd{color:#e16}.shj-syn-num,.shj-syn-class{color:#f60}.shj-syn-insert,.shj-syn-str{color:#7d8}.shj-syn-bool{color:#3bf}.shj-syn-type,.shj-syn-oper{color:#5af}.shj-syn-section,.shj-syn-func{color:#84f}.shj-syn-deleted,.shj-syn-var{color:#f44}.shj-oneline{padding:12px 10px}.shj-lang-http.shj-oneline .shj-syn-kwd{color:#fff;background:#25f;border-radius:5px;padding:5px 7px}[class*=shj-lang-]{color:#24292f;background:#fff}.shj-syn-deleted,.shj-syn-err,.shj-syn-kwd{color:#cf222e}.shj-syn-class{color:#953800}.shj-numbers,.shj-syn-cmnt{color:#6e7781}.shj-syn-type,.shj-syn-oper,.shj-syn-num,.shj-syn-section,.shj-syn-var,.shj-syn-bool{color:#0550ae}.shj-syn-str{color:#0a3069}.shj-syn-func{color:#8250df}</style>
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Cuckoo Search</li>
+          </ul>
+        </nav>
+
+        <p class="docs-type-badge">Heuristic · nature-inspired metaheuristic</p>
+        
+        <h1>Cuckoo Search</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>cs</code>, <code>cuckoo_search</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — nature-inspired metaheuristic</td></tr>
+        <tr><td><strong>Auto-seeds from</strong></td><td><code>shuffle</code> (random nests)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Nature-inspired metaheuristic that models brood parasitism in cuckoos. Maintains a population of <em>nests</em> (candidate tours). Each epoch:</p>
+<ol>
+<li>A new cuckoo tour is generated from a randomly selected nest via a <strong>Lévy flight</strong> step — a sequence of random 2-opt reversals whose count is drawn from a power-law Lévy distribution.</li>
+<li>The cuckoo tour replaces a random nest if it is better.</li>
+<li>Each nest is independently <strong>abandoned</strong> with probability <code>pa</code> and re-seeded randomly (Bernoulli nest abandonment) to maintain population diversity.</li>
+</ol>
+<p><strong>TSP-specific adaptations</strong> (deviations from Yang &amp; Deb 2009):</p>
+<table>
+  <thead><tr><th>Adaptation</th><th>Reason</th></tr></thead>
+  <tbody>
+        <tr><td>Lévy flight → k random 2-opt reversals</td><td>Maps continuous step magnitude to a discrete tour perturbation; preserves permutation validity</td></tr>
+        <tr><td>k capped at n/2</td><td>Prevents full-tour scrambles from very large Lévy draws</td></tr>
+        <tr><td>β=1.5 fixed; σ_u≈0.6966 precomputed</td><td>Standard Lévy exponent (Mantegna 1994); constant avoids repeated gamma evaluation</td></tr>
+        <tr><td>Per-nest Bernoulli abandonment</td><td>Closer to the original paper than deterministic worst-k; avoids discarding more information per epoch than Lévy moves can recover</td></tr>
+  </tbody>
+</table>
+<p>Auto-expands to <code>pipeline(shuffle, cs)</code>.</p>
+<h2>Options</h2>
+<table>
+  <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+        <tr><td><code>--epochs</code></td><td>Maximum iterations</td><td>10 000</td></tr>
+        <tr><td><code>--n_nearest</code></td><td>Number of nests (floored at 25)</td><td>25</td></tr>
+        <tr><td><code>--mutation_probability</code></td><td>Per-nest abandonment probability <code>pa</code></td><td>0.001</td></tr>
+  </tbody>
+</table>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> solve cs<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+<span class="shj-syn-func">teeline</span> solve cuckoo_search<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --epochs<span class="shj-syn-oper">=</span><span class="shj-syn-num">500</span>
+<span class="shj-syn-func">teeline</span> solve cs<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --n_nearest<span class="shj-syn-oper">=</span><span class="shj-syn-num">40</span> --mutation_probability<span class="shj-syn-oper">=</span><span class="shj-syn-num">0.25</span></code></pre><h2>References</h2>
+<ul>
+<li>Yang, X.-S. &amp; Deb, S. (2009) — &quot;Cuckoo Search via Lévy Flights&quot;, <em>Proc. World Congress on Nature &amp; Biologically Inspired Computing (NaBIC 2009)</em>, IEEE, pp. 210–214</li>
+<li><a href="https://en.wikipedia.org/wiki/Cuckoo_search">Cuckoo search (Wikipedia)</a></li>
+</ul>
+
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

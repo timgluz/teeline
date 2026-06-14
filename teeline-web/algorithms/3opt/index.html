@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3-opt — Teeline</title>
+    <meta name="description" content="Extension of 2-opt that removes three edges per iteration and reconnects the three segments in the best of eight possible configurations. Deeper local optima than 2-opt at O(n³) per pass." />
+    <style>[class*=shj-lang-]{white-space:pre;color:#112;text-shadow:none;box-sizing:border-box;background:#fff;border-radius:10px;max-width:min(100%,100vw);margin:10px 0;padding:30px 20px;font:18px/24px Consolas,Courier New,Monaco,Andale Mono,Ubuntu Mono,monospace;box-shadow:0 0 5px #0001}.shj-inline{border-radius:5px;margin:0;padding:2px 5px;display:inline-block}[class*=shj-lang-]::selection{background:#bdf5}[class*=shj-lang-] ::selection{background:#bdf5}[class*=shj-lang-]>div{display:flex;overflow:auto}[class*=shj-lang-]>div :last-child{outline:none;flex:1}.shj-numbers{counter-reset:line;padding-left:5px}.shj-numbers div{padding-right:5px}.shj-numbers div:before{color:#999;content:counter(line);opacity:.5;text-align:right;counter-increment:line;margin-right:5px;display:block}.shj-syn-cmnt{font-style:italic}.shj-syn-err,.shj-syn-kwd{color:#e16}.shj-syn-num,.shj-syn-class{color:#f60}.shj-syn-insert,.shj-syn-str{color:#7d8}.shj-syn-bool{color:#3bf}.shj-syn-type,.shj-syn-oper{color:#5af}.shj-syn-section,.shj-syn-func{color:#84f}.shj-syn-deleted,.shj-syn-var{color:#f44}.shj-oneline{padding:12px 10px}.shj-lang-http.shj-oneline .shj-syn-kwd{color:#fff;background:#25f;border-radius:5px;padding:5px 7px}[class*=shj-lang-]{color:#24292f;background:#fff}.shj-syn-deleted,.shj-syn-err,.shj-syn-kwd{color:#cf222e}.shj-syn-class{color:#953800}.shj-numbers,.shj-syn-cmnt{color:#6e7781}.shj-syn-type,.shj-syn-oper,.shj-syn-num,.shj-syn-section,.shj-syn-var,.shj-syn-bool{color:#0550ae}.shj-syn-str{color:#0a3069}.shj-syn-func{color:#8250df}</style>
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>3-opt</li>
+          </ul>
+        </nav>
+
+        <p class="docs-type-badge">Heuristic · local search</p>
+        
+        <h1>3-opt</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>3opt</code>, <code>three_opt</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — local search</td></tr>
+        <tr><td><strong>Auto-seeds from</strong></td><td><code>nn</code> (nearest neighbor)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Extension of 2-opt that removes three edges per iteration and reconnects the three segments in the best of the eight possible reconnection configurations. Each pass tries every triple of edges, keeps the single best improvement found, and repeats until no triple yields improvement.</p>
+<p>Finds deeper local optima than 2-opt at the cost of O(n³) per pass. Typical tour quality is a few percentage points better than <code>nn → 2opt</code> at the expense of longer runtime.</p>
+<p>Auto-expands to <code>pipeline(nn, 3opt)</code>.</p>
+<h2>Options</h2>
+<table>
+  <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+        <tr><td><code>--epochs</code></td><td>Maximum passes (0 = until convergence)</td><td>0</td></tr>
+  </tbody>
+</table>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># auto-expands to pipeline(nn, 3opt)</span>
+<span class="shj-syn-func">teeline</span> solve 3opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># as part of the thorough preset (nn → 3opt → SA)</span>
+<span class="shj-syn-func">teeline</span> solve thorough<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># skip seeding</span>
+<span class="shj-syn-func">teeline</span> solve 3opt --no-seed<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><h2>References</h2>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/3-opt">3-opt (Wikipedia)</a></li>
+<li>Lin, S. (1965) — &quot;Computer Solutions of the Traveling Salesman Problem&quot;, <em>Bell System Technical Journal</em>, 44, 2245–2269</li>
+</ul>
+
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

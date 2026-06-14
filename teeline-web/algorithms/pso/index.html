@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Particle Swarm Optimisation — Teeline</title>
+    <meta name="description" content="Swarm metaheuristic where each particle is a candidate tour with a velocity (ordered swap list) pulled toward personal and global bests. Velocity-capped with linearly decaying inertia." />
+    <style>[class*=shj-lang-]{white-space:pre;color:#112;text-shadow:none;box-sizing:border-box;background:#fff;border-radius:10px;max-width:min(100%,100vw);margin:10px 0;padding:30px 20px;font:18px/24px Consolas,Courier New,Monaco,Andale Mono,Ubuntu Mono,monospace;box-shadow:0 0 5px #0001}.shj-inline{border-radius:5px;margin:0;padding:2px 5px;display:inline-block}[class*=shj-lang-]::selection{background:#bdf5}[class*=shj-lang-] ::selection{background:#bdf5}[class*=shj-lang-]>div{display:flex;overflow:auto}[class*=shj-lang-]>div :last-child{outline:none;flex:1}.shj-numbers{counter-reset:line;padding-left:5px}.shj-numbers div{padding-right:5px}.shj-numbers div:before{color:#999;content:counter(line);opacity:.5;text-align:right;counter-increment:line;margin-right:5px;display:block}.shj-syn-cmnt{font-style:italic}.shj-syn-err,.shj-syn-kwd{color:#e16}.shj-syn-num,.shj-syn-class{color:#f60}.shj-syn-insert,.shj-syn-str{color:#7d8}.shj-syn-bool{color:#3bf}.shj-syn-type,.shj-syn-oper{color:#5af}.shj-syn-section,.shj-syn-func{color:#84f}.shj-syn-deleted,.shj-syn-var{color:#f44}.shj-oneline{padding:12px 10px}.shj-lang-http.shj-oneline .shj-syn-kwd{color:#fff;background:#25f;border-radius:5px;padding:5px 7px}[class*=shj-lang-]{color:#24292f;background:#fff}.shj-syn-deleted,.shj-syn-err,.shj-syn-kwd{color:#cf222e}.shj-syn-class{color:#953800}.shj-numbers,.shj-syn-cmnt{color:#6e7781}.shj-syn-type,.shj-syn-oper,.shj-syn-num,.shj-syn-section,.shj-syn-var,.shj-syn-bool{color:#0550ae}.shj-syn-str{color:#0a3069}.shj-syn-func{color:#8250df}</style>
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Particle Swarm</li>
+          </ul>
+        </nav>
+
+        <p class="docs-type-badge">Heuristic · swarm metaheuristic</p>
+        
+        <h1>Particle Swarm Optimisation</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>pso</code>, <code>particle_swarm</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — swarm metaheuristic</td></tr>
+        <tr><td><strong>Auto-seeds from</strong></td><td><code>shuffle</code> (random swarm)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>Swarm metaheuristic where each particle is a candidate tour with a velocity — an ordered list of position swaps. Each iteration, the velocity is updated to pull the particle toward both its personal best tour and the global best tour found by any particle. The new position (tour) is obtained by applying the velocity swaps.</p>
+<p><strong>TSP-specific adaptations</strong> (deviations from Clerc 2004):</p>
+<table>
+  <thead><tr><th>Adaptation</th><th>Reason</th></tr></thead>
+  <tbody>
+        <tr><td>Velocity cap at <code>⌈0.35 · n⌉</code> swaps</td><td>Without a cap, velocity grows to ~5n swaps per epoch, scrambling tours into noise</td></tr>
+        <tr><td>Linear inertia decay W: 0.9 → 0.4</td><td>High inertia early for broad exploration; decays like a cooling schedule for late fine-tuning</td></tr>
+        <tr><td>All particles initialised randomly</td><td>Seeding via the pipeline; PSO itself stays a pure algorithm</td></tr>
+  </tbody>
+</table>
+<p>Auto-expands to <code>pipeline(shuffle, pso)</code>.</p>
+<h2>Options</h2>
+<table>
+  <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
+  <tbody>
+        <tr><td><code>--epochs</code></td><td>Maximum iterations</td><td>10 000</td></tr>
+        <tr><td><code>--n_nearest</code></td><td>Number of particles (floored at 30)</td><td>30</td></tr>
+  </tbody>
+</table>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> solve pso<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+<span class="shj-syn-func">teeline</span> solve particle_swarm<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --epochs<span class="shj-syn-oper">=</span><span class="shj-syn-num">500</span>
+<span class="shj-syn-func">teeline</span> solve pso<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --n_nearest<span class="shj-syn-oper">=</span><span class="shj-syn-num">50</span></code></pre><h2>References</h2>
+<ul>
+<li><a href="https://en.wikipedia.org/wiki/Particle_swarm_optimization">Particle swarm optimisation (Wikipedia)</a></li>
+<li>Kennedy, J. &amp; Eberhart, R. (1995) — &quot;Particle Swarm Optimization&quot;, <em>Proc. IEEE ICNN&#39;95</em>, Vol. 4, pp. 1942–1948. DOI: 10.1109/ICNN.1995.488968</li>
+<li>Clerc, M. (2004) — &quot;Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem&quot;, in <em>New Optimization Techniques in Engineering</em>, Springer, pp. 219–239</li>
+</ul>
+
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

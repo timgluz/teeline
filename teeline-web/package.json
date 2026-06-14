@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build && node scripts/copy-wasm.mjs",
-    "build:check": "tsc && vite build",
+    "dev": "node scripts/build-docs.mjs && vite",
+    "build": "node scripts/build-docs.mjs && tsc && vite build && node scripts/copy-wasm.mjs",
+    "build:check": "node scripts/build-docs.mjs && tsc && vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "deploy": "npm run build && wrangler pages deploy dist/"
@@ -21,6 +21,7 @@
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
+    "marked": "^18.0.5",
     "typescript": "6.0.3",
     "vite": "8.0.14",
     "vitest": "4.1.7",

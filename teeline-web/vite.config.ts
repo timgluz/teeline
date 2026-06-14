@@ -1,6 +1,19 @@
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
+import { existsSync } from 'fs'
+import { globSync } from 'tinyglobby'
+
+// Dynamically discover all generated solver doc pages and explainer sub-pages.
+// build-docs.mjs must run before vite build to populate algorithms/*/index.html.
+const algoPages = Object.fromEntries(
+  globSync('algorithms/*/index.html').map(f => [f.split('/')[1], f])
+)
+const explainerPages = Object.fromEntries(
+  globSync('algorithms/*/explainer/index.html')
+    .filter(f => existsSync(f))
+    .map(f => [`${f.split('/')[1]}Explainer`, f])
+)
 
 export default defineConfig({
   build: {
@@ -9,8 +22,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
-        fourier: 'algorithms/fourier/index.html',
-        fourierExplainer: 'algorithms/fourier/explainer/index.html',
+        ...algoPages,
+        ...explainerPages,
       },
     },
   },

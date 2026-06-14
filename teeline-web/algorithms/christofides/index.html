@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Christofides — Teeline</title>
+    <meta name="description" content="Approximation algorithm with a provable 1.5× optimal bound for metric TSP. Builds a tour via MST, minimum-weight matching, Eulerian circuit, and shortcutting." />
+    <style>[class*=shj-lang-]{white-space:pre;color:#112;text-shadow:none;box-sizing:border-box;background:#fff;border-radius:10px;max-width:min(100%,100vw);margin:10px 0;padding:30px 20px;font:18px/24px Consolas,Courier New,Monaco,Andale Mono,Ubuntu Mono,monospace;box-shadow:0 0 5px #0001}.shj-inline{border-radius:5px;margin:0;padding:2px 5px;display:inline-block}[class*=shj-lang-]::selection{background:#bdf5}[class*=shj-lang-] ::selection{background:#bdf5}[class*=shj-lang-]>div{display:flex;overflow:auto}[class*=shj-lang-]>div :last-child{outline:none;flex:1}.shj-numbers{counter-reset:line;padding-left:5px}.shj-numbers div{padding-right:5px}.shj-numbers div:before{color:#999;content:counter(line);opacity:.5;text-align:right;counter-increment:line;margin-right:5px;display:block}.shj-syn-cmnt{font-style:italic}.shj-syn-err,.shj-syn-kwd{color:#e16}.shj-syn-num,.shj-syn-class{color:#f60}.shj-syn-insert,.shj-syn-str{color:#7d8}.shj-syn-bool{color:#3bf}.shj-syn-type,.shj-syn-oper{color:#5af}.shj-syn-section,.shj-syn-func{color:#84f}.shj-syn-deleted,.shj-syn-var{color:#f44}.shj-oneline{padding:12px 10px}.shj-lang-http.shj-oneline .shj-syn-kwd{color:#fff;background:#25f;border-radius:5px;padding:5px 7px}[class*=shj-lang-]{color:#24292f;background:#fff}.shj-syn-deleted,.shj-syn-err,.shj-syn-kwd{color:#cf222e}.shj-syn-class{color:#953800}.shj-numbers,.shj-syn-cmnt{color:#6e7781}.shj-syn-type,.shj-syn-oper,.shj-syn-num,.shj-syn-section,.shj-syn-var,.shj-syn-bool{color:#0550ae}.shj-syn-str{color:#0a3069}.shj-syn-func{color:#8250df}</style>
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
+      </aside>
+      <main class="docs-main">
+
+        <nav aria-label="breadcrumb">
+          <ul>
+            <li><a href="/">teeline</a></li>
+            <li>Algorithms</li>
+            <li>Christofides</li>
+          </ul>
+        </nav>
+
+        <p class="docs-type-badge">Heuristic · constructive approximation</p>
+        
+        <h1>Christofides</h1>
+<table class="docs-meta-table">
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+        <tr><td><strong>Alias</strong></td><td><code>christofides</code>, <code>chr</code></td></tr>
+        <tr><td><strong>Type</strong></td><td>Heuristic — constructive approximation</td></tr>
+        <tr><td><strong>Approximation bound</strong></td><td>≤ 1.5× optimal (EUC_2D only)</td></tr>
+  </tbody>
+</table>
+<h2>Description</h2>
+<p>The only TSP heuristic with a <strong>provable worst-case bound</strong>: the output tour is always within 1.5× the optimal length, provided the distance matrix satisfies the triangle inequality (TSPLIB EUC_2D instances do; arbitrary FULL_MATRIX instances may not).</p>
+<p>The algorithm builds a tour from scratch through six deterministic steps:</p>
+<pre><code class="shj-lang-plain">1. Minimum Spanning Tree (Prim's, O(n²))
+2. Identify odd-degree MST vertices
+3. Greedy min-weight perfect matching on odd-degree vertices
+4. Overlay MST + matching → multigraph (all degrees now even)
+5. Eulerian circuit (Hierholzer's algorithm)
+6. Shortcut repeated cities → Hamiltonian tour</code></pre><p>Because it is <strong>constructive</strong> (not a local search), it does not use or benefit from a seed tour. Its output is a natural warm-start for Lin-Kernighan:</p>
+<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> pipeline --steps<span class="shj-syn-oper">=</span>christofides,lk<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><p>On berlin52 this reduces the tour from 8707 (Christofides alone) to 8156 (+8.1% vs optimal).</p>
+<h3>Why each step matters</h3>
+<p><strong>Step 1 (MST):</strong> Gives a lower bound on OPT (MST cost ≤ OPT). Acts as the tour&#39;s skeleton.</p>
+<p><strong>Steps 2–3 (Matching):</strong> The MST has some odd-degree vertices; Euler&#39;s theorem requires all vertices to have even degree. A perfect matching on odd-degree vertices fixes this while adding the minimum extra edge weight.</p>
+<p><strong>Step 5 (Eulerian circuit):</strong> The combined multigraph is guaranteed connected and Eulerian (all even degrees). Hierholzer&#39;s algorithm finds the circuit in O(edges) time.</p>
+<p><strong>Step 6 (Shortcut):</strong> Skipping already-visited cities in the Eulerian walk never increases tour length when the triangle inequality holds — this is where the 1.5× proof closes.</p>
+<h3>When to use</h3>
+<ul>
+<li>You need a <strong>guaranteed quality bound</strong> (not just empirical quality).</li>
+<li>You need a <strong>reproducible constructive tour</strong> to seed another solver.</li>
+<li>You want to study classic approximation algorithm theory in a concrete implementation.</li>
+</ul>
+<h2>Options</h2>
+<p>Christofides is parameter-free. <code>--epochs</code> and other options are accepted but ignored.</p>
+<h2>Usage</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># standalone</span>
+<span class="shj-syn-func">teeline</span> solve christofides<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># short alias</span>
+<span class="shj-syn-func">teeline</span> solve chr<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># as warm-start for LK (recommended usage)</span>
+<span class="shj-syn-func">teeline</span> pipeline --steps<span class="shj-syn-oper">=</span>christofides,lk<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
+
+<span class="shj-syn-cmnt"># combine with Or-opt instead of LK</span>
+<span class="shj-syn-func">teeline</span> pipeline --steps<span class="shj-syn-oper">=</span>christofides,or_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><h2>References</h2>
+<ul>
+<li>Christofides, N. (1976) — &quot;Worst-case analysis of a new heuristic for the travelling salesman problem,&quot; Carnegie Mellon University report</li>
+<li>Applegate, D. et al. (2006) — <em>The Traveling Salesman Problem</em>, Princeton University Press, Chapter 2</li>
+<li>Hierholzer, C. &amp; Wiener, C. (1873) — &quot;Ueber die Möglichkeit, einen Linienzug ohne Wiederholung und ohne Unterbrechung zu umfahren&quot;, <em>Mathematische Annalen</em>, 6(1), 30–32</li>
+<li><a href="https://en.wikipedia.org/wiki/Christofides_algorithm">Christofides algorithm (Wikipedia)</a></li>
+</ul>
+
+      </main>
+    </div>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>
