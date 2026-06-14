@@ -10,7 +10,7 @@
 
 Iterated Local Search (ILS) built around a candidate-list 2-opt move with the Lin-Kernighan gain criterion. Each iteration of the inner loop scans every edge of the tour and tests replacements restricted to a pre-built candidate list of the `k` nearest neighbours. The LK gain bound short-circuits the search: when the cheapest candidate edge already costs more than the edge being removed, no profitable swap exists further down the sorted list, so the scan stops early. The inner loop repeats until no improving move remains (a local optimum is reached).
 
-Once the inner optimizer stalls, a **double-bridge** perturbation kicks the tour out of the current basin of attraction. Double-bridge is a non-sequential 4-opt move that splits the tour at four random cut points and reconnects the four segments in a different order — the resulting tour cannot be reached by any 2-opt or 3-opt move, so it provides a genuinely different starting point for the next optimization pass. The best tour seen across all restarts is kept; a configurable plateau counter terminates early if no improvement is found for `platoo_epochs` consecutive restarts.
+Once the inner optimizer stalls, a **double-bridge** perturbation kicks the tour out of the current basin of attraction. The move cuts the tour at three random positions, producing four segments A–B–C–D, then reconnects them as A–C–B–D. Because the two middle segments are swapped, the result cannot be reached by any 2-opt or 3-opt move, so it provides a genuinely different starting point for the next optimization pass. The best tour seen across all restarts is kept; a configurable plateau counter terminates early if no improvement is found for `platoo_epochs` consecutive restarts.
 
 Auto-expands to `pipeline(nn, lk)`: the nearest-neighbour tour provides a low-cost starting point, avoiding the wasted restarts that a random seed would require.
 
@@ -51,5 +51,5 @@ The gap reflects the 2-opt depth of the inner optimizer. True LK moves use seque
 
 - Lin, S. & Kernighan, B. W. (1973) — "An Effective Heuristic Algorithm for the Traveling-Salesman Problem", *Operations Research*, **21**(2), 498–516. DOI: 10.1287/opre.21.2.498
   (source of the gain criterion and candidate-list restriction used in the inner optimizer)
-- [4-opt — Double bridge move (Wikipedia)](https://en.wikipedia.org/wiki/4-opt#Double-bridge_move)
+- [Lin–Kernighan heuristic (Wikipedia)](https://en.wikipedia.org/wiki/Lin%E2%80%93Kernighan_heuristic)
 - [Iterated Local Search (Wikipedia)](https://en.wikipedia.org/wiki/Iterated_local_search)
