@@ -352,6 +352,7 @@ jobs:
           target: desktop
           arch: linux_gcc_64
           cache: true
+          extra: '--base https://download.qt.io/'
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -430,6 +431,7 @@ jobs:
           target: desktop
           arch: win64_msvc2022_64
           cache: true
+          extra: '--base https://download.qt.io/'
       - name: Build teeline-qt
         run: cargo build --release --manifest-path teeline-qt/Cargo.toml
       - name: Deploy Qt dependencies
@@ -472,6 +474,7 @@ jobs:
           target: desktop
           arch: clang_64
           cache: true
+          extra: '--base https://download.qt.io/'
       - name: Build teeline-qt
         run: cargo build --release --manifest-path teeline-qt/Cargo.toml
       - name: Create .app bundle
