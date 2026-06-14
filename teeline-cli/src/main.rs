@@ -289,9 +289,13 @@ fn resolve_preset(name: &str) -> Option<Vec<Solvers>> {
 fn run_solve(args: &ArgMatches) {
     let solver_name = args.get_one::<String>("solver").unwrap().as_str();
     let no_seed = args.get_flag("no_seed");
+    let json_mode = args
+        .get_one::<String>("output_format")
+        .map(|s| s == "json")
+        .unwrap_or(false);
 
     if let Some(steps) = resolve_preset(solver_name) {
-        run_as_pipeline(&steps, args);
+        run_as_pipeline(&steps, args, json_mode);
         return;
     }
 
@@ -300,14 +304,14 @@ fn run_solve(args: &ArgMatches) {
 
     if !no_seed {
         if solver.auto_expand_with_nn() {
-            run_as_pipeline(&[Solvers::NearestNeighbor, solver], args);
+            run_as_pipeline(&[Solvers::NearestNeighbor, solver], args, json_mode);
         } else if solver.auto_expand_with_shuffle() {
-            run_as_pipeline(&[Solvers::RandomShuffle, solver], args);
+            run_as_pipeline(&[Solvers::RandomShuffle, solver], args, json_mode);
         } else {
-            run_as_pipeline(&[solver], args);
+            run_as_pipeline(&[solver], args, json_mode);
         }
     } else {
-        run_as_pipeline(&[solver], args);
+        run_as_pipeline(&[solver], args, json_mode);
     }
 }
 
@@ -330,23 +334,23 @@ fn run_pipeline_cmd(args: &ArgMatches) {
                     std::process::exit(1);
                 }
             };
-            run_as_pipeline_stages(stage_configs, args);
+            run_as_pipeline_stages(stage_configs, args, false);
         }
         Ok(PipelineSource::Steps(solvers)) => {
-            run_as_pipeline(&solvers, args);
+            run_as_pipeline(&solvers, args, false);
         }
     }
 }
 
-fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
+fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches, json_mode: bool) {
     let stage_configs: Vec<(Solvers, AppOptions)> = steps
         .iter()
         .map(|&s| (s, solver_options_from_args(args, s)))
         .collect();
-    run_as_pipeline_stages(stage_configs, args);
+    run_as_pipeline_stages(stage_configs, args, json_mode);
 }
 
-fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgMatches) {
+fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgMatches, json_mode: bool) {
     let verbose = args.get_flag("verbose");
     let default_level = if verbose { "debug" } else { "info" };
     let _ = tracing_subscriber::fmt()
@@ -414,11 +418,6 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
             )
         })
         .collect();
-
-    let json_mode = args
-        .get_one::<String>("output_format")
-        .map(|s| s == "json")
-        .unwrap_or(false);
 
     let n_stages = stages.len();
     let span = tracing::info_span!("solver", n_stages);
