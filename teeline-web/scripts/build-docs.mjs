@@ -6,10 +6,13 @@ import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
 import { Marked } from 'marked'
 import { highlightText } from '@speed-highlight/core'
+import { Eta } from 'eta'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const WEB_ROOT = join(__dirname, '..')
 const DOCS_ROOT = join(WEB_ROOT, '../docs/algorithms')
+
+const eta = new Eta({ views: join(__dirname, 'templates') })
 
 // Solver ID → source filename in docs/algorithms/
 const SOLVER_DOCS = {
@@ -48,10 +51,6 @@ function extractMeta(md, solverId) {
     .trim()
 
   return { name, typeBadge, description }
-}
-
-function escAttr(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 }
 
 const HIGHLIGHT_LANGS = new Set(['bash', 'rs', 'ts', 'js', 'toml', 'yaml', 'json'])
@@ -113,49 +112,6 @@ function makeMarked() {
   }
 }
 
-function renderShell({ solverId, name, typeBadge, description, bodyHtml }) {
-  const hasExplainer = existsSync(join(WEB_ROOT, `algorithms/${solverId}/explainer/index.html`))
-  const explainerCta = hasExplainer
-    ? `<a class="docs-explainer-cta" href="/algorithms/${solverId}/explainer/">▶ Open interactive explainer →</a>`
-    : ''
-  const typeBadgeHtml = typeBadge
-    ? `<p class="docs-type-badge">${typeBadge}</p>`
-    : ''
-
-  return `<!doctype html>
-<html lang="en" data-theme="light">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escAttr(name)} — Teeline</title>
-    <meta name="description" content="${escAttr(description)}" />
-  </head>
-  <body>
-    <div id="topbar"></div>
-    <div class="docs-layout">
-      <aside class="docs-sidebar">
-        <nav id="algo-sidebar" aria-label="Algorithms"></nav>
-      </aside>
-      <main class="docs-main">
-
-        <nav aria-label="breadcrumb">
-          <ul>
-            <li><a href="/">teeline</a></li>
-            <li>Algorithms</li>
-            <li>${name}</li>
-          </ul>
-        </nav>
-
-        ${typeBadgeHtml}
-        ${explainerCta}
-        ${bodyHtml}
-      </main>
-    </div>
-    <script type="module" src="/src/docs-init.ts"></script>
-  </body>
-</html>`
-}
-
 const { marked, resetFirstTable } = makeMarked()
 
 for (const [solverId, filename] of Object.entries(SOLVER_DOCS)) {
@@ -170,9 +126,11 @@ for (const [solverId, filename] of Object.entries(SOLVER_DOCS)) {
   resetFirstTable()
   const processedMd = await preHighlightCode(md)
   const bodyHtml = marked.parse(processedMd, { breaks: false, gfm: true, html: true })
+  const hasExplainer = existsSync(join(WEB_ROOT, `algorithms/${solverId}/explainer/index.html`))
 
   const outDir = join(WEB_ROOT, `algorithms/${solverId}`)
   mkdirSync(outDir, { recursive: true })
-  writeFileSync(join(outDir, 'index.html'), renderShell({ solverId, name, typeBadge, description, bodyHtml }))
+  const html = eta.render('algorithm-page', { solverId, name, typeBadge, description, bodyHtml, hasExplainer })
+  writeFileSync(join(outDir, 'index.html'), html)
   console.log(`[build-docs] docs/algorithms/${filename} → algorithms/${solverId}/index.html`)
 }
