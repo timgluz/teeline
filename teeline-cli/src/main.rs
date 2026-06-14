@@ -258,7 +258,7 @@ fn tuning_args() -> Vec<Arg> {
             .required(false),
         Arg::new("max_depth")
             .long("max-depth")
-            .help("LK: reserved for future depth-k backtracking extension (not yet active)")
+            .help("LK: max sequential-search chain depth (default 5; depth-1 = 2-opt, depth-5 = full LK quality)")
             .value_name("N")
             .action(ArgAction::Set)
             .required(false),
