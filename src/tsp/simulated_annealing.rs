@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use rand::Rng;
+use rand::RngExt;
 
 use super::probability::{cooling, metropolis};
 use super::progress::ProgressMessage;

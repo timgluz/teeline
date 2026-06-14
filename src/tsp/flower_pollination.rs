@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use rand::Rng;
+use rand::RngExt;
 
 use super::probability::{bernoulli, levy_step, sample_without_replacement};
 use super::progress::ProgressMessage;
@@ -9,7 +9,7 @@ use super::{FPAOptions, Solution, TspProblem};
 
 const DEFAULT_N_FLOWERS: usize = 25;
 
-fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl Rng) -> Vec<usize> {
+fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl RngExt) -> Vec<usize> {
     let seq = swap_sequence(flower, gbest);
     if seq.is_empty() {
         return flower.to_vec();
@@ -28,7 +28,7 @@ fn local_pollination(
     flower: &[usize],
     flowers: &[Vec<usize>],
     flower_idx: usize,
-    rng: &mut impl Rng,
+    rng: &mut impl RngExt,
 ) -> Vec<usize> {
     let n_flowers = flowers.len();
     if n_flowers < 3 {

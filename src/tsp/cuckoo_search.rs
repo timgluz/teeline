@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use rand::Rng;
+use rand::RngExt;
 
 use super::probability::levy_step;
 use super::progress::ProgressMessage;
@@ -9,7 +9,7 @@ use super::{CSOptions, Solution, TspProblem};
 
 const DEFAULT_N_NESTS: usize = 25;
 
-fn apply_k_random_2opt(tour: &[usize], k: usize, rng: &mut impl Rng) -> Vec<usize> {
+fn apply_k_random_2opt(tour: &[usize], k: usize, rng: &mut impl RngExt) -> Vec<usize> {
     let n = tour.len();
     let mut result = tour.to_vec();
     if n < 2 {

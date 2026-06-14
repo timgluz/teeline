@@ -1,4 +1,4 @@
-use rand::Rng;
+use rand::RngExt;
 use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
