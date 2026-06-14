@@ -11,11 +11,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const WEB_ROOT = join(__dirname, '..')
 const DOCS_ROOT = join(WEB_ROOT, '../docs/algorithms')
 
-const HIGHLIGHT_CSS = readFileSync(
-  join(WEB_ROOT, 'node_modules/@speed-highlight/core/dist/themes/github-light.css'),
-  'utf8'
-)
-
 // Solver ID → source filename in docs/algorithms/
 const SOLVER_DOCS = {
   'bhk':          'bellman-held-karp.md',
@@ -134,7 +129,6 @@ function renderShell({ solverId, name, typeBadge, description, bodyHtml }) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escAttr(name)} — Teeline</title>
     <meta name="description" content="${escAttr(description)}" />
-    <style>${HIGHLIGHT_CSS}</style>
   </head>
   <body>
     <div id="topbar"></div>
