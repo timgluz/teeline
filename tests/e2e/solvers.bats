@@ -103,3 +103,40 @@ setup() {
     run "$BIN" solvers --heuristic --exact
     [ "$status" -ne 0 ]
 }
+
+# ---------------------------------------------------------------------------
+# --output-format=json
+# ---------------------------------------------------------------------------
+
+@test "solvers --output-format=json exits 0" {
+    run "$BIN" solvers --output-format=json
+    [ "$status" -eq 0 ]
+}
+
+@test "solvers --output-format=json outputs a JSON array" {
+    run "$BIN" solvers --output-format=json
+    [ "$status" -eq 0 ]
+    echo "$output" | python3 -c "import sys,json; arr=json.load(sys.stdin); assert isinstance(arr, list)"
+}
+
+@test "solvers --output-format=json includes nn with alias field" {
+    run "$BIN" solvers --output-format=json
+    echo "$output" | python3 -c "import sys,json; arr=json.load(sys.stdin); assert any(s['alias']=='nn' for s in arr)"
+}
+
+@test "solvers --output-format=json includes category and complexity fields" {
+    run "$BIN" solvers --output-format=json
+    echo "$output" | python3 -c "import sys,json; arr=json.load(sys.stdin); assert all('category' in s and 'complexity' in s for s in arr)"
+}
+
+@test "solvers --exact --output-format=json returns only exact solvers" {
+    run "$BIN" solvers --exact --output-format=json
+    [ "$status" -eq 0 ]
+    echo "$output" | python3 -c "import sys,json; arr=json.load(sys.stdin); assert arr and all(s['exact'] for s in arr)"
+}
+
+@test "solvers --heuristic --output-format=json excludes exact solvers" {
+    run "$BIN" solvers --heuristic --output-format=json
+    [ "$status" -eq 0 ]
+    echo "$output" | python3 -c "import sys,json; arr=json.load(sys.stdin); assert not any(s['exact'] for s in arr)"
+}
