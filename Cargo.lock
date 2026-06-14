@@ -1637,6 +1637,7 @@ name = "teeline-cli"
 version = "1.0.1"
 dependencies = [
  "clap",
+ "serde_json",
  "teeline",
  "tracing",
  "tracing-subscriber",

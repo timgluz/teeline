@@ -77,3 +77,30 @@ setup() {
     [ "$status" -ne 0 ]
     echo "$output" | grep -i "n_nearest"
 }
+
+# ---------------------------------------------------------------------------
+# --output-format=json
+# ---------------------------------------------------------------------------
+
+@test "solve nn --output-format=json exits 0" {
+    run bash -c "\"$BIN\" solve nn -i \"$GR17\" --output-format=json 2>/dev/null"
+    [ "$status" -eq 0 ]
+}
+
+@test "solve nn --output-format=json outputs valid JSON with cost and route" {
+    run bash -c "\"$BIN\" solve nn -i \"$GR17\" --output-format=json 2>/dev/null"
+    [ "$status" -eq 0 ]
+    echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); assert 'cost' in d and 'route' in d"
+}
+
+@test "solve nn --output-format=json route is an array of integers" {
+    run bash -c "\"$BIN\" solve nn -i \"$GR17\" --output-format=json 2>/dev/null"
+    [ "$status" -eq 0 ]
+    echo "$output" | python3 -c "import sys,json; d=json.load(sys.stdin); assert all(isinstance(x,int) for x in d['route'])"
+}
+
+@test "solve --output-format=json does not regress text default" {
+    run bash -c "\"$BIN\" solve nn -i \"$GR17\" 2>/dev/null"
+    [ "$status" -eq 0 ]
+    echo "$output" | head -1 | grep -E '^[0-9]+\.[0-9]+ [01]$'
+}

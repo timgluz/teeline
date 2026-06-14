@@ -9,11 +9,13 @@ use teeline::config::{
 };
 use teeline::tsp::{
     self, AppOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
+    list_solvers,
     pipeline::{PipelineStage, run_pipeline},
     tsplib,
 };
 use teeline::DistanceType;
 use tracing_subscriber::EnvFilter;
+use serde_json::json;
 
 // ---------------------------------------------------------------------------
 // CliArgsProvider — applies CLI tuning flags to a base AppOptions.
@@ -97,6 +99,14 @@ fn main() {
                 .action(ArgAction::SetTrue)
                 .required(false),
         )
+        .arg(
+            Arg::new("output_format")
+                .long("output-format")
+                .value_name("FORMAT")
+                .value_parser(["text", "json"])
+                .default_value("text")
+                .help("output format: text (default) or json"),
+        )
         .args(tuning.clone());
 
     let pipeline_cmd = Command::new("pipeline")
@@ -161,6 +171,14 @@ fn main() {
                 .action(ArgAction::SetTrue)
                 .conflicts_with("heuristic")
                 .help("show only exact solvers"),
+        )
+        .arg(
+            Arg::new("output_format")
+                .long("output-format")
+                .value_name("FORMAT")
+                .value_parser(["text", "json"])
+                .default_value("text")
+                .help("output format: text (default) or json"),
         );
 
     let cli = Command::new("Teeline")
@@ -271,9 +289,13 @@ fn resolve_preset(name: &str) -> Option<Vec<Solvers>> {
 fn run_solve(args: &ArgMatches) {
     let solver_name = args.get_one::<String>("solver").unwrap().as_str();
     let no_seed = args.get_flag("no_seed");
+    let json_mode = args
+        .get_one::<String>("output_format")
+        .map(|s| s == "json")
+        .unwrap_or(false);
 
     if let Some(steps) = resolve_preset(solver_name) {
-        run_as_pipeline(&steps, args);
+        run_as_pipeline(&steps, args, json_mode);
         return;
     }
 
@@ -282,14 +304,14 @@ fn run_solve(args: &ArgMatches) {
 
     if !no_seed {
         if solver.auto_expand_with_nn() {
-            run_as_pipeline(&[Solvers::NearestNeighbor, solver], args);
+            run_as_pipeline(&[Solvers::NearestNeighbor, solver], args, json_mode);
         } else if solver.auto_expand_with_shuffle() {
-            run_as_pipeline(&[Solvers::RandomShuffle, solver], args);
+            run_as_pipeline(&[Solvers::RandomShuffle, solver], args, json_mode);
         } else {
-            run_as_pipeline(&[solver], args);
+            run_as_pipeline(&[solver], args, json_mode);
         }
     } else {
-        run_as_pipeline(&[solver], args);
+        run_as_pipeline(&[solver], args, json_mode);
     }
 }
 
@@ -312,23 +334,23 @@ fn run_pipeline_cmd(args: &ArgMatches) {
                     std::process::exit(1);
                 }
             };
-            run_as_pipeline_stages(stage_configs, args);
+            run_as_pipeline_stages(stage_configs, args, false);
         }
         Ok(PipelineSource::Steps(solvers)) => {
-            run_as_pipeline(&solvers, args);
+            run_as_pipeline(&solvers, args, false);
         }
     }
 }
 
-fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches) {
+fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches, json_mode: bool) {
     let stage_configs: Vec<(Solvers, AppOptions)> = steps
         .iter()
         .map(|&s| (s, solver_options_from_args(args, s)))
         .collect();
-    run_as_pipeline_stages(stage_configs, args);
+    run_as_pipeline_stages(stage_configs, args, json_mode);
 }
 
-fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgMatches) {
+fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgMatches, json_mode: bool) {
     let verbose = args.get_flag("verbose");
     let default_level = if verbose { "debug" } else { "info" };
     let _ = tracing_subscriber::fmt()
@@ -403,14 +425,22 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
         let _enter = span.entered();
         let tour = run_pipeline(&stages).expect("solver failed");
         tracing::info!(tour_length = tour.total, "solver finished");
-        print_solution(&tour, false);
+        if !json_mode {
+            print_solution(&tour, false);
+        }
         tour
     })
     .join()
     .expect("Solver thread failed");
 
-    if let Some(ot) = opt_tour {
-        print_optimal_comparison(&tour, &distances, tsp_data.len(), &ot);
+    let opt_cmp = opt_tour
+        .as_ref()
+        .and_then(|ot| compute_optimal_comparison(tour.total, &distances, tsp_data.len(), ot));
+
+    if json_mode {
+        print_solution_json(&tour, false, opt_cmp.as_ref());
+    } else if let Some(ref cmp) = opt_cmp {
+        print_optimal_comparison(tour.total, cmp);
     }
 }
 
@@ -449,33 +479,62 @@ fn run_solvers(args: &ArgMatches) {
     let only_heuristic = args.get_flag("heuristic");
     let only_exact = args.get_flag("exact");
     let short = args.get_flag("short");
+    let json_mode = args
+        .get_one::<String>("output_format")
+        .map(|s| s == "json")
+        .unwrap_or(false);
 
-    let all = Solvers::all_meta();
-    let filtered = all.iter().filter(|m| {
-        if only_heuristic {
-            m.kind == SolverKind::Heuristic
-        } else if only_exact {
-            m.kind == SolverKind::Exact
-        } else {
-            true
-        }
-    });
-
-    if short {
-        for m in filtered {
-            println!("{}", m.short());
-        }
+    if json_mode {
+        print_solvers_json(only_heuristic, only_exact);
+    } else if short {
+        print_solvers_short(only_heuristic, only_exact);
     } else {
-        println!("{:<22} {:<8} TYPE", "NAME", "ALIAS");
-        for m in filtered {
-            println!("{:<22} {:<8} {}", m.name, m.alias.unwrap_or("—"), m.kind.as_str());
-        }
+        print_solvers_table(only_heuristic, only_exact);
     }
 }
 
 // ---------------------------------------------------------------------------
 // Output helpers
 // ---------------------------------------------------------------------------
+
+fn solver_meta_matches(m: &tsp::SolverMeta, only_heuristic: bool, only_exact: bool) -> bool {
+    if only_heuristic { m.kind == SolverKind::Heuristic }
+    else if only_exact { m.kind == SolverKind::Exact }
+    else { true }
+}
+
+fn print_solvers_table(only_heuristic: bool, only_exact: bool) {
+    println!("{:<22} {:<8} TYPE", "NAME", "ALIAS");
+    for m in Solvers::all_meta().iter().filter(|m| solver_meta_matches(m, only_heuristic, only_exact)) {
+        println!("{:<22} {:<8} {}", m.name, m.alias.unwrap_or("—"), m.kind.as_str());
+    }
+}
+
+fn print_solvers_short(only_heuristic: bool, only_exact: bool) {
+    for m in Solvers::all_meta().iter().filter(|m| solver_meta_matches(m, only_heuristic, only_exact)) {
+        println!("{}", m.short());
+    }
+}
+
+fn print_solvers_json(only_heuristic: bool, only_exact: bool) {
+    let arr: Vec<_> = list_solvers()
+        .iter()
+        .filter(|s| {
+            if only_heuristic { !s.exact && s.category != "Utility" }
+            else if only_exact { s.exact }
+            else { true }
+        })
+        .map(|s| json!({
+            "name": s.name,
+            "alias": s.alias,
+            "category": s.category,
+            "complexity": s.complexity,
+            "has_options": s.has_options,
+            "exact": s.exact,
+        }))
+        .collect();
+    println!("{}", serde_json::to_string(&arr).unwrap());
+}
 
 fn print_solution(tour: &Solution, is_optimized: bool) {
     let optimization_flag = if is_optimized { 1 } else { 0 };
@@ -486,36 +545,57 @@ fn print_solution(tour: &Solution, is_optimized: bool) {
     println!();
 }
 
-fn print_optimal_comparison(
-    solver_tour: &Solution,
+struct OptimalComparison {
+    optimal_cost: f32,
+    gap_pct: f32,
+    opt_name: String,
+}
+
+fn compute_optimal_comparison(
+    solver_cost: f32,
     distances: &distance_matrix::DistanceMatrix,
     n_cities: usize,
     opt_tour: &teeline::tsp::opt_tour::OptTour,
-) {
+) -> Option<OptimalComparison> {
     if opt_tour.dimension != n_cities {
         eprintln!(
             "--optimal-tour: dimension mismatch ({} vs {}); skipping comparison",
             opt_tour.dimension, n_cities
         );
-        return;
+        return None;
     }
-
     let optimal_cost = distances.tour_length(&opt_tour.route);
-    let solver_cost = solver_tour.total;
     let gap_pct = if optimal_cost > 0.0 {
         (solver_cost - optimal_cost) / optimal_cost * 100.0
     } else {
         0.0
     };
+    Some(OptimalComparison { optimal_cost, gap_pct, opt_name: opt_tour.name.clone() })
+}
 
+fn print_optimal_comparison(solver_cost: f32, cmp: &OptimalComparison) {
     eprintln!("--- Comparison ---");
-    eprintln!("Optimal  : {:.5}  (from {})", optimal_cost, opt_tour.name);
+    eprintln!("Optimal  : {:.5}  (from {})", cmp.optimal_cost, cmp.opt_name);
     eprintln!("Solver   : {:.5}", solver_cost);
-    if gap_pct.abs() < 0.001 {
+    if cmp.gap_pct.abs() < 0.001 {
         eprintln!("Gap      : 0.00 % (matches optimal)");
     } else {
-        eprintln!("Gap      : {:+.2} %", gap_pct);
+        eprintln!("Gap      : {:+.2} %", cmp.gap_pct);
     }
+}
+
+fn print_solution_json(tour: &Solution, is_optimized: bool, opt: Option<&OptimalComparison>) {
+    let route: Vec<usize> = tour.route().to_vec();
+    let mut obj = json!({
+        "cost": tour.total,
+        "optimized": is_optimized,
+        "route": route,
+    });
+    if let Some(cmp) = opt {
+        obj["optimal_cost"] = json!(cmp.optimal_cost);
+        obj["gap_pct"] = json!(cmp.gap_pct);
+    }
+    println!("{}", obj);
 }
 
 fn read_tsp_data_from_file(file_path: &Path) -> tsplib::TspLibData {
