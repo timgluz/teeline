@@ -1,35 +1,58 @@
 #!/usr/bin/env node
-// Generates algorithms/<id>/index.html from algorithms/<id>/docs.md at build time.
+// Generates algorithms/<id>/index.html from docs/algorithms/<name>.md at build time.
 // Run before vite build so Vite finds all MPA entry points.
-import { readFileSync, writeFileSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname, join } from 'path'
-import { globSync } from 'tinyglobby'
 import { Marked } from 'marked'
 import { highlightText } from '@speed-highlight/core'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const WEB_ROOT = join(__dirname, '..')
+const DOCS_ROOT = join(WEB_ROOT, '../docs/algorithms')
 
 const HIGHLIGHT_CSS = readFileSync(
   join(WEB_ROOT, 'node_modules/@speed-highlight/core/dist/themes/github-light.css'),
   'utf8'
 )
 
-// Simple key: "value" frontmatter parser — no YAML library needed
-function parseFrontmatter(src) {
-  if (!src.startsWith('---\n')) return { meta: {}, body: src }
-  const end = src.indexOf('\n---\n', 4)
-  if (end === -1) return { meta: {}, body: src }
-  const meta = {}
-  for (const line of src.slice(4, end).split('\n')) {
-    const colon = line.indexOf(':')
-    if (colon === -1) continue
-    const key = line.slice(0, colon).trim()
-    const raw = line.slice(colon + 1).trim().replace(/^["']|["']$/g, '')
-    meta[key] = raw === 'true' ? true : raw === 'false' ? false : raw
-  }
-  return { meta, body: src.slice(end + 5).trim() }
+// Solver ID → source filename in docs/algorithms/
+const SOLVER_DOCS = {
+  'bhk':          'bellman-held-karp.md',
+  'branch_bound': 'branch-bound.md',
+  'nn':           'nearest-neighbor.md',
+  'fourier':      'fourier.md',
+  'christofides': 'christofides.md',
+  '2opt':         'two-opt.md',
+  '3opt':         'three-opt.md',
+  'or_opt':       'or-opt.md',
+  'sa':           'simulated-annealing.md',
+  'tabu':         'tabu-search.md',
+  'ga':           'genetic-algorithm.md',
+  'pso':          'particle-swarm.md',
+  'cs':           'cuckoo-search.md',
+  'fpa':          'flower-pollination.md',
+  'gsa':          'gravitational-search.md',
+}
+
+// Extract page metadata directly from the Markdown source — no frontmatter needed.
+function extractMeta(md, solverId) {
+  const name = md.match(/^#\s+(.+)$/m)?.[1]?.trim() ?? solverId
+
+  // Pull the Type row from the metadata table: | **Type** | value |
+  const typeBadge = md.match(/\|\s*\*\*Type\*\*\s*\|\s*([^|\n]+?)\s*\|/)?.[1]?.trim() ?? ''
+
+  // First paragraph under ## Description, stripped of markdown formatting, for <meta>
+  const descSection = md.match(/^## Description\n+([\s\S]+?)(?=\n##|\n```|\n\||\n\n\n|$)/m)
+  const description = (descSection?.[1]?.trim().split('\n\n')[0] ?? '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/\n/g, ' ')
+    .slice(0, 250)
+    .trim()
+
+  return { name, typeBadge, description }
 }
 
 function escAttr(s) {
@@ -58,7 +81,7 @@ async function preHighlightCode(md) {
     })
   )
 
-  // Replace each fence with its rendered HTML (iterate in reverse to preserve indices)
+  // Replace each fence in reverse order to preserve string indices
   let result = md
   for (let i = matches.length - 1; i >= 0; i--) {
     const { index } = matches[i]
@@ -91,20 +114,17 @@ function makeMarked() {
 
   return {
     marked: m,
-    resetFirstTable() {
-      isFirstTable = true
-    },
+    resetFirstTable() { isFirstTable = true },
   }
 }
 
-function renderShell({ meta, bodyHtml }) {
-  const title = meta.title ?? `${meta.name} — Teeline`
-  const explainerCta =
-    meta.explainer === true
-      ? `<a class="docs-explainer-cta" href="/algorithms/${meta.solver_id}/explainer/">▶ Open interactive explainer →</a>`
-      : ''
-  const typeBadge = meta.type_badge
-    ? `<p class="docs-type-badge">${meta.type_badge}</p>`
+function renderShell({ solverId, name, typeBadge, description, bodyHtml }) {
+  const hasExplainer = existsSync(join(WEB_ROOT, `algorithms/${solverId}/explainer/index.html`))
+  const explainerCta = hasExplainer
+    ? `<a class="docs-explainer-cta" href="/algorithms/${solverId}/explainer/">▶ Open interactive explainer →</a>`
+    : ''
+  const typeBadgeHtml = typeBadge
+    ? `<p class="docs-type-badge">${typeBadge}</p>`
     : ''
 
   return `<!doctype html>
@@ -112,8 +132,8 @@ function renderShell({ meta, bodyHtml }) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escAttr(title)}</title>
-    <meta name="description" content="${escAttr(meta.description ?? '')}" />
+    <title>${escAttr(name)} — Teeline</title>
+    <meta name="description" content="${escAttr(description)}" />
     <style>${HIGHLIGHT_CSS}</style>
   </head>
   <body>
@@ -128,11 +148,11 @@ function renderShell({ meta, bodyHtml }) {
           <ul>
             <li><a href="/">teeline</a></li>
             <li>Algorithms</li>
-            <li>${meta.name ?? meta.solver_id}</li>
+            <li>${name}</li>
           </ul>
         </nav>
 
-        ${typeBadge}
+        ${typeBadgeHtml}
         ${explainerCta}
         ${bodyHtml}
       </main>
@@ -143,21 +163,22 @@ function renderShell({ meta, bodyHtml }) {
 }
 
 const { marked, resetFirstTable } = makeMarked()
-const docFiles = globSync('algorithms/*/docs.md', { cwd: WEB_ROOT })
 
-if (docFiles.length === 0) {
-  console.warn('[build-docs] no algorithms/*/docs.md files found')
-  process.exit(0)
-}
+for (const [solverId, filename] of Object.entries(SOLVER_DOCS)) {
+  const srcPath = join(DOCS_ROOT, filename)
+  if (!existsSync(srcPath)) {
+    console.warn(`[build-docs] skipping ${solverId}: docs/algorithms/${filename} not found`)
+    continue
+  }
 
-for (const relPath of docFiles) {
-  const src = readFileSync(join(WEB_ROOT, relPath), 'utf8')
-  const { meta, body } = parseFrontmatter(src)
+  const md = readFileSync(srcPath, 'utf8')
+  const { name, typeBadge, description } = extractMeta(md, solverId)
   resetFirstTable()
-  const processedBody = await preHighlightCode(body)
-  const bodyHtml = marked.parse(processedBody, { breaks: false, gfm: true, html: true })
-  const html = renderShell({ meta, bodyHtml })
-  const outPath = relPath.replace('docs.md', 'index.html')
-  writeFileSync(join(WEB_ROOT, outPath), html)
-  console.log(`[build-docs] ${relPath} → ${outPath}`)
+  const processedMd = await preHighlightCode(md)
+  const bodyHtml = marked.parse(processedMd, { breaks: false, gfm: true, html: true })
+
+  const outDir = join(WEB_ROOT, `algorithms/${solverId}`)
+  mkdirSync(outDir, { recursive: true })
+  writeFileSync(join(outDir, 'index.html'), renderShell({ solverId, name, typeBadge, description, bodyHtml }))
+  console.log(`[build-docs] docs/algorithms/${filename} → algorithms/${solverId}/index.html`)
 }
