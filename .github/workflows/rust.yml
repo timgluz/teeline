@@ -56,7 +56,7 @@ jobs:
     - name: Build WASM component
       run: cd teeline-wasm && cargo component build --target wasm32-wasip2
     - name: Upload WASM artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: teeline-wasm-debug
         path: target/wasm32-wasip2/debug/teeline_wasm.wasm
