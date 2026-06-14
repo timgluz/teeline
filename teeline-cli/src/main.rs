@@ -434,27 +434,14 @@ fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgM
     .join()
     .expect("Solver thread failed");
 
+    let opt_cmp = opt_tour
+        .as_ref()
+        .and_then(|ot| compute_optimal_comparison(tour.total, &distances, tsp_data.len(), ot));
+
     if json_mode {
-        let opt_data = opt_tour.as_ref().and_then(|ot| {
-            if ot.dimension != tsp_data.len() {
-                eprintln!(
-                    "--optimal-tour: dimension mismatch ({} vs {}); skipping",
-                    ot.dimension,
-                    tsp_data.len()
-                );
-                return None;
-            }
-            let optimal_cost = distances.tour_length(&ot.route);
-            let gap_pct = if optimal_cost > 0.0 {
-                (tour.total - optimal_cost) / optimal_cost * 100.0
-            } else {
-                0.0
-            };
-            Some((optimal_cost, gap_pct))
-        });
-        print_solution_json(&tour, false, opt_data);
-    } else if let Some(ot) = opt_tour {
-        print_optimal_comparison(&tour, &distances, tsp_data.len(), &ot);
+        print_solution_json(&tour, false, opt_cmp.as_ref());
+    } else if let Some(ref cmp) = opt_cmp {
+        print_optimal_comparison(tour.total, cmp);
     }
 }
 
@@ -561,48 +548,55 @@ fn print_solution(tour: &Solution, is_optimized: bool) {
     println!();
 }
 
-fn print_optimal_comparison(
-    solver_tour: &Solution,
+struct OptimalComparison {
+    optimal_cost: f32,
+    gap_pct: f32,
+    opt_name: String,
+}
+
+fn compute_optimal_comparison(
+    solver_cost: f32,
     distances: &distance_matrix::DistanceMatrix,
     n_cities: usize,
     opt_tour: &teeline::tsp::opt_tour::OptTour,
-) {
+) -> Option<OptimalComparison> {
     if opt_tour.dimension != n_cities {
         eprintln!(
             "--optimal-tour: dimension mismatch ({} vs {}); skipping comparison",
             opt_tour.dimension, n_cities
         );
-        return;
+        return None;
     }
-
     let optimal_cost = distances.tour_length(&opt_tour.route);
-    let solver_cost = solver_tour.total;
     let gap_pct = if optimal_cost > 0.0 {
         (solver_cost - optimal_cost) / optimal_cost * 100.0
     } else {
         0.0
     };
+    Some(OptimalComparison { optimal_cost, gap_pct, opt_name: opt_tour.name.clone() })
+}
 
+fn print_optimal_comparison(solver_cost: f32, cmp: &OptimalComparison) {
     eprintln!("--- Comparison ---");
-    eprintln!("Optimal  : {:.5}  (from {})", optimal_cost, opt_tour.name);
+    eprintln!("Optimal  : {:.5}  (from {})", cmp.optimal_cost, cmp.opt_name);
     eprintln!("Solver   : {:.5}", solver_cost);
-    if gap_pct.abs() < 0.001 {
+    if cmp.gap_pct.abs() < 0.001 {
         eprintln!("Gap      : 0.00 % (matches optimal)");
     } else {
-        eprintln!("Gap      : {:+.2} %", gap_pct);
+        eprintln!("Gap      : {:+.2} %", cmp.gap_pct);
     }
 }
 
-fn print_solution_json(tour: &Solution, is_optimized: bool, opt: Option<(f32, f32)>) {
+fn print_solution_json(tour: &Solution, is_optimized: bool, opt: Option<&OptimalComparison>) {
     let route: Vec<usize> = tour.route().to_vec();
     let mut obj = json!({
         "cost": tour.total,
         "optimized": is_optimized,
         "route": route,
     });
-    if let Some((optimal_cost, gap_pct)) = opt {
-        obj["optimal_cost"] = json!(optimal_cost);
-        obj["gap_pct"] = json!(gap_pct);
+    if let Some(cmp) = opt {
+        obj["optimal_cost"] = json!(cmp.optimal_cost);
+        obj["gap_pct"] = json!(cmp.gap_pct);
     }
     println!("{}", obj);
 }
