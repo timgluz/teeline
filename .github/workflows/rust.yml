@@ -35,7 +35,7 @@ jobs:
     - name: Coverage
       run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
     - name: Upload coverage
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v7
       with:
         files: lcov.info
       env:
