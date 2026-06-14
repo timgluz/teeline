@@ -194,6 +194,7 @@ fn is_solution(path: &Path, k: usize, n_cities: usize) -> bool {
     k == n_cities && k > 1 && uniq_ids.len() == n_cities
 }
 
+#[allow(clippy::too_many_arguments)]
 fn construct_candidates(
     path: &Path,
     k: usize,
