@@ -1,18 +1,18 @@
-use rand::Rng;
+use rand::RngExt;
 
 pub const BETA: f64 = 1.5;
 // Mantegna (1994) σ_u for β=1.5: (Γ(1+β)·sin(πβ/2)/(Γ((1+β)/2)·β·2^((β-1)/2)))^(1/β)
 pub const SIGMA_U: f64 = 0.6966;
 
 /// Box-Muller normal sample; guards ln(0) with MIN_POSITIVE floor.
-pub fn normal_sample(rng: &mut impl Rng) -> f64 {
+pub fn normal_sample(rng: &mut impl RngExt) -> f64 {
     let u1: f64 = rng.random::<f64>().max(f64::MIN_POSITIVE);
     let u2: f64 = rng.random();
     (-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()
 }
 
 /// Mantegna's Lévy-stable step (β=1.5). Resamples v to avoid ÷0 → inf.
-pub fn levy_step(rng: &mut impl Rng) -> f64 {
+pub fn levy_step(rng: &mut impl RngExt) -> f64 {
     let u = normal_sample(rng) * SIGMA_U;
     let mut v = normal_sample(rng);
     while v.abs() < f64::MIN_POSITIVE {
@@ -38,12 +38,12 @@ pub fn probability(p: f32) -> bool {
 }
 
 /// Bernoulli trial using a caller-supplied RNG — zero allocation, suitable for inner loops.
-pub fn bernoulli(rng: &mut impl Rng, p: f64) -> bool {
+pub fn bernoulli(rng: &mut impl RngExt, p: f64) -> bool {
     rng.random::<f64>() < p
 }
 
 /// Sample a random index in `0..n` that is not in `excluded`. Panics if no valid index exists.
-pub fn sample_without_replacement(rng: &mut impl Rng, n: usize, excluded: &[usize]) -> usize {
+pub fn sample_without_replacement(rng: &mut impl RngExt, n: usize, excluded: &[usize]) -> usize {
     loop {
         let idx = rng.random_range(0..n);
         if !excluded.contains(&idx) {
