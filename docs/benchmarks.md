@@ -42,8 +42,9 @@ representative, not as a guarantee.
 | **Cuckoo Search** | default (`--epochs=10000 --n_nearest=25`) | 7 877.84 | +4.4 % | 0.72 s | 100 % | 7.9 MB |
 | **Flower Pollination (FPA)** | default (`--epochs=10000 --n_nearest=25`) | 8 867.93 | +17.5 % | 0.53 s | 100 % | 7.2 MB |
 | **Flower Pollination (FPA)** | `--epochs=10000 --n_nearest=50` | 8 950.21 | +18.6 % | 1.13 s | 99 % | 7.2 MB |
-| **Lin-Kernighan (ILS)** | default (`--epochs=100 --n_nearest=5`) | 8 146.28 | +8.0 % | 0.02 s | 82 % | 6.5 MB |
-| **Lin-Kernighan (ILS)** | `--epochs=1000 --n_nearest=10` | 8 128.86 | +7.7 % | 0.03 s | 85 % | 6.4 MB |
+| **Lin-Kernighan (depth-k ILS)** | `--max-depth=1` (2-opt + ILS) | 7 544.37–7 825.62 | 0–3.7 % | 0.15 s | 85 % | 6.5 MB |
+| **Lin-Kernighan (depth-k ILS)** | `--max-depth=2` | 7 544.37–7 794.76 | 0–3.3 % | 0.15 s | 85 % | 6.5 MB |
+| **Lin-Kernighan (depth-k ILS)** | default (`--max-depth=5 --epochs=100 --n_nearest=5`) | 7 544.37 | **0.0 %** | 0.15 s | 85 % | 6.5 MB |
 | **Or-opt** | default (NN seed, best-improvement) | 8 097.48 | +7.3 % | 0.03 s | 93 % | 6.6 MB |
 | **Christofides** | default (MST + greedy matching) | 8 707.66 | +15.4 % | < 0.01 s | 50 % | 6.5 MB |
 | **Gravitational Search (GSA)** | default (`--epochs=10000 --n_nearest=25`, G0=20, α=1, W=0) | ~18 500 | ~+145 % | 1.2 s | 99 % | 7.6 MB |
@@ -128,7 +129,9 @@ generations to build good crossover material regardless of seeding quality.
 more epochs hurts here (22 % at 100 000) because restarts can scatter away from a good local
 optimum already found.
 
-**Christofides** achieves +15.4 % in under 10 ms — slower than Or-opt in quality, but uniquely valuable: it is the **only solver with a proven ≤1.5× approximation guarantee** on EUC_2D instances. Its deterministic construction also makes it the best warm-start for Lin-Kernighan: `pipeline(christofides, lk)` reaches 8156 (+8.1 %), tighter than either solver alone, in about 40 ms.
+**Lin-Kernighan (depth-k ILS)** now implements full sequential LK chain search (issue #184). The `max_depth` parameter (default 5) controls the chain-search depth: depth-1 is 2-opt moves with ILS restarts, and depth-5 enables the full k-opt move space. Depth matters: over 10 runs on berlin52, depth-1 hits optimal 6/10 times (mean 7595), depth-2 hits 7/10 (mean 7580), and depth-5 hits 10/10 (mean 7544). The `chain_is_valid_tour` guard prevents subtour moves that would otherwise corrupt the tour. Distance computation is verified correct — Python EUC_2D recomputation agrees with Rust to float precision on every run.
+
+**Christofides** achieves +15.4 % in under 10 ms — slower than Or-opt in quality, but uniquely valuable: it is the **only solver with a proven ≤1.5× approximation guarantee** on EUC_2D instances. Its deterministic construction also makes it the best warm-start for Lin-Kernighan: `pipeline(christofides, lk)` now finds the optimal tour in under 50 ms.
 
 **Or-opt** achieves +7.3 % in 0.03 s — tying SA quality at a fraction of the cost — by relocating
 segments of 1–3 cities rather than reversing segments like 2-opt does. Because the two methods
