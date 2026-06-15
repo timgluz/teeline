@@ -142,7 +142,8 @@ const CSS = `
 .lk-tab { display: flex; flex-direction: column; gap: 14px; }
 @media (min-width: 620px) {
   .lk-tab { flex-direction: row; align-items: flex-start; }
-  .lk-canvas { flex: 0 0 300px; }
+  .lk-canvas-col { flex: 0 0 300px; }
+  .lk-canvas { width: 300px; }
   .lk-prose { flex: 1 1 auto; min-width: 0; }
 }
 
@@ -150,7 +151,7 @@ const CSS = `
 .lk-bg { fill: var(--panel); }
 .lk-tour-edge { stroke-width: 1.8; }
 .lk-best-edge { stroke: #aaa; stroke-width: 1; stroke-dasharray: 4 3; opacity: 0.5; }
-.lk-scan-edge { stroke: #999; stroke-width: 1.5; stroke-dasharray: 5 3; opacity: 0.7; }
+.lk-scan-edge { stroke: #e8a000; stroke-width: 4; opacity: 0.55; }
 .lk-swap-edge { stroke: #1a7f37; stroke-width: 2.5; opacity: 0.9; }
 .lk-bridge-circle { fill: none; stroke: #cf222e; stroke-width: 2; stroke-dasharray: 4 3; opacity: 0.85; }
 .lk-city { fill: #f2a154; stroke: #fff; stroke-width: 1.5; }
@@ -188,6 +189,16 @@ const CSS = `
 .lk-phase-pass   { background: #f0f8ff; border-color: var(--accent); color: var(--accent); }
 
 .lk-footer { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); }
+
+.lk-canvas-col { display: flex; flex-direction: column; gap: 6px; }
+.lk-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 6px 8px; background: var(--panel); border-radius: 6px; border: 1px solid var(--line); }
+.lk-legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--muted); white-space: nowrap; }
+
+.lk-status { min-height: 1.5em; margin-bottom: 6px; font-size: 0.82rem; font-style: italic; color: var(--muted); }
+.lk-status-swap { color: var(--green); font-style: normal; font-weight: 500; }
+.lk-status-best { color: var(--gold); font-style: normal; font-weight: 600; }
+.lk-status-bridge { color: var(--red); font-style: normal; font-weight: 500; }
+.lk-status-done  { color: var(--text); font-style: normal; font-weight: 500; }
 `
 
 // ── Controls ──────────────────────────────────────────────────────────────────
@@ -198,19 +209,22 @@ interface ControlsProps {
   playing: boolean
   done: boolean
   speedIdx: number
+  canStepBack: boolean
   onPlayPause: () => void
+  onStepBack: () => void
   onStep: () => void
   onReset: () => void
   onSpeedChange: (idx: number) => void
 }
 
-function Controls({ playing, done, speedIdx, onPlayPause, onStep, onReset, onSpeedChange }: ControlsProps) {
+function Controls({ playing, done, speedIdx, canStepBack, onPlayPause, onStepBack, onStep, onReset, onSpeedChange }: ControlsProps) {
   return (
     <div className="lk-controls">
       <button className="lk-btn lk-btn-primary" onClick={onPlayPause} disabled={done}>
         {playing ? '⏸ Pause' : done ? '⏹ Done' : '▶ Run'}
       </button>
-      <button className="lk-btn" onClick={onStep} disabled={done}>⏭ Step</button>
+      <button className="lk-btn" onClick={onStepBack} disabled={!canStepBack}>◀ Back</button>
+      <button className="lk-btn" onClick={onStep} disabled={done}>Step ▶</button>
       <button className="lk-btn" onClick={onReset}>↺ Reset</button>
       <span className="lk-speed-label">Speed:</span>
       <input
@@ -254,6 +268,69 @@ function PhaseIndicator({ phase }: { phase: string }) {
   return <div className={`lk-phase ${cls}`}>{phase}</div>
 }
 
+// ── TourLegend ────────────────────────────────────────────────────────────────
+
+function TourLegend({ mode }: { mode: 'ls' | 'ils' }) {
+  return (
+    <div className="lk-legend">
+      <span className="lk-legend-item">
+        <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#e0626b" strokeWidth="2" /></svg>
+        Tour
+      </span>
+      <span className="lk-legend-item">
+        <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#e8a000" strokeWidth="4" opacity="0.55" /></svg>
+        Candidate pair
+      </span>
+      <span className="lk-legend-item">
+        <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#1a7f37" strokeWidth="2.5" /></svg>
+        Accepted swap
+      </span>
+      {mode === 'ils' && (
+        <span className="lk-legend-item">
+          <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#aaa" strokeWidth="1" strokeDasharray="4 3" /></svg>
+          Best tour
+        </span>
+      )}
+      {mode === 'ils' && (
+        <span className="lk-legend-item">
+          <svg width="16" height="16" style={{ marginRight: 2 }}>
+            <circle cx="8" cy="8" r="5" fill="none" stroke="#cf222e" strokeWidth="1.5" strokeDasharray="3 2" />
+          </svg>
+          Bridge cut
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ── Status lines ─────────────────────────────────────────────────────────────
+
+function LSStatusLine({ frame }: { frame: LSFrame }) {
+  const cls = frame.overlay ? 'lk-status-done'
+    : frame.swapEdges ? 'lk-status-swap'
+    : ''
+  const msg = frame.overlay
+    ?? (frame.swapEdges ? 'Improvement found — swapping edges ✓'
+    : 'Scanning candidate pair — no improvement yet, step further')
+  return <div className={`lk-status ${cls}`}>{msg}</div>
+}
+
+function ILSStatusLine({ frame }: { frame: ILSFrame }) {
+  const cls = frame.overlay ? 'lk-status-done'
+    : frame.highlight === 'best' ? 'lk-status-best'
+    : frame.highlight === 'bridge' ? 'lk-status-bridge'
+    : frame.highlight === 'swap' ? 'lk-status-swap'
+    : ''
+  const msg = frame.overlay
+    ?? (frame.highlight === 'best' ? 'New best tour found! ✓'
+    : frame.highlight === 'bridge' ? 'Double-bridge kick applied — escaping local optimum'
+    : frame.highlight === 'swap' ? 'Improvement found — swapping edges ✓'
+    : frame.phase === 'Plateau' ? `Plateau ${frame.plateauCount} of 5 — no improvement, will kick again`
+    : frame.phase === 'Local optimum' ? 'Local optimum reached — comparing to best tour'
+    : 'Running 2-opt local search...')
+  return <div className={`lk-status ${cls}`}>{msg}</div>
+}
+
 // ── LocalSearchTab ────────────────────────────────────────────────────────────
 
 function LocalSearchTab() {
@@ -285,7 +362,15 @@ function LocalSearchTab() {
   }, [playing, speed, advance])
 
   const handlePlayPause = useCallback(() => setPlaying(p => !p), [])
-  const handleStep = useCallback(() => { setPlaying(false); advance(false) }, [advance])
+  const handleStep = useCallback(() => { setPlaying(false); advance(true) }, [advance])
+  const handleStepBack = useCallback(() => {
+    setPlaying(false)
+    setIdx(i => {
+      let prev = i - 1
+      while (prev > 0 && frames[prev].isScan) prev--
+      return Math.max(0, prev)
+    })
+  }, [frames])
   const handleReset = useCallback(() => {
     setPlaying(false)
     setIdx(0)
@@ -295,21 +380,27 @@ function LocalSearchTab() {
 
   return (
     <div className="lk-tab">
-      <TourSVG
-        tour={frame.tour}
-        scanEdges={frame.scanEdges}
-        swapEdges={frame.swapEdges}
-        overlay={frame.overlay}
-      />
+      <div className="lk-canvas-col">
+        <TourSVG
+          tour={frame.tour}
+          scanEdges={frame.scanEdges}
+          swapEdges={frame.swapEdges}
+          overlay={frame.overlay}
+        />
+        <TourLegend mode="ls" />
+      </div>
       <div className="lk-prose">
         <Controls
           playing={playing} done={done} speedIdx={speedIdx}
-          onPlayPause={handlePlayPause} onStep={handleStep}
+          canStepBack={idx > 0}
+          onPlayPause={handlePlayPause} onStepBack={handleStepBack} onStep={handleStep}
           onReset={handleReset} onSpeedChange={setSpeedIdx}
         />
+        <LSStatusLine frame={frame} />
         <StatsPanel stats={[
           { label: 'Distance', value: frame.dist },
           { label: 'Swaps accepted', value: swapCount },
+          { label: 'Step', value: `${idx + 1} / ${frames.length}` },
         ]} />
         <p className="lk-note">
           This shows simplified <strong>2-opt</strong> local search. Press{' '}
@@ -356,34 +447,40 @@ function ILSTab() {
 
   const handlePlayPause = useCallback(() => setPlaying(p => !p), [])
   const handleStep = useCallback(() => { setPlaying(false); advance() }, [advance])
+  const handleStepBack = useCallback(() => { setPlaying(false); setIdx(i => Math.max(0, i - 1)) }, [])
   const handleReset = useCallback(() => { setPlaying(false); setIdx(0) }, [])
 
   return (
     <div className="lk-tab">
-      <TourSVG
-        tour={frame.tour}
-        bestTour={frame.bestTour}
-        swapEdges={frame.swapEdges}
-        bridgePoints={frame.bridgePoints}
-        highlight={frame.highlight}
-        overlay={frame.overlay}
-      />
+      <div className="lk-canvas-col">
+        <TourSVG
+          tour={frame.tour}
+          bestTour={frame.bestTour}
+          swapEdges={frame.swapEdges}
+          bridgePoints={frame.bridgePoints}
+          highlight={frame.highlight}
+          overlay={frame.overlay}
+        />
+        <TourLegend mode="ils" />
+      </div>
       <div className="lk-prose">
         <PhaseIndicator phase={frame.phase} />
         <Controls
           playing={playing} done={done} speedIdx={speedIdx}
-          onPlayPause={handlePlayPause} onStep={handleStep}
+          canStepBack={idx > 0}
+          onPlayPause={handlePlayPause} onStepBack={handleStepBack} onStep={handleStep}
           onReset={handleReset} onSpeedChange={setSpeedIdx}
         />
+        <ILSStatusLine frame={frame} />
         <StatsPanel stats={[
           { label: 'Current dist', value: frame.currentDist },
           { label: 'Best dist', value: frame.bestDist },
-          { label: 'Restarts', value: frame.restarts },
+          { label: 'Epoch', value: frame.restarts },
           { label: `Plateau (limit ${5})`, value: frame.plateauCount },
+          { label: 'Step', value: `${idx + 1} / ${frames.length}` },
         ]} />
         <p className="lk-note">
-          Dashed gray line = best tour found so far.
-          Gold = new best; red circles = double-bridge cut points.
+          Gold tour = new best found. Red dashed circles mark the double-bridge cut points.
         </p>
       </div>
     </div>
