@@ -578,7 +578,7 @@ jobs:
           cp target/wasm32-wasip2/release/teeline_wasm.wasm teeline-solver-wassette.wasm
 
       - name: Install ORAS
-        uses: oras-project/setup-oras@v1
+        uses: oras-project/setup-oras@v2
 
       - name: Log in to GHCR
         uses: docker/login-action@v4
