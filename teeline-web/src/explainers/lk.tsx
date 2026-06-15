@@ -253,3 +253,72 @@ function PhaseIndicator({ phase }: { phase: string }) {
     : ''
   return <div className={`lk-phase ${cls}`}>{phase}</div>
 }
+
+// ── LocalSearchTab ────────────────────────────────────────────────────────────
+
+function LocalSearchTab() {
+  const frames = useMemo(() => computeLocalSearchFrames(INIT_TOUR, DIST), [])
+  const [idx, setIdx] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [speedIdx, setSpeedIdx] = useState(2) // default 150ms
+
+  const speed = SPEED_STEPS[speedIdx]
+  const frame: LSFrame = frames[Math.min(idx, frames.length - 1)]
+  const done = idx >= frames.length - 1
+
+  // Advance one event; skip scan frames only while playing
+  const advance = useCallback((skipScan: boolean) => {
+    setIdx(i => {
+      let next = i + 1
+      if (skipScan) {
+        while (next < frames.length - 1 && frames[next].isScan) next++
+      }
+      if (next >= frames.length) { setPlaying(false); return frames.length - 1 }
+      return next
+    })
+  }, [frames])
+
+  useEffect(() => {
+    if (!playing) return
+    const id = setInterval(() => advance(true), speed)
+    return () => clearInterval(id)
+  }, [playing, speed, advance])
+
+  const handlePlayPause = useCallback(() => setPlaying(p => !p), [])
+  const handleStep = useCallback(() => { setPlaying(false); advance(false) }, [advance])
+  const handleReset = useCallback(() => {
+    setPlaying(false)
+    setIdx(0)
+  }, [])
+
+  const swapCount = frames.slice(0, idx + 1).filter(f => f.swapEdges !== null).length
+
+  return (
+    <div className="lk-tab">
+      <TourSVG
+        tour={frame.tour}
+        scanEdges={frame.scanEdges}
+        swapEdges={frame.swapEdges}
+        overlay={frame.overlay}
+      />
+      <div className="lk-prose">
+        <Controls
+          playing={playing} done={done} speedIdx={speedIdx}
+          onPlayPause={handlePlayPause} onStep={handleStep}
+          onReset={handleReset} onSpeedChange={setSpeedIdx}
+        />
+        <StatsPanel stats={[
+          { label: 'Distance', value: frame.dist },
+          { label: 'Swaps accepted', value: swapCount },
+        ]} />
+        <p className="lk-note">
+          This shows simplified <strong>2-opt</strong> local search. Press{' '}
+          <strong>Step</strong> to see each candidate pair scanned;{' '}
+          <strong>Run</strong> skips to accepted swaps only.{' '}
+          The actual LK solver uses depth-k chain moves —{' '}
+          <a href="/algorithms/lk/">see the docs</a>.
+        </p>
+      </div>
+    </div>
+  )
+}
