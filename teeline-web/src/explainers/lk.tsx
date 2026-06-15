@@ -322,3 +322,113 @@ function LocalSearchTab() {
     </div>
   )
 }
+
+// ── ILSTab ────────────────────────────────────────────────────────────────────
+
+const ILS_RAND_SEED = 2026
+
+function ILSTab() {
+  const frames = useMemo(
+    () => computeILSFrames(INIT_TOUR, DIST, 30, 5, lcgRand(ILS_RAND_SEED)),
+    []
+  )
+  const [idx, setIdx] = useState(0)
+  const [playing, setPlaying] = useState(false)
+  const [speedIdx, setSpeedIdx] = useState(2)
+
+  const speed = SPEED_STEPS[speedIdx]
+  const frame: ILSFrame = frames[Math.min(idx, frames.length - 1)]
+  const done = idx >= frames.length - 1
+
+  const advance = useCallback(() => {
+    setIdx(i => {
+      const next = i + 1
+      if (next >= frames.length) { setPlaying(false); return frames.length - 1 }
+      return next
+    })
+  }, [frames])
+
+  useEffect(() => {
+    if (!playing) return
+    const id = setInterval(advance, speed)
+    return () => clearInterval(id)
+  }, [playing, speed, advance])
+
+  const handlePlayPause = useCallback(() => setPlaying(p => !p), [])
+  const handleStep = useCallback(() => { setPlaying(false); advance() }, [advance])
+  const handleReset = useCallback(() => { setPlaying(false); setIdx(0) }, [])
+
+  return (
+    <div className="lk-tab">
+      <TourSVG
+        tour={frame.tour}
+        bestTour={frame.bestTour}
+        swapEdges={frame.swapEdges}
+        bridgePoints={frame.bridgePoints}
+        highlight={frame.highlight}
+        overlay={frame.overlay}
+      />
+      <div className="lk-prose">
+        <PhaseIndicator phase={frame.phase} />
+        <Controls
+          playing={playing} done={done} speedIdx={speedIdx}
+          onPlayPause={handlePlayPause} onStep={handleStep}
+          onReset={handleReset} onSpeedChange={setSpeedIdx}
+        />
+        <StatsPanel stats={[
+          { label: 'Current dist', value: frame.currentDist },
+          { label: 'Best dist', value: frame.bestDist },
+          { label: 'Restarts', value: frame.restarts },
+          { label: `Plateau (limit ${5})`, value: frame.plateauCount },
+        ]} />
+        <p className="lk-note">
+          Dashed gray line = best tour found so far.
+          Gold = new best; red circles = double-bridge cut points.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── LKExplainer root ──────────────────────────────────────────────────────────
+
+type TabId = 'ls' | 'ils'
+
+export default function LKExplainer() {
+  const [tab, setTab] = useState<TabId>('ls')
+
+  return (
+    <div className="lk-root">
+      <style>{CSS}</style>
+      <header className="lk-header">
+        <div className="lk-eyebrow">teeline · algorithms/lk</div>
+        <h2 className="lk-title">Lin-Kernighan ILS — interactive explainer</h2>
+        <p className="lk-sub">
+          Local Search shows simplified 2-opt edge swaps. ILS adds double-bridge
+          kicks to escape local optima.
+        </p>
+      </header>
+
+      <nav className="lk-tabs" role="tablist">
+        {([['ls', 'Local Search'], ['ils', 'ILS']] as [TabId, string][]).map(([id, label]) => (
+          <button
+            key={id} role="tab" aria-selected={tab === id}
+            className={'lk-tabbtn' + (tab === id ? ' lk-tabbtn-active' : '')}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Keep both tabs mounted so per-tab playback state is preserved on switch */}
+      <div style={{ display: tab === 'ls' ? 'block' : 'none' }}><LocalSearchTab /></div>
+      <div style={{ display: tab === 'ils' ? 'block' : 'none' }}><ILSTab /></div>
+
+      <footer className="lk-footer">
+        <span className="lk-mono">cities: {CITIES.length}</span>
+        <span className="lk-mono">algorithm: 2-opt + double-bridge ILS</span>
+      </footer>
+    </div>
+  )
+}
