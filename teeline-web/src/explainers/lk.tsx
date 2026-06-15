@@ -189,3 +189,67 @@ const CSS = `
 
 .lk-footer { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); }
 `
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+
+const SPEED_STEPS = [600, 300, 150, 80, 30] // ms per tick
+
+interface ControlsProps {
+  playing: boolean
+  done: boolean
+  speedIdx: number
+  onPlayPause: () => void
+  onStep: () => void
+  onReset: () => void
+  onSpeedChange: (idx: number) => void
+}
+
+function Controls({ playing, done, speedIdx, onPlayPause, onStep, onReset, onSpeedChange }: ControlsProps) {
+  return (
+    <div className="lk-controls">
+      <button className="lk-btn lk-btn-primary" onClick={onPlayPause} disabled={done}>
+        {playing ? '⏸ Pause' : done ? '⏹ Done' : '▶ Run'}
+      </button>
+      <button className="lk-btn" onClick={onStep} disabled={done}>⏭ Step</button>
+      <button className="lk-btn" onClick={onReset}>↺ Reset</button>
+      <span className="lk-speed-label">Speed:</span>
+      <input
+        type="range" min={0} max={4} step={1} value={speedIdx}
+        className="lk-slider"
+        aria-label="animation speed"
+        onChange={e => onSpeedChange(Number((e.target as HTMLInputElement).value))}
+      />
+    </div>
+  )
+}
+
+// ── StatsPanel ────────────────────────────────────────────────────────────────
+
+interface StatEntry { label: string; value: string | number }
+
+function StatsPanel({ stats }: { stats: StatEntry[] }) {
+  return (
+    <div className="lk-statgrid">
+      {stats.map(({ label, value }) => (
+        <div key={label}>
+          <div className="lk-statlabel">{label}</div>
+          <div className="lk-mono">
+            {typeof value === 'number'
+              ? Number.isInteger(value) ? value : value.toFixed(1)
+              : value}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── PhaseIndicator ────────────────────────────────────────────────────────────
+
+function PhaseIndicator({ phase }: { phase: string }) {
+  const cls = phase.includes('bridge') ? 'lk-phase-bridge'
+    : phase.includes('best') || phase.includes('New') ? 'lk-phase-best'
+    : phase.includes('LK') ? 'lk-phase-pass'
+    : ''
+  return <div className={`lk-phase ${cls}`}>{phase}</div>
+}
