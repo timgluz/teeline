@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   CITIES, euclidDist, buildDistMatrix, tourDist, DIST, INIT_TOUR,
-  doubleBridge, lcgRand, computeLocalSearchFrames,
+  doubleBridge, lcgRand, computeLocalSearchFrames, computeILSFrames,
 } from './lk'
 
 describe('euclidDist', () => {
@@ -142,5 +142,35 @@ describe('computeLocalSearchFrames', () => {
     for (let i = 1; i < swapFrames.length; i++) {
       expect(swapFrames[i].dist).toBeLessThan(swapFrames[i - 1].dist + 1e-9)
     }
+  })
+})
+
+describe('computeILSFrames', () => {
+  const rand = lcgRand(42)
+  const frames = computeILSFrames(INIT_TOUR, DIST, 30, 5, rand)
+
+  it('last frame has overlay starting with "Done"', () => {
+    expect(frames[frames.length - 1].overlay).toMatch(/^Done/)
+  })
+
+  it('has at least one bridge_cut frame (highlight === "bridge")', () => {
+    expect(frames.some(f => f.highlight === 'bridge')).toBe(true)
+  })
+
+  it('bestDist is non-increasing across frames', () => {
+    let prev = frames[0].bestDist
+    for (const f of frames) {
+      expect(f.bestDist).toBeLessThanOrEqual(prev + 1e-9)
+      prev = f.bestDist
+    }
+  })
+
+  it('final bestDist is no worse than initial tour distance', () => {
+    const initD = frames[0].currentDist
+    expect(frames[frames.length - 1].bestDist).toBeLessThanOrEqual(initD + 1e-9)
+  })
+
+  it('all tour arrays have length 15', () => {
+    expect(frames.every(f => f.tour.length === 15)).toBe(true)
   })
 })

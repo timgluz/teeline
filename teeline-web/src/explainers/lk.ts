@@ -164,3 +164,171 @@ export function computeLocalSearchFrames(
 
   return frames;
 }
+
+export interface ILSFrame {
+  tour: number[];
+  bestTour: number[];
+  swapEdges: EdgePair | null;
+  bridgePoints: [number, number, number] | null; // city indices at cut positions
+  phase: string;
+  currentDist: number;
+  bestDist: number;
+  restarts: number;
+  plateauCount: number;
+  overlay: string | null;
+  highlight: 'swap' | 'bridge' | 'best' | null;
+}
+
+// Number of duplicate frames for visual hold on bridge_cut and new_best events.
+const ILS_HOLD = 3;
+
+// Pre-computes all ILS animation frames: NN → 2-opt → [kick → 2-opt → accept/reject]*.
+// No scan events — Tab 2 shows only accepted swaps and ILS events.
+export function computeILSFrames(
+  initTour: number[],
+  dist: number[][],
+  maxEpochs: number,
+  plateauLimit: number,
+  rand: () => number
+): ILSFrame[] {
+  const frames: ILSFrame[] = [];
+
+  let currentTour = [...initTour];
+  let bestTour = [...initTour];
+  let currentDist = tourDist(currentTour, dist);
+  let bestDist = currentDist;
+  let restarts = 0;
+  let plateauCount = 0;
+  const n = currentTour.length;
+
+  // Helper: run first-improvement 2-opt on `t` in place, emitting swap frames.
+  function runPass(t: number[], phase: string): void {
+    let improved = true;
+    while (improved) {
+      improved = false;
+      outer:
+      for (let i = 0; i < n - 1; i++) {
+        for (let j = i + 2; j < n; j++) {
+          if (i === 0 && j === n - 1) continue;
+          const removed = dist[t[i]][t[i + 1]] + dist[t[j]][t[(j + 1) % n]];
+          const added   = dist[t[i]][t[j]]     + dist[t[i + 1]][t[(j + 1) % n]];
+          if (removed - added > 1e-10) {
+            const e1: [number, number] = [t[i],     t[j]];
+            const e2: [number, number] = [t[i + 1], t[(j + 1) % n]];
+            t.splice(i + 1, j - i, ...t.slice(i + 1, j + 1).reverse());
+            currentDist = tourDist(t, dist);
+            frames.push({
+              tour: [...t], bestTour: [...bestTour],
+              swapEdges: [e1, e2], bridgePoints: null,
+              phase, currentDist, bestDist, restarts, plateauCount,
+              overlay: null, highlight: 'swap',
+            });
+            improved = true;
+            break outer;
+          }
+        }
+      }
+    }
+  }
+
+  // Initial pass
+  frames.push({
+    tour: [...currentTour], bestTour: [...bestTour],
+    swapEdges: null, bridgePoints: null,
+    phase: 'LK pass', currentDist, bestDist, restarts, plateauCount,
+    overlay: null, highlight: null,
+  });
+  runPass(currentTour, 'LK pass');
+  currentDist = tourDist(currentTour, dist);
+
+  if (currentDist < bestDist) {
+    bestDist = currentDist;
+    bestTour = [...currentTour];
+    plateauCount = 0;
+  }
+  for (let h = 0; h < ILS_HOLD; h++) {
+    frames.push({
+      tour: [...currentTour], bestTour: [...bestTour],
+      swapEdges: null, bridgePoints: null,
+      phase: 'New best!', currentDist, bestDist, restarts, plateauCount,
+      overlay: null, highlight: 'best',
+    });
+  }
+
+  // ILS loop
+  for (let epoch = 0; epoch < maxEpochs; epoch++) {
+    // Kick
+    const { result: kicked, p1, p2, p3 } = doubleBridge(bestTour, rand);
+    currentTour = kicked;
+    currentDist = tourDist(currentTour, dist);
+    restarts++;
+    const bridgePoints: [number, number, number] = [bestTour[p1], bestTour[p2], bestTour[p3]];
+
+    for (let h = 0; h < ILS_HOLD; h++) {
+      frames.push({
+        tour: [...currentTour], bestTour: [...bestTour],
+        swapEdges: null, bridgePoints,
+        phase: 'Double-bridge kick', currentDist, bestDist, restarts, plateauCount,
+        overlay: null, highlight: 'bridge',
+      });
+    }
+
+    // Optimise kicked tour
+    frames.push({
+      tour: [...currentTour], bestTour: [...bestTour],
+      swapEdges: null, bridgePoints: null,
+      phase: 'LK pass', currentDist, bestDist, restarts, plateauCount,
+      overlay: null, highlight: null,
+    });
+    runPass(currentTour, 'LK pass');
+    currentDist = tourDist(currentTour, dist);
+
+    // Local optimum label
+    frames.push({
+      tour: [...currentTour], bestTour: [...bestTour],
+      swapEdges: null, bridgePoints: null,
+      phase: 'Local optimum', currentDist, bestDist, restarts, plateauCount,
+      overlay: 'Local optimum', highlight: null,
+    });
+
+    // Accept / reject
+    if (currentDist < bestDist - 1e-10) {
+      bestDist = currentDist;
+      bestTour = [...currentTour];
+      plateauCount = 0;
+      for (let h = 0; h < ILS_HOLD; h++) {
+        frames.push({
+          tour: [...currentTour], bestTour: [...bestTour],
+          swapEdges: null, bridgePoints: null,
+          phase: 'New best!', currentDist, bestDist, restarts, plateauCount,
+          overlay: null, highlight: 'best',
+        });
+      }
+    } else {
+      plateauCount++;
+      frames.push({
+        tour: [...currentTour], bestTour: [...bestTour],
+        swapEdges: null, bridgePoints: null,
+        phase: 'Plateau', currentDist, bestDist, restarts, plateauCount,
+        overlay: null, highlight: null,
+      });
+      if (plateauCount >= plateauLimit) {
+        frames.push({
+          tour: [...bestTour], bestTour: [...bestTour],
+          swapEdges: null, bridgePoints: null,
+          phase: 'Done', currentDist: bestDist, bestDist, restarts, plateauCount,
+          overlay: 'Done — plateau limit reached', highlight: null,
+        });
+        return frames;
+      }
+    }
+  }
+
+  frames.push({
+    tour: [...bestTour], bestTour: [...bestTour],
+    swapEdges: null, bridgePoints: null,
+    phase: 'Done', currentDist: bestDist, bestDist, restarts, plateauCount,
+    overlay: 'Done — max epochs', highlight: null,
+  });
+  return frames;
+}
