@@ -61,3 +61,23 @@ export function lcgRand(seed: number): () => number {
 // Pre-computed constants used by both tabs.
 export const DIST = buildDistMatrix(CITIES);
 export const INIT_TOUR = nnTour(CITIES, DIST);
+
+// Port of lin_kernighan.rs::double_bridge.
+// Returns the kicked tour plus the three cut positions used,
+// so callers can highlight the cut cities in the animation.
+export function doubleBridge(
+  tour: number[],
+  rand: () => number
+): { result: number[]; p1: number; p2: number; p3: number } {
+  const n = tour.length;
+  const p1 = 1 + Math.floor(rand() * Math.floor(n / 4));
+  const p2 = p1 + 1 + Math.floor(rand() * Math.floor(n / 4));
+  const p3 = p2 + 1 + Math.floor(rand() * Math.floor(n / 4));
+  const result = [
+    ...tour.slice(0, p1),
+    ...tour.slice(p2, p3),
+    ...tour.slice(p1, p2),
+    ...tour.slice(p3),
+  ];
+  return { result, p1, p2, p3 };
+}

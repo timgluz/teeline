@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   CITIES, euclidDist, buildDistMatrix, tourDist, DIST, INIT_TOUR,
+  doubleBridge, lcgRand,
 } from './lk'
 
 describe('euclidDist', () => {
@@ -58,5 +59,50 @@ describe('DIST', () => {
   it('is square matrix of size 15', () => {
     expect(DIST.length).toBe(15)
     expect(DIST[0].length).toBe(15)
+  })
+})
+
+describe('doubleBridge', () => {
+  const rand = lcgRand(42)
+  const tour = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+  it('output has same length as input', () => {
+    const { result } = doubleBridge(tour, rand)
+    expect(result.length).toBe(tour.length)
+  })
+
+  it('output contains same cities (just reordered)', () => {
+    const rand2 = lcgRand(99)
+    const { result } = doubleBridge(tour, rand2)
+    expect([...result].sort((a, b) => a - b)).toEqual(tour)
+  })
+
+  it('p1 < p2 < p3 and all within bounds', () => {
+    const rand3 = lcgRand(7)
+    const n = tour.length
+    const { p1, p2, p3 } = doubleBridge(tour, rand3)
+    expect(p1).toBeGreaterThanOrEqual(1)
+    expect(p2).toBeGreaterThan(p1)
+    expect(p3).toBeGreaterThan(p2)
+    expect(p3).toBeLessThan(n)
+  })
+})
+
+describe('lcgRand', () => {
+  it('returns values in [0,1)', () => {
+    const r = lcgRand(1)
+    for (let i = 0; i < 20; i++) {
+      const v = r()
+      expect(v).toBeGreaterThanOrEqual(0)
+      expect(v).toBeLessThan(1)
+    }
+  })
+
+  it('same seed produces same sequence', () => {
+    const r1 = lcgRand(42)
+    const r2 = lcgRand(42)
+    for (let i = 0; i < 5; i++) {
+      expect(r1()).toBe(r2())
+    }
   })
 })
