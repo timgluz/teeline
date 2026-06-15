@@ -81,3 +81,86 @@ export function doubleBridge(
   ];
   return { result, p1, p2, p3 };
 }
+
+// Each [from, to] pair is a city index pair forming one edge.
+export type EdgePair = [[number, number], [number, number]];
+
+export interface LSFrame {
+  tour: number[];
+  scanEdges: EdgePair | null;   // edges being considered (gray dashed in Step mode)
+  swapEdges: EdgePair | null;   // new edges just accepted (green flash)
+  dist: number;
+  overlay: string | null;       // label overlaid on SVG ("Local optimum")
+  isScan: boolean;              // true → skip this frame in Run mode
+}
+
+// Pre-computes all 2-opt animation frames (first-improvement, single restart per swap).
+// scan events are interleaved so Step mode can show them; Run mode skips isScan frames.
+export function computeLocalSearchFrames(
+  initTour: number[],
+  dist: number[][]
+): LSFrame[] {
+  const frames: LSFrame[] = [];
+  const tour = [...initTour];
+  const n = tour.length;
+  let currentDist = tourDist(tour, dist);
+
+  let foundImprovement = true;
+  while (foundImprovement) {
+    foundImprovement = false;
+    outer:
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue; // would reverse entire tour
+
+        // Scan frame: show the two candidate edges (old edges that might be removed)
+        frames.push({
+          tour: [...tour],
+          scanEdges: [[tour[i], tour[i + 1]], [tour[j], tour[(j + 1) % n]]],
+          swapEdges: null,
+          dist: currentDist,
+          overlay: null,
+          isScan: true,
+        });
+
+        const removed = dist[tour[i]][tour[i + 1]] + dist[tour[j]][tour[(j + 1) % n]];
+        const added   = dist[tour[i]][tour[j]]     + dist[tour[i + 1]][tour[(j + 1) % n]];
+        const gain = removed - added;
+
+        if (gain > 1e-10) {
+          // Record new edges before applying reversal
+          const newEdge1: [number, number] = [tour[i],     tour[j]];
+          const newEdge2: [number, number] = [tour[i + 1], tour[(j + 1) % n]];
+
+          // Apply 2-opt reversal: reverse segment [i+1 .. j]
+          tour.splice(i + 1, j - i, ...tour.slice(i + 1, j + 1).reverse());
+          currentDist = tourDist(tour, dist);
+
+          frames.push({
+            tour: [...tour],
+            scanEdges: null,
+            swapEdges: [newEdge1, newEdge2],
+            dist: currentDist,
+            overlay: null,
+            isScan: false,
+          });
+
+          foundImprovement = true;
+          break outer; // restart scan from i=0 after each swap
+        }
+      }
+    }
+  }
+
+  // Terminal frame
+  frames.push({
+    tour: [...tour],
+    scanEdges: null,
+    swapEdges: null,
+    dist: currentDist,
+    overlay: "Local optimum",
+    isScan: false,
+  });
+
+  return frames;
+}

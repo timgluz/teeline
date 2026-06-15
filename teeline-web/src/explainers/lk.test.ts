@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   CITIES, euclidDist, buildDistMatrix, tourDist, DIST, INIT_TOUR,
-  doubleBridge, lcgRand,
+  doubleBridge, lcgRand, computeLocalSearchFrames,
 } from './lk'
 
 describe('euclidDist', () => {
@@ -103,6 +103,44 @@ describe('lcgRand', () => {
     const r2 = lcgRand(42)
     for (let i = 0; i < 5; i++) {
       expect(r1()).toBe(r2())
+    }
+  })
+})
+
+describe('computeLocalSearchFrames', () => {
+  const frames = computeLocalSearchFrames(INIT_TOUR, DIST)
+
+  it('last frame has overlay "Local optimum"', () => {
+    expect(frames[frames.length - 1].overlay).toBe('Local optimum')
+  })
+
+  it('last frame has no scan or swap edges', () => {
+    const last = frames[frames.length - 1]
+    expect(last.scanEdges).toBeNull()
+    expect(last.swapEdges).toBeNull()
+  })
+
+  it('swap frames have isScan = false', () => {
+    const swapFrames = frames.filter(f => f.swapEdges !== null)
+    expect(swapFrames.every(f => !f.isScan)).toBe(true)
+  })
+
+  it('scan frames have isScan = true', () => {
+    const scanFrames = frames.filter(f => f.scanEdges !== null)
+    expect(scanFrames.every(f => f.isScan)).toBe(true)
+  })
+
+  it('final tour distance is no worse than initial', () => {
+    const initDist = tourDist(INIT_TOUR, DIST)
+    const finalDist = frames[frames.length - 1].dist
+    expect(finalDist).toBeLessThanOrEqual(initDist + 1e-9)
+  })
+
+  it('all swap frames have improving dist (each swap reduces distance)', () => {
+    const swapFrames = frames.filter(f => f.swapEdges !== null)
+    expect(swapFrames.length).toBeGreaterThan(0) // NN tour should have crossings
+    for (let i = 1; i < swapFrames.length; i++) {
+      expect(swapFrames[i].dist).toBeLessThan(swapFrames[i - 1].dist + 1e-9)
     }
   })
 })
