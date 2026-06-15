@@ -1,7 +1,7 @@
 // teeline-web/src/explainers/lk.test.ts
 import { describe, it, expect } from 'vitest'
 import {
-  CITIES, euclidDist, buildDistMatrix, tourDist, nnTour, DIST, INIT_TOUR,
+  CITIES, euclidDist, buildDistMatrix, tourDist, DIST, INIT_TOUR,
 } from './lk'
 
 describe('euclidDist', () => {
