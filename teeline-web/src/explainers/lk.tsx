@@ -1,5 +1,5 @@
 // teeline-web/src/explainers/lk.tsx
-import { useState, useEffect, useCallback, useMemo } from 'preact/hooks'
+import { useState, useCallback, useMemo } from 'preact/hooks'
 import type { LSFrame, ILSFrame } from './lk'
 import {
   CITIES, DIST, INIT_TOUR,
@@ -173,8 +173,6 @@ const CSS = `
 .lk-btn:hover:not(:disabled) { border-color: var(--accent); }
 .lk-btn:disabled { opacity: 0.45; cursor: default; }
 .lk-btn-primary { color: var(--accent); border-color: var(--accent); }
-.lk-speed-label { font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
-.lk-slider { accent-color: var(--accent); width: 80px; }
 
 .lk-statgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px; }
 .lk-statlabel { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
@@ -203,36 +201,20 @@ const CSS = `
 
 // ── Controls ──────────────────────────────────────────────────────────────────
 
-const SPEED_STEPS = [600, 300, 150, 80, 30] // ms per tick
-
 interface ControlsProps {
-  playing: boolean
   done: boolean
-  speedIdx: number
   canStepBack: boolean
-  onPlayPause: () => void
   onStepBack: () => void
   onStep: () => void
   onReset: () => void
-  onSpeedChange: (idx: number) => void
 }
 
-function Controls({ playing, done, speedIdx, canStepBack, onPlayPause, onStepBack, onStep, onReset, onSpeedChange }: ControlsProps) {
+function Controls({ done, canStepBack, onStepBack, onStep, onReset }: ControlsProps) {
   return (
     <div className="lk-controls">
-      <button className="lk-btn lk-btn-primary" onClick={onPlayPause} disabled={done}>
-        {playing ? '⏸ Pause' : done ? '⏹ Done' : '▶ Run'}
-      </button>
       <button className="lk-btn" onClick={onStepBack} disabled={!canStepBack}>◀ Back</button>
-      <button className="lk-btn" onClick={onStep} disabled={done}>Step ▶</button>
+      <button className="lk-btn lk-btn-primary" onClick={onStep} disabled={done}>Step ▶</button>
       <button className="lk-btn" onClick={onReset}>↺ Reset</button>
-      <span className="lk-speed-label">Speed:</span>
-      <input
-        type="range" min={0} max={4} step={1} value={speedIdx}
-        className="lk-slider"
-        aria-label="animation speed"
-        onChange={e => onSpeedChange(Number((e.target as HTMLInputElement).value))}
-      />
     </div>
   )
 }
@@ -336,45 +318,15 @@ function ILSStatusLine({ frame }: { frame: ILSFrame }) {
 function LocalSearchTab() {
   const frames = useMemo(() => computeLocalSearchFrames(INIT_TOUR, DIST), [])
   const [idx, setIdx] = useState(0)
-  const [playing, setPlaying] = useState(false)
-  const [speedIdx, setSpeedIdx] = useState(2) // default 150ms
 
-  const speed = SPEED_STEPS[speedIdx]
   const frame: LSFrame = frames[Math.min(idx, frames.length - 1)]
   const done = idx >= frames.length - 1
 
-  // Advance one event; skip scan frames only while playing
-  const advance = useCallback((skipScan: boolean) => {
-    setIdx(i => {
-      let next = i + 1
-      if (skipScan) {
-        while (next < frames.length - 1 && frames[next].isScan) next++
-      }
-      if (next >= frames.length) { setPlaying(false); return frames.length - 1 }
-      return next
-    })
+  const handleStep = useCallback(() => {
+    setIdx(i => Math.min(i + 1, frames.length - 1))
   }, [frames])
-
-  useEffect(() => {
-    if (!playing) return
-    const id = setInterval(() => advance(true), speed)
-    return () => clearInterval(id)
-  }, [playing, speed, advance])
-
-  const handlePlayPause = useCallback(() => setPlaying(p => !p), [])
-  const handleStep = useCallback(() => { setPlaying(false); advance(true) }, [advance])
-  const handleStepBack = useCallback(() => {
-    setPlaying(false)
-    setIdx(i => {
-      let prev = i - 1
-      while (prev > 0 && frames[prev].isScan) prev--
-      return Math.max(0, prev)
-    })
-  }, [frames])
-  const handleReset = useCallback(() => {
-    setPlaying(false)
-    setIdx(0)
-  }, [])
+  const handleStepBack = useCallback(() => setIdx(i => Math.max(0, i - 1)), [frames])
+  const handleReset = useCallback(() => setIdx(0), [])
 
   const swapCount = frames.slice(0, idx + 1).filter(f => f.swapEdges !== null).length
 
@@ -391,10 +343,8 @@ function LocalSearchTab() {
       </div>
       <div className="lk-prose">
         <Controls
-          playing={playing} done={done} speedIdx={speedIdx}
-          canStepBack={idx > 0}
-          onPlayPause={handlePlayPause} onStepBack={handleStepBack} onStep={handleStep}
-          onReset={handleReset} onSpeedChange={setSpeedIdx}
+          done={done} canStepBack={idx > 0}
+          onStepBack={handleStepBack} onStep={handleStep} onReset={handleReset}
         />
         <LSStatusLine frame={frame} />
         <StatsPanel stats={[
@@ -403,10 +353,9 @@ function LocalSearchTab() {
           { label: 'Step', value: `${idx + 1} / ${frames.length}` },
         ]} />
         <p className="lk-note">
-          This shows simplified <strong>2-opt</strong> local search. Press{' '}
-          <strong>Step</strong> to see each candidate pair scanned;{' '}
-          <strong>Run</strong> skips to accepted swaps only.{' '}
-          The actual LK solver uses depth-k chain moves —{' '}
+          This shows simplified <strong>2-opt</strong> local search: scan candidate
+          pairs, swap when one improves the tour, repeat until no gain is found.{' '}
+          The actual LK solver chains deeper moves —{' '}
           <a href="/algorithms/lk/">see the docs</a>.
         </p>
       </div>
@@ -424,31 +373,15 @@ function ILSTab() {
     []
   )
   const [idx, setIdx] = useState(0)
-  const [playing, setPlaying] = useState(false)
-  const [speedIdx, setSpeedIdx] = useState(2)
 
-  const speed = SPEED_STEPS[speedIdx]
   const frame: ILSFrame = frames[Math.min(idx, frames.length - 1)]
   const done = idx >= frames.length - 1
 
-  const advance = useCallback(() => {
-    setIdx(i => {
-      const next = i + 1
-      if (next >= frames.length) { setPlaying(false); return frames.length - 1 }
-      return next
-    })
+  const handleStep = useCallback(() => {
+    setIdx(i => Math.min(i + 1, frames.length - 1))
   }, [frames])
-
-  useEffect(() => {
-    if (!playing) return
-    const id = setInterval(advance, speed)
-    return () => clearInterval(id)
-  }, [playing, speed, advance])
-
-  const handlePlayPause = useCallback(() => setPlaying(p => !p), [])
-  const handleStep = useCallback(() => { setPlaying(false); advance() }, [advance])
-  const handleStepBack = useCallback(() => { setPlaying(false); setIdx(i => Math.max(0, i - 1)) }, [])
-  const handleReset = useCallback(() => { setPlaying(false); setIdx(0) }, [])
+  const handleStepBack = useCallback(() => setIdx(i => Math.max(0, i - 1)), [])
+  const handleReset = useCallback(() => setIdx(0), [])
 
   return (
     <div className="lk-tab">
@@ -466,10 +399,8 @@ function ILSTab() {
       <div className="lk-prose">
         <PhaseIndicator phase={frame.phase} />
         <Controls
-          playing={playing} done={done} speedIdx={speedIdx}
-          canStepBack={idx > 0}
-          onPlayPause={handlePlayPause} onStepBack={handleStepBack} onStep={handleStep}
-          onReset={handleReset} onSpeedChange={setSpeedIdx}
+          done={done} canStepBack={idx > 0}
+          onStepBack={handleStepBack} onStep={handleStep} onReset={handleReset}
         />
         <ILSStatusLine frame={frame} />
         <StatsPanel stats={[

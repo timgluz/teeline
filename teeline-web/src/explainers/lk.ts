@@ -96,6 +96,9 @@ export interface LSFrame {
 
 // Pre-computes all 2-opt animation frames (first-improvement, single restart per swap).
 // scan events are interleaved so Step mode can show them; Run mode skips isScan frames.
+// How many non-improving "miss" scan frames to show before each accepted swap.
+const PREVIEW_SCANS = 2;
+
 export function computeLocalSearchFrames(
   initTour: number[],
   dist: number[][]
@@ -108,59 +111,50 @@ export function computeLocalSearchFrames(
   let foundImprovement = true;
   while (foundImprovement) {
     foundImprovement = false;
+
+    // First pass: collect up to PREVIEW_SCANS non-improving pairs, then find the winner.
+    const misses: EdgePair[] = [];
+    let winI = -1, winJ = -1;
+
     outer:
     for (let i = 0; i < n - 1; i++) {
       for (let j = i + 2; j < n; j++) {
-        if (i === 0 && j === n - 1) continue; // would reverse entire tour
-
-        // Scan frame: show the two candidate edges (old edges that might be removed)
-        frames.push({
-          tour: [...tour],
-          scanEdges: [[tour[i], tour[i + 1]], [tour[j], tour[(j + 1) % n]]],
-          swapEdges: null,
-          dist: currentDist,
-          overlay: null,
-          isScan: true,
-        });
-
+        if (i === 0 && j === n - 1) continue;
         const removed = dist[tour[i]][tour[i + 1]] + dist[tour[j]][tour[(j + 1) % n]];
         const added   = dist[tour[i]][tour[j]]     + dist[tour[i + 1]][tour[(j + 1) % n]];
-        const gain = removed - added;
-
-        if (gain > 1e-10) {
-          // Record new edges before applying reversal
-          const newEdge1: [number, number] = [tour[i],     tour[j]];
-          const newEdge2: [number, number] = [tour[i + 1], tour[(j + 1) % n]];
-
-          // Apply 2-opt reversal: reverse segment [i+1 .. j]
-          tour.splice(i + 1, j - i, ...tour.slice(i + 1, j + 1).reverse());
-          currentDist = tourDist(tour, dist);
-
-          frames.push({
-            tour: [...tour],
-            scanEdges: null,
-            swapEdges: [newEdge1, newEdge2],
-            dist: currentDist,
-            overlay: null,
-            isScan: false,
-          });
-
-          foundImprovement = true;
-          break outer; // restart scan from i=0 after each swap
+        if (removed - added > 1e-10) { winI = i; winJ = j; break outer; }
+        if (misses.length < PREVIEW_SCANS) {
+          misses.push([[tour[i], tour[i + 1]], [tour[j], tour[(j + 1) % n]]]);
         }
       }
     }
+
+    if (winI === -1) break; // no improvement found in this pass
+
+    // Emit miss scan frames (showing "still looking...")
+    for (const edges of misses) {
+      frames.push({ tour: [...tour], scanEdges: edges, swapEdges: null, dist: currentDist, overlay: null, isScan: true });
+    }
+
+    // Emit winning pair as scan frame (showing "found it!")
+    frames.push({
+      tour: [...tour],
+      scanEdges: [[tour[winI], tour[winI + 1]], [tour[winJ], tour[(winJ + 1) % n]]],
+      swapEdges: null, dist: currentDist, overlay: null, isScan: true,
+    });
+
+    // Apply 2-opt reversal and emit swap frame
+    const newEdge1: [number, number] = [tour[winI],     tour[winJ]];
+    const newEdge2: [number, number] = [tour[winI + 1], tour[(winJ + 1) % n]];
+    tour.splice(winI + 1, winJ - winI, ...tour.slice(winI + 1, winJ + 1).reverse());
+    currentDist = tourDist(tour, dist);
+    frames.push({ tour: [...tour], scanEdges: null, swapEdges: [newEdge1, newEdge2], dist: currentDist, overlay: null, isScan: false });
+
+    foundImprovement = true;
   }
 
   // Terminal frame
-  frames.push({
-    tour: [...tour],
-    scanEdges: null,
-    swapEdges: null,
-    dist: currentDist,
-    overlay: "Local optimum",
-    isScan: false,
-  });
+  frames.push({ tour: [...tour], scanEdges: null, swapEdges: null, dist: currentDist, overlay: "Local optimum", isScan: false });
 
   return frames;
 }
