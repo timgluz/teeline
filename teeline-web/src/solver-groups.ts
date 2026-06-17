@@ -20,6 +20,7 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   'cs':           { id: 'cs',           name: 'Cuckoo Search' },
   'fpa':          { id: 'fpa',          name: 'Flower Pollination' },
   'gsa':          { id: 'gsa',          name: 'Gravitational Search' },
+  'som':          { id: 'som',          name: 'Kohonen SOM' },
 }
 
 export interface SolverGroup {
@@ -29,12 +30,12 @@ export interface SolverGroup {
 
 export const SOLVER_GROUPS: SolverGroup[] = [
   { label: 'Exact',         ids: ['bhk', 'branch_bound'] },
-  { label: 'Constructive',  ids: ['nn', 'fourier', 'christofides'] },
+  { label: 'Constructive',  ids: ['nn', 'fourier', 'christofides', 'som'] },
   { label: 'Local search',  ids: ['2opt', '3opt', 'or_opt', 'lk'] },
   { label: 'Metaheuristic', ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa'] },
 ]
 
 export const PAGED_SOLVERS = new Set<string>([
-  'bhk', 'branch_bound', 'nn', 'fourier', 'christofides',
+  'bhk', 'branch_bound', 'nn', 'fourier', 'christofides', 'som',
   '2opt', '3opt', 'or_opt', 'lk', 'sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa',
 ])
