@@ -84,5 +84,5 @@ teeline solve som --epochs=200000 --learning_rate=0.9 -i ./data/tsplib/berlin52.
 
 - Kohonen, T. (1982) — "Self-organized formation of topologically correct feature maps",
   *Biological Cybernetics* **43**(1), 59–69.
-- Angeniol, B., de la Croix Vaubois, G., & Le Texier, J.-Y. (1988) — "Self-organizing feature
+- Angéniol, B., de la Croix Vaubois, G., & Le Texier, J.-Y. (1988) — "Self-organizing feature
   maps and the travelling salesman problem", *Neural Networks* **1**(4), 289–293.
