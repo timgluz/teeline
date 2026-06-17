@@ -4,6 +4,11 @@ use crate::tsp::route::Route;
 use std::sync::mpsc;
 use rand::RngExt;
 
+#[inline]
+fn sq_dist(a: &[f64; 2], b: &[f64; 2]) -> f64 {
+    (a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2)
+}
+
 pub fn solve(
     problem: &TspProblem,
     opts: &SOMOptions,
@@ -85,9 +90,7 @@ pub fn solve(
             .iter()
             .enumerate()
             .min_by(|&(_, a), &(_, b)| {
-                let da = (a[0] - city[0]).powi(2) + (a[1] - city[1]).powi(2);
-                let db = (b[0] - city[0]).powi(2) + (b[1] - city[1]).powi(2);
-                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+                sq_dist(a, &city).partial_cmp(&sq_dist(b, &city)).unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(i, _)| i)
             .unwrap_or(0);
@@ -148,10 +151,7 @@ fn extract_tour(
             neurons
                 .iter()
                 .enumerate()
-                .map(|(ni, neuron)| {
-                    let d = (neuron[0] - city[0]).powi(2) + (neuron[1] - city[1]).powi(2);
-                    (ni, d)
-                })
+                .map(|(ni, neuron)| (ni, sq_dist(neuron, city)))
                 .min_by(|(_, da), (_, db)| da.partial_cmp(db).unwrap_or(std::cmp::Ordering::Equal))
                 .unwrap_or((0, f64::MAX))
         })
