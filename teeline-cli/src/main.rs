@@ -1,4 +1,5 @@
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use usage::complete::{CompleteOptions, complete};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
@@ -77,7 +78,7 @@ fn solver_options_from_args(args: &ArgMatches, solver: Solvers) -> AppOptions {
 // CLI definition
 // ---------------------------------------------------------------------------
 
-fn main() {
+fn build_cli() -> Command {
     let tuning = tuning_args();
 
     let solve_cmd = Command::new("solve")
@@ -184,7 +185,17 @@ fn main() {
                 .help("output format: text (default) or json"),
         );
 
-    let cli = Command::new("Teeline")
+    let completions_cmd = Command::new("completions")
+        .about("Generate shell completion scripts")
+        .arg(
+            Arg::new("shell")
+                .help("target shell")
+                .value_parser(["bash", "zsh", "fish", "nushell"])
+                .required(true)
+                .value_name("SHELL"),
+        );
+
+    Command::new("Teeline")
         .version(tsp::VERSION)
         .author(tsp::AUTHOR)
         .about("Traveling Salesman Problem solver")
@@ -193,13 +204,18 @@ fn main() {
         .subcommand(pipeline_cmd)
         .subcommand(convert_cmd)
         .subcommand(solvers_cmd)
-        .get_matches();
+        .subcommand(completions_cmd)
+}
+
+fn main() {
+    let cli = build_cli().get_matches();
 
     match cli.subcommand() {
         Some(("solve", args)) => run_solve(args),
         Some(("pipeline", args)) => run_pipeline_cmd(args),
         Some(("convert", args)) => run_convert(args),
         Some(("solvers", args)) => run_solvers(args),
+        Some(("completions", args)) => run_completions(args),
         _ => unreachable!("clap ensures a subcommand is always present"),
     }
 }
@@ -506,6 +522,26 @@ fn run_solvers(args: &ArgMatches) {
     } else {
         print_solvers_table(only_heuristic, only_exact);
     }
+}
+
+fn run_completions(args: &ArgMatches) {
+    let shell = args.get_one::<String>("shell").unwrap();
+    let spec = usage::spec::Spec::from(&build_cli());
+    let script = complete(&CompleteOptions {
+        usage_bin: "usage".to_string(),
+        shell: shell.clone(),
+        bin: "teeline".to_string(),
+        cache_key: None,
+        spec: Some(spec),
+        usage_cmd: None,
+        include_bash_completion_lib: false,
+        source_file: None,
+    })
+    .unwrap_or_else(|e| {
+        eprintln!("error generating completions: {e}");
+        std::process::exit(1);
+    });
+    print!("{script}");
 }
 
 // ---------------------------------------------------------------------------

@@ -85,6 +85,35 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/timgluz/teeline/release
 
 Each release also includes `teeline-solver.wasm` — the WebAssembly component built with `cargo-component`.
 
+### Shell completions
+
+The `completions` subcommand prints a completion script for the requested shell. It requires the [`usage` CLI](https://usage.jdx.dev) to be available at runtime (the generated script calls it for dynamic completions). Install it via mise or follow the usage docs.
+
+```bash
+# zsh — add to ~/.zshrc
+eval "$(teeline completions zsh)"
+
+# or generate once to a file (faster shell startup)
+teeline completions zsh > ~/.zsh/completions/_teeline
+
+# bash — add to ~/.bashrc
+eval "$(teeline completions bash)"
+
+# fish — add to ~/.config/fish/config.fish
+teeline completions fish | source
+
+# or save to the fish completions directory
+teeline completions fish > ~/.config/fish/completions/teeline.fish
+```
+
+With `go-task`:
+
+```bash
+task completions:zsh   # prints zsh script
+task completions:bash  # prints bash script
+task completions:fish  # prints fish script
+```
+
 ### Install locally from source (optional)
 
 ```bash
