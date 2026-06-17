@@ -1,0 +1,31 @@
+# Teeline
+
+> Browser-based Traveling Salesman Problem (TSP) solver. Upload a TSPLIB `.tsp` file,
+> pick a heuristic algorithm, and download the optimised tour — computed entirely
+> in-browser via WebAssembly (Rust compiled to WASM).
+
+## Solver Algorithms
+
+- [Nearest Neighbor](https://tspsolver.com/algorithms/nn/): Greedy constructive heuristic; start at a random city, always move to the closest unvisited city.
+- [2-opt](https://tspsolver.com/algorithms/2opt/): Local search that removes crossing edges by reversing path segments.
+- [3-opt](https://tspsolver.com/algorithms/3opt/): Extends 2-opt by considering triple-edge swaps.
+- [Simulated Annealing](https://tspsolver.com/algorithms/sa/): Probabilistic metaheuristic that accepts worse solutions early to escape local optima.
+- [Genetic Algorithm](https://tspsolver.com/algorithms/ga/): Population-based search using crossover and mutation operators.
+- [Lin-Kernighan](https://tspsolver.com/algorithms/lk/): Candidate-list sequential 2-opt with double-bridge kicks; best general-purpose heuristic.
+- [Or-opt](https://tspsolver.com/algorithms/or_opt/): Relocates segments of 1-3 cities for best-improvement local search.
+- [Christofides](https://tspsolver.com/algorithms/christofides/): Approximation algorithm with a proven <=1.5x optimal bound.
+- [Fourier](https://tspsolver.com/algorithms/fourier/): Constructive solver encoding the tour as a closed Fourier curve.
+- [Kohonen SOM](https://tspsolver.com/algorithms/som/): Self-Organizing Map elastic ring that wraps around city clusters.
+- [Particle Swarm](https://tspsolver.com/algorithms/pso/): Swarm-based velocity search adapted for discrete tour space.
+- [Cuckoo Search](https://tspsolver.com/algorithms/cs/): Levy-flight based search with nest abandonment.
+- [Flower Pollination](https://tspsolver.com/algorithms/fpa/): Global/local pollination with Levy flights toward the best tour.
+- [Tabu Search](https://tspsolver.com/algorithms/tabu/): Local search with a memory structure to avoid revisiting solutions.
+- [Bellman-Held-Karp](https://tspsolver.com/algorithms/bhk/): Exact dynamic programming; optimal but exponential (<=20 cities).
+- [Branch and Bound](https://tspsolver.com/algorithms/branch_bound/): Exact branch-and-bound search (small instances only).
+- [Stochastic Hill Climbing](https://tspsolver.com/algorithms/sa/): Random restarts with uphill moves to escape local optima.
+- [Gravitational Search](https://tspsolver.com/algorithms/gsa/): Mass-weighted swap-velocity swarm inspired by gravitational physics.
+
+## Optional
+
+- [Source code (GitHub)](https://github.com/timgluz/teeline): Rust library + CLI + WASM component + web front-end.
+- [WebAssembly component](https://github.com/timgluz/teeline/releases): Standalone WASM build callable from JS, Python, Go, and Rust.

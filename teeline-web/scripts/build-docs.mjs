@@ -136,3 +136,19 @@ for (const [solverId, filename] of Object.entries(SOLVER_DOCS)) {
   writeFileSync(join(outDir, 'index.html'), html)
   console.log(`[build-docs] docs/algorithms/${filename} → algorithms/${solverId}/index.html`)
 }
+
+// Generate sitemap.xml listing all static pages
+const BASE = 'https://tspsolver.com'
+const sitemapUrls = [
+  `${BASE}/`,
+  ...Object.keys(SOLVER_DOCS).map(id => `${BASE}/algorithms/${id}/`),
+  ...Object.keys(SOLVER_DOCS)
+    .filter(id => existsSync(join(WEB_ROOT, `algorithms/${id}/explainer/index.html`)))
+    .map(id => `${BASE}/algorithms/${id}/explainer/`),
+]
+const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${sitemapUrls.map(url => `  <url><loc>${url}</loc></url>`).join('\n')}
+</urlset>\n`
+writeFileSync(join(WEB_ROOT, 'public/sitemap.xml'), sitemapXml)
+console.log(`[build-docs] generated public/sitemap.xml (${sitemapUrls.length} URLs)`)

@@ -53,8 +53,26 @@ export default defineConfig({
     // node env (default) — tests import only DOM-free modules
   },
 
-  plugins: [sentryVitePlugin({
-    org: "timo-sulg",
-    project: "javascript"
-  })],
+  plugins: [
+    sentryVitePlugin({
+      org: "timo-sulg",
+      project: "javascript"
+    }),
+    // Make CSS non-blocking on the main SPA page.
+    // Algorithm docs pages keep blocking CSS (static HTML needs immediate styling).
+    {
+      name: 'async-css-main',
+      transformIndexHtml: {
+        order: 'post' as const,
+        handler(html: string, ctx: { filename: string }) {
+          if (ctx.filename.includes('/algorithms/')) return html
+          return html.replace(
+            /<link rel="stylesheet" crossorigin href="([^"]+)">/g,
+            `<link rel="preload" as="style" crossorigin href="$1" onload="this.onload=null;this.rel='stylesheet'">` +
+            `<noscript><link rel="stylesheet" crossorigin href="$1"></noscript>`
+          )
+        },
+      },
+    },
+  ],
 })

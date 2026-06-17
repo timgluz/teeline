@@ -1,5 +1,3 @@
-import './sentry.js'
-import 'htmx.org'
 import '@picocss/pico/css/pico.min.css'
 import './main.css'
 import './docs.css'
@@ -13,6 +11,7 @@ import { initResults, updateOptRoute, showRunning, showResult, computeRouteLengt
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
 initTopbar()
+window.addEventListener('load', () => import('./sentry'), { once: true })
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
