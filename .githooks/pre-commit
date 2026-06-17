@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || true)
+
+if [ -z "$STAGED" ]; then
+    exit 0
+fi
+
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+FAILED=0
+
+skip_notice() {
+    echo -e "${YELLOW}[SKIP]${NC} $1 not installed — did you forget to run mise install?"
+}
+
+fail_notice() {
+    echo -e "${RED}[FAIL]${NC} $1"
+    echo "       autofix: $2"
+    FAILED=1
+}
+
+# ── Rust ──────────────────────────────────────────────────────────────────────
+RS_FILES=$(echo "$STAGED" | grep -E '\.rs$' || true)
+if [ -n "$RS_FILES" ]; then
+    echo "[CHECK] cargo fmt"
+    if ! cargo fmt --all --check 2>&1; then
+        fail_notice "cargo fmt: code is not formatted" "cargo fmt"
+    fi
+
+    echo "[CHECK] cargo clippy"
+    if ! cargo clippy --workspace -- -D warnings 2>&1; then
+        fail_notice "cargo clippy: lint errors found" "cargo clippy --workspace --fix"
+    fi
+fi
+
+# ── Markdown ──────────────────────────────────────────────────────────────────
+MD_FILES=$(echo "$STAGED" | grep -E '\.md$' || true)
+if [ -n "$MD_FILES" ]; then
+    if ! command -v markdownlint &>/dev/null; then
+        skip_notice "markdownlint"
+    else
+        echo "[CHECK] markdownlint"
+        if ! echo "$MD_FILES" | xargs markdownlint 2>&1; then
+            fail_notice "markdownlint: issues found in markdown files" "markdownlint --fix <file>"
+        fi
+    fi
+fi
+
+# ── YAML ──────────────────────────────────────────────────────────────────────
+YAML_FILES=$(echo "$STAGED" | grep -E '\.(yml|yaml)$' || true)
+if [ -n "$YAML_FILES" ]; then
+    if ! command -v yamllint &>/dev/null; then
+        skip_notice "yamllint"
+    else
+        echo "[CHECK] yamllint"
+        if ! echo "$YAML_FILES" | xargs yamllint 2>&1; then
+            fail_notice "yamllint: issues found in YAML files" "yamllint <file>  # fix errors manually"
+        fi
+    fi
+fi
+
+# ── TypeScript (teeline-web) ──────────────────────────────────────────────────
+TS_FILES=$(echo "$STAGED" | grep -E 'teeline-web/.*\.(ts|js|tsx)$' || true)
+if [ -n "$TS_FILES" ]; then
+    if [ ! -d "teeline-web/node_modules" ]; then
+        skip_notice "teeline-web/node_modules (run: cd teeline-web && npm install)"
+    else
+        echo "[CHECK] tsc (teeline-web)"
+        if ! npx --prefix teeline-web tsc --noEmit 2>&1; then
+            fail_notice "tsc: TypeScript errors found in teeline-web" "# fix errors manually, then re-run tsc --noEmit to verify"
+        fi
+    fi
+fi
+
+# ── TOML ──────────────────────────────────────────────────────────────────────
+TOML_FILES=$(echo "$STAGED" | grep -E '\.toml$' || true)
+if [ -n "$TOML_FILES" ]; then
+    if ! command -v taplo &>/dev/null; then
+        skip_notice "taplo"
+    else
+        echo "[CHECK] taplo"
+        if ! echo "$TOML_FILES" | xargs taplo fmt --check 2>&1; then
+            fail_notice "taplo: TOML formatting issues found" "taplo fmt"
+        fi
+    fi
+fi
+
+# ── Shell ─────────────────────────────────────────────────────────────────────
+SH_FILES=$(echo "$STAGED" | grep -E '\.sh$' || true)
+if [ -n "$SH_FILES" ]; then
+    if ! command -v shellcheck &>/dev/null; then
+        skip_notice "shellcheck"
+    else
+        echo "[CHECK] shellcheck"
+        if ! echo "$SH_FILES" | xargs shellcheck 2>&1; then
+            fail_notice "shellcheck: issues found in shell scripts" "# fix errors manually"
+        fi
+    fi
+fi
+
+# ── Result ────────────────────────────────────────────────────────────────────
+if [ "$FAILED" -ne 0 ]; then
+    echo ""
+    echo -e "${RED}Pre-commit checks failed. Fix the issues above and try again.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}[OK]${NC} All pre-commit checks passed."
