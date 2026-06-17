@@ -1,12 +1,13 @@
 use crate::tsp::{SOMOptions, Solution, TspProblem};
 use crate::tsp::progress::ProgressMessage;
+use crate::tsp::route::Route;
 use std::sync::mpsc;
 use rand::RngExt;
 
 pub fn solve(
     problem: &TspProblem,
     opts: &SOMOptions,
-    _progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
@@ -56,6 +57,16 @@ pub fn solve(
     let epochs = opts.epochs;
     let eta0 = opts.learning_rate;
     let sigma0 = opts.radius_fraction * num_neurons as f64;
+    let checkpoint = (epochs / 10).max(1);
+
+    tracing::info!(
+        epochs,
+        neurons = num_neurons,
+        learning_rate = eta0,
+        radius_fraction = opts.radius_fraction,
+        "SOM starting"
+    );
+
     let mut rng = rand::rng();
 
     // Training loop
@@ -96,41 +107,67 @@ pub fn solve(
             neuron[0] += eta * h * (city[0] - neuron[0]);
             neuron[1] += eta * h * (city[1] - neuron[1]);
         }
+
+        // Send progress at each 10% milestone
+        if t % checkpoint == 0 {
+            tracing::debug!(epoch = t, pct = t * 100 / epochs, eta, sigma, "SOM: checkpoint");
+            if let Some(tx) = progress_tx {
+                let snapshot = extract_tour(&norm_cities, &neurons, cities);
+                let cost = problem.distances.tour_length(&snapshot);
+                let _ = tx.send(ProgressMessage::EpochUpdate(t));
+                let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&snapshot), cost));
+            }
+        }
     }
 
-    // Tour extraction: assign each city to its closest neuron (BMU), sort by ring index
-    // Collision tie-break: closer city wins; city index as final tie-breaker
-    let city_bmu: Vec<(usize, usize, f64)> = norm_cities
+    let tour = extract_tour(&norm_cities, &neurons, cities);
+    let final_cost = problem.distances.tour_length(&tour);
+
+    tracing::info!(tour_length = final_cost, "SOM done");
+
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&tour), final_cost));
+        let _ = tx.send(ProgressMessage::Done);
+    }
+
+    Solution::new(&tour, problem)
+}
+
+/// Extract a tour from current neuron state.
+/// Assigns each city to its closest neuron, sorts by ring index.
+/// Collision tie-break: closer city wins; city array index as final tie-breaker.
+fn extract_tour(
+    norm_cities: &[[f64; 2]],
+    neurons: &[[f64; 2]],
+    cities: &[crate::tsp::kdtree::KDPoint],
+) -> Vec<usize> {
+    let n = norm_cities.len();
+    let city_bmu: Vec<(usize, f64)> = norm_cities
         .iter()
-        .enumerate()
-        .map(|(city_idx, city)| {
-            let (bmu_idx, dist) = neurons
+        .map(|city| {
+            neurons
                 .iter()
                 .enumerate()
-                .map(|(ni, n)| {
-                    let d = (n[0] - city[0]).powi(2) + (n[1] - city[1]).powi(2);
+                .map(|(ni, neuron)| {
+                    let d = (neuron[0] - city[0]).powi(2) + (neuron[1] - city[1]).powi(2);
                     (ni, d)
                 })
                 .min_by(|(_, da), (_, db)| da.partial_cmp(db).unwrap_or(std::cmp::Ordering::Equal))
-                .map(|(ni, d)| (ni, d))
-                .unwrap_or((0, f64::MAX));
-            (city_idx, bmu_idx, dist)
+                .unwrap_or((0, f64::MAX))
         })
         .collect();
 
-    // Sort by (bmu_ring_index, dist_to_neuron, city_array_idx) for stable collision handling
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by(|&a, &b| {
-        let (_, bmu_a, dist_a) = city_bmu[a];
-        let (_, bmu_b, dist_b) = city_bmu[b];
+        let (bmu_a, dist_a) = city_bmu[a];
+        let (bmu_b, dist_b) = city_bmu[b];
         bmu_a
             .cmp(&bmu_b)
             .then_with(|| dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal))
             .then_with(|| a.cmp(&b))
     });
 
-    let tour: Vec<usize> = order.iter().map(|&ci| cities[ci].id).collect();
-    Solution::new(&tour, problem)
+    order.iter().map(|&ci| cities[ci].id).collect()
 }
 
 #[cfg(test)]
