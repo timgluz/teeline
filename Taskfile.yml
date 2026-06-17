@@ -94,6 +94,10 @@ tasks:
     deps: [build]
     cmds:
       - ./target/debug/teeline completions fish
+  setup:
+    desc: Configure local dev environment (install git hooks)
+    cmds:
+      - bash scripts/setup-hooks.sh
 
   clean:
     desc: Remove build artifacts

@@ -1,0 +1,7 @@
+[tools]
+# Lint tools used by .githooks/pre-commit
+# Install all with: mise install
+"npm:markdownlint-cli" = "latest"
+"pipx:yamllint" = "latest"
+"cargo:taplo-cli" = "latest"
+"github:koalaman/shellcheck" = "latest"
