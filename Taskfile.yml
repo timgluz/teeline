@@ -77,6 +77,11 @@ tasks:
       - echo "=== berlin52 (optimal 7542) ==="
       - for solver in $(./target/release/teeline solvers --heuristic --short); do printf "%-12s " $solver; ./target/release/teeline solve $solver -i tests/fixtures/berlin52.tsp 2>/dev/null | head -1; done
 
+  setup:
+    desc: Configure local dev environment (install git hooks)
+    cmds:
+      - bash scripts/setup-hooks.sh
+
   clean:
     desc: Remove build artifacts
     cmds:
