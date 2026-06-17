@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://tspsolver.com/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/bhk/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/branch_bound/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/nn/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/fourier/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/christofides/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/2opt/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/3opt/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/or_opt/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/sa/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/tabu/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/ga/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/pso/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/cs/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/fpa/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/gsa/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/lk/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/som/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/fourier/explainer/</loc></url>
+  <url><loc>https://tspsolver.com/algorithms/lk/explainer/</loc></url>
+</urlset>

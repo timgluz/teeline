@@ -1,0 +1,4 @@
+Contact: mailto:timgluz@gmail.com
+Expires: 2027-06-17T00:00:00.000Z
+Canonical: https://tspsolver.com/.well-known/security.txt
+Preferred-Languages: en

@@ -71,8 +71,8 @@ if [ -n "$TS_FILES" ]; then
         skip_notice "teeline-web/node_modules (run: cd teeline-web && npm install)"
     else
         echo "[CHECK] tsc (teeline-web)"
-        if ! npx --prefix teeline-web tsc --noEmit 2>&1; then
-            fail_notice "tsc: TypeScript errors found in teeline-web" "# fix errors manually, then re-run tsc --noEmit to verify"
+        if ! npx --prefix teeline-web tsc --noEmit --project teeline-web/tsconfig.json 2>&1; then
+            fail_notice "tsc: TypeScript errors found in teeline-web" "# fix errors manually, then re-run: cd teeline-web && npx tsc --noEmit"
         fi
     fi
 fi
