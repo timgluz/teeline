@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { SOLVER_META, SOLVER_GROUPS, PAGED_SOLVERS } from './solver-groups'
 
 describe('SOLVER_META', () => {
-  it('contains exactly 16 solvers', () => {
-    expect(Object.keys(SOLVER_META)).toHaveLength(16)
+  it('contains exactly 17 solvers', () => {
+    expect(Object.keys(SOLVER_META)).toHaveLength(17)
   })
 
   it('every entry has id and name', () => {

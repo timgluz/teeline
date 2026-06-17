@@ -22,6 +22,7 @@ pub mod progress;
 pub mod random_shuffle;
 pub mod route;
 pub mod simulated_annealing;
+pub mod som;
 pub mod stochastic_hill;
 pub mod tabu_search;
 pub mod three_opt;
@@ -55,6 +56,7 @@ pub enum Solvers {
     ParticleSwarmOptimization,
     RandomShuffle,
     SimulatedAnnealing,
+    KohonenSom,
     StochasticHill,
     TabuSearch,
     ThreeOpt,
@@ -89,6 +91,9 @@ impl Solvers {
             "shuffle",
             "simulated_annealing",
             "sa",
+            "som",
+            "kohonen",
+            "kohonen_som",
             "stochastic_hill",
             "tabu_search",
             "three_opt",
@@ -239,6 +244,7 @@ impl Solvers {
             },
             SolverMeta { name: "or_opt", alias: Some("or-opt"), kind: SolverKind::Heuristic },
             SolverMeta { name: "stochastic_hill", alias: None, kind: SolverKind::Heuristic },
+            SolverMeta { name: "kohonen_som", alias: Some("som"), kind: SolverKind::Heuristic },
             SolverMeta {
                 name: "random_shuffle",
                 alias: Some("shuffle"),
@@ -262,7 +268,7 @@ pub struct SolverInfo {
     pub exact:       bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 18] = [
+static SOLVER_LIST: [SolverInfo; 19] = [
     SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
                  desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
                  complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
@@ -314,6 +320,9 @@ static SOLVER_LIST: [SolverInfo; 18] = [
     SolverInfo { name: "Tabu Search",           alias: "tabu_search",     category: "Metaheuristic",
                  desc: "Local search with a memory structure to avoid revisiting solutions.",
                  complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
+    SolverInfo { name: "Kohonen SOM",            alias: "som",             category: "Constructive",
+                 desc: "Elastic ring of neurons wrapping around cities via Hebbian learning; topology-preserving tour extraction.",
+                 complexity: "O(epochs\u{00b7}N\u{00b7}n)", has_options: true, exact: false },
     SolverInfo { name: "Random Shuffle",        alias: "shuffle",         category: "Utility",
                  desc: "Baseline random tour. Useful as a warm-start seed for pipelines.",
                  complexity: "O(n)", has_options: false, exact: false },
@@ -341,6 +350,7 @@ impl FromStr for Solvers {
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
             "shuffle" | "random_shuffle" => Ok(Solvers::RandomShuffle),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
+            "som" | "kohonen" | "kohonen_som" => Ok(Solvers::KohonenSom),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
             "tabu_search" => Ok(Solvers::TabuSearch),
             "or_opt" | "or-opt" => Ok(Solvers::OrOpt),
@@ -1027,6 +1037,110 @@ impl FourierOptions {
 }
 
 // ---------------------------------------------------------------------------
+// SOMOptions
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SOMOptions {
+    pub epochs: usize,            // training iterations, default 100_000
+    pub learning_rate: f64,       // η₀ — initial learning rate, default 0.8
+    pub radius_fraction: f64,     // σ₀ = radius_fraction × N neurons, default 0.1
+    pub neuron_multiplier: usize, // N = n_cities × neuron_multiplier, default 8
+}
+
+impl Default for SOMOptions {
+    fn default() -> Self {
+        SOMOptions {
+            epochs: 100_000,
+            learning_rate: 0.8,
+            radius_fraction: 0.1,
+            neuron_multiplier: 8,
+        }
+    }
+}
+
+impl SOMOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.epochs == 0 {
+            return Err("epochs must be >= 1".to_string());
+        }
+        if self.learning_rate <= 0.0 || self.learning_rate > 1.0 {
+            return Err("learning_rate must be in (0, 1]".to_string());
+        }
+        if self.radius_fraction <= 0.0 || self.radius_fraction > 1.0 {
+            return Err("radius_fraction must be in (0, 1]".to_string());
+        }
+        if self.neuron_multiplier == 0 {
+            return Err("neuron_multiplier must be >= 1".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut s = SOMOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    let raw = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?;
+                    if raw < 1 {
+                        return Err(format!("config: `epochs` must be >= 1, got {raw}"));
+                    }
+                    s.epochs = raw as usize;
+                }
+                "learning_rate" => {
+                    s.learning_rate = v.as_float()
+                        .or_else(|| v.as_integer().map(|i| i as f64))
+                        .ok_or_else(|| format!("config: `learning_rate` must be a float, got {v}"))?;
+                }
+                "radius_fraction" => {
+                    s.radius_fraction = v.as_float()
+                        .or_else(|| v.as_integer().map(|i| i as f64))
+                        .ok_or_else(|| format!("config: `radius_fraction` must be a float, got {v}"))?;
+                }
+                "neuron_multiplier" => {
+                    let raw = v.as_integer()
+                        .ok_or_else(|| format!("config: `neuron_multiplier` must be an integer, got {v}"))?;
+                    if raw < 1 {
+                        return Err(format!("config: `neuron_multiplier` must be >= 1, got {raw}"));
+                    }
+                    s.neuron_multiplier = raw as usize;
+                }
+                other => {
+                    return Err(format!(
+                        "config: unknown field `{other}` in [som] — valid: epochs, learning_rate, radius_fraction, neuron_multiplier"
+                    ));
+                }
+            }
+        }
+        s.validate()?;
+        Ok(s)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut s = SOMOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            s.epochs = v.parse::<usize>()
+                .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("learning_rate") {
+            s.learning_rate = v.parse::<f64>()
+                .map_err(|_| format!("--learning_rate: invalid float `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("radius_fraction") {
+            s.radius_fraction = v.parse::<f64>()
+                .map_err(|_| format!("--radius_fraction: invalid float `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("neuron_multiplier") {
+            s.neuron_multiplier = v.parse::<usize>()
+                .map_err(|_| format!("--neuron_multiplier: invalid integer `{v}`"))?;
+        }
+        s.validate()?;
+        Ok(s)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // AppOptions — pure config shell; no runtime state
 // ---------------------------------------------------------------------------
 
@@ -1040,6 +1154,7 @@ pub struct AppOptions {
     pub fpa: Option<FPAOptions>,
     pub lk: Option<LKOptions>,
     pub fourier: Option<FourierOptions>,
+    pub som: Option<SOMOptions>,
     pub heuristic: Option<HeuristicOptions>,
 }
 
@@ -1126,6 +1241,10 @@ pub fn solve_with_context(
         Solvers::GravitationalSearch => gravitational_search::solve(problem, &h, tx, init_tour),
         Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
         Solvers::RandomShuffle => random_shuffle::solve(problem, &h, tx, init_tour),
+        Solvers::KohonenSom => {
+            let s = opts.som.as_ref().cloned().unwrap_or_default();
+            som::solve(problem, &s, tx, init_tour)
+        }
         Solvers::SimulatedAnnealing => {
             let sa = opts.sa.as_ref().cloned().unwrap_or_default();
             simulated_annealing::solve(problem, &sa, tx, init_tour)
@@ -1359,6 +1478,7 @@ mod tests {
             fpa: None,
             lk: None,
             fourier: None,
+            som: None,
             heuristic: None,
         };
         drop(a);
