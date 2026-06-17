@@ -130,7 +130,7 @@ pub fn solve(
 
     if let Some(tx) = progress_tx {
         // Only send a final PathUpdate if the last checkpoint didn't already cover it
-        if epochs % checkpoint != 0 {
+        if !epochs.is_multiple_of(checkpoint) {
             let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&tour), final_cost));
         }
         let _ = tx.send(ProgressMessage::Done);
