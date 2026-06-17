@@ -387,6 +387,33 @@ task bench:berlin52      # compare all approximate solvers on berlin52 (release 
 task build:wasm          # build the WebAssembly component
 ```
 
+### Git hooks
+
+Run once after cloning to activate the pre-commit hooks:
+
+```bash
+bash scripts/setup-hooks.sh
+# or, if you have go-task installed:
+task setup
+```
+
+The hook checks only the files you've staged, so it's fast:
+
+| Staged files | Check | Autofix |
+|---|---|---|
+| `*.rs` | `cargo fmt --check` + `cargo clippy -D warnings` | `cargo fmt` / `cargo clippy --fix` |
+| `*.md` | `markdownlint` | `markdownlint --fix <file>` |
+| `*.yml` / `*.yaml` | `yamllint` | fix manually |
+| `teeline-web/*.ts` | `tsc --noEmit` | fix manually |
+| `*.toml` | `taplo fmt --check` | `taplo fmt` |
+| `*.sh` | `shellcheck` | fix manually |
+
+Rust checks always run (Rust toolchain is assumed). The others are skipped silently if the tool is not installed and print a reminder to run `mise install`. Install all optional tools at once with [mise](https://mise.jdx.dev/):
+
+```bash
+mise install
+```
+
 The `qt:` namespace proxies into `teeline-qt/Taskfile.yml` (requires Qt 6 at `~/Qt/6.11.1/gcc_64`):
 
 ```bash
