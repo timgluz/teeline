@@ -8,7 +8,7 @@ use teeline::config::{
     select_pipeline_source,
 };
 use teeline::tsp::{
-    self, AppOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
+    self, AppOptions, Solution, SolverKind, Solvers, SOMOptions, TspProblem, distance_matrix,
     list_solvers,
     pipeline::{PipelineStage, run_pipeline},
     tsplib,
@@ -51,6 +51,9 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
             }
             Solvers::LinKernighan => {
                 base.lk = Some(LKOptions::from_cli(self.args)?);
+            }
+            Solvers::KohonenSom => {
+                base.som = Some(SOMOptions::from_cli(self.args)?);
             }
             _ => {
                 base.heuristic = Some(HeuristicOptions::from_cli(self.args)?);
@@ -261,6 +264,18 @@ fn tuning_args() -> Vec<Arg> {
             .help("LK: max sequential-search chain depth (default 5; depth-1 = 2-opt, depth-5 = full LK quality)")
             .value_name("N")
             .action(ArgAction::Set)
+            .required(false),
+        Arg::new("learning_rate")
+            .long("learning_rate")
+            .help("SOM: initial learning rate η₀ (default 0.8)")
+            .required(false),
+        Arg::new("radius_fraction")
+            .long("radius_fraction")
+            .help("SOM: initial neighbourhood radius as fraction of neuron count (default 0.1)")
+            .required(false),
+        Arg::new("neuron_multiplier")
+            .long("neuron_multiplier")
+            .help("SOM: neurons = n_cities × multiplier (default 8)")
             .required(false),
     ]
 }

@@ -32,6 +32,7 @@ const SOLVER_DOCS = {
   'fpa':          'flower-pollination.md',
   'gsa':          'gravitational-search.md',
   'lk':           'lin-kernighan.md',
+  'som':          'som.md',
 }
 
 // Extract page metadata directly from the Markdown source — no frontmatter needed.

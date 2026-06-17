@@ -58,6 +58,13 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::KohonenSom => AppOptions {
+            som: Some(teeline::tsp::SOMOptions {
+                epochs: o.epochs as usize,
+                ..teeline::tsp::SOMOptions::default()
+            }),
+            ..AppOptions::default()
+        },
         _ => AppOptions {
             heuristic: Some(heuristic),
             ..AppOptions::default()
@@ -97,6 +104,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "shuffle"         => "Baseline only; never produces good tours on its own",
         "christofides"    => "Only solver with a proven \u{2264}1.5\u{00d7} bound; ideal warm-start for pipeline(christofides,lk)",
         "fourier"         => "Constructive Fourier-basis solver; best as warm-start: pipeline(fourier,2opt)",
+        "som"             => "Topology-preserving constructive solver; best piped: pipeline(som,2opt) or pipeline(som,sa)",
         _                 => info.category,
     }
     .to_string()
@@ -105,7 +113,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
 fn kind_for(solver: Solvers) -> String {
     match solver {
         Solvers::BellmanKarp | Solvers::BranchBound       => "exact",
-        Solvers::NearestNeighbor | Solvers::Christofides | Solvers::Fourier => "constructive",
+        Solvers::NearestNeighbor | Solvers::Christofides | Solvers::Fourier | Solvers::KohonenSom => "constructive",
         Solvers::TwoOpt | Solvers::ThreeOpt                => "local-search",
         Solvers::RandomShuffle                             => "utility",
         _                                                  => "metaheuristic",
@@ -188,6 +196,7 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         | Solvers::TabuSearch
         | Solvers::StochasticHill => shared_heuristic_params(),
         Solvers::Fourier => vec![pi("epochs", "Gradient steps per stage", 1.0)],
+        Solvers::KohonenSom => vec![pi("epochs", "Training iterations", 1.0)],
         _ => vec![],
     }
 }
