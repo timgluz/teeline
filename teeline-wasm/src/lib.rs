@@ -58,6 +58,13 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::KohonenSom => AppOptions {
+            som: Some(teeline::tsp::SOMOptions {
+                epochs: o.epochs as usize,
+                ..teeline::tsp::SOMOptions::default()
+            }),
+            ..AppOptions::default()
+        },
         _ => AppOptions {
             heuristic: Some(heuristic),
             ..AppOptions::default()
@@ -189,12 +196,7 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         | Solvers::TabuSearch
         | Solvers::StochasticHill => shared_heuristic_params(),
         Solvers::Fourier => vec![pi("epochs", "Gradient steps per stage", 1.0)],
-        Solvers::KohonenSom => vec![
-            pi("epochs",           "Training iterations",          1.0),
-            pf("learningRate",     "Learning rate η₀",             0.01, 1.0, 0.01),
-            pf("radiusFraction",   "Neighbourhood radius fraction", 0.01, 1.0, 0.01),
-            pi("neuronMultiplier", "Neuron multiplier",             1.0),
-        ],
+        Solvers::KohonenSom => vec![pi("epochs", "Training iterations", 1.0)],
         _ => vec![],
     }
 }

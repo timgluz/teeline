@@ -93,7 +93,7 @@ pub fn solve(
                 sq_dist(a, &city).partial_cmp(&sq_dist(b, &city)).unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(i, _)| i)
-            .unwrap_or(0);
+            .expect("neurons is always non-empty: n >= 2 and neuron_multiplier >= 1");
 
         // Update neurons within neighborhood; skip those with negligible influence
         let bmu_i = bmu as isize;
@@ -129,7 +129,10 @@ pub fn solve(
     tracing::info!(tour_length = final_cost, "SOM done");
 
     if let Some(tx) = progress_tx {
-        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&tour), final_cost));
+        // Only send a final PathUpdate if the last checkpoint didn't already cover it
+        if epochs % checkpoint != 0 {
+            let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&tour), final_cost));
+        }
         let _ = tx.send(ProgressMessage::Done);
     }
 

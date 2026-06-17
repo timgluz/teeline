@@ -1081,9 +1081,12 @@ impl SOMOptions {
         for (k, v) in table.iter() {
             match k.as_str() {
                 "epochs" => {
-                    s.epochs = v.as_integer()
-                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
-                        as usize;
+                    let raw = v.as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?;
+                    if raw < 1 {
+                        return Err(format!("config: `epochs` must be >= 1, got {raw}"));
+                    }
+                    s.epochs = raw as usize;
                 }
                 "learning_rate" => {
                     s.learning_rate = v.as_float()
@@ -1096,9 +1099,12 @@ impl SOMOptions {
                         .ok_or_else(|| format!("config: `radius_fraction` must be a float, got {v}"))?;
                 }
                 "neuron_multiplier" => {
-                    s.neuron_multiplier = v.as_integer()
-                        .ok_or_else(|| format!("config: `neuron_multiplier` must be an integer, got {v}"))?
-                        as usize;
+                    let raw = v.as_integer()
+                        .ok_or_else(|| format!("config: `neuron_multiplier` must be an integer, got {v}"))?;
+                    if raw < 1 {
+                        return Err(format!("config: `neuron_multiplier` must be >= 1, got {raw}"));
+                    }
+                    s.neuron_multiplier = raw as usize;
                 }
                 other => {
                     return Err(format!(
