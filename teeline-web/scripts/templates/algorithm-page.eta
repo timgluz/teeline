@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title><%= it.name %> — Teeline</title>
     <meta name="description" content="<%= it.description %>" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://tspsolver.com/algorithms/<%= it.solverId %>/" />
+    <meta property="og:title" content="<%= it.name %> — Teeline" />
+    <meta property="og:description" content="<%= it.description %>" />
+    <link rel="canonical" href="https://tspsolver.com/algorithms/<%= it.solverId %>/" />
   </head>
   <body>
     <div id="topbar"></div>
