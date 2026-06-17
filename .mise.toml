@@ -4,4 +4,4 @@
 "npm:markdownlint-cli" = "latest"
 "pipx:yamllint" = "latest"
 "cargo:taplo-cli" = "latest"
-"cargo:shellcheck" = "latest"
+"github:koalaman/shellcheck" = "latest"
