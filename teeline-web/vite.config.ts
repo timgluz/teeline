@@ -2,7 +2,11 @@ import { sentryVitePlugin } from "@sentry/vite-plugin";
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import { existsSync } from 'fs'
+import { resolve as resolvePath } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { globSync } from 'tinyglobby'
+
+const configDir = fileURLToPath(new URL('.', import.meta.url))
 
 // Dynamically discover all generated solver doc pages and explainer sub-pages.
 // build-docs.mjs must run before vite build to populate algorithms/*/index.html.
@@ -58,6 +62,19 @@ export default defineConfig({
   },
 
   plugins: [
+    // preview2-shim ships separate node/ and browser/ variants.
+    // With preserveSymlinks:true, Vite finds the copy nested inside
+    // teeline-wasm/js-bindings/node_modules/ and picks the 'node' condition.
+    // Intercept here to force the browser variant from our own node_modules.
+    {
+      name: 'force-preview2-shim-browser',
+      resolveId(id: string) {
+        if (!id.startsWith('@bytecodealliance/preview2-shim')) return undefined
+        const sub = id.slice('@bytecodealliance/preview2-shim'.length)
+        const name = sub.replace(/^\//, '') || 'index'
+        return resolvePath(configDir, `node_modules/@bytecodealliance/preview2-shim/lib/browser/${name}.js`)
+      },
+    },
     sentryVitePlugin({
       org: "timo-sulg",
       project: "javascript"
