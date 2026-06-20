@@ -152,6 +152,40 @@
             </div>
           </fieldset>
 
+          <details id="webmcp-guide" open>
+            <summary>AI agent access via WebMCP <span id="webmcp-chrome-status"></span></summary>
+            <p>
+              This page exposes its solver tools via the
+              <a href="https://developer.chrome.com/docs/ai/webmcp" target="_blank" rel="noopener">WebMCP declarative API</a>,
+              allowing AI agents to call <code>solveTSP</code>, <code>listAlgorithms</code>,
+              <code>parseProblem</code>, and <code>compareTours</code> directly in the browser.
+            </p>
+            <ol>
+              <li>
+                <strong>Chrome ≥ 149 required</strong>
+                <span id="webmcp-chrome-badge"></span>
+                — check your version at <code>chrome://version</code>.
+              </li>
+              <li>
+                Enable the testing flag: open
+                <code>chrome://flags/#enable-webmcp-testing</code>,
+                set it to <strong>Enabled</strong>, and relaunch Chrome.
+              </li>
+              <li>
+                Install the
+                <a href="https://chromewebstore.google.com/detail/gbpdfapgefenggkahomfgkhfehlcenpd?utm_source=item-share-cb"
+                   target="_blank" rel="noopener">WebMCP Inspector extension</a>
+                from the Chrome Web Store.
+              </li>
+              <li>
+                Follow
+                <a href="https://developer.chrome.com/docs/ai/webmcp#get_started"
+                   target="_blank" rel="noopener">Google's official getting started guide</a>
+                to connect your AI agent.
+              </li>
+            </ol>
+          </details>
+
           <div class="step-actions">
             <button type="button" id="btn-continue" hidden>Continue →</button>
           </div>
@@ -335,5 +369,40 @@
     </footer>
 
     <script type="module" src="/src/main.ts"></script>
+
+    <!-- WebMCP tools — hidden forms for AI agent access -->
+    <form id="webmcp-solve" toolname="solveTSP"
+          tooldescription="Solve a TSP problem using a named algorithm. Returns tour cost and city sequence."
+          toolautosubmit hidden>
+      <textarea name="problem" toolparamdescription="TSPLIB-format problem data (NODE_COORD_SECTION etc.)"></textarea>
+      <input name="algorithm" type="text"
+             toolparamdescription="Algorithm ID: nn, 2opt, lk, sa, ga, pso, cs, fpa, or_opt, christofides, gsa, fourier. Default: lk">
+      <input name="epochs" type="number" toolparamdescription="Iteration count. Default: 500">
+      <input name="max_temperature" type="number" toolparamdescription="Max temperature for SA. Default: 1000">
+      <input name="mutation_probability" type="number" toolparamdescription="Mutation rate for GA (0–1). Default: 0.05">
+      <input name="n_nearest" type="number" toolparamdescription="KD-tree candidate list size. Default: 5">
+    </form>
+
+    <form id="webmcp-list-algorithms" toolname="listAlgorithms"
+          tooldescription="List all available TSP solving algorithms with metadata."
+          toolautosubmit hidden>
+    </form>
+
+    <form id="webmcp-parse" toolname="parseProblem"
+          tooldescription="Parse a TSPLIB problem string and return full problem data (name, cities, distance type)."
+          toolautosubmit hidden>
+      <textarea name="problem" toolparamdescription="TSPLIB-format problem data"></textarea>
+    </form>
+
+    <form id="webmcp-compare" toolname="compareTours"
+          tooldescription="Compare a solver tour against an optimal tour. Returns gap %, shared edges, and per-tour edge counts."
+          toolautosubmit hidden>
+      <input name="solver_route" type="text"
+             toolparamdescription="JSON array of city IDs in solver tour order, e.g. [1,5,3,...]">
+      <input name="opt_route" type="text"
+             toolparamdescription="JSON array of city IDs in optimal tour order">
+      <input name="cities" type="text"
+             toolparamdescription="JSON array of city objects: [{id,x,y}, ...]">
+    </form>
   </body>
 </html>

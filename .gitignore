@@ -11,6 +11,7 @@ docs/superpowers/
 
 # env files
 .env*
+!.env.example
 
 # teeline-qt
 teeline-qt/target/

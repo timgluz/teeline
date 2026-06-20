@@ -9,6 +9,8 @@ vi.mock('teeline-wasm', () => ({
   compareTours: vi.fn(),
 }))
 
+
+
 import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours } from 'teeline-wasm'
 import {
   handleMessage,
@@ -19,6 +21,9 @@ import {
   type GetVersionRequest,
   type CompareToursRequest,
   type ComparisonStats,
+  type WebMCPSolveRequest,
+  type WebMCPListAlgorithmsRequest,
+  type WebMCPParseRequest,
 } from './worker'
 
 const mockSolution = { total: 42.0, route: new Uint32Array([0, 1, 2]) }
@@ -247,6 +252,109 @@ describe('handleMessage — compare-tours', () => {
       expect(res.id).toBe('test-id-err')
       expect(res.error).toContain('dimension mismatch')
       expect(res.stats).toBeUndefined()
+    }
+  })
+})
+
+describe('handleMessage — webmcp-solve', () => {
+  it('calls parseAndSolve and returns webmcp-result with solution', () => {
+    vi.mocked(parseAndSolve).mockReturnValue(mockSolution)
+    const req: WebMCPSolveRequest = {
+      type: 'webmcp-solve',
+      id: 'webmcp-id-1',
+      solver: 'nn',
+      input: 'NAME: test\n',
+      options: {},
+    }
+    const res = handleMessage(req)
+    expect(parseAndSolve).toHaveBeenCalledOnce()
+    expect(res.type).toBe('webmcp-result')
+    if (res.type === 'webmcp-result') {
+      expect(res.id).toBe('webmcp-id-1')
+      expect(res.solution?.total).toBe(42.0)
+      expect(res.solution?.route).toEqual([0, 1, 2])
+      expect(res.error).toBeUndefined()
+    }
+  })
+
+  it('echoes id in the error response when parseAndSolve throws', () => {
+    vi.mocked(parseAndSolve).mockImplementation(() => { throw new Error('bad tsplib') })
+    const req: WebMCPSolveRequest = {
+      type: 'webmcp-solve',
+      id: 'webmcp-id-err',
+      solver: 'nn',
+      input: 'garbage',
+      options: {},
+    }
+    const res = handleMessage(req)
+    expect(res.type).toBe('webmcp-result')
+    if (res.type === 'webmcp-result') {
+      expect(res.id).toBe('webmcp-id-err')
+      expect(res.error).toContain('bad tsplib')
+      expect(res.solution).toBeUndefined()
+    }
+  })
+})
+
+describe('handleMessage — webmcp-list-algorithms', () => {
+  it('calls listAlgorithms and returns webmcp-algorithms with id', () => {
+    vi.mocked(listAlgorithms).mockReturnValue([mockAlgorithm])
+    const req: WebMCPListAlgorithmsRequest = { type: 'webmcp-list-algorithms', id: 'algo-id-1' }
+    const res = handleMessage(req)
+    expect(listAlgorithms).toHaveBeenCalledOnce()
+    expect(res.type).toBe('webmcp-algorithms')
+    if (res.type === 'webmcp-algorithms') {
+      expect(res.id).toBe('algo-id-1')
+      expect(res.algorithms).toHaveLength(1)
+      expect(res.algorithms?.[0].id).toBe('nn')
+      expect(res.error).toBeUndefined()
+    }
+  })
+
+  it('echoes id in the error response when listAlgorithms throws', () => {
+    vi.mocked(listAlgorithms).mockImplementation(() => { throw new Error('wasm not ready') })
+    const req: WebMCPListAlgorithmsRequest = { type: 'webmcp-list-algorithms', id: 'algo-id-err' }
+    const res = handleMessage(req)
+    expect(res.type).toBe('webmcp-algorithms')
+    if (res.type === 'webmcp-algorithms') {
+      expect(res.id).toBe('algo-id-err')
+      expect(res.error).toContain('wasm not ready')
+      expect(res.algorithms).toBeUndefined()
+    }
+  })
+})
+
+describe('handleMessage — webmcp-parse', () => {
+  const mockProblem = {
+    name: 'test',
+    comment: '',
+    distanceType: 'EUC_2D',
+    cities: [{ id: 1, x: 0.0, y: 0.0 }, { id: 2, x: 1.0, y: 0.0 }],
+  }
+
+  it('calls parse and returns webmcp-parsed with full problem', () => {
+    vi.mocked(parse).mockReturnValue(mockProblem)
+    const req: WebMCPParseRequest = { type: 'webmcp-parse', id: 'parse-id-1', input: 'NAME: test\n' }
+    const res = handleMessage(req)
+    expect(parse).toHaveBeenCalledWith('NAME: test\n')
+    expect(res.type).toBe('webmcp-parsed')
+    if (res.type === 'webmcp-parsed') {
+      expect(res.id).toBe('parse-id-1')
+      expect(res.problem?.name).toBe('test')
+      expect(res.problem?.cities).toHaveLength(2)
+      expect(res.error).toBeUndefined()
+    }
+  })
+
+  it('echoes id in the error response when parse throws', () => {
+    vi.mocked(parse).mockImplementation(() => { throw new Error('invalid tsplib') })
+    const req: WebMCPParseRequest = { type: 'webmcp-parse', id: 'parse-id-err', input: '' }
+    const res = handleMessage(req)
+    expect(res.type).toBe('webmcp-parsed')
+    if (res.type === 'webmcp-parsed') {
+      expect(res.id).toBe('parse-id-err')
+      expect(res.error).toContain('invalid tsplib')
+      expect(res.problem).toBeUndefined()
     }
   })
 })

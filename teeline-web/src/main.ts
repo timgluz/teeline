@@ -7,6 +7,7 @@ import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage, CompareToursResult } from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
+import { initWebMCP } from './webmcp'
 import { initResults, updateOptRoute, showRunning, showResult, patchComparison } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
@@ -185,6 +186,7 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
       },
     )
 
+    initWebMCP(worker)
     setWasmStatus('ready')
     gotAlgorithms = true
   }
@@ -253,3 +255,20 @@ function showDownloadButtons(record: import('./results').RunRecord, problem: Par
   document.getElementById('btn-download-svg')!.onclick = () =>
     triggerDownload(serializeSvg(svgEl), `${sessionId}.svg`, 'image/svg+xml')
 }
+
+// ---- WebMCP guide: Chrome version badge ----
+
+;(function initWebMCPChromeBadge() {
+  const badge = document.getElementById('webmcp-chrome-badge')
+  if (!badge) return
+  const match = navigator.userAgent.match(/Chrome\/(\d+)/)
+  if (!match) return
+  const major = parseInt(match[1], 10)
+  if (major >= 149) {
+    badge.textContent = ` ✓ Chrome ${major} detected`
+    badge.className = 'pico-color-green-500'
+  } else {
+    badge.textContent = ` (Chrome ${major} — requires ≥ 149)`
+    badge.className = 'pico-color-orange-500'
+  }
+})()
