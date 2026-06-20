@@ -53,6 +53,8 @@ export default defineConfig({
 
   test: {
     // node env (default) — tests import only DOM-free modules
+    // Playwright tests live in tests/ — exclude them from Vitest
+    include: ['src/**/*.test.ts'],
   },
 
   plugins: [
