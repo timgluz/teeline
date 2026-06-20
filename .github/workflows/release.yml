@@ -336,6 +336,7 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' }}
+    continue-on-error: true
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -412,6 +413,7 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' }}
+    continue-on-error: true
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -527,16 +529,18 @@ jobs:
       - build-qt-linux
       - build-qt-windows
       - build-qt-macos
-    if: ${{ always() && needs.host.result == 'success' && needs.build-qt-linux.result == 'success' && needs.build-qt-windows.result == 'success' }}
+    if: ${{ always() && needs.host.result == 'success' && (needs.build-qt-linux.result == 'success' || needs.build-qt-windows.result == 'success' || needs.build-qt-macos.result == 'success') }}
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/download-artifact@v8
+        if: ${{ needs.build-qt-linux.result == 'success' }}
         with:
           name: qt-linux
           path: artifacts/
       - uses: actions/download-artifact@v8
+        if: ${{ needs.build-qt-windows.result == 'success' }}
         with:
           name: qt-windows
           path: artifacts/
