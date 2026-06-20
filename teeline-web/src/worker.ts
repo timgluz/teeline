@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { solve, parseAndSolve, parse, listAlgorithms, getVersion, type ParsedProblem } from 'teeline-wasm'
+import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours, type ParsedProblem } from 'teeline-wasm'
 import type { AlgorithmInfo } from 'teeline-wasm'
 import { defaultSolveOptions, type SolveOptions } from './solver-options'
 
@@ -60,8 +60,32 @@ export interface WorkerReadyMessage {
   type: 'worker-ready'
 }
 
-type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest
-type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError | WorkerReadyMessage
+export interface ComparisonStats {
+  optimalCost: number
+  solverCost: number
+  gapPct: number
+  sharedEdges: number
+  solverOnlyEdges: number
+  optimalOnlyEdges: number
+}
+
+export interface CompareToursRequest {
+  type: 'compare-tours'
+  id: string
+  solverRoute: number[]
+  optRoute: number[]
+  cities: Array<{ id: number; x: number; y: number }>
+}
+
+export interface CompareToursResult {
+  type: 'compare-tours-result'
+  id: string
+  stats?: ComparisonStats
+  error?: string
+}
+
+type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest | CompareToursRequest
+type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError | WorkerReadyMessage | CompareToursResult
 
 export function handleMessage(data: WorkerRequest): WorkerResponse {
   try {
@@ -74,6 +98,31 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
     }
     if (data.type === 'get-version') {
       return { type: 'version', version: getVersion() }
+    }
+    if (data.type === 'compare-tours') {
+      const req = data as CompareToursRequest
+      try {
+        // compareTours returns ComparisonStats directly (jco throws on WIT Err)
+        const s = compareTours(new Uint32Array(req.solverRoute), new Uint32Array(req.optRoute), req.cities)
+        return {
+          type: 'compare-tours-result',
+          id: req.id,
+          stats: {
+            optimalCost: s.optimalCost,
+            solverCost: s.solverCost,
+            gapPct: s.gapPct,
+            sharedEdges: s.sharedEdges,
+            solverOnlyEdges: s.solverOnlyEdges,
+            optimalOnlyEdges: s.optimalOnlyEdges,
+          },
+        }
+      } catch (err) {
+        return {
+          type: 'compare-tours-result',
+          id: req.id,
+          error: err instanceof Error ? err.message : String(err),
+        }
+      }
     }
     const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...data.options }
     let solution: ReturnType<typeof solve>

@@ -1,11 +1,8 @@
-use crate::tsp::{
-    kdtree::KDPoint,
-    FourierOptions, Solution, TspProblem,
-};
+use crate::tsp::progress::ProgressMessage;
+use crate::tsp::{FourierOptions, Solution, TspProblem, kdtree::KDPoint};
 use num_complex::Complex;
 use std::f64::consts::PI;
 use std::sync::mpsc;
-use crate::tsp::progress::ProgressMessage;
 
 pub fn solve(
     problem: &TspProblem,
@@ -74,7 +71,8 @@ fn nearest_sample(gamma: &[Complex<f64>], city: Complex<f64>) -> usize {
         .iter()
         .enumerate()
         .min_by(|&(_, a), &(_, b)| {
-            (*a - city).norm_sqr()
+            (*a - city)
+                .norm_sqr()
                 .partial_cmp(&(*b - city).norm_sqr())
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
@@ -97,7 +95,7 @@ mod tests {
     use super::*;
     use std::f64::consts::PI;
 
-    use crate::tsp::{distance_matrix, TspProblem};
+    use crate::tsp::{TspProblem, distance_matrix};
 
     fn circle_cities(n: usize) -> Vec<KDPoint> {
         (0..n)
@@ -129,7 +127,11 @@ mod tests {
         assert_eq!(sol.route().len(), 5, "tour must visit all 5 cities");
         let mut sorted = sol.route().to_vec();
         sorted.sort_unstable();
-        assert_eq!(sorted, vec![0, 1, 2, 3, 4], "tour must contain all city IDs exactly once");
+        assert_eq!(
+            sorted,
+            vec![0, 1, 2, 3, 4],
+            "tour must contain all city IDs exactly once"
+        );
     }
 
     #[test]
@@ -161,10 +163,12 @@ mod tests {
     fn test_fourier_gradient_reduces_energy() {
         // 3 cities arranged around a circle; one gradient step should pull the curve toward them
         let cities: Vec<Complex<f64>> = (0..3)
-            .map(|i| Complex::new(
-                (2.0 * PI * i as f64 / 3.0).cos(),
-                (2.0 * PI * i as f64 / 3.0).sin(),
-            ))
+            .map(|i| {
+                Complex::new(
+                    (2.0 * PI * i as f64 / 3.0).cos(),
+                    (2.0 * PI * i as f64 / 3.0).sin(),
+                )
+            })
             .collect();
         let k_max = 1usize;
         let ks = ks_array(k_max);
@@ -173,7 +177,8 @@ mod tests {
         let lr = 0.05f64;
 
         let centroid: Complex<f64> = cities.iter().sum::<Complex<f64>>() / cities.len() as f64;
-        let radius = cities.iter().map(|z| (z - centroid).norm()).sum::<f64>() / cities.len() as f64;
+        let radius =
+            cities.iter().map(|z| (z - centroid).norm()).sum::<f64>() / cities.len() as f64;
         let mut c = init_coefficients(centroid, radius, k_max);
 
         let energy_before = compute_energy(&c, &ks, m, &cities, lambda);
@@ -200,7 +205,8 @@ mod tests {
         let c = init_coefficients(centroid, radius, k_max);
         let m = 100;
         let gamma = eval_curve(&c, &ks, m);
-        let max_dist_from_centroid = gamma.iter()
+        let max_dist_from_centroid = gamma
+            .iter()
             .map(|g| (g - centroid).norm())
             .fold(0.0f64, f64::max);
         // c[k_max+1] = radius*0.5, so the curve traces a circle of radius ~0.5
@@ -218,14 +224,18 @@ mod tests {
         lambda: f64,
     ) -> f64 {
         let gamma = eval_curve(c, ks, m);
-        let attraction: f64 = cities.iter()
+        let attraction: f64 = cities
+            .iter()
             .map(|&z| {
-                gamma.iter()
+                gamma
+                    .iter()
                     .map(|&g| (g - z).norm_sqr())
                     .fold(f64::MAX, f64::min)
             })
             .sum();
-        let tension: f64 = c.iter().zip(ks.iter())
+        let tension: f64 = c
+            .iter()
+            .zip(ks.iter())
             .map(|(ck, &k)| lambda * (2.0 * PI * k as f64).powi(2) * ck.norm_sqr())
             .sum();
         attraction + tension

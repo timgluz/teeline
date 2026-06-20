@@ -1,23 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { formatGap, formatRuntime, computeRouteLength } from './results'
-
-describe('formatGap', () => {
-  it('returns "—" when optimal is not provided', () => {
-    expect(formatGap(8000, undefined)).toBe('—')
-  })
-
-  it('returns "0.0%" when tour equals optimal', () => {
-    expect(formatGap(7542, 7542)).toBe('0.0%')
-  })
-
-  it('returns correct percentage with 1 decimal place', () => {
-    expect(formatGap(8296, 7542)).toBe('10.0%')
-  })
-
-  it('handles large gaps correctly', () => {
-    expect(formatGap(15084, 7542)).toBe('100.0%')
-  })
-})
+import { formatRuntime } from './results'
+import type { RunRecord } from './results'
+import type { ComparisonStats } from './worker'
 
 describe('formatRuntime', () => {
   it('formats sub-second as "<N>ms"', () => {
@@ -33,23 +17,31 @@ describe('formatRuntime', () => {
   })
 })
 
-describe('computeRouteLength', () => {
-  it('returns 0 for a single-city route', () => {
-    const cities = [{ id: 1, x: 0, y: 0 }]
-    expect(computeRouteLength([1], cities)).toBe(0)
+describe('RunRecord type', () => {
+  it('accepts comparison field with ComparisonStats', () => {
+    const stats: ComparisonStats = {
+      optimalCost: 7542,
+      solverCost: 8296,
+      gapPct: 10.0,
+      sharedEdges: 30,
+      solverOnlyEdges: 22,
+      optimalOnlyEdges: 22,
+    }
+    const record: RunRecord = {
+      solver: 'nn',
+      total: 8296,
+      comparison: stats,
+      runtime: 12,
+      route: [1, 2, 3],
+    }
+    expect(record.comparison?.gapPct).toBe(10.0)
+    expect(record.comparison?.sharedEdges).toBe(30)
+    expect(record.comparison?.solverOnlyEdges).toBe(22)
+    expect(record.comparison?.optimalOnlyEdges).toBe(22)
   })
 
-  it('computes Euclidean distances for a simple triangle', () => {
-    const cities = [
-      { id: 1, x: 0, y: 0 },
-      { id: 2, x: 3, y: 0 },
-      { id: 3, x: 0, y: 4 },
-    ]
-    // 1→2: 3, 2→3: 5, 3→1: 4 → total 12
-    expect(computeRouteLength([1, 2, 3], cities)).toBeCloseTo(12)
-  })
-
-  it('returns 0 for empty route', () => {
-    expect(computeRouteLength([], [])).toBe(0)
+  it('allows comparison to be absent', () => {
+    const record: RunRecord = { solver: 'nn', total: 8296, runtime: 12, route: [1, 2, 3] }
+    expect(record.comparison).toBeUndefined()
   })
 })

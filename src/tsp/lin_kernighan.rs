@@ -1,15 +1,19 @@
+use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
+    HeuristicOptions, LKOptions, Solution, TspProblem,
     distance_matrix::{self, DistanceMatrix},
     kdtree::KDPoint,
     nearest_neighbor,
     route::Route,
-    HeuristicOptions, Solution, LKOptions, TspProblem,
 };
-use std::sync::mpsc;
-use crate::tsp::progress::ProgressMessage;
 use rand::RngExt;
+use std::sync::mpsc;
 
-pub(crate) fn build_candidates(cities: &[KDPoint], dm: &DistanceMatrix, k: usize) -> Vec<Vec<usize>> {
+pub(crate) fn build_candidates(
+    cities: &[KDPoint],
+    dm: &DistanceMatrix,
+    k: usize,
+) -> Vec<Vec<usize>> {
     let n = cities.len();
     let k = k.min(n.saturating_sub(1));
     let max_id = cities.iter().map(|c| c.id).max().unwrap_or(0);
@@ -52,7 +56,9 @@ pub fn solve(
             epochs: 1,
             ..HeuristicOptions::default()
         };
-        nearest_neighbor::solve(problem, &nn_opts, None, None).route().to_vec()
+        nearest_neighbor::solve(problem, &nn_opts, None, None)
+            .route()
+            .to_vec()
     };
 
     if best_tour.len() < 4 {
@@ -60,7 +66,13 @@ pub fn solve(
     }
 
     let mut init_pos = make_pos(&best_tour);
-    lk_pass(&mut best_tour, &mut init_pos, &candidates, &dm, opts.max_depth);
+    lk_pass(
+        &mut best_tour,
+        &mut init_pos,
+        &candidates,
+        &dm,
+        opts.max_depth,
+    );
     drop(init_pos);
     let mut best_dist = tour_distance(&best_tour, &dm);
     send_progress(progress_tx, &best_tour, best_dist);
@@ -70,7 +82,13 @@ pub fn solve(
     for _ in 0..opts.heuristic.epochs {
         let mut candidate = double_bridge(&best_tour, &mut rng);
         let mut cand_pos = make_pos(&candidate);
-        lk_pass(&mut candidate, &mut cand_pos, &candidates, &dm, opts.max_depth);
+        lk_pass(
+            &mut candidate,
+            &mut cand_pos,
+            &candidates,
+            &dm,
+            opts.max_depth,
+        );
         let dist = tour_distance(&candidate, &dm);
         if dist < best_dist {
             best_tour = candidate;
@@ -304,8 +322,17 @@ fn find_lk_chain(
         used[t_break] = true;
 
         if find_lk_chain(
-            t1, t_break, g2, depth + 1, max_depth,
-            chain, used, next, prev, dm, candidates,
+            t1,
+            t_break,
+            g2,
+            depth + 1,
+            max_depth,
+            chain,
+            used,
+            next,
+            prev,
+            dm,
+            candidates,
         ) {
             return true;
         }
@@ -346,8 +373,7 @@ fn find_lk_move(
             used[t2] = true;
 
             let found = find_lk_chain(
-                t1, t2, g0, 0, max_depth,
-                &mut chain, &mut used, next, prev, dm, candidates,
+                t1, t2, g0, 0, max_depth, &mut chain, &mut used, next, prev, dm, candidates,
             );
 
             if found {
@@ -549,7 +575,10 @@ mod tests {
     #[test]
     fn tour_distance_sums_consecutive_edges() {
         let pts: Vec<KDPoint> = (0..4)
-            .map(|i| KDPoint { id: i, coords: [i as f32, 0.0] })
+            .map(|i| KDPoint {
+                id: i,
+                coords: [i as f32, 0.0],
+            })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
         let tour = vec![0usize, 1, 2, 3];
@@ -619,7 +648,10 @@ mod tests {
     fn is_single_cycle_valid_and_invalid() {
         let tour = vec![0usize, 1, 2, 3];
         let (next, _) = flat_to_next_prev(&tour, 3);
-        assert!(is_single_cycle(0, &next, 4), "valid tour must be a single cycle");
+        assert!(
+            is_single_cycle(0, &next, 4),
+            "valid tour must be a single cycle"
+        );
 
         // Break the cycle manually: next[2] = 2 (self-loop), making it invalid
         let mut bad_next = next.clone();
@@ -632,10 +664,22 @@ mod tests {
     #[test]
     fn find_lk_move_improves_crossed_tour() {
         let pts: Vec<KDPoint> = vec![
-            KDPoint { id: 0, coords: [0.0, 0.0] },
-            KDPoint { id: 1, coords: [1.0, 0.0] },
-            KDPoint { id: 2, coords: [1.0, 1.0] },
-            KDPoint { id: 3, coords: [0.0, 1.0] },
+            KDPoint {
+                id: 0,
+                coords: [0.0, 0.0],
+            },
+            KDPoint {
+                id: 1,
+                coords: [1.0, 0.0],
+            },
+            KDPoint {
+                id: 2,
+                coords: [1.0, 1.0],
+            },
+            KDPoint {
+                id: 3,
+                coords: [0.0, 1.0],
+            },
         ];
         let dm = distance_matrix::from_cities(&pts);
         let candidates = build_candidates(&pts, &dm, 3);
@@ -644,13 +688,19 @@ mod tests {
         let (next, prev) = flat_to_next_prev(&tour, max_id);
         let city_ids: Vec<usize> = tour.clone();
         let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &city_ids);
-        assert!(chain.is_some(), "must find an improvement in a crossed tour");
+        assert!(
+            chain.is_some(),
+            "must find an improvement in a crossed tour"
+        );
     }
 
     #[test]
     fn find_lk_move_returns_none_for_optimal_tour() {
         let pts: Vec<KDPoint> = (0..4)
-            .map(|i| KDPoint { id: i, coords: [i as f32, 0.0] })
+            .map(|i| KDPoint {
+                id: i,
+                coords: [i as f32, 0.0],
+            })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
         let candidates = build_candidates(&pts, &dm, 3);
@@ -668,10 +718,22 @@ mod tests {
     fn apply_lk_chain_consistency_after_depth1_move() {
         // Same crossed-square setup as above
         let pts: Vec<KDPoint> = vec![
-            KDPoint { id: 0, coords: [0.0, 0.0] },
-            KDPoint { id: 1, coords: [1.0, 0.0] },
-            KDPoint { id: 2, coords: [1.0, 1.0] },
-            KDPoint { id: 3, coords: [0.0, 1.0] },
+            KDPoint {
+                id: 0,
+                coords: [0.0, 0.0],
+            },
+            KDPoint {
+                id: 1,
+                coords: [1.0, 0.0],
+            },
+            KDPoint {
+                id: 2,
+                coords: [1.0, 1.0],
+            },
+            KDPoint {
+                id: 3,
+                coords: [0.0, 1.0],
+            },
         ];
         let dm = distance_matrix::from_cities(&pts);
         let candidates = build_candidates(&pts, &dm, 3);
@@ -684,7 +746,10 @@ mod tests {
             .expect("must find improvement");
         apply_lk_chain(&chain, &mut tour, &mut pos);
         let after = tour_distance(&tour, &dm);
-        assert!(after < before, "tour must improve: before={before} after={after}");
+        assert!(
+            after < before,
+            "tour must improve: before={before} after={after}"
+        );
         // pos consistency
         for (rank, &city) in tour.iter().enumerate() {
             assert_eq!(pos[city], rank, "pos[{city}] must equal {rank}");
@@ -705,7 +770,10 @@ mod tests {
         (0..6)
             .map(|i| {
                 let angle = i as f32 * PI / 3.0;
-                KDPoint { id: i, coords: [angle.cos(), angle.sin()] }
+                KDPoint {
+                    id: i,
+                    coords: [angle.cos(), angle.sin()],
+                }
             })
             .collect()
     }
@@ -747,9 +815,15 @@ mod tests {
         if let Some(chain) = find_lk_move(&next, &prev, &dm, &candidates, 2, &city_ids) {
             apply_lk_chain(&chain, &mut tour_mut, &mut pos);
             let after = tour_distance(&tour_mut, &dm);
-            assert!(after < before, "depth-2 move must improve tour: before={before} after={after}");
+            assert!(
+                after < before,
+                "depth-2 move must improve tour: before={before} after={after}"
+            );
             let (new_next, _) = flat_to_next_prev(&tour_mut, max_id);
-            assert!(is_single_cycle(tour_mut[0], &new_next, 6), "result must be a single cycle");
+            assert!(
+                is_single_cycle(tour_mut[0], &new_next, 6),
+                "result must be a single cycle"
+            );
         }
         // If no depth-2 move found, the tour may already be LK-optimal — not a failure
     }
@@ -759,10 +833,22 @@ mod tests {
     #[test]
     fn lk_pass_improves_crossed_tour() {
         let pts: Vec<KDPoint> = vec![
-            KDPoint { id: 0, coords: [0.0, 0.0] },
-            KDPoint { id: 1, coords: [1.0, 0.0] },
-            KDPoint { id: 2, coords: [1.0, 1.0] },
-            KDPoint { id: 3, coords: [0.0, 1.0] },
+            KDPoint {
+                id: 0,
+                coords: [0.0, 0.0],
+            },
+            KDPoint {
+                id: 1,
+                coords: [1.0, 0.0],
+            },
+            KDPoint {
+                id: 2,
+                coords: [1.0, 1.0],
+            },
+            KDPoint {
+                id: 3,
+                coords: [0.0, 1.0],
+            },
         ];
         let dm = distance_matrix::from_cities(&pts);
         let cands = build_candidates(&pts, &dm, 3);
@@ -772,26 +858,38 @@ mod tests {
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm, 1);
         let after = tour_distance(&tour, &dm);
         assert!(improved, "lk_pass must return true when it improved");
-        assert!(after < before, "tour must be shorter: before={before} after={after}");
+        assert!(
+            after < before,
+            "tour must be shorter: before={before} after={after}"
+        );
     }
 
     #[test]
     fn lk_pass_returns_false_for_optimal_tour() {
         let pts: Vec<KDPoint> = (0..4)
-            .map(|i| KDPoint { id: i, coords: [i as f32, 0.0] })
+            .map(|i| KDPoint {
+                id: i,
+                coords: [i as f32, 0.0],
+            })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
         let cands = build_candidates(&pts, &dm, 3);
         let mut tour = vec![0usize, 1, 2, 3];
         let mut pos = make_pos(&tour);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm, 5);
-        assert!(!improved, "lk_pass must return false when tour is already optimal");
+        assert!(
+            !improved,
+            "lk_pass must return false when tour is already optimal"
+        );
     }
 
     #[test]
     fn lk_pass_returns_none_for_tiny_tour() {
         let pts: Vec<KDPoint> = (0..3)
-            .map(|i| KDPoint { id: i, coords: [i as f32, 0.0] })
+            .map(|i| KDPoint {
+                id: i,
+                coords: [i as f32, 0.0],
+            })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
         let cands = build_candidates(&pts, &dm, 2);
@@ -830,7 +928,10 @@ mod tests {
         let mut rng = rand::rngs::StdRng::seed_from_u64(0);
         let tour: Vec<usize> = (0..7).collect();
         let result = double_bridge(&tour, &mut rng);
-        assert_eq!(result, tour, "tours with < 8 cities must be returned unchanged");
+        assert_eq!(
+            result, tour,
+            "tours with < 8 cities must be returned unchanged"
+        );
     }
 
     // ── solve on berlin52 ─────────────────────────────────────────────────────

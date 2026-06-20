@@ -248,29 +248,21 @@ mod tests {
         // Tour: 0→1→2→3→4 (closed cycle). City 2 is a detour.
         // Layout: 0=(0,0), 1=(1,0), 2=(5,5) [far detour], 3=(2,0), 4=(3,0)
         // Moving city 2 elsewhere should be profitable.
-        let problem = make_problem(&[
-            [0.0, 0.0],
-            [1.0, 0.0],
-            [5.0, 5.0],
-            [2.0, 0.0],
-            [3.0, 0.0],
-        ]);
+        let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [5.0, 5.0], [2.0, 0.0], [3.0, 0.0]]);
         let path: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
         let result = find_best_move(&path, &problem.distances);
         assert!(result.is_some(), "expected an improving move");
         let (delta, _, _, _, _) = result.unwrap();
-        assert!(delta < 0.0, "delta should be negative (improvement), got {delta}");
+        assert!(
+            delta < 0.0,
+            "delta should be negative (improvement), got {delta}"
+        );
     }
 
     #[test]
     fn find_best_move_returns_none_for_optimal_tour() {
         // Square: [0,1,2,3] is already optimal (perimeter tour).
-        let problem = make_problem(&[
-            [0.0, 0.0],
-            [1.0, 0.0],
-            [1.0, 1.0],
-            [0.0, 1.0],
-        ]);
+        let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
         let path = vec![0, 1, 2, 3];
         let result = find_best_move(&path, &problem.distances);
         assert!(
@@ -286,13 +278,7 @@ mod tests {
     #[test]
     fn or_opt_improves_detour_tour() {
         // City 2 is a far detour; Or-opt should relocate it.
-        let problem = make_problem(&[
-            [0.0, 0.0],
-            [1.0, 0.0],
-            [5.0, 5.0],
-            [2.0, 0.0],
-            [3.0, 0.0],
-        ]);
+        let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [5.0, 5.0], [2.0, 0.0], [3.0, 0.0]]);
         let detour_tour: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
         let detour_cost = problem.distances.tour_length(&detour_tour);
         let sol = solve(
@@ -312,19 +298,9 @@ mod tests {
     #[test]
     fn or_opt_preserves_optimal_tour() {
         // Already-optimal 4-city square; Or-opt must not worsen it.
-        let problem = make_problem(&[
-            [0.0, 0.0],
-            [1.0, 0.0],
-            [1.0, 1.0],
-            [0.0, 1.0],
-        ]);
+        let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
         let optimal = vec![0, 1, 2, 3];
-        let sol = solve(
-            &problem,
-            &HeuristicOptions::default(),
-            None,
-            Some(&optimal),
-        );
+        let sol = solve(&problem, &HeuristicOptions::default(), None, Some(&optimal));
         assert!(
             (sol.total - 4.0).abs() < 1e-2,
             "tour cost changed from optimal: {}",

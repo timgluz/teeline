@@ -219,12 +219,8 @@ fn particle_swarm_valid_tour_berlin52() {
 #[test]
 fn gravitational_search_valid_tour_berlin52() {
     let cities = load_berlin52();
-    let tour = gravitational_search::solve(
-        &make_problem(&cities),
-        &stochastic_options(200),
-        None,
-        None,
-    );
+    let tour =
+        gravitational_search::solve(&make_problem(&cities), &stochastic_options(200), None, None);
     assert!(
         is_valid_tour(tour.route(), &cities),
         "GSA tour is not valid on berlin52"
@@ -234,12 +230,8 @@ fn gravitational_search_valid_tour_berlin52() {
 #[test]
 fn gravitational_search_valid_tour_small() {
     let cities = tsp5_cities();
-    let tour = gravitational_search::solve(
-        &make_problem(&cities),
-        &stochastic_options(50),
-        None,
-        None,
-    );
+    let tour =
+        gravitational_search::solve(&make_problem(&cities), &stochastic_options(50), None, None);
     assert!(
         is_valid_tour(tour.route(), &cities),
         "GSA tour is not valid on 5-city instance"

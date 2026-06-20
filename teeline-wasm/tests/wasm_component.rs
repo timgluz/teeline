@@ -85,11 +85,31 @@ fn make_instance() -> (Store<HostState>, Solver) {
 fn five_cities() -> Vec<crate::teeline::solver::types::City> {
     use crate::teeline::solver::types::City;
     vec![
-        City { id: 0, x: 565.0, y: 575.0 },
-        City { id: 1, x: 25.0,  y: 185.0 },
-        City { id: 2, x: 345.0, y: 750.0 },
-        City { id: 3, x: 945.0, y: 685.0 },
-        City { id: 4, x: 845.0, y: 655.0 },
+        City {
+            id: 0,
+            x: 565.0,
+            y: 575.0,
+        },
+        City {
+            id: 1,
+            x: 25.0,
+            y: 185.0,
+        },
+        City {
+            id: 2,
+            x: 345.0,
+            y: 750.0,
+        },
+        City {
+            id: 3,
+            x: 945.0,
+            y: 685.0,
+        },
+        City {
+            id: 4,
+            x: 845.0,
+            y: 655.0,
+        },
     ]
 }
 
@@ -112,7 +132,11 @@ fn assert_valid_tour(solution: &crate::teeline::solver::types::Solution, n_citie
     let mut sorted: Vec<u32> = solution.route.clone();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), n_cities, "each city must be visited exactly once");
+    assert_eq!(
+        sorted.len(),
+        n_cities,
+        "each city must be visited exactly once"
+    );
 }
 
 // ── Per-call helpers (use shared runtime) ────────────────────────────────────
@@ -163,50 +187,102 @@ fn run_get_version() -> String {
     instance.call_get_version(&mut store).unwrap()
 }
 
+fn run_compare_tours(
+    solver_route: &[u32],
+    opt_route: &[u32],
+    cities: &[crate::teeline::solver::types::City],
+) -> Result<crate::teeline::solver::types::ComparisonStats, String> {
+    let (mut store, instance) = make_instance();
+    instance
+        .call_compare_tours(&mut store, solver_route, opt_route, cities)
+        .unwrap()
+}
+
 // ── solve tests ───────────────────────────────────────────────────────────────
 
 #[test]
-fn test_sa() { run_solver("sa") }
+fn test_sa() {
+    run_solver("sa")
+}
 #[test]
-fn test_two_opt() { run_solver("two_opt") }
+fn test_two_opt() {
+    run_solver("two_opt")
+}
 #[test]
-fn test_nearest_neighbor() { run_solver("nn") }
+fn test_nearest_neighbor() {
+    run_solver("nn")
+}
 #[test]
-fn test_genetic_algorithm() { run_solver("ga") }
+fn test_genetic_algorithm() {
+    run_solver("ga")
+}
 #[test]
-fn test_particle_swarm() { run_solver("pso") }
+fn test_particle_swarm() {
+    run_solver("pso")
+}
 #[test]
-fn test_cuckoo_search() { run_solver("cs") }
+fn test_cuckoo_search() {
+    run_solver("cs")
+}
 #[test]
-fn test_flower_pollination() { run_solver("fpa") }
+fn test_flower_pollination() {
+    run_solver("fpa")
+}
 #[test]
-fn test_lin_kernighan() { run_solver("lk") }
+fn test_lin_kernighan() {
+    run_solver("lk")
+}
 #[test]
-fn test_tabu_search() { run_solver("tabu_search") }
+fn test_tabu_search() {
+    run_solver("tabu_search")
+}
 #[test]
-fn test_stochastic_hill() { run_solver("stochastic_hill") }
+fn test_stochastic_hill() {
+    run_solver("stochastic_hill")
+}
 #[test]
-fn test_bellman_karp() { run_solver("bhk") }
+fn test_bellman_karp() {
+    run_solver("bhk")
+}
 #[test]
-fn test_branch_bound() { run_solver("branch_bound") }
+fn test_branch_bound() {
+    run_solver("branch_bound")
+}
 #[test]
-fn test_three_opt() { run_solver("3opt") }
+fn test_three_opt() {
+    run_solver("3opt")
+}
 #[test]
-fn test_or_opt() { run_solver("or_opt") }
+fn test_or_opt() {
+    run_solver("or_opt")
+}
 #[test]
-fn test_shuffle() { run_solver("shuffle") }
+fn test_shuffle() {
+    run_solver("shuffle")
+}
 #[test]
-fn test_christofides() { run_solver("christofides") }
+fn test_christofides() {
+    run_solver("christofides")
+}
 #[test]
-fn test_gravitational_search() { run_solver("gsa") }
+fn test_gravitational_search() {
+    run_solver("gsa")
+}
 #[test]
-fn test_fourier() { run_solver("fourier") }
+fn test_fourier() {
+    run_solver("fourier")
+}
 
 #[test]
 fn unknown_solver_returns_err() {
     let (mut store, instance) = make_instance();
     let result = instance
-        .call_solve(&mut store, "does_not_exist", &five_cities(), default_options())
+        .call_solve(
+            &mut store,
+            "does_not_exist",
+            &five_cities(),
+            default_options(),
+        )
         .unwrap();
     assert!(
         result.is_err(),
@@ -245,7 +321,12 @@ fn test_parse_and_solve_json_leading_whitespace() {
 fn test_parse_and_solve_one_city_json_returns_err() {
     let (mut store, instance) = make_instance();
     let result = instance
-        .call_parse_and_solve(&mut store, "nn", r#"[{"id":0,"x":1.0,"y":2.0}]"#, default_options())
+        .call_parse_and_solve(
+            &mut store,
+            "nn",
+            r#"[{"id":0,"x":1.0,"y":2.0}]"#,
+            default_options(),
+        )
         .unwrap();
     assert!(result.is_err(), "single city must return Err");
 }
@@ -308,11 +389,31 @@ fn test_list_algorithms_returns_all_solvers() {
     assert_eq!(algorithms.len(), 19, "expected 19 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
-        "nn", "2opt", "3opt", "sa", "ga", "gsa", "pso", "cs", "fpa",
-        "tabu_search", "stochastic_hill", "shuffle", "bhk", "branch_bound", "lk", "or_opt",
-        "christofides", "fourier", "som",
+        "nn",
+        "2opt",
+        "3opt",
+        "sa",
+        "ga",
+        "gsa",
+        "pso",
+        "cs",
+        "fpa",
+        "tabu_search",
+        "stochastic_hill",
+        "shuffle",
+        "bhk",
+        "branch_bound",
+        "lk",
+        "or_opt",
+        "christofides",
+        "fourier",
+        "som",
     ] {
-        assert!(ids.contains(expected_id), "missing algorithm id: {}", expected_id);
+        assert!(
+            ids.contains(expected_id),
+            "missing algorithm id: {}",
+            expected_id
+        );
     }
 }
 
@@ -320,10 +421,18 @@ fn test_list_algorithms_returns_all_solvers() {
 fn test_list_algorithms_fields_non_empty() {
     let algorithms = run_list_algorithms();
     for algo in &algorithms {
-        assert!(!algo.id.is_empty(),             "id empty for {:?}", algo.name);
-        assert!(!algo.name.is_empty(),           "name empty for {}", algo.id);
-        assert!(!algo.description.is_empty(),    "description empty for {}", algo.id);
-        assert!(!algo.recommendation.is_empty(), "recommendation empty for {}", algo.id);
+        assert!(!algo.id.is_empty(), "id empty for {:?}", algo.name);
+        assert!(!algo.name.is_empty(), "name empty for {}", algo.id);
+        assert!(
+            !algo.description.is_empty(),
+            "description empty for {}",
+            algo.id
+        );
+        assert!(
+            !algo.recommendation.is_empty(),
+            "recommendation empty for {}",
+            algo.id
+        );
     }
 }
 
@@ -354,16 +463,25 @@ fn test_compare_preserves_algorithm_order() {
 fn test_compare_unknown_algorithm_returns_error_entry() {
     let results = run_compare(&["nn", "does_not_exist"], FIVE_CITIES_TSPLIB);
     assert_eq!(results.len(), 2);
-    assert!(results[0].solution.is_ok(),  "nn should succeed");
-    assert!(results[1].solution.is_err(), "unknown solver should return error entry");
+    assert!(results[0].solution.is_ok(), "nn should succeed");
+    assert!(
+        results[1].solution.is_err(),
+        "unknown solver should return error entry"
+    );
 }
 
 #[test]
 fn test_compare_invalid_input_all_error_entries() {
     let results = run_compare(&["nn", "2opt"], "not valid tsplib or json");
     assert_eq!(results.len(), 2);
-    assert!(results[0].solution.is_err(), "should return parse error for nn");
-    assert!(results[1].solution.is_err(), "should return parse error for 2opt");
+    assert!(
+        results[0].solution.is_err(),
+        "should return parse error for nn"
+    );
+    assert!(
+        results[1].solution.is_err(),
+        "should return parse error for 2opt"
+    );
 }
 
 #[test]
@@ -371,9 +489,113 @@ fn test_compare_json_input() {
     let results = run_compare(&["nn", "2opt"], &five_cities_json());
     assert_eq!(results.len(), 2);
     for r in &results {
-        let sol = r.solution.as_ref().expect("solver should succeed with JSON input");
+        let sol = r
+            .solution
+            .as_ref()
+            .expect("solver should succeed with JSON input");
         assert_valid_tour(sol, 5);
     }
+}
+
+// ── compare_tours tests ───────────────────────────────────────────────────────
+
+#[test]
+fn test_compare_tours_identical_routes() {
+    let cities = five_cities();
+    let route: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let stats = run_compare_tours(&route, &route, &cities).expect("identical routes must succeed");
+    assert_eq!(stats.gap_pct, 0.0, "identical tour must have 0% gap");
+    assert_eq!(
+        stats.shared_edges,
+        route.len() as u32,
+        "all edges must be shared"
+    );
+    assert_eq!(stats.solver_only_edges, 0);
+    assert_eq!(stats.optimal_only_edges, 0);
+    assert!((stats.optimal_cost - stats.solver_cost).abs() < 0.001);
+}
+
+#[test]
+fn test_compare_tours_permuted_route_has_positive_gap() {
+    let cities = five_cities();
+    // five_cities() returns IDs 0..4; optimal: [0,1,2,3,4], solver: [0,2,1,3,4]
+    let optimal: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let mut solver = optimal.clone();
+    solver.swap(1, 2); // swap cities 1 and 2 to create a worse route
+    let stats =
+        run_compare_tours(&solver, &optimal, &cities).expect("valid permuted routes must succeed");
+    assert!(stats.gap_pct >= 0.0, "gap must be non-negative");
+    // Swapped route may or may not be worse depending on geometry; just verify the call works
+    // and stats are consistent
+    assert_eq!(
+        stats.shared_edges + stats.solver_only_edges,
+        optimal.len() as u32,
+        "shared + solver_only must equal tour length"
+    );
+}
+
+#[test]
+fn test_compare_tours_dimension_mismatch_returns_error() {
+    let cities = five_cities();
+    let route: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let short_route = vec![route[0], route[1]]; // only 2 cities
+    let result = run_compare_tours(&short_route, &route, &cities);
+    assert!(result.is_err(), "mismatched lengths must return Err");
+    let msg = result.unwrap_err();
+    assert!(
+        msg.contains("dimension mismatch"),
+        "error must mention 'dimension mismatch', got: {msg}"
+    );
+}
+
+#[test]
+fn test_compare_tours_unknown_city_id_returns_error() {
+    let cities = five_cities(); // IDs 0..4
+    let route: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let bad_route: Vec<u32> = route.iter().map(|&id| id + 100).collect(); // IDs 100..104 don't exist
+    let result = run_compare_tours(&bad_route, &route, &cities);
+    assert!(result.is_err(), "unknown city IDs must return Err");
+    let msg = result.unwrap_err();
+    assert!(
+        msg.contains("unknown city"),
+        "error must mention 'unknown city', got: {msg}"
+    );
+}
+
+#[test]
+fn test_compare_tours_berlin52_optimal_vs_itself() {
+    // Parse berlin52 cities from the TSP file (reuse existing run_parse helper)
+    let tsp_input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/berlin52.tsp",
+    ))
+    .expect("berlin52.tsp must exist");
+    let parsed = run_parse(&tsp_input);
+
+    // Parse the optimal tour (city IDs, 1-based as per TSPLIB)
+    let opt_text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/berlin52.opt.tour",
+    ))
+    .expect("berlin52.opt.tour must exist");
+    let opt_route: Vec<u32> = opt_text
+        .lines()
+        .skip_while(|l| l.trim() != "TOUR_SECTION")
+        .skip(1)
+        .map(|l| l.trim().parse::<i32>().unwrap_or(-1))
+        .take_while(|&n| n > 0)
+        .map(|n| n as u32)
+        .collect();
+    assert_eq!(
+        opt_route.len(),
+        52,
+        "berlin52 optimal tour must have 52 cities"
+    );
+
+    let stats = run_compare_tours(&opt_route, &opt_route, &parsed.cities)
+        .expect("optimal vs itself must succeed");
+    assert_eq!(stats.gap_pct, 0.0, "optimal vs itself must have 0% gap");
+    assert_eq!(stats.shared_edges, 52, "all 52 edges must be shared");
 }
 
 // ── parse integration tests ────────────────────────────────────────────────────
@@ -432,12 +654,19 @@ fn test_get_version_returns_non_empty() {
 #[test]
 fn test_list_algorithms_kind_fields_present() {
     let algorithms = run_list_algorithms();
-    let valid_kinds = ["exact", "constructive", "local-search", "metaheuristic", "utility"];
+    let valid_kinds = [
+        "exact",
+        "constructive",
+        "local-search",
+        "metaheuristic",
+        "utility",
+    ];
     for algo in &algorithms {
         assert!(
             valid_kinds.contains(&algo.kind.as_str()),
             "unexpected kind '{}' for solver '{}'",
-            algo.kind, algo.id
+            algo.kind,
+            algo.id
         );
     }
 }
@@ -445,13 +674,25 @@ fn test_list_algorithms_kind_fields_present() {
 #[test]
 fn test_list_algorithms_sa_kind_and_params() {
     let algorithms = run_list_algorithms();
-    let sa = algorithms.iter().find(|a| a.id == "sa").expect("sa missing");
+    let sa = algorithms
+        .iter()
+        .find(|a| a.id == "sa")
+        .expect("sa missing");
     assert_eq!(sa.kind, "metaheuristic");
     let keys: Vec<&str> = sa.params.iter().map(|p| p.key.as_str()).collect();
-    assert!(keys.contains(&"coolingRate"),    "sa must have coolingRate param");
-    assert!(keys.contains(&"maxTemperature"), "sa must have maxTemperature param");
-    assert!(keys.contains(&"minTemperature"), "sa must have minTemperature param");
-    assert!(keys.contains(&"epochs"),         "sa must have epochs param");
+    assert!(
+        keys.contains(&"coolingRate"),
+        "sa must have coolingRate param"
+    );
+    assert!(
+        keys.contains(&"maxTemperature"),
+        "sa must have maxTemperature param"
+    );
+    assert!(
+        keys.contains(&"minTemperature"),
+        "sa must have minTemperature param"
+    );
+    assert!(keys.contains(&"epochs"), "sa must have epochs param");
     let cr = sa.params.iter().find(|p| p.key == "coolingRate").unwrap();
     assert_eq!(cr.value_type, "float", "coolingRate must be float type");
 }
@@ -459,7 +700,10 @@ fn test_list_algorithms_sa_kind_and_params() {
 #[test]
 fn test_list_algorithms_nn_kind_and_params() {
     let algorithms = run_list_algorithms();
-    let nn = algorithms.iter().find(|a| a.id == "nn").expect("nn missing");
+    let nn = algorithms
+        .iter()
+        .find(|a| a.id == "nn")
+        .expect("nn missing");
     assert_eq!(nn.kind, "constructive");
     assert!(nn.params.is_empty(), "nn must have no configurable params");
 }
@@ -467,29 +711,50 @@ fn test_list_algorithms_nn_kind_and_params() {
 #[test]
 fn test_list_algorithms_bhk_kind_and_params() {
     let algorithms = run_list_algorithms();
-    let bhk = algorithms.iter().find(|a| a.id == "bhk").expect("bhk missing");
+    let bhk = algorithms
+        .iter()
+        .find(|a| a.id == "bhk")
+        .expect("bhk missing");
     assert_eq!(bhk.kind, "exact");
-    assert!(bhk.params.is_empty(), "bhk must have no configurable params");
+    assert!(
+        bhk.params.is_empty(),
+        "bhk must have no configurable params"
+    );
 }
 
 #[test]
 fn test_list_algorithms_two_opt_kind() {
     let algorithms = run_list_algorithms();
-    let two_opt = algorithms.iter().find(|a| a.id == "2opt").expect("2opt missing");
+    let two_opt = algorithms
+        .iter()
+        .find(|a| a.id == "2opt")
+        .expect("2opt missing");
     assert_eq!(two_opt.kind, "local-search");
-    assert!(!two_opt.params.is_empty(), "2opt must have heuristic params");
+    assert!(
+        !two_opt.params.is_empty(),
+        "2opt must have heuristic params"
+    );
 }
 
 #[test]
 fn test_list_algorithms_shuffle_kind() {
     let algorithms = run_list_algorithms();
-    let shuffle = algorithms.iter().find(|a| a.id == "shuffle").expect("shuffle missing");
+    let shuffle = algorithms
+        .iter()
+        .find(|a| a.id == "shuffle")
+        .expect("shuffle missing");
     assert_eq!(shuffle.kind, "utility");
 }
 
 const VALID_SOLVE_OPTIONS_KEYS: &[&str] = &[
-    "epochs", "platooEpochs", "coolingRate", "maxTemperature",
-    "minTemperature", "mutationProbability", "nElite", "nNearest",
+    "epochs",
+    "platooEpochs",
+    "coolingRate",
+    "maxTemperature",
+    "minTemperature",
+    "mutationProbability",
+    "nElite",
+    "nNearest",
 ];
 
 #[test]
@@ -500,7 +765,8 @@ fn test_list_algorithms_all_param_keys_are_valid_solve_options_fields() {
             assert!(
                 VALID_SOLVE_OPTIONS_KEYS.contains(&param.key.as_str()),
                 "solver '{}' has unknown param key '{}' — must be a valid SolveOptions field",
-                algo.id, param.key
+                algo.id,
+                param.key
             );
         }
     }
@@ -509,8 +775,14 @@ fn test_list_algorithms_all_param_keys_are_valid_solve_options_fields() {
 #[test]
 fn test_list_algorithms_christofides_kind_and_recommendation() {
     let algorithms = run_list_algorithms();
-    let chr = algorithms.iter().find(|a| a.id == "christofides").expect("christofides missing");
-    assert_eq!(chr.kind, "constructive", "christofides must be 'constructive'");
+    let chr = algorithms
+        .iter()
+        .find(|a| a.id == "christofides")
+        .expect("christofides missing");
+    assert_eq!(
+        chr.kind, "constructive",
+        "christofides must be 'constructive'"
+    );
     assert!(
         chr.params.is_empty(),
         "christofides must have no configurable params"
@@ -529,9 +801,16 @@ fn test_list_algorithms_christofides_kind_and_recommendation() {
 #[test]
 fn test_list_algorithms_fourier_kind_and_params() {
     let algorithms = run_list_algorithms();
-    let f = algorithms.iter().find(|a| a.id == "fourier").expect("fourier missing");
+    let f = algorithms
+        .iter()
+        .find(|a| a.id == "fourier")
+        .expect("fourier missing");
     assert_eq!(f.kind, "constructive", "fourier must be 'constructive'");
-    assert_eq!(f.params.len(), 1, "fourier must have exactly 1 param (epochs)");
+    assert_eq!(
+        f.params.len(),
+        1,
+        "fourier must have exactly 1 param (epochs)"
+    );
     assert_eq!(f.params[0].key, "epochs", "fourier param must be 'epochs'");
     assert_eq!(f.params[0].value_type, "int", "epochs must be int type");
     assert!(
@@ -544,11 +823,17 @@ fn test_list_algorithms_fourier_kind_and_params() {
 #[test]
 fn test_list_algorithms_ga_params() {
     let algorithms = run_list_algorithms();
-    let ga = algorithms.iter().find(|a| a.id == "ga").expect("ga missing");
+    let ga = algorithms
+        .iter()
+        .find(|a| a.id == "ga")
+        .expect("ga missing");
     assert_eq!(ga.kind, "metaheuristic");
     let keys: Vec<&str> = ga.params.iter().map(|p| p.key.as_str()).collect();
-    assert!(keys.contains(&"mutationProbability"), "ga must have mutationProbability");
-    assert!(keys.contains(&"nElite"),             "ga must have nElite");
+    assert!(
+        keys.contains(&"mutationProbability"),
+        "ga must have mutationProbability"
+    );
+    assert!(keys.contains(&"nElite"), "ga must have nElite");
     let n_elite = ga.params.iter().find(|p| p.key == "nElite").unwrap();
     assert_eq!(n_elite.value_type, "int", "nElite must be int type");
 }

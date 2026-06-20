@@ -652,7 +652,8 @@ mod tests {
     #[cfg(feature = "json")]
     #[test]
     fn test_parse_json_cities_valid() {
-        let json = r#"[{"id":0,"x":1.0,"y":2.0},{"id":1,"x":3.0,"y":4.0},{"id":2,"x":5.0,"y":6.0}]"#;
+        let json =
+            r#"[{"id":0,"x":1.0,"y":2.0},{"id":1,"x":3.0,"y":4.0},{"id":2,"x":5.0,"y":6.0}]"#;
         let cities = parse_json_cities(json).unwrap();
         assert_eq!(3, cities.len());
         assert_eq!(0, cities[0].id);
@@ -700,8 +701,8 @@ mod tests {
 
     #[test]
     fn test_read_from_str_burma14() {
-        let input = std::fs::read_to_string("tests/fixtures/burma14.tsp")
-            .expect("burma14.tsp missing");
+        let input =
+            std::fs::read_to_string("tests/fixtures/burma14.tsp").expect("burma14.tsp missing");
         let dt = read_from_str(&input).unwrap();
         assert_eq!(14, dt.len());
         assert_eq!("burma14", dt.name);
@@ -709,8 +710,8 @@ mod tests {
 
     #[test]
     fn test_read_from_str_berlin52() {
-        let input = std::fs::read_to_string("tests/fixtures/berlin52.tsp")
-            .expect("berlin52.tsp missing");
+        let input =
+            std::fs::read_to_string("tests/fixtures/berlin52.tsp").expect("berlin52.tsp missing");
         let dt = read_from_str(&input).unwrap();
         assert_eq!(52, dt.len());
     }
