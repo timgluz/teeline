@@ -6,9 +6,10 @@ vi.mock('teeline-wasm', () => ({
   parse: vi.fn(),
   listAlgorithms: vi.fn(),
   getVersion: vi.fn(),
+  compareTours: vi.fn(),
 }))
 
-import { solve, parseAndSolve, parse, listAlgorithms, getVersion } from 'teeline-wasm'
+import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours } from 'teeline-wasm'
 import {
   handleMessage,
   type ParseAndSolveRequest,
@@ -16,6 +17,8 @@ import {
   type SolveRequest,
   type ListAlgorithmsRequest,
   type GetVersionRequest,
+  type CompareToursRequest,
+  type ComparisonStats,
 } from './worker'
 
 const mockSolution = { total: 42.0, route: new Uint32Array([0, 1, 2]) }
@@ -171,6 +174,79 @@ describe('handleMessage — get-version', () => {
     expect(res.type).toBe('error')
     if (res.type === 'error') {
       expect(res.message).toContain('version unavailable')
+    }
+  })
+})
+
+describe('handleMessage — compare-tours', () => {
+  const mockStats: ComparisonStats = {
+    optimalCost: 100.0,
+    solverCost: 110.0,
+    gapPct: 10.0,
+    sharedEdges: 3,
+    solverOnlyEdges: 1,
+    optimalOnlyEdges: 1,
+  }
+  const cities = [
+    { id: 1, x: 0.0, y: 0.0 },
+    { id: 2, x: 1.0, y: 0.0 },
+    { id: 3, x: 1.0, y: 1.0 },
+    { id: 4, x: 0.0, y: 1.0 },
+  ]
+  const solverRoute = [1, 2, 3, 4]
+  const optRoute    = [1, 2, 4, 3]
+
+  it('returns compare-tours-result with stats on success', () => {
+    vi.mocked(compareTours).mockReturnValue(mockStats)
+    const req: CompareToursRequest = {
+      type: 'compare-tours',
+      id: 'test-id-1',
+      solverRoute,
+      optRoute,
+      cities,
+    }
+    const res = handleMessage(req)
+    expect(res.type).toBe('compare-tours-result')
+    if (res.type === 'compare-tours-result') {
+      expect(res.id).toBe('test-id-1')
+      expect(res.stats?.gapPct).toBe(10.0)
+      expect(res.stats?.sharedEdges).toBe(3)
+      expect(res.error).toBeUndefined()
+    }
+  })
+
+  it('echoes the request id in the response', () => {
+    vi.mocked(compareTours).mockReturnValue(mockStats)
+    const req: CompareToursRequest = {
+      type: 'compare-tours',
+      id: 'correlation-abc',
+      solverRoute,
+      optRoute,
+      cities,
+    }
+    const res = handleMessage(req)
+    if (res.type === 'compare-tours-result') {
+      expect(res.id).toBe('correlation-abc')
+    }
+  })
+
+  it('returns error in compare-tours-result when compareTours throws', () => {
+    vi.mocked(compareTours).mockImplementation(() => {
+      throw new Error('dimension mismatch: solver=3 opt=4 cities=4')
+    })
+    const req: CompareToursRequest = {
+      type: 'compare-tours',
+      id: 'test-id-err',
+      solverRoute: [1, 2, 3],
+      optRoute: [1, 2, 3, 4],
+      cities,
+    }
+    const res = handleMessage(req)
+    expect(res.type).toBe('compare-tours-result')
+    if (res.type === 'compare-tours-result') {
+      expect(res.id).toBe('test-id-err')
+      expect(res.error).toContain('dimension mismatch')
+      expect(res.stats).toBeUndefined()
     }
   })
 })
