@@ -335,5 +335,40 @@
     </footer>
 
     <script type="module" src="/src/main.ts"></script>
+
+    <!-- WebMCP tools — hidden forms for AI agent access -->
+    <form id="webmcp-solve" toolname="solveTSP"
+          tooldescription="Solve a TSP problem using a named algorithm. Returns tour cost and city sequence."
+          toolautosubmit hidden>
+      <textarea name="problem" toolparamdescription="TSPLIB-format problem data (NODE_COORD_SECTION etc.)"></textarea>
+      <input name="algorithm" type="text"
+             toolparamdescription="Algorithm ID: nn, 2opt, lk, sa, ga, pso, cs, fpa, or_opt, christofides, gsa, fourier. Default: lk">
+      <input name="epochs" type="number" toolparamdescription="Iteration count. Default: 500">
+      <input name="max_temperature" type="number" toolparamdescription="Max temperature for SA. Default: 1000">
+      <input name="mutation_probability" type="number" toolparamdescription="Mutation rate for GA (0–1). Default: 0.05">
+      <input name="n_nearest" type="number" toolparamdescription="KD-tree candidate list size. Default: 5">
+    </form>
+
+    <form id="webmcp-list-algorithms" toolname="listAlgorithms"
+          tooldescription="List all available TSP solving algorithms with metadata."
+          toolautosubmit hidden>
+    </form>
+
+    <form id="webmcp-parse" toolname="parseProblem"
+          tooldescription="Parse a TSPLIB problem string and return full problem data (name, cities, distance type)."
+          toolautosubmit hidden>
+      <textarea name="problem" toolparamdescription="TSPLIB-format problem data"></textarea>
+    </form>
+
+    <form id="webmcp-compare" toolname="compareTours"
+          tooldescription="Compare a solver tour against an optimal tour. Returns gap %, shared edges, and per-tour edge counts."
+          toolautosubmit hidden>
+      <input name="solver_route" type="text"
+             toolparamdescription="JSON array of city IDs in solver tour order, e.g. [1,5,3,...]">
+      <input name="opt_route" type="text"
+             toolparamdescription="JSON array of city IDs in optimal tour order">
+      <input name="cities" type="text"
+             toolparamdescription="JSON array of city objects: [{id,x,y}, ...]">
+    </form>
   </body>
 </html>

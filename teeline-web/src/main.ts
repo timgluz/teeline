@@ -7,6 +7,7 @@ import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage, CompareToursResult } from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
+import { initWebMCP } from './webmcp'
 import { initResults, updateOptRoute, showRunning, showResult, patchComparison } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
@@ -185,6 +186,7 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
       },
     )
 
+    initWebMCP(worker)
     setWasmStatus('ready')
     gotAlgorithms = true
   }

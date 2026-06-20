@@ -84,8 +84,45 @@ export interface CompareToursResult {
   error?: string
 }
 
-type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest | CompareToursRequest
-type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError | WorkerReadyMessage | CompareToursResult
+export interface WebMCPSolveRequest {
+  type: 'webmcp-solve'
+  id: string
+  solver: string
+  input: string
+  options: Partial<SolveOptions>
+}
+export interface WebMCPSolveResult {
+  type: 'webmcp-result'
+  id: string
+  solution?: { total: number; route: number[] }
+  error?: string
+}
+
+export interface WebMCPListAlgorithmsRequest {
+  type: 'webmcp-list-algorithms'
+  id: string
+}
+export interface WebMCPAlgorithmsResult {
+  type: 'webmcp-algorithms'
+  id: string
+  algorithms?: AlgorithmInfo[]
+  error?: string
+}
+
+export interface WebMCPParseRequest {
+  type: 'webmcp-parse'
+  id: string
+  input: string
+}
+export interface WebMCPParseResult {
+  type: 'webmcp-parsed'
+  id: string
+  problem?: ParsedProblem
+  error?: string
+}
+
+type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest | CompareToursRequest | WebMCPSolveRequest | WebMCPListAlgorithmsRequest | WebMCPParseRequest
+type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError | WorkerReadyMessage | CompareToursResult | WebMCPSolveResult | WebMCPAlgorithmsResult | WebMCPParseResult
 
 export function handleMessage(data: WorkerRequest): WorkerResponse {
   try {
@@ -122,6 +159,32 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
           id: req.id,
           error: err instanceof Error ? err.message : String(err),
         }
+      }
+    }
+    if (data.type === 'webmcp-solve') {
+      const req = data as WebMCPSolveRequest
+      try {
+        const opts = { ...defaultSolveOptions(), ...req.options }
+        const raw = parseAndSolve(req.solver, req.input, opts)
+        return { type: 'webmcp-result', id: req.id, solution: { total: raw.total, route: Array.from(raw.route) } }
+      } catch (e) {
+        return { type: 'webmcp-result', id: req.id, error: String(e) }
+      }
+    }
+    if (data.type === 'webmcp-list-algorithms') {
+      const req = data as WebMCPListAlgorithmsRequest
+      try {
+        return { type: 'webmcp-algorithms', id: req.id, algorithms: listAlgorithms() }
+      } catch (e) {
+        return { type: 'webmcp-algorithms', id: req.id, error: String(e) }
+      }
+    }
+    if (data.type === 'webmcp-parse') {
+      const req = data as WebMCPParseRequest
+      try {
+        return { type: 'webmcp-parsed', id: req.id, problem: parse(req.input) }
+      } catch (e) {
+        return { type: 'webmcp-parsed', id: req.id, error: String(e) }
       }
     }
     const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...data.options }

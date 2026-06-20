@@ -16,6 +16,8 @@ const explainerPages = Object.fromEntries(
 )
 
 export default defineConfig({
+  envPrefix: ['VITE_', 'WEBMCP_'],
+
   build: {
     outDir: 'dist',
     sourcemap: true,
