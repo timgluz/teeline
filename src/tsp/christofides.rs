@@ -40,7 +40,10 @@ pub fn solve(
 
     // Step 2: Identify odd-degree vertices.
     let odd = odd_degree_nodes(&mst_edges, n);
-    debug_assert!(odd.len().is_multiple_of(2), "handshaking lemma: odd-degree count must be even");
+    debug_assert!(
+        odd.len().is_multiple_of(2),
+        "handshaking lemma: odd-degree count must be even"
+    );
 
     // Step 3: Greedy minimum-weight perfect matching on odd-degree nodes.
     let matching = greedy_matching(&odd, distances, n);
@@ -71,7 +74,7 @@ pub fn solve(
 /// Returns MST edges as `(pos_a, pos_b)` position-index pairs.
 fn prim_mst(n: usize, distances: &super::distance_matrix::DistanceMatrix) -> Vec<(usize, usize)> {
     let mut in_mst = vec![false; n];
-    let mut key = vec![f32::MAX; n];   // minimum edge weight to bring each vertex into the tree
+    let mut key = vec![f32::MAX; n]; // minimum edge weight to bring each vertex into the tree
     let mut parent = vec![usize::MAX; n];
     key[0] = 0.0;
 
@@ -81,7 +84,11 @@ fn prim_mst(n: usize, distances: &super::distance_matrix::DistanceMatrix) -> Vec
         // Minimum-key vertex not yet in MST.
         let u = (0..n)
             .filter(|&i| !in_mst[i])
-            .min_by(|&a, &b| key[a].partial_cmp(&key[b]).unwrap_or(std::cmp::Ordering::Equal))
+            .min_by(|&a, &b| {
+                key[a]
+                    .partial_cmp(&key[b])
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .expect("at least one non-MST vertex remains");
 
         in_mst[u] = true;
@@ -280,7 +287,10 @@ mod tests {
             .iter()
             .map(|&(u, v)| problem.distances.distance_by_pos(u, v).unwrap())
             .sum();
-        assert!((weight - 4.0).abs() < 1e-3, "chain MST weight must be 4.0, got {weight}");
+        assert!(
+            (weight - 4.0).abs() < 1e-3,
+            "chain MST weight must be 4.0, got {weight}"
+        );
     }
 
     // ------------------------------------------------------------------
@@ -292,7 +302,11 @@ mod tests {
         // MST: (0-1), (1-2), (1-3) → degrees: 0→1, 1→3, 2→1, 3→1 → odd: {0,1,2,3} = 4, even.
         let mst = vec![(0, 1), (1, 2), (1, 3)];
         let odd = odd_degree_nodes(&mst, 4);
-        assert_eq!(odd.len() % 2, 0, "odd-degree count must be even (handshaking lemma)");
+        assert_eq!(
+            odd.len() % 2,
+            0,
+            "odd-degree count must be even (handshaking lemma)"
+        );
     }
 
     #[test]
@@ -312,8 +326,7 @@ mod tests {
     #[test]
     fn greedy_matching_covers_all_odd_nodes() {
         // 5-node layout; verify each odd-degree node appears exactly once in the matching.
-        let problem =
-            make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
+        let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
         let mst = prim_mst(n, &problem.distances);
         let odd = odd_degree_nodes(&mst, n);
@@ -336,8 +349,7 @@ mod tests {
 
     #[test]
     fn eulerian_circuit_length_equals_edges_plus_one() {
-        let problem =
-            make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
+        let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
         let mst = prim_mst(n, &problem.distances);
         let odd = odd_degree_nodes(&mst, n);
@@ -365,7 +377,11 @@ mod tests {
         assert_eq!(tour.len(), n, "shortcut must produce n-city tour");
         let mut sorted = tour.clone();
         sorted.sort_unstable();
-        assert_eq!(sorted, vec![0, 1, 2, 3, 4], "tour must be a permutation of 0..n");
+        assert_eq!(
+            sorted,
+            vec![0, 1, 2, 3, 4],
+            "tour must be a permutation of 0..n"
+        );
     }
 
     // ------------------------------------------------------------------
@@ -383,14 +399,7 @@ mod tests {
     #[test]
     fn christofides_all_cities_visited_once() {
         // 6-city problem: validate tour is a valid permutation.
-        let problem = make_problem(&[
-            [0., 0.],
-            [1., 0.],
-            [5., 5.],
-            [2., 0.],
-            [3., 0.],
-            [4., 1.],
-        ]);
+        let problem = make_problem(&[[0., 0.], [1., 0.], [5., 5.], [2., 0.], [3., 0.], [4., 1.]]);
         let sol = solve(&problem, &HeuristicOptions::default(), None, None);
         let mut visited = sol.route().to_vec();
         visited.sort_unstable();
@@ -401,13 +410,7 @@ mod tests {
     #[test]
     fn christofides_tour_cost_matches_reported() {
         // Reported total must match the sum of edge distances in the tour.
-        let problem = make_problem(&[
-            [0., 0.],
-            [1., 0.],
-            [2., 0.],
-            [3., 0.],
-            [4., 0.],
-        ]);
+        let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.], [4., 0.]]);
         let sol = solve(&problem, &HeuristicOptions::default(), None, None);
         let route = sol.route();
         let n = route.len();

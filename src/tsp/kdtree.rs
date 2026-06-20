@@ -139,7 +139,12 @@ pub(crate) struct KDNode {
 
 impl KDNode {
     #[cfg(test)]
-    pub(crate) fn new(point: KDPoint, depth: usize, left: Option<KDNode>, right: Option<KDNode>) -> Self {
+    pub(crate) fn new(
+        point: KDPoint,
+        depth: usize,
+        left: Option<KDNode>,
+        right: Option<KDNode>,
+    ) -> Self {
         KDNode {
             point,
             depth,
@@ -148,7 +153,12 @@ impl KDNode {
         }
     }
 
-    pub(crate) fn from_subtrees(point: KDPoint, depth: usize, left: KDSubTree, right: KDSubTree) -> Self {
+    pub(crate) fn from_subtrees(
+        point: KDPoint,
+        depth: usize,
+        left: KDSubTree,
+        right: KDSubTree,
+    ) -> Self {
         KDNode {
             point,
             depth,
@@ -187,7 +197,9 @@ impl KDNode {
         }
 
         let split_dist = self.point.split_distance(target_point, self.level_coord());
-        if acc.search_radius() > split_dist && let Some(branch) = further_branch {
+        if acc.search_radius() > split_dist
+            && let Some(branch) = further_branch
+        {
             branch.nearest(target_point, acc);
         }
     }
@@ -234,11 +246,17 @@ pub struct KDPoint {
 
 impl KDPoint {
     pub fn new(coords: &[f32]) -> Self {
-        KDPoint { id: 0, coords: [coords[0], coords[1]] }
+        KDPoint {
+            id: 0,
+            coords: [coords[0], coords[1]],
+        }
     }
 
     pub fn new_with_id(id: usize, coords: &[f32]) -> Self {
-        KDPoint { id, coords: [coords[0], coords[1]] }
+        KDPoint {
+            id,
+            coords: [coords[0], coords[1]],
+        }
     }
 
     pub fn dim(&self) -> usize {

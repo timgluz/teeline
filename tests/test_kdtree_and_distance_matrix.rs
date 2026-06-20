@@ -62,7 +62,10 @@ fn test_nearest_excludes_self() {
     let dm = distance_matrix::from_cities(&cities);
     let result = dm.nearest(&cities[0], 2);
     let ids: Vec<usize> = result.nearest().iter().map(|r| r.point.id).collect();
-    assert!(!ids.contains(&0), "self must not appear in nearest results: {ids:?}");
+    assert!(
+        !ids.contains(&0),
+        "self must not appear in nearest results: {ids:?}"
+    );
 }
 
 /// distance_by_pos must return Err (not panic) for an out-of-range position.
@@ -92,11 +95,7 @@ fn test_distance_between_unknown_city_returns_err() {
 /// nearest() must return an empty result (not panic) for an unknown target city ID.
 #[test]
 fn test_nearest_unknown_target_returns_empty() {
-    let cities = kdtree::build_points(&[
-        vec![0.0, 0.0],
-        vec![1.0, 0.0],
-        vec![2.0, 0.0],
-    ]);
+    let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
     let dm = distance_matrix::from_cities(&cities);
     let unknown = KDPoint::new_with_id(99, &[0.0, 0.0]);
     let result = dm.nearest(&unknown, 2);
@@ -130,7 +129,9 @@ fn test_burma14_geo_distance_matrix() {
 
     // Cities 1=(16.47, 96.10) and 2=(16.47, 94.44) share the same latitude.
     // Euclidean distance would be ~1.66; GEO distance should be much larger (hundreds of km).
-    let geo_d = dm.distance_between(1, 2).expect("distance between city 1 and 2");
+    let geo_d = dm
+        .distance_between(1, 2)
+        .expect("distance between city 1 and 2");
     assert!(
         geo_d > 100.0,
         "GEO distance should be > 100 km, got {geo_d}"

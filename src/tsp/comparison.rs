@@ -1,5 +1,5 @@
-use std::collections::{HashMap, HashSet};
 use crate::tsp::kdtree::KDPoint;
+use std::collections::{HashMap, HashSet};
 
 pub struct ComparisonStats {
     pub optimal_cost: f32,
@@ -72,10 +72,22 @@ mod tests {
 
     fn square_cities() -> Vec<KDPoint> {
         vec![
-            KDPoint { id: 1, coords: [0.0, 0.0] },
-            KDPoint { id: 2, coords: [1.0, 0.0] },
-            KDPoint { id: 3, coords: [1.0, 1.0] },
-            KDPoint { id: 4, coords: [0.0, 1.0] },
+            KDPoint {
+                id: 1,
+                coords: [0.0, 0.0],
+            },
+            KDPoint {
+                id: 2,
+                coords: [1.0, 0.0],
+            },
+            KDPoint {
+                id: 3,
+                coords: [1.0, 1.0],
+            },
+            KDPoint {
+                id: 4,
+                coords: [0.0, 1.0],
+            },
         ]
     }
 
@@ -98,13 +110,22 @@ mod tests {
         // Solver:  [1,2,4,3] — edges {1-2, 2-4, 3-4, 1-3} — crosses diagonals = 2+2√2
         let cities = square_cities();
         let optimal = vec![1, 2, 3, 4];
-        let solver  = vec![1, 2, 4, 3];
+        let solver = vec![1, 2, 4, 3];
         let stats = compare_tours(&solver, &optimal, &cities);
 
-        assert!(stats.gap_pct > 0.0, "solver has a crossing edge, must be worse");
-        assert_eq!(stats.shared_edges, 2,        "edges (1-2) and (3-4) are shared");
-        assert_eq!(stats.solver_only_edges, 2,   "solver has extra (2-4) and (1-3)");
-        assert_eq!(stats.optimal_only_edges, 2,  "optimal has (2-3) and (1-4) not in solver");
+        assert!(
+            stats.gap_pct > 0.0,
+            "solver has a crossing edge, must be worse"
+        );
+        assert_eq!(stats.shared_edges, 2, "edges (1-2) and (3-4) are shared");
+        assert_eq!(
+            stats.solver_only_edges, 2,
+            "solver has extra (2-4) and (1-3)"
+        );
+        assert_eq!(
+            stats.optimal_only_edges, 2,
+            "optimal has (2-3) and (1-4) not in solver"
+        );
         // Invariant: shared + solver_only == n
         assert_eq!(stats.shared_edges + stats.solver_only_edges, optimal.len());
     }
@@ -129,6 +150,9 @@ mod tests {
         let mut sorted_route: Vec<usize> = opt.route.clone();
         sorted_route.sort_unstable();
         let stats2 = compare_tours(&sorted_route, &opt.route, cities);
-        assert!(stats2.gap_pct > 0.0, "ID-sorted route must be worse than the known optimal");
+        assert!(
+            stats2.gap_pct > 0.0,
+            "ID-sorted route must be worse than the known optimal"
+        );
     }
 }

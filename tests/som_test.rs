@@ -4,8 +4,8 @@
 /// The quality test is #[ignore] and requires: cargo test --test som_test -- --include-ignored
 use std::path::Path;
 use std::sync::mpsc;
-use teeline::tsp::{SOMOptions, TspProblem, distance_matrix, kdtree, tsplib};
 use teeline::tsp::progress::ProgressMessage;
+use teeline::tsp::{SOMOptions, TspProblem, distance_matrix, kdtree, tsplib};
 
 fn load_tsp(fixture: &str) -> tsplib::TspLibData {
     let path = Path::new("tests/fixtures").join(fixture);
@@ -73,18 +73,23 @@ fn som_sends_progress_messages() {
     let cities = load_tsp("berlin52.tsp").cities().to_vec();
     let problem = make_problem(cities);
     // 100 epochs → checkpoint = 10, so we get 10 EpochUpdates and the last fires at t=100=epochs
-    let opts = SOMOptions { epochs: 100, ..SOMOptions::default() };
+    let opts = SOMOptions {
+        epochs: 100,
+        ..SOMOptions::default()
+    };
     let (tx, rx) = mpsc::channel();
     let _ = teeline::tsp::som::solve(&problem, &opts, Some(&tx), None);
     drop(tx);
 
     let msgs: Vec<_> = rx.try_iter().collect();
     assert!(
-        msgs.iter().any(|m| matches!(m, ProgressMessage::EpochUpdate(_))),
+        msgs.iter()
+            .any(|m| matches!(m, ProgressMessage::EpochUpdate(_))),
         "expected at least one EpochUpdate"
     );
     assert!(
-        msgs.iter().any(|m| matches!(m, ProgressMessage::PathUpdate(..))),
+        msgs.iter()
+            .any(|m| matches!(m, ProgressMessage::PathUpdate(..))),
         "expected at least one PathUpdate"
     );
     assert!(

@@ -165,7 +165,11 @@ mod tests {
     #[test]
     fn test_gsa_returns_valid_tour() {
         let (cities, problem) = five_city_problem();
-        let opts = HeuristicOptions { epochs: 20, n_nearest: 5, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 20,
+            n_nearest: 5,
+            ..HeuristicOptions::default()
+        };
         let sol = solve(&problem, &opts, None, None);
         assert_eq!(sol.route().len(), cities.len());
         let mut visited = sol.route().to_vec();
@@ -181,7 +185,10 @@ mod tests {
         let dm = distance_matrix::from_cities(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
-        let opts = HeuristicOptions { epochs: 0, ..HeuristicOptions::default() };
+        let opts = HeuristicOptions {
+            epochs: 0,
+            ..HeuristicOptions::default()
+        };
         let result = solve(&problem, &opts, None, Some(&optimal));
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
@@ -201,7 +208,11 @@ mod tests {
         let tour: Vec<usize> = cities.iter().map(|c| c.id).collect();
         // Run a few epochs; all agents start from the same init_tour so sum_fitness
         // is 0 on the first epoch, exercising the uniform-mass fallback.
-        let opts2 = HeuristicOptions { epochs: 5, n_nearest: 5, ..HeuristicOptions::default() };
+        let opts2 = HeuristicOptions {
+            epochs: 5,
+            n_nearest: 5,
+            ..HeuristicOptions::default()
+        };
         let sol = solve(&problem, &opts2, None, Some(&tour));
         assert_eq!(sol.route().len(), cities.len());
         assert!(sol.total.is_finite());
