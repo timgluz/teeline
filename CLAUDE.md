@@ -42,20 +42,23 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 **Library root:** `src/lib.rs` exposes `pub mod tsp` and a private `mod test`.
 
 **Core types (all in `src/tsp/mod.rs`):**
+
 - `Solvers` enum — lists every algorithm with string aliases (e.g. `"nn"` → `NearestNeighbor`, `"2opt"` → `TwoOpt`)
 - `SolverOptions` — shared config struct passed to every solver (epochs, temperatures, mutation rate, etc.)
 - `Solution` — holds the tour route (`Vec<usize>` of city IDs) and total distance
 - `NearestResult` / `NearestResultItem` — returned by both KD-tree and distance matrix nearest-neighbor lookups
 
 **Spatial data structures:**
+
 - `src/tsp/kdtree.rs` — KD-tree for fast nearest-neighbor queries; `KDPoint` is the shared city/point type used everywhere
 - `src/tsp/distance_matrix.rs` — brute-force O(n²) alternative; both expose the same `nearest(&pt, n)` interface
 
 **Input:** `src/tsp/tsplib.rs` — state-machine parser for TSPLIB format; accepts `NODE_COORD_SECTION` and `DISPLAY_DATA_SECTION`; reads from file or stdin.
 
 **Solvers** (each in its own file under `src/tsp/`):
+
 | File | Algorithm | Alias |
-|---|---|---|
+| --- | --- | --- |
 | `bellman_karp.rs` | Bellman–Held–Karp (exact, exponential) | `bhk` |
 | `branch_bound.rs` | Branch and bound (exact) | — |
 | `nearest_neighbor.rs` | Greedy nearest neighbor via KD-tree | `nn` |
@@ -74,6 +77,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | `fourier.rs` | Fourier-basis constructive solver: closed-curve gradient descent + argsort decode | `fourier` |
 
 **Tests:**
+
 - Unit tests live inline in each source file (`#[cfg(test)]`)
 - Integration tests in `tests/` use the public library crate
 - Test helpers (approximate float comparison, etc.) in `src/test/helpers.rs`
@@ -85,6 +89,16 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
 - `teeline convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
 - `download_data.sh` fetches benchmark datasets.
+
+## teeline-web WASM Development Gotcha
+
+`teeline-web/src/teeline-wasm.d.ts` is an **ambient module declaration** that TypeScript uses as the sole source of truth for `'teeline-wasm'` imports — it completely shadows `node_modules/teeline-wasm/teeline_wasm.d.ts`. **Any new WIT export must be added to this ambient file**, or tsc will fail with "Module 'teeline-wasm' has no exported member '...'".
+
+After adding a new WIT export:
+
+1. Build WASM: `cargo component build --manifest-path teeline-wasm/Cargo.toml --target wasm32-wasip2`
+2. Run jco: `npx jco transpile ...` (see Taskfile)
+3. **Update `teeline-web/src/teeline-wasm.d.ts`** with the new export's TypeScript type
 
 ## GitKB
 
