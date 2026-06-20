@@ -1,5 +1,6 @@
 [workspace]
 members = [".", "teeline-cli"]
+exclude = ["teeline-wasm"]
 default-members = ["."]
 resolver = "2"
 
