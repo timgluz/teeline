@@ -3,8 +3,10 @@ mod bindings;
 
 use bindings::Guest;
 use bindings::teeline::solver::types::{
-    AlgorithmInfo, City, CompareResult, ParamSpec, ParsedProblem, Solution, SolveOptions,
+    AlgorithmInfo, City, CompareResult, ComparisonStats, ParamSpec, ParsedProblem, Solution,
+    SolveOptions,
 };
+use teeline::tsp::comparison;
 use teeline::tsp::{
     AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions,
     Solvers, TspProblem, distance_matrix::DistanceMatrix, kdtree::KDPoint,
@@ -73,7 +75,11 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
 }
 
 fn kd_to_city(c: &KDPoint) -> City {
-    City { id: c.id as u32, x: c.x(), y: c.y() }
+    City {
+        id: c.id as u32,
+        x: c.x(),
+        y: c.y(),
+    }
 }
 
 fn parse_input_to_kd(input: &str) -> Result<Vec<KDPoint>, String> {
@@ -112,11 +118,14 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
 
 fn kind_for(solver: Solvers) -> String {
     match solver {
-        Solvers::BellmanKarp | Solvers::BranchBound       => "exact",
-        Solvers::NearestNeighbor | Solvers::Christofides | Solvers::Fourier | Solvers::KohonenSom => "constructive",
-        Solvers::TwoOpt | Solvers::ThreeOpt                => "local-search",
-        Solvers::RandomShuffle                             => "utility",
-        _                                                  => "metaheuristic",
+        Solvers::BellmanKarp | Solvers::BranchBound => "exact",
+        Solvers::NearestNeighbor
+        | Solvers::Christofides
+        | Solvers::Fourier
+        | Solvers::KohonenSom => "constructive",
+        Solvers::TwoOpt | Solvers::ThreeOpt => "local-search",
+        Solvers::RandomShuffle => "utility",
+        _ => "metaheuristic",
     }
     .to_string()
 }
@@ -159,23 +168,29 @@ fn pi(key: &str, label: &str, min: f32) -> ParamSpec {
 
 fn shared_heuristic_params() -> Vec<ParamSpec> {
     vec![
-        pi("epochs",       "Epochs",              1.0),
-        pi("platooEpochs", "Plateau epochs",       0.0),
-        pi("nNearest",     "Nearest neighbours",   1.0),
+        pi("epochs", "Epochs", 1.0),
+        pi("platooEpochs", "Plateau epochs", 0.0),
+        pi("nNearest", "Nearest neighbours", 1.0),
     ]
 }
 
 fn mutation_param() -> ParamSpec {
-    pf("mutationProbability", "Mutation probability", 0.0, 1.0, 0.001)
+    pf(
+        "mutationProbability",
+        "Mutation probability",
+        0.0,
+        1.0,
+        0.001,
+    )
 }
 
 fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
     match solver {
         Solvers::SimulatedAnnealing => {
             let mut v = shared_heuristic_params();
-            v.push(pf("coolingRate",    "Cooling rate",    0.00001, 0.9999, 0.00001));
-            v.push(pf_min("maxTemperature", "Max temperature", 0.01,  1.0));
-            v.push(pf_min("minTemperature", "Min temperature", 0.0,   0.001));
+            v.push(pf("coolingRate", "Cooling rate", 0.00001, 0.9999, 0.00001));
+            v.push(pf_min("maxTemperature", "Max temperature", 0.01, 1.0));
+            v.push(pf_min("minTemperature", "Min temperature", 0.0, 0.001));
             v
         }
         Solvers::GeneticAlgorithm => {
@@ -320,6 +335,52 @@ impl Guest for Component {
                 }
             })
             .collect()
+    }
+
+    fn compare_tours(
+        solver_route: Vec<u32>,
+        opt_route: Vec<u32>,
+        cities: Vec<City>,
+    ) -> Result<ComparisonStats, String> {
+        // Length validation
+        if solver_route.len() != opt_route.len() || opt_route.len() != cities.len() {
+            return Err(format!(
+                "dimension mismatch: solver={} opt={} cities={}",
+                solver_route.len(),
+                opt_route.len(),
+                cities.len()
+            ));
+        }
+
+        // Convert WIT City -> KDPoint
+        let kd_cities: Vec<KDPoint> = cities
+            .iter()
+            .map(|c| KDPoint::new_with_id(c.id as usize, &[c.x, c.y]))
+            .collect();
+
+        // Build city ID set for membership validation
+        let city_ids: std::collections::HashSet<usize> = kd_cities.iter().map(|c| c.id).collect();
+
+        // Validate that every route ID exists in the cities list
+        for &id in solver_route.iter().chain(opt_route.iter()) {
+            if !city_ids.contains(&(id as usize)) {
+                return Err(format!("unknown city id {} in route", id));
+            }
+        }
+
+        // Convert route IDs
+        let solver: Vec<usize> = solver_route.iter().map(|&x| x as usize).collect();
+        let opt: Vec<usize> = opt_route.iter().map(|&x| x as usize).collect();
+
+        let stats = comparison::compare_tours(&solver, &opt, &kd_cities);
+        Ok(ComparisonStats {
+            optimal_cost: stats.optimal_cost,
+            solver_cost: stats.solver_cost,
+            gap_pct: stats.gap_pct,
+            shared_edges: stats.shared_edges as u32,
+            solver_only_edges: stats.solver_only_edges as u32,
+            optimal_only_edges: stats.optimal_only_edges as u32,
+        })
     }
 }
 

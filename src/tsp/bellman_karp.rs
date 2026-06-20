@@ -235,8 +235,14 @@ mod tests {
         // Accumulated rounding reaches ~1e-6 >> f32::EPSILON, causing the loop
         // to leave positions as 0, producing repeated cities in the route.
         let coords: &[&[f32]] = &[
-            &[0.0, 0.0], &[3.0, 1.0], &[1.0, 3.0], &[4.0, 4.0],
-            &[2.0, 0.5], &[0.5, 2.0], &[3.5, 2.5], &[1.5, 4.0],
+            &[0.0, 0.0],
+            &[3.0, 1.0],
+            &[1.0, 3.0],
+            &[4.0, 4.0],
+            &[2.0, 0.5],
+            &[0.5, 2.0],
+            &[3.5, 2.5],
+            &[1.5, 4.0],
         ];
         let cities: Vec<kdtree::KDPoint> = coords
             .iter()

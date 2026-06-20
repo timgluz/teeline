@@ -179,7 +179,10 @@ impl DistanceMatrix {
         let from = pos1.max(pos2);
         let to = pos1.min(pos2);
         let idx = from * (from - 1) / 2 + to;
-        self.items.get(idx).copied().ok_or("distance index out of range")
+        self.items
+            .get(idx)
+            .copied()
+            .ok_or("distance index out of range")
     }
 
     /// returns distance between city n and m
@@ -190,8 +193,16 @@ impl DistanceMatrix {
         if city_id1 == city_id2 {
             return Ok(0.0);
         }
-        let pos1 = self.city_idx.get(&city_id1).copied().ok_or("city_id1 not in index")?;
-        let pos2 = self.city_idx.get(&city_id2).copied().ok_or("city_id2 not in index")?;
+        let pos1 = self
+            .city_idx
+            .get(&city_id1)
+            .copied()
+            .ok_or("city_id1 not in index")?;
+        let pos2 = self
+            .city_idx
+            .get(&city_id2)
+            .copied()
+            .ok_or("city_id2 not in index")?;
         self.distance_by_pos(pos1, pos2)
     }
 
@@ -266,10 +277,16 @@ impl DistanceMatrix {
     fn distances_from_index(&self, pos: usize) -> Vec<f32> {
         let mut distances = Vec::with_capacity(self.n);
         for i in 0..pos {
-            distances.push(self.distance_by_pos(pos, i).expect("valid position in distances_from_index"));
+            distances.push(
+                self.distance_by_pos(pos, i)
+                    .expect("valid position in distances_from_index"),
+            );
         }
         for i in pos..self.n {
-            distances.push(self.distance_by_pos(i, pos).expect("valid position in distances_from_index"));
+            distances.push(
+                self.distance_by_pos(i, pos)
+                    .expect("valid position in distances_from_index"),
+            );
         }
         distances
     }

@@ -256,6 +256,9 @@
                   <tr>
                     <th>Tour length</th>
                     <th>Gap vs optimal</th>
+                    <th>Shared edges</th>
+                    <th>Solver-only</th>
+                    <th>Opt-only</th>
                     <th>Runtime</th>
                   </tr>
                 </thead>
@@ -263,10 +266,15 @@
                   <tr>
                     <td id="result-total">—</td>
                     <td id="result-gap">—</td>
+                    <td id="result-shared-edges">—</td>
+                    <td id="result-solver-only-edges">—</td>
+                    <td id="result-optimal-only-edges">—</td>
                     <td id="result-runtime">—</td>
                   </tr>
                 </tbody>
               </table>
+
+              <p id="comparison-error" class="comparison-error pico-color-red-500" hidden aria-live="polite"></p>
 
               <section aria-labelledby="run-history-heading">
                 <h3 id="run-history-heading">Run history</h3>

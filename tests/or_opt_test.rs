@@ -73,7 +73,12 @@ fn or_opt_berlin52_improves_over_identity_tour() {
     let identity: Vec<usize> = cities.iter().map(|c| c.id).collect();
     let identity_cost = problem.distances.tour_length(&identity);
 
-    let sol = or_opt::solve(&problem, &HeuristicOptions::default(), None, Some(&identity));
+    let sol = or_opt::solve(
+        &problem,
+        &HeuristicOptions::default(),
+        None,
+        Some(&identity),
+    );
     assert!(
         sol.total < identity_cost,
         "or-opt ({:.1}) should improve over identity tour ({:.1})",

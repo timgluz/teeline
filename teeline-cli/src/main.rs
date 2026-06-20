@@ -4,19 +4,19 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::thread;
 
+use serde_json::json;
+use teeline::DistanceType;
 use teeline::config::{
     AppOptionsProvider, IdentityProvider, PipelineSource, resolve_config_file,
     select_pipeline_source,
 };
 use teeline::tsp::{
-    self, AppOptions, Solution, SolverKind, Solvers, SOMOptions, TspProblem, distance_matrix,
+    self, AppOptions, SOMOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
     list_solvers,
     pipeline::{PipelineStage, run_pipeline},
     tsplib,
 };
-use teeline::DistanceType;
 use tracing_subscriber::EnvFilter;
-use serde_json::json;
 
 // ---------------------------------------------------------------------------
 // CliArgsProvider — applies CLI tuning flags to a base AppOptions.
@@ -36,7 +36,9 @@ impl<'a> CliArgsProvider<'a> {
 
 impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
-        use teeline::tsp::{CSOptions, FPAOptions, GAOptions, HeuristicOptions, LKOptions, SAOptions};
+        use teeline::tsp::{
+            CSOptions, FPAOptions, GAOptions, HeuristicOptions, LKOptions, SAOptions,
+        };
         match self.solver {
             Solvers::SimulatedAnnealing => {
                 base.sa = Some(SAOptions::from_cli(self.args)?);
@@ -381,7 +383,11 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches, json_mode: bool) {
     run_as_pipeline_stages(stage_configs, args, json_mode);
 }
 
-fn run_as_pipeline_stages(stage_configs: Vec<(Solvers, AppOptions)>, args: &ArgMatches, json_mode: bool) {
+fn run_as_pipeline_stages(
+    stage_configs: Vec<(Solvers, AppOptions)>,
+    args: &ArgMatches,
+    json_mode: bool,
+) {
     let verbose = args.get_flag("verbose");
     let default_level = if verbose { "debug" } else { "info" };
     let _ = tracing_subscriber::fmt()
@@ -549,20 +555,35 @@ fn run_completions(args: &ArgMatches) {
 // ---------------------------------------------------------------------------
 
 fn solver_meta_matches(m: &tsp::SolverMeta, only_heuristic: bool, only_exact: bool) -> bool {
-    if only_heuristic { m.kind == SolverKind::Heuristic }
-    else if only_exact { m.kind == SolverKind::Exact }
-    else { true }
+    if only_heuristic {
+        m.kind == SolverKind::Heuristic
+    } else if only_exact {
+        m.kind == SolverKind::Exact
+    } else {
+        true
+    }
 }
 
 fn print_solvers_table(only_heuristic: bool, only_exact: bool) {
     println!("{:<22} {:<8} TYPE", "NAME", "ALIAS");
-    for m in Solvers::all_meta().iter().filter(|m| solver_meta_matches(m, only_heuristic, only_exact)) {
-        println!("{:<22} {:<8} {}", m.name, m.alias.unwrap_or("—"), m.kind.as_str());
+    for m in Solvers::all_meta()
+        .iter()
+        .filter(|m| solver_meta_matches(m, only_heuristic, only_exact))
+    {
+        println!(
+            "{:<22} {:<8} {}",
+            m.name,
+            m.alias.unwrap_or("—"),
+            m.kind.as_str()
+        );
     }
 }
 
 fn print_solvers_short(only_heuristic: bool, only_exact: bool) {
-    for m in Solvers::all_meta().iter().filter(|m| solver_meta_matches(m, only_heuristic, only_exact)) {
+    for m in Solvers::all_meta()
+        .iter()
+        .filter(|m| solver_meta_matches(m, only_heuristic, only_exact))
+    {
         println!("{}", m.short());
     }
 }
@@ -571,18 +592,24 @@ fn print_solvers_json(only_heuristic: bool, only_exact: bool) {
     let arr: Vec<_> = list_solvers()
         .iter()
         .filter(|s| {
-            if only_heuristic { !s.exact && s.category != "Utility" }
-            else if only_exact { s.exact }
-            else { true }
+            if only_heuristic {
+                !s.exact && s.category != "Utility"
+            } else if only_exact {
+                s.exact
+            } else {
+                true
+            }
         })
-        .map(|s| json!({
-            "name": s.name,
-            "alias": s.alias,
-            "category": s.category,
-            "complexity": s.complexity,
-            "has_options": s.has_options,
-            "exact": s.exact,
-        }))
+        .map(|s| {
+            json!({
+                "name": s.name,
+                "alias": s.alias,
+                "category": s.category,
+                "complexity": s.complexity,
+                "has_options": s.has_options,
+                "exact": s.exact,
+            })
+        })
         .collect();
     println!("{}", serde_json::to_string(&arr).unwrap());
 }
@@ -621,12 +648,19 @@ fn compute_optimal_comparison(
     } else {
         0.0
     };
-    Some(OptimalComparison { optimal_cost, gap_pct, opt_name: opt_tour.name.clone() })
+    Some(OptimalComparison {
+        optimal_cost,
+        gap_pct,
+        opt_name: opt_tour.name.clone(),
+    })
 }
 
 fn print_optimal_comparison(solver_cost: f32, cmp: &OptimalComparison) {
     eprintln!("--- Comparison ---");
-    eprintln!("Optimal  : {:.5}  (from {})", cmp.optimal_cost, cmp.opt_name);
+    eprintln!(
+        "Optimal  : {:.5}  (from {})",
+        cmp.optimal_cost, cmp.opt_name
+    );
     eprintln!("Solver   : {:.5}", solver_cost);
     if cmp.gap_pct.abs() < 0.001 {
         eprintln!("Gap      : 0.00 % (matches optimal)");

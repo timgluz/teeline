@@ -52,11 +52,7 @@ fn lk_solve_returns_valid_tour() {
     let cities = load_tsp("berlin52.tsp").cities().to_vec();
     let problem = make_problem(cities.clone());
     let sol = lin_kernighan::solve(&problem, &lk_opts_fast(), None, None);
-    assert_eq!(
-        sol.route().len(),
-        52,
-        "tour must visit all 52 cities"
-    );
+    assert_eq!(sol.route().len(), 52, "tour must visit all 52 cities");
     assert!(
         is_valid_tour(sol.route(), &cities),
         "tour must contain every city exactly once"
@@ -90,7 +86,10 @@ fn lk_solve_reported_distance_matches_tour() {
     let route = sol.route();
     let n = route.len();
     let recomputed: f32 = (0..n)
-        .map(|i| dm.distance_between(route[i], route[(i + 1) % n]).unwrap_or(f32::MAX))
+        .map(|i| {
+            dm.distance_between(route[i], route[(i + 1) % n])
+                .unwrap_or(f32::MAX)
+        })
         .sum();
 
     assert!(

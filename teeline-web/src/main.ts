@@ -4,10 +4,10 @@ import './docs.css'
 import { initTopbar } from './topbar'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
-import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage } from './worker'
+import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage, CompareToursResult } from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
-import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
+import { initResults, updateOptRoute, showRunning, showResult, patchComparison } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
 initTopbar()
@@ -140,12 +140,32 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
         runSolver(solver, parsedProblem.cities, options)
           .then((result) => {
             const runtime = Date.now() - start
-            const optTotal = optTourRoute
-              ? computeRouteLength(optTourRoute, parsedProblem!.cities)
-              : undefined
-            const record = { solver, total: result.total, optTotal, runtime, route: result.route }
+            const record = { solver, total: result.total, runtime, route: result.route }
             showResult(record)
             showDownloadButtons(record, parsedProblem!)
+            clearCompareError()
+
+            if (optTourRoute) {
+              const compareId = crypto.randomUUID()
+              const compareHandler = (e: MessageEvent<CompareToursResult>) => {
+                if (e.data.type !== 'compare-tours-result') return
+                if (e.data.id !== compareId) return
+                worker.removeEventListener('message', compareHandler)
+                if (e.data.stats) {
+                  patchComparison(record, e.data.stats)
+                } else {
+                  showCompareError(e.data.error ?? 'Comparison failed')
+                }
+              }
+              worker.addEventListener('message', compareHandler)
+              worker.postMessage({
+                type: 'compare-tours',
+                id: compareId,
+                solverRoute: result.route,
+                optRoute: optTourRoute,
+                cities: parsedProblem!.cities,
+              })
+            }
           })
           .catch((err: Error) => {
             const overlay = document.getElementById('solving-overlay') as HTMLElement
@@ -179,6 +199,20 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
     worker.removeEventListener('message', onInit)
   }
 })
+
+// ---- Comparison error banner ----
+
+function showCompareError(msg: string): void {
+  const el = document.getElementById('comparison-error') as HTMLElement | null
+  if (!el) return
+  el.textContent = `Comparison unavailable: ${msg}`
+  el.hidden = false
+}
+
+function clearCompareError(): void {
+  const el = document.getElementById('comparison-error') as HTMLElement | null
+  if (el) { el.hidden = true; el.textContent = '' }
+}
 
 // ---- Reset / new dataset ----
 

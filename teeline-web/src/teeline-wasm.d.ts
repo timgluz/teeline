@@ -46,5 +46,14 @@ declare module 'teeline-wasm' {
   export function parse(input: string): ParsedProblem
   export function listAlgorithms(): Array<AlgorithmInfo>
   export function getVersion(): string
+  export interface ComparisonStats {
+    optimalCost: number
+    solverCost: number
+    gapPct: number
+    sharedEdges: number
+    solverOnlyEdges: number
+    optimalOnlyEdges: number
+  }
+  export function compareTours(solverRoute: Uint32Array, optRoute: Uint32Array, cities: Array<City>): ComparisonStats
   export type Result<T, E> = { tag: 'ok'; val: T } | { tag: 'err'; val: E }
 }

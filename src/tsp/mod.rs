@@ -2,16 +2,16 @@ pub mod bellman_karp;
 pub mod branch_bound;
 pub mod christofides;
 pub mod comparison;
-pub use comparison::{compare_tours, tour_cost, ComparisonStats};
+pub use comparison::{ComparisonStats, compare_tours, tour_cost};
 pub mod convert;
 pub mod cuckoo_search;
 pub mod distance_matrix;
 pub mod flower_pollination;
 pub mod fourier;
-pub mod lin_kernighan;
 pub mod genetic_algorithm;
 pub mod gravitational_search;
 pub mod kdtree;
+pub mod lin_kernighan;
 pub mod nearest_neighbor;
 pub mod opt_tour;
 pub mod or_opt;
@@ -200,15 +200,39 @@ impl SolverMeta {
 impl Solvers {
     pub fn all_meta() -> &'static [SolverMeta] {
         &[
-            SolverMeta { name: "bellman_karp", alias: Some("bhk"), kind: SolverKind::Exact },
-            SolverMeta { name: "branch_bound", alias: None, kind: SolverKind::Exact },
+            SolverMeta {
+                name: "bellman_karp",
+                alias: Some("bhk"),
+                kind: SolverKind::Exact,
+            },
+            SolverMeta {
+                name: "branch_bound",
+                alias: None,
+                kind: SolverKind::Exact,
+            },
             // SolverKind::Heuristic is the CLI-facing kind; the WASM-facing SolverInfo uses
             // category: "Approximation" to expose the distinction to the UI. The two registries
             // serve different audiences and intentionally diverge here.
-            SolverMeta { name: "christofides", alias: Some("chr"), kind: SolverKind::Heuristic },
-            SolverMeta { name: "nearest_neighbor", alias: Some("nn"), kind: SolverKind::Heuristic },
-            SolverMeta { name: "two_opt", alias: Some("2opt"), kind: SolverKind::Heuristic },
-            SolverMeta { name: "three_opt", alias: Some("3opt"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "christofides",
+                alias: Some("chr"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
+                name: "nearest_neighbor",
+                alias: Some("nn"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
+                name: "two_opt",
+                alias: Some("2opt"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
+                name: "three_opt",
+                alias: Some("3opt"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta {
                 name: "simulated_annealing",
                 alias: Some("sa"),
@@ -224,27 +248,51 @@ impl Solvers {
                 alias: Some("gsa"),
                 kind: SolverKind::Heuristic,
             },
-            SolverMeta { name: "tabu_search", alias: Some("tabu"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "tabu_search",
+                alias: Some("tabu"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta {
                 name: "particle_swarm",
                 alias: Some("pso"),
                 kind: SolverKind::Heuristic,
             },
-            SolverMeta { name: "cuckoo_search", alias: Some("cs"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "cuckoo_search",
+                alias: Some("cs"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta {
                 name: "flower_pollination",
                 alias: Some("fpa"),
                 kind: SolverKind::Heuristic,
             },
-            SolverMeta { name: "fourier", alias: Some("fourier"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "fourier",
+                alias: Some("fourier"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta {
                 name: "lin_kernighan",
                 alias: Some("lk"),
                 kind: SolverKind::Heuristic,
             },
-            SolverMeta { name: "or_opt", alias: Some("or-opt"), kind: SolverKind::Heuristic },
-            SolverMeta { name: "stochastic_hill", alias: None, kind: SolverKind::Heuristic },
-            SolverMeta { name: "kohonen_som", alias: Some("som"), kind: SolverKind::Heuristic },
+            SolverMeta {
+                name: "or_opt",
+                alias: Some("or-opt"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
+                name: "stochastic_hill",
+                alias: None,
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
+                name: "kohonen_som",
+                alias: Some("som"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta {
                 name: "random_shuffle",
                 alias: Some("shuffle"),
@@ -259,73 +307,187 @@ impl Solvers {
 // ---------------------------------------------------------------------------
 
 pub struct SolverInfo {
-    pub name:        &'static str,
-    pub alias:       &'static str,
-    pub category:    &'static str,
-    pub desc:        &'static str,
-    pub complexity:  &'static str,
+    pub name: &'static str,
+    pub alias: &'static str,
+    pub category: &'static str,
+    pub desc: &'static str,
+    pub complexity: &'static str,
     pub has_options: bool,
-    pub exact:       bool,
+    pub exact: bool,
 }
 
 static SOLVER_LIST: [SolverInfo; 19] = [
-    SolverInfo { name: "Bellman-Held-Karp",     alias: "bhk",             category: "Exact",
-                 desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
-                 complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})", has_options: false, exact: true },
-    SolverInfo { name: "Branch & Bound",        alias: "branch_bound",    category: "Exact",
-                 desc: "Exact branch-and-bound with lower-bound pruning.",
-                 complexity: "O(n!)", has_options: false, exact: true },
-    SolverInfo { name: "Christofides",          alias: "christofides",    category: "Approximation",
-                 desc: "\u{2264}1.5\u{00d7} approximation via MST + greedy matching + Eulerian shortcut (EUC_2D only).",
-                 complexity: "O(n\u{00b2})", has_options: false, exact: false },
-    SolverInfo { name: "Fourier",               alias: "fourier",         category: "Constructive",
-                 desc: "Closed-curve Fourier-basis gradient descent with argsort decode.",
-                 complexity: "O(K\u{00b7}epochs\u{00b7}n\u{00b7}M)", has_options: true, exact: false },
-    SolverInfo { name: "Nearest Neighbor",      alias: "nn",              category: "Constructive",
-                 desc: "Greedy heuristic: always visit the nearest unvisited city.",
-                 complexity: "O(n\u{00b2})", has_options: false, exact: false },
-    SolverInfo { name: "2-opt",                 alias: "2opt",            category: "Local Search",
-                 desc: "Iteratively reverses sub-tours to remove crossing edges.",
-                 complexity: "O(n\u{00b2}) / pass", has_options: false, exact: false },
-    SolverInfo { name: "3-opt",                 alias: "3opt",            category: "Local Search",
-                 desc: "Extends 2-opt by considering triple-edge reconnections.",
-                 complexity: "O(n\u{00b3}) / pass", has_options: false, exact: false },
-    SolverInfo { name: "Simulated Annealing",   alias: "sa",              category: "Metaheuristic",
-                 desc: "Accepts worse moves with decreasing probability to escape local optima.",
-                 complexity: "O(epochs \u{00b7} n)", has_options: true, exact: false },
-    SolverInfo { name: "Genetic Algorithm",     alias: "ga",              category: "Metaheuristic",
-                 desc: "Evolves a population of tours via crossover and mutation operators.",
-                 complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
-    SolverInfo { name: "Gravitational Search",  alias: "gsa",             category: "Metaheuristic",
-                 desc: "Agents (tours) attract each other by mass (fitness); heavier agents pull lighter ones via swap-list velocity.",
-                 complexity: "O(epochs \u{00b7} pop\u{00b2})", has_options: true, exact: false },
-    SolverInfo { name: "Particle Swarm",        alias: "pso",             category: "Metaheuristic",
-                 desc: "Discrete PSO with velocity-capped particles guided by a global best.",
-                 complexity: "O(epochs \u{00b7} swarm \u{00b7} n)", has_options: true, exact: false },
-    SolverInfo { name: "Cuckoo Search",         alias: "cs",              category: "Metaheuristic",
-                 desc: "L\u{00e9}vy-flight search with probabilistic nest abandonment.",
-                 complexity: "O(epochs \u{00b7} nests \u{00b7} n)", has_options: true, exact: false },
-    SolverInfo { name: "Flower Pollination",    alias: "fpa",             category: "Metaheuristic",
-                 desc: "Global L\u{00e9}vy-flight toward best tour; local \u{03b5}-scaled cross-pollination.",
-                 complexity: "O(epochs \u{00b7} pop \u{00b7} n)", has_options: true, exact: false },
-    SolverInfo { name: "Lin-Kernighan",         alias: "lk",              category: "Local Search",
-                 desc: "Lin-Kernighan style ILS: 2-opt with candidate lists + double-bridge kicks.",
-                 complexity: "O(epochs \u{00b7} n\u{00b2})", has_options: true, exact: false },
-    SolverInfo { name: "Or-opt",                alias: "or_opt",          category: "Local Search",
-                 desc: "Relocates segments of 1\u{2013}3 cities to better positions (best-improvement).",
-                 complexity: "O(n\u{00b2}) / pass", has_options: false, exact: false },
-    SolverInfo { name: "Stochastic Hill Climb", alias: "stochastic_hill", category: "Metaheuristic",
-                 desc: "Random-restart hill climbing to escape local optima.",
-                 complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
-    SolverInfo { name: "Tabu Search",           alias: "tabu_search",     category: "Metaheuristic",
-                 desc: "Local search with a memory structure to avoid revisiting solutions.",
-                 complexity: "O(epochs \u{00b7} n)", has_options: false, exact: false },
-    SolverInfo { name: "Kohonen SOM",            alias: "som",             category: "Constructive",
-                 desc: "Elastic ring of neurons wrapping around cities via Hebbian learning; topology-preserving tour extraction.",
-                 complexity: "O(epochs\u{00b7}N\u{00b7}n)", has_options: true, exact: false },
-    SolverInfo { name: "Random Shuffle",        alias: "shuffle",         category: "Utility",
-                 desc: "Baseline random tour. Useful as a warm-start seed for pipelines.",
-                 complexity: "O(n)", has_options: false, exact: false },
+    SolverInfo {
+        name: "Bellman-Held-Karp",
+        alias: "bhk",
+        category: "Exact",
+        desc: "Exact dynamic-programming solution. Optimal tour guaranteed.",
+        complexity: "O(n\u{00b2} \u{00b7} 2\u{207f})",
+        has_options: false,
+        exact: true,
+    },
+    SolverInfo {
+        name: "Branch & Bound",
+        alias: "branch_bound",
+        category: "Exact",
+        desc: "Exact branch-and-bound with lower-bound pruning.",
+        complexity: "O(n!)",
+        has_options: false,
+        exact: true,
+    },
+    SolverInfo {
+        name: "Christofides",
+        alias: "christofides",
+        category: "Approximation",
+        desc: "\u{2264}1.5\u{00d7} approximation via MST + greedy matching + Eulerian shortcut (EUC_2D only).",
+        complexity: "O(n\u{00b2})",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Fourier",
+        alias: "fourier",
+        category: "Constructive",
+        desc: "Closed-curve Fourier-basis gradient descent with argsort decode.",
+        complexity: "O(K\u{00b7}epochs\u{00b7}n\u{00b7}M)",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Nearest Neighbor",
+        alias: "nn",
+        category: "Constructive",
+        desc: "Greedy heuristic: always visit the nearest unvisited city.",
+        complexity: "O(n\u{00b2})",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "2-opt",
+        alias: "2opt",
+        category: "Local Search",
+        desc: "Iteratively reverses sub-tours to remove crossing edges.",
+        complexity: "O(n\u{00b2}) / pass",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "3-opt",
+        alias: "3opt",
+        category: "Local Search",
+        desc: "Extends 2-opt by considering triple-edge reconnections.",
+        complexity: "O(n\u{00b3}) / pass",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Simulated Annealing",
+        alias: "sa",
+        category: "Metaheuristic",
+        desc: "Accepts worse moves with decreasing probability to escape local optima.",
+        complexity: "O(epochs \u{00b7} n)",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Genetic Algorithm",
+        alias: "ga",
+        category: "Metaheuristic",
+        desc: "Evolves a population of tours via crossover and mutation operators.",
+        complexity: "O(epochs \u{00b7} pop \u{00b7} n)",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Gravitational Search",
+        alias: "gsa",
+        category: "Metaheuristic",
+        desc: "Agents (tours) attract each other by mass (fitness); heavier agents pull lighter ones via swap-list velocity.",
+        complexity: "O(epochs \u{00b7} pop\u{00b2})",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Particle Swarm",
+        alias: "pso",
+        category: "Metaheuristic",
+        desc: "Discrete PSO with velocity-capped particles guided by a global best.",
+        complexity: "O(epochs \u{00b7} swarm \u{00b7} n)",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Cuckoo Search",
+        alias: "cs",
+        category: "Metaheuristic",
+        desc: "L\u{00e9}vy-flight search with probabilistic nest abandonment.",
+        complexity: "O(epochs \u{00b7} nests \u{00b7} n)",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Flower Pollination",
+        alias: "fpa",
+        category: "Metaheuristic",
+        desc: "Global L\u{00e9}vy-flight toward best tour; local \u{03b5}-scaled cross-pollination.",
+        complexity: "O(epochs \u{00b7} pop \u{00b7} n)",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Lin-Kernighan",
+        alias: "lk",
+        category: "Local Search",
+        desc: "Lin-Kernighan style ILS: 2-opt with candidate lists + double-bridge kicks.",
+        complexity: "O(epochs \u{00b7} n\u{00b2})",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Or-opt",
+        alias: "or_opt",
+        category: "Local Search",
+        desc: "Relocates segments of 1\u{2013}3 cities to better positions (best-improvement).",
+        complexity: "O(n\u{00b2}) / pass",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Stochastic Hill Climb",
+        alias: "stochastic_hill",
+        category: "Metaheuristic",
+        desc: "Random-restart hill climbing to escape local optima.",
+        complexity: "O(epochs \u{00b7} n)",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Tabu Search",
+        alias: "tabu_search",
+        category: "Metaheuristic",
+        desc: "Local search with a memory structure to avoid revisiting solutions.",
+        complexity: "O(epochs \u{00b7} n)",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Kohonen SOM",
+        alias: "som",
+        category: "Constructive",
+        desc: "Elastic ring of neurons wrapping around cities via Hebbian learning; topology-preserving tour extraction.",
+        complexity: "O(epochs\u{00b7}N\u{00b7}n)",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Random Shuffle",
+        alias: "shuffle",
+        category: "Utility",
+        desc: "Baseline random tour. Useful as a warm-start seed for pipelines.",
+        complexity: "O(n)",
+        has_options: false,
+        exact: false,
+    },
 ];
 
 pub fn list_solvers() -> &'static [SolverInfo] {
@@ -936,12 +1098,12 @@ impl LKOptions {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct FourierOptions {
-    pub k_max: usize,       // max Fourier mode, default 4
-    pub m: usize,           // curve sampling resolution, default 200
-    pub lambda: f64,        // initial tension weight, default 0.05
-    pub lambda_decay: f64,  // tension decay multiplier per k_active stage, default 0.5
-    pub lr: f64,            // gradient learning rate, default 0.05
-    pub epochs: usize,      // gradient steps per k_active stage, default 400
+    pub k_max: usize,      // max Fourier mode, default 4
+    pub m: usize,          // curve sampling resolution, default 200
+    pub lambda: f64,       // initial tension weight, default 0.05
+    pub lambda_decay: f64, // tension decay multiplier per k_active stage, default 0.5
+    pub lr: f64,           // gradient learning rate, default 0.05
+    pub epochs: usize,     // gradient steps per k_active stage, default 400
 }
 
 impl Default for FourierOptions {
@@ -985,32 +1147,40 @@ impl FourierOptions {
         for (k, v) in table.iter() {
             match k.as_str() {
                 "k_max" => {
-                    f.k_max = v.as_integer()
+                    f.k_max = v
+                        .as_integer()
                         .ok_or_else(|| format!("config: `k_max` must be an integer, got {v}"))?
                         as usize;
                 }
                 "m" => {
-                    f.m = v.as_integer()
+                    f.m = v
+                        .as_integer()
                         .ok_or_else(|| format!("config: `m` must be an integer, got {v}"))?
                         as usize;
                 }
                 "lambda" => {
-                    f.lambda = v.as_float()
+                    f.lambda = v
+                        .as_float()
                         .or_else(|| v.as_integer().map(|i| i as f64))
                         .ok_or_else(|| format!("config: `lambda` must be a float, got {v}"))?;
                 }
                 "lambda_decay" => {
-                    f.lambda_decay = v.as_float()
+                    f.lambda_decay = v
+                        .as_float()
                         .or_else(|| v.as_integer().map(|i| i as f64))
-                        .ok_or_else(|| format!("config: `lambda_decay` must be a float, got {v}"))?;
+                        .ok_or_else(|| {
+                            format!("config: `lambda_decay` must be a float, got {v}")
+                        })?;
                 }
                 "lr" => {
-                    f.lr = v.as_float()
+                    f.lr = v
+                        .as_float()
                         .or_else(|| v.as_integer().map(|i| i as f64))
                         .ok_or_else(|| format!("config: `lr` must be a float, got {v}"))?;
                 }
                 "epochs" => {
-                    f.epochs = v.as_integer()
+                    f.epochs = v
+                        .as_integer()
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
@@ -1028,7 +1198,8 @@ impl FourierOptions {
     pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
         let mut f = FourierOptions::default();
         if let Some(v) = args.get_one::<String>("epochs") {
-            f.epochs = v.parse::<usize>()
+            f.epochs = v
+                .parse::<usize>()
                 .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
         }
         f.validate()?;
@@ -1081,7 +1252,8 @@ impl SOMOptions {
         for (k, v) in table.iter() {
             match k.as_str() {
                 "epochs" => {
-                    let raw = v.as_integer()
+                    let raw = v
+                        .as_integer()
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?;
                     if raw < 1 {
                         return Err(format!("config: `epochs` must be >= 1, got {raw}"));
@@ -1089,20 +1261,29 @@ impl SOMOptions {
                     s.epochs = raw as usize;
                 }
                 "learning_rate" => {
-                    s.learning_rate = v.as_float()
+                    s.learning_rate = v
+                        .as_float()
                         .or_else(|| v.as_integer().map(|i| i as f64))
-                        .ok_or_else(|| format!("config: `learning_rate` must be a float, got {v}"))?;
+                        .ok_or_else(|| {
+                            format!("config: `learning_rate` must be a float, got {v}")
+                        })?;
                 }
                 "radius_fraction" => {
-                    s.radius_fraction = v.as_float()
+                    s.radius_fraction = v
+                        .as_float()
                         .or_else(|| v.as_integer().map(|i| i as f64))
-                        .ok_or_else(|| format!("config: `radius_fraction` must be a float, got {v}"))?;
+                        .ok_or_else(|| {
+                        format!("config: `radius_fraction` must be a float, got {v}")
+                    })?;
                 }
                 "neuron_multiplier" => {
-                    let raw = v.as_integer()
-                        .ok_or_else(|| format!("config: `neuron_multiplier` must be an integer, got {v}"))?;
+                    let raw = v.as_integer().ok_or_else(|| {
+                        format!("config: `neuron_multiplier` must be an integer, got {v}")
+                    })?;
                     if raw < 1 {
-                        return Err(format!("config: `neuron_multiplier` must be >= 1, got {raw}"));
+                        return Err(format!(
+                            "config: `neuron_multiplier` must be >= 1, got {raw}"
+                        ));
                     }
                     s.neuron_multiplier = raw as usize;
                 }
@@ -1120,19 +1301,23 @@ impl SOMOptions {
     pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
         let mut s = SOMOptions::default();
         if let Some(v) = args.get_one::<String>("epochs") {
-            s.epochs = v.parse::<usize>()
+            s.epochs = v
+                .parse::<usize>()
                 .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("learning_rate") {
-            s.learning_rate = v.parse::<f64>()
+            s.learning_rate = v
+                .parse::<f64>()
                 .map_err(|_| format!("--learning_rate: invalid float `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("radius_fraction") {
-            s.radius_fraction = v.parse::<f64>()
+            s.radius_fraction = v
+                .parse::<f64>()
                 .map_err(|_| format!("--radius_fraction: invalid float `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("neuron_multiplier") {
-            s.neuron_multiplier = v.parse::<usize>()
+            s.neuron_multiplier = v
+                .parse::<usize>()
                 .map_err(|_| format!("--neuron_multiplier: invalid integer `{v}`"))?;
         }
         s.validate()?;
@@ -1731,13 +1916,18 @@ mod tests {
 
     #[test]
     fn lk_options_default_is_valid() {
-        LKOptions::default().validate().expect("default LKOptions must be valid");
+        LKOptions::default()
+            .validate()
+            .expect("default LKOptions must be valid");
     }
 
     #[test]
     fn lk_options_validate_rejects_zero_n_nearest() {
         let opts = LKOptions {
-            heuristic: HeuristicOptions { n_nearest: 0, ..HeuristicOptions::default() },
+            heuristic: HeuristicOptions {
+                n_nearest: 0,
+                ..HeuristicOptions::default()
+            },
             max_depth: 5,
         };
         assert!(opts.validate().is_err(), "n_nearest=0 must be rejected");
@@ -1745,14 +1935,16 @@ mod tests {
 
     #[test]
     fn lk_options_validate_rejects_zero_max_depth() {
-        let opts = LKOptions { max_depth: 0, ..LKOptions::default() };
+        let opts = LKOptions {
+            max_depth: 0,
+            ..LKOptions::default()
+        };
         assert!(opts.validate().is_err(), "max_depth=0 must be rejected");
     }
 
     #[test]
     fn lk_options_from_toml_parses_all_fields() {
-        let t: toml::Table =
-            toml::from_str("epochs=50\nn_nearest=7\nmax_depth=3").unwrap();
+        let t: toml::Table = toml::from_str("epochs=50\nn_nearest=7\nmax_depth=3").unwrap();
         let opts = LKOptions::from_toml(&t).unwrap();
         assert_eq!(opts.heuristic.epochs, 50);
         assert_eq!(opts.heuristic.n_nearest, 7);
@@ -1764,11 +1956,27 @@ mod tests {
         use clap::{Arg, ArgAction, Command};
         let cmd = Command::new("t")
             .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
-            .arg(Arg::new("platoo_epochs").long("platoo_epochs").action(ArgAction::Set))
-            .arg(Arg::new("n_nearest").long("n_nearest").action(ArgAction::Set))
-            .arg(Arg::new("verbose").long("verbose").action(ArgAction::SetTrue))
-            .arg(Arg::new("max_depth").long("max-depth").action(ArgAction::Set));  // hyphen matches production CLI
-        let args = cmd.get_matches_from(["t", "--max-depth", "3"]);  // hyphen matches production CLI
+            .arg(
+                Arg::new("platoo_epochs")
+                    .long("platoo_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("n_nearest")
+                    .long("n_nearest")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("verbose")
+                    .long("verbose")
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(
+                Arg::new("max_depth")
+                    .long("max-depth")
+                    .action(ArgAction::Set),
+            ); // hyphen matches production CLI
+        let args = cmd.get_matches_from(["t", "--max-depth", "3"]); // hyphen matches production CLI
         let opts = LKOptions::from_cli(&args).unwrap();
         assert_eq!(opts.max_depth, 3);
     }

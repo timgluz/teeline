@@ -54,10 +54,19 @@ interface types {
         algorithm: string,
         solution: result<solution, string>,
     }
+
+    record comparison-stats {
+        optimal-cost:       f32,
+        solver-cost:        f32,
+        gap-pct:            f32,
+        shared-edges:       u32,
+        solver-only-edges:  u32,
+        optimal-only-edges: u32,
+    }
 }
 
 world solver {
-    use types.{city, solve-options, solution, parsed-problem, algorithm-info, compare-result};
+    use types.{city, solve-options, solution, parsed-problem, algorithm-info, compare-result, comparison-stats};
 
     export solve: func(
         solver: string,
@@ -84,4 +93,10 @@ world solver {
         input: string,
         options: solve-options,
     ) -> list<compare-result>;
+
+    export compare-tours: func(
+        solver-route: list<u32>,
+        opt-route:    list<u32>,
+        cities:       list<city>,
+    ) -> result<comparison-stats, string>;
 }

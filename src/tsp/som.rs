@@ -1,8 +1,8 @@
-use crate::tsp::{SOMOptions, Solution, TspProblem};
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::route::Route;
-use std::sync::mpsc;
+use crate::tsp::{SOMOptions, Solution, TspProblem};
 use rand::RngExt;
+use std::sync::mpsc;
 
 #[inline]
 fn sq_dist(a: &[f64; 2], b: &[f64; 2]) -> f64 {
@@ -90,7 +90,9 @@ pub fn solve(
             .iter()
             .enumerate()
             .min_by(|&(_, a), &(_, b)| {
-                sq_dist(a, &city).partial_cmp(&sq_dist(b, &city)).unwrap_or(std::cmp::Ordering::Equal)
+                sq_dist(a, &city)
+                    .partial_cmp(&sq_dist(b, &city))
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(i, _)| i)
             .expect("neurons is always non-empty: n >= 2 and neuron_multiplier >= 1");
@@ -113,7 +115,13 @@ pub fn solve(
 
         // Send progress at each 10% milestone
         if t % checkpoint == 0 {
-            tracing::debug!(epoch = t, pct = t * 100 / epochs, eta, sigma, "SOM: checkpoint");
+            tracing::debug!(
+                epoch = t,
+                pct = t * 100 / epochs,
+                eta,
+                sigma,
+                "SOM: checkpoint"
+            );
             if let Some(tx) = progress_tx {
                 let snapshot = extract_tour(&norm_cities, &neurons, cities);
                 let cost = problem.distances.tour_length(&snapshot);
@@ -166,7 +174,11 @@ fn extract_tour(
         let (bmu_b, dist_b) = city_bmu[b];
         bmu_a
             .cmp(&bmu_b)
-            .then_with(|| dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal))
+            .then_with(|| {
+                dist_a
+                    .partial_cmp(&dist_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .then_with(|| a.cmp(&b))
     });
 
@@ -176,8 +188,8 @@ fn extract_tour(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::{TspProblem, distance_matrix, kdtree::KDPoint};
     use std::f32::consts::PI;
-    use crate::tsp::{distance_matrix, kdtree::KDPoint, TspProblem};
 
     fn circle_cities(n: usize) -> Vec<KDPoint> {
         (0..n)
@@ -217,7 +229,10 @@ mod tests {
         let problem = make_problem(cities.clone());
         let sol = solve(&problem, &fast_opts(), None, None);
         assert_eq!(sol.route().len(), 3, "tour must visit all 3 cities");
-        assert!(is_valid_tour(sol.route(), &cities), "tour must be a valid permutation");
+        assert!(
+            is_valid_tour(sol.route(), &cities),
+            "tour must be a valid permutation"
+        );
         assert!(sol.total > 0.0, "tour distance must be positive");
     }
 
@@ -227,7 +242,10 @@ mod tests {
         let problem = make_problem(cities.clone());
         let sol = solve(&problem, &fast_opts(), None, None);
         assert_eq!(sol.route().len(), 10, "tour must visit all 10 cities");
-        assert!(is_valid_tour(sol.route(), &cities), "tour must be a valid permutation");
+        assert!(
+            is_valid_tour(sol.route(), &cities),
+            "tour must be a valid permutation"
+        );
     }
 
     #[test]
@@ -257,8 +275,14 @@ mod tests {
     #[test]
     fn test_som_two_cities() {
         let cities = vec![
-            KDPoint { id: 0, coords: [0.0, 0.0] },
-            KDPoint { id: 1, coords: [1.0, 0.0] },
+            KDPoint {
+                id: 0,
+                coords: [0.0, 0.0],
+            },
+            KDPoint {
+                id: 1,
+                coords: [1.0, 0.0],
+            },
         ];
         let problem = make_problem(cities.clone());
         let sol = solve(&problem, &fast_opts(), None, None);
