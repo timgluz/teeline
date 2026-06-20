@@ -30,7 +30,8 @@ function wireSolveTSP(worker: Worker): void {
   if (!form) return
   form.addEventListener('submit', (e) => {
     const ae = e as AgentSubmitEvent
-    if (!ae.agentInvoked) return
+    if (typeof ae.respondWith !== 'function') return
+    e.preventDefault()
     ae.respondWith(new Promise((resolve, reject) => {
       const data = new FormData(form)
       const id = crypto.randomUUID()
@@ -68,7 +69,8 @@ function wireListAlgorithms(worker: Worker): void {
   if (!form) return
   form.addEventListener('submit', (e) => {
     const ae = e as AgentSubmitEvent
-    if (!ae.agentInvoked) return
+    if (typeof ae.respondWith !== 'function') return
+    e.preventDefault()
     ae.respondWith(new Promise((resolve, reject) => {
       const id = crypto.randomUUID()
       const handler = (msg: MessageEvent) => {
@@ -89,7 +91,8 @@ function wireParseProblem(worker: Worker): void {
   if (!form) return
   form.addEventListener('submit', (e) => {
     const ae = e as AgentSubmitEvent
-    if (!ae.agentInvoked) return
+    if (typeof ae.respondWith !== 'function') return
+    e.preventDefault()
     ae.respondWith(new Promise((resolve, reject) => {
       const data = new FormData(form)
       const id = crypto.randomUUID()
@@ -111,7 +114,8 @@ function wireCompareTours(worker: Worker): void {
   if (!form) return
   form.addEventListener('submit', (e) => {
     const ae = e as AgentSubmitEvent
-    if (!ae.agentInvoked) return
+    if (typeof ae.respondWith !== 'function') return
+    e.preventDefault()
     ae.respondWith(new Promise((resolve, reject) => {
       const data = new FormData(form)
       const id = crypto.randomUUID()
