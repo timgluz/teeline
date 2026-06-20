@@ -81,19 +81,19 @@ tasks:
     desc: Print bash completion script (eval in .bashrc or pipe to a file)
     deps: [build]
     cmds:
-      - ./target/debug/teeline completions bash
+      - ./target/debug/teeline --usage-spec | usage generate completion -f - bash teeline
 
   completions:zsh:
     desc: Print zsh completion script (eval in .zshrc or pipe to ~/.zsh/completions/_teeline)
     deps: [build]
     cmds:
-      - ./target/debug/teeline completions zsh
+      - ./target/debug/teeline --usage-spec | usage generate completion -f - zsh teeline
 
   completions:fish:
     desc: Print fish completion script (source or pipe to ~/.config/fish/completions/teeline.fish)
     deps: [build]
     cmds:
-      - ./target/debug/teeline completions fish
+      - ./target/debug/teeline --usage-spec | usage generate completion -f - fish teeline
   setup:
     desc: Configure local dev environment (install git hooks)
     cmds:
