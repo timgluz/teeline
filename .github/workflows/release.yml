@@ -339,7 +339,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      QT_VERSION: '6.11.0'
+      QT_VERSION: '6.11.1'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -415,7 +415,7 @@ jobs:
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      QT_VERSION: '6.11.0'
+      QT_VERSION: '6.11.1'
     steps:
       - name: Configure long paths
         run: git config --global core.longpaths true
@@ -461,7 +461,7 @@ jobs:
     runs-on: macos-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      QT_VERSION: '6.11.0'
+      QT_VERSION: '6.11.1'
     steps:
       - uses: actions/checkout@v6
         with:
