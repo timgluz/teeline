@@ -7,7 +7,7 @@ import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage } from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
-import { initResults, updateOptRoute, showRunning, showResult, computeRouteLength } from './results'
+import { initResults, updateOptRoute, showRunning, showResult } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
 initTopbar()
@@ -140,10 +140,7 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
         runSolver(solver, parsedProblem.cities, options)
           .then((result) => {
             const runtime = Date.now() - start
-            const optTotal = optTourRoute
-              ? computeRouteLength(optTourRoute, parsedProblem!.cities)
-              : undefined
-            const record = { solver, total: result.total, optTotal, runtime, route: result.route }
+            const record = { solver, total: result.total, runtime, route: result.route }
             showResult(record)
             showDownloadButtons(record, parsedProblem!)
           })
