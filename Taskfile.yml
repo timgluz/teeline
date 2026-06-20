@@ -77,6 +77,23 @@ tasks:
       - echo "=== berlin52 (optimal 7542) ==="
       - for solver in $(./target/release/teeline solvers --heuristic --short); do printf "%-12s " $solver; ./target/release/teeline solve $solver -i tests/fixtures/berlin52.tsp 2>/dev/null | head -1; done
 
+  completions:bash:
+    desc: Print bash completion script (eval in .bashrc or pipe to a file)
+    deps: [build]
+    cmds:
+      - ./target/debug/teeline --usage-spec | usage generate completion -f - bash teeline
+
+  completions:zsh:
+    desc: Print zsh completion script (eval in .zshrc or pipe to ~/.zsh/completions/_teeline)
+    deps: [build]
+    cmds:
+      - ./target/debug/teeline --usage-spec | usage generate completion -f - zsh teeline
+
+  completions:fish:
+    desc: Print fish completion script (source or pipe to ~/.config/fish/completions/teeline.fish)
+    deps: [build]
+    cmds:
+      - ./target/debug/teeline --usage-spec | usage generate completion -f - fish teeline
   setup:
     desc: Configure local dev environment (install git hooks)
     cmds:

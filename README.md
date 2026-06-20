@@ -9,7 +9,7 @@ It is a work in progress. It already implements all algorithms typically covered
 ## Subprojects
 
 | Subproject | Description |
-|---|---|
+| --- | --- |
 | [teeline-cli](teeline-cli/README.md) | Command-line solver — reads TSPLIB files, prints the best tour found |
 | [teeline-qt](teeline-qt/README.md) | Qt 6 desktop GUI with live solver visualization and a pipeline builder |
 | [teeline-wasm](teeline-wasm/README.md) | WebAssembly Component Model build — callable from JS, Python, Go, and Rust |
@@ -30,9 +30,11 @@ After finishing the book I took the [Discrete Optimization](https://coursera.org
 ### Prerequisites
 
 - **Rust toolchain** — install via [rustup](https://www.rust-lang.org/tools/install):
+
   ```bash
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
+
 - Rust 1.80 or later is required (uses `std::sync::LazyLock`).
 
 ### Build
@@ -85,6 +87,37 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/timgluz/teeline/release
 
 Each release also includes `teeline-solver.wasm` — the WebAssembly component built with `cargo-component`.
 
+### Shell completions
+
+`teeline --usage-spec` prints the [usage spec](https://usage.jdx.dev) for the CLI. Pipe it into `usage generate completion -f -` to generate a static completion script with the full spec baked in (no runtime call back to `teeline`):
+
+```bash
+# zsh — generate once to a file (recommended)
+teeline --usage-spec | usage generate completion -f - zsh teeline > ~/.zsh/completions/_teeline
+
+# zsh — inline (add to ~/.zshrc)
+eval "$(teeline --usage-spec | usage generate completion -f - zsh teeline)"
+
+# bash — generate once to a file
+teeline --usage-spec | usage generate completion -f - bash teeline > /etc/bash_completion.d/teeline
+
+# bash — inline (add to ~/.bashrc)
+eval "$(teeline --usage-spec | usage generate completion -f - bash teeline)"
+
+# fish
+teeline --usage-spec | usage generate completion -f - fish teeline > ~/.config/fish/completions/teeline.fish
+```
+
+Install the `usage` CLI via `mise install usage` or follow the [usage docs](https://usage.jdx.dev).
+
+With `go-task`:
+
+```bash
+task completions:zsh   # prints zsh script
+task completions:bash  # prints bash script
+task completions:fish  # prints fish script
+```
+
 ### Install locally from source (optional)
 
 ```bash
@@ -107,14 +140,14 @@ Teeline reads a subset of the TSPLIB format — cities must be given as 2D Eucli
 curl -O -L https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/tsp/ALL_tsp.tar.gz
 ```
 
-2. Unpack into the `data/` folder:
+1. Unpack into the `data/` folder:
 
 ```bash
 mkdir -p data/tsplib
 tar -xzf ALL_tsp.tar.gz -C data/tsplib
 ```
 
-3. The archive contains individually gzipped files — decompress them all in one go:
+1. The archive contains individually gzipped files — decompress them all in one go:
 
 ```bash
 gunzip data/tsplib/*.gz
@@ -148,7 +181,7 @@ cat ./data/tsplib/berlin52.tsp | teeline solve nn
 
 Output format:
 
-```
+```text
 10628.46302 0
 1 49 32 45 19 41 8 9 10 43 33 51 11 52 6 22 ...
 ```
@@ -177,7 +210,7 @@ teeline solvers --exact
 
 Example output:
 
-```
+```text
 NAME                   ALIAS    TYPE
 bellman_karp           bhk      exact
 branch_bound           —        exact
@@ -207,7 +240,7 @@ done
 ## Algorithms
 
 | Algorithm | Alias | Type | Docs |
-|-----------|-------|------|------|
+| ----------- | ------- | ------ | ------ |
 | Bellman–Held–Karp | `bhk` | exact | [→](docs/algorithms/bellman-held-karp.md) |
 | Branch and Bound | `branch_bound` | exact | [→](docs/algorithms/branch-bound.md) |
 | Nearest Neighbor | `nn` | heuristic — constructive | [→](docs/algorithms/nearest-neighbor.md) |
@@ -224,7 +257,6 @@ done
 
 Exact algorithms find the provably optimal tour but have exponential complexity — do not use on more than ~20 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics.
 
-
 ## Pipeline
 
 Local search algorithms (2-opt, 3-opt, SA, hill climbing, tabu, GA, PSO, CS, FPA, GSA) improve an existing tour; they do not construct one from scratch. Starting from a random or sequential tour wastes the early epochs escaping a bad initial state. **Warm-starting from a greedy Nearest Neighbour tour** gives the solver a much better region to refine, typically reducing the optimality gap by several percentage points at no extra tuning cost.
@@ -236,7 +268,7 @@ Teeline makes this composable through the pipeline mechanism: solvers are chaine
 Auto-expansion strategy depends on the solver type:
 
 | Solver type | Auto-expands to | Why |
-|---|---|---|
+| --- | --- | --- |
 | **Deterministic local search** (2opt, 3opt, tabu) | `pipeline(nn, solver)` | Monotone hill-climbers: better start = better end |
 | **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
 | **Constructive** (nn, bhk, branch_bound) | no expansion | They build a tour from scratch |
@@ -262,7 +294,7 @@ teeline solve sa --no-seed -i ./data/tsplib/berlin52.tsp
 Three presets bundle commonly useful chains:
 
 | Preset | Expands to | Character |
-|--------|-----------|-----------|
+| -------- | ----------- | ----------- |
 | `fast` | nn → 2-opt | Deterministic, sub-second, good quality |
 | `classic` | nn → 2-opt → SA | Balanced quality and speed |
 | `thorough` | nn → 3-opt → SA | Best quality, slower |
@@ -320,7 +352,7 @@ teeline solve ga -i data/tsplib/berlin52.tsp \
 
 Example output (stderr):
 
-```
+```text
 --- Comparison ---
 Optimal  : 7544.36572  (from BERLIN52.OPT.TOUR)
 Solver   : 7953.25830
@@ -340,7 +372,7 @@ See [docs/benchmarks.md](docs/benchmarks.md) for a full comparison of all solver
 Quick summary (pipeline presets first, then standalone `--no-seed` baselines):
 
 | Algorithm | Gap | Wall time |
-|-----------|:---:|----------:|
+| ----------- | :---: | ----------: |
 | `classic` preset (nn→2opt→sa) | +4.8 % | 0.36 s |
 | `fast` preset (nn→2opt) | +11.2 % | < 0.01 s |
 | — | — | — |
@@ -400,7 +432,7 @@ task setup
 The hook checks only the files you've staged, so it's fast:
 
 | Staged files | Check | Autofix |
-|---|---|---|
+| --- | --- | --- |
 | `*.rs` | `cargo fmt --check` + `cargo clippy -D warnings` | `cargo fmt` / `cargo clippy --fix` |
 | `*.md` | `markdownlint` | `markdownlint --fix <file>` |
 | `*.yml` / `*.yaml` | `yamllint` | fix manually |

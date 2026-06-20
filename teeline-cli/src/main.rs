@@ -79,7 +79,7 @@ fn solver_options_from_args(args: &ArgMatches, solver: Solvers) -> AppOptions {
 // CLI definition
 // ---------------------------------------------------------------------------
 
-fn main() {
+fn build_cli() -> Command {
     let tuning = tuning_args();
 
     let solve_cmd = Command::new("solve")
@@ -186,7 +186,7 @@ fn main() {
                 .help("output format: text (default) or json"),
         );
 
-    let cli = Command::new("Teeline")
+    Command::new("Teeline")
         .version(tsp::VERSION)
         .author(tsp::AUTHOR)
         .about("Traveling Salesman Problem solver")
@@ -195,7 +195,18 @@ fn main() {
         .subcommand(pipeline_cmd)
         .subcommand(convert_cmd)
         .subcommand(solvers_cmd)
-        .get_matches();
+}
+
+fn main() {
+    // --usage-spec bypasses subcommand dispatch: prints the usage spec so it can
+    // be piped into `usage generate completion <shell>` without a runtime dependency.
+    if std::env::args().any(|a| a == "--usage-spec") {
+        let spec = usage::spec::Spec::from(&build_cli());
+        print!("{spec}");
+        return;
+    }
+
+    let cli = build_cli().get_matches();
 
     match cli.subcommand() {
         Some(("solve", args)) => run_solve(args),
