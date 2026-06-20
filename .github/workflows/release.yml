@@ -417,7 +417,7 @@ jobs:
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      QT_VERSION: '6.11.1'
+      QT_VERSION: '6.9.1'
     steps:
       - name: Configure long paths
         run: git config --global core.longpaths true
