@@ -369,7 +369,7 @@ jobs:
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp target/release/teeline-qt AppDir/usr/bin/
+          cp teeline-qt/target/release/teeline-qt AppDir/usr/bin/
           cat > AppDir/teeline-qt.desktop << 'DESKTOP'
           [Desktop Entry]
           Type=Application
@@ -438,8 +438,8 @@ jobs:
         shell: pwsh
         run: |
           $windeployqt = "${{ env.QT_ROOT_DIR }}\bin\windeployqt.exe"
-          & $windeployqt --release --compiler-runtime --qmldir teeline-qt\src --dir deploy target\release\teeline-qt.exe
-          Copy-Item target\release\teeline-qt.exe deploy\
+          & $windeployqt --release --compiler-runtime --qmldir teeline-qt\src --dir deploy teeline-qt\target\release\teeline-qt.exe
+          Copy-Item teeline-qt\target\release\teeline-qt.exe deploy\
       - name: Package zip
         shell: pwsh
         run: |
@@ -481,7 +481,7 @@ jobs:
         run: |
           mkdir -p TeelineQt.app/Contents/MacOS
           mkdir -p TeelineQt.app/Contents/Resources
-          cp target/release/teeline-qt TeelineQt.app/Contents/MacOS/
+          cp teeline-qt/target/release/teeline-qt TeelineQt.app/Contents/MacOS/
           cat > TeelineQt.app/Contents/Info.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
