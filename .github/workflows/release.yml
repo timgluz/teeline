@@ -236,7 +236,7 @@ jobs:
       - name: Package WASM artifact
         run: |
           mkdir -p target/distrib
-          cp target/wasm32-wasip1/release/teeline_wasm.wasm target/distrib/teeline-solver.wasm
+          cp teeline-wasm/target/wasm32-wasip1/release/teeline_wasm.wasm target/distrib/teeline-solver.wasm
       - name: Upload WASM artifact
         uses: actions/upload-artifact@v7
         with:
@@ -581,7 +581,7 @@ jobs:
             --manifest-path teeline-wasm/Cargo.toml \
             --target wasm32-wasip2 \
             --release
-          cp target/wasm32-wasip2/release/teeline_wasm.wasm teeline-solver-wassette.wasm
+          cp teeline-wasm/target/wasm32-wasip2/release/teeline_wasm.wasm teeline-solver-wassette.wasm
 
       - name: Install ORAS
         uses: oras-project/setup-oras@v2
