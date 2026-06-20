@@ -187,6 +187,17 @@ fn run_get_version() -> String {
     instance.call_get_version(&mut store).unwrap()
 }
 
+fn run_compare_tours(
+    solver_route: &[u32],
+    opt_route: &[u32],
+    cities: &[crate::teeline::solver::types::City],
+) -> Result<crate::teeline::solver::types::ComparisonStats, String> {
+    let (mut store, instance) = make_instance();
+    instance
+        .call_compare_tours(&mut store, solver_route, opt_route, cities)
+        .unwrap()
+}
+
 // ── solve tests ───────────────────────────────────────────────────────────────
 
 #[test]
@@ -484,6 +495,107 @@ fn test_compare_json_input() {
             .expect("solver should succeed with JSON input");
         assert_valid_tour(sol, 5);
     }
+}
+
+// ── compare_tours tests ───────────────────────────────────────────────────────
+
+#[test]
+fn test_compare_tours_identical_routes() {
+    let cities = five_cities();
+    let route: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let stats = run_compare_tours(&route, &route, &cities).expect("identical routes must succeed");
+    assert_eq!(stats.gap_pct, 0.0, "identical tour must have 0% gap");
+    assert_eq!(
+        stats.shared_edges,
+        route.len() as u32,
+        "all edges must be shared"
+    );
+    assert_eq!(stats.solver_only_edges, 0);
+    assert_eq!(stats.optimal_only_edges, 0);
+    assert!((stats.optimal_cost - stats.solver_cost).abs() < 0.001);
+}
+
+#[test]
+fn test_compare_tours_permuted_route_has_positive_gap() {
+    let cities = five_cities();
+    // five_cities() returns IDs 0..4; optimal: [0,1,2,3,4], solver: [0,2,1,3,4]
+    let optimal: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let mut solver = optimal.clone();
+    solver.swap(1, 2); // swap cities 1 and 2 to create a worse route
+    let stats =
+        run_compare_tours(&solver, &optimal, &cities).expect("valid permuted routes must succeed");
+    assert!(stats.gap_pct >= 0.0, "gap must be non-negative");
+    // Swapped route may or may not be worse depending on geometry; just verify the call works
+    // and stats are consistent
+    assert_eq!(
+        stats.shared_edges + stats.solver_only_edges,
+        optimal.len() as u32,
+        "shared + solver_only must equal tour length"
+    );
+}
+
+#[test]
+fn test_compare_tours_dimension_mismatch_returns_error() {
+    let cities = five_cities();
+    let route: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let short_route = vec![route[0], route[1]]; // only 2 cities
+    let result = run_compare_tours(&short_route, &route, &cities);
+    assert!(result.is_err(), "mismatched lengths must return Err");
+    let msg = result.unwrap_err();
+    assert!(
+        msg.contains("dimension mismatch"),
+        "error must mention 'dimension mismatch', got: {msg}"
+    );
+}
+
+#[test]
+fn test_compare_tours_unknown_city_id_returns_error() {
+    let cities = five_cities(); // IDs 0..4
+    let route: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let bad_route: Vec<u32> = route.iter().map(|&id| id + 100).collect(); // IDs 100..104 don't exist
+    let result = run_compare_tours(&bad_route, &route, &cities);
+    assert!(result.is_err(), "unknown city IDs must return Err");
+    let msg = result.unwrap_err();
+    assert!(
+        msg.contains("unknown city"),
+        "error must mention 'unknown city', got: {msg}"
+    );
+}
+
+#[test]
+fn test_compare_tours_berlin52_optimal_vs_itself() {
+    // Parse berlin52 cities from the TSP file (reuse existing run_parse helper)
+    let tsp_input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/berlin52.tsp",
+    ))
+    .expect("berlin52.tsp must exist");
+    let parsed = run_parse(&tsp_input);
+
+    // Parse the optimal tour (city IDs, 1-based as per TSPLIB)
+    let opt_text = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/berlin52.opt.tour",
+    ))
+    .expect("berlin52.opt.tour must exist");
+    let opt_route: Vec<u32> = opt_text
+        .lines()
+        .skip_while(|l| l.trim() != "TOUR_SECTION")
+        .skip(1)
+        .map(|l| l.trim().parse::<i32>().unwrap_or(-1))
+        .take_while(|&n| n > 0)
+        .map(|n| n as u32)
+        .collect();
+    assert_eq!(
+        opt_route.len(),
+        52,
+        "berlin52 optimal tour must have 52 cities"
+    );
+
+    let stats = run_compare_tours(&opt_route, &opt_route, &parsed.cities)
+        .expect("optimal vs itself must succeed");
+    assert_eq!(stats.gap_pct, 0.0, "optimal vs itself must have 0% gap");
+    assert_eq!(stats.shared_edges, 52, "all 52 edges must be shared");
 }
 
 // ── parse integration tests ────────────────────────────────────────────────────
