@@ -4,9 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "preact/hooks"
 // Fixed demo instance: 18 cities on a 300×300 canvas.
 // ---------------------------------------------------------------
 const CITIES: [number, number][] = [
-  [50, 50], [150, 20], [260, 60], [290, 160], [240, 260], [140, 280],
-  [40, 250], [20, 140], [100, 110], [200, 90], [250, 170], [190, 230],
-  [110, 210], [60, 170], [150, 140], [220, 140], [130, 80], [175, 195],
+  [45, 45], [155, 18], [265, 45], [285, 150],
+  [255, 265], [150, 285], [40, 260], [18, 150],
+  [110, 115], [200, 95], [220, 210], [95, 215],
 ]
 const N_CITIES = CITIES.length
 
@@ -119,6 +119,52 @@ function polyPts(tour: number[]): string {
 }
 
 // ---------------------------------------------------------------
+// FlowerHeatmap — population quality panel beside the canvas
+// ---------------------------------------------------------------
+interface FlowerHeatmapProps {
+  costs: number[]
+  activeIdx: number
+  gbestIdx: number
+}
+
+function FlowerHeatmap({ costs, activeIdx, gbestIdx }: FlowerHeatmapProps) {
+  if (!costs.length) return null
+  const minC = Math.min(...costs)
+  const maxC = Math.max(...costs)
+  const range = maxC - minC || 1
+
+  return (
+    <div className="fp-heatmap" aria-label="Flower quality heatmap">
+      <div className="fp-heatmap-title">Flowers</div>
+      {costs.map((c, i) => {
+        const norm = (maxC - c) / range
+        const hue = Math.round(norm * 120)
+        const bg = `hsl(${hue},55%,42%)`
+        const border =
+          i === activeIdx ? "2px solid #3b82f6" :
+          i === gbestIdx  ? "2px solid #16a34a" : "2px solid transparent"
+        const status =
+          i === activeIdx && i === gbestIdx ? "active · best" :
+          i === activeIdx ? "active flower" :
+          i === gbestIdx  ? "global best" :
+          `quality ${Math.round(norm * 100)}%`
+        return (
+          <div
+            key={i}
+            className="fp-heatmap-cell"
+            style={{ background: bg, outline: border, outlineOffset: "1px" }}
+          >
+            <span className="fp-heatmap-idx">{i}</span>
+            <span className="fp-heatmap-cost">{c.toFixed(0)}</span>
+            <span className="fp-heatmap-overlay">{status}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------
 // TourSVG
 // ---------------------------------------------------------------
 interface TourSVGProps {
@@ -140,6 +186,9 @@ function TourSVG({ flowers, gbest, activeIdx }: TourSVGProps) {
       {gbest.length > 0 && <polyline className="fp-gbest" points={polyPts(gbest)} />}
       {CITIES.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r={4} className="fp-city" />
+      ))}
+      {CITIES.map(([x, y], i) => (
+        <text key={i} x={x + 6} y={y - 5} className="fp-city-label">{i}</text>
       ))}
     </svg>
   )
@@ -194,6 +243,7 @@ export default function FPAExplainer() {
 
   // Display state — mirrors simRef for rendering
   const [flowers, setFlowers] = useState<number[][]>(() => simRef.current.flowers)
+  const [costs, setCosts] = useState<number[]>(() => simRef.current.costs)
   const [gbest, setGbest] = useState<number[]>(() => simRef.current.gbest)
   const [gbestCost, setGbestCost] = useState(() => simRef.current.gbestCost)
   const [iter, setIter] = useState(0)
@@ -214,6 +264,7 @@ export default function FPAExplainer() {
     const s = makeInitState(n)
     simRef.current = s
     setFlowers(s.flowers.slice())
+    setCosts(s.costs.slice())
     setGbest(s.gbest.slice())
     setGbestCost(s.gbestCost)
     setIter(0)
@@ -307,6 +358,7 @@ export default function FPAExplainer() {
     }
 
     setFlowers(newFlowers)
+    setCosts(newCosts.slice())
     setGbest(newGbest)
     setGbestCost(newGbestCost)
     setIter(newIter)
@@ -359,22 +411,31 @@ export default function FPAExplainer() {
         </p>
       </header>
 
-      {/* Tour canvas + emoji icon overlay */}
-      <div className="fp-canvas-wrap">
-        <TourSVG flowers={flowers} gbest={gbest} activeIdx={activeIdx} />
-        {iconPos && (
-          <span className="fp-icon" style={{ left: `${iconPos.x}%`, top: `${iconPos.y}%` }}>
-            {iconPos.icon}
-          </span>
-        )}
+      {/* Tour canvas + flower heatmap side by side */}
+      <div className="fp-viz-row">
+        <div className="fp-canvas-wrap">
+          <TourSVG flowers={flowers} gbest={gbest} activeIdx={activeIdx} />
+          {iconPos && (
+            <span className="fp-icon" style={{ left: `${iconPos.x}%`, top: `${iconPos.y}%` }}>
+              {iconPos.icon}
+            </span>
+          )}
+        </div>
+        <FlowerHeatmap
+          costs={costs}
+          activeIdx={activeIdx}
+          gbestIdx={costs.indexOf(Math.min(...costs))}
+        />
       </div>
 
       {/* Canvas legend */}
       <div className="fp-legend">
-        <span><span className="fp-dot fp-dot-gbest">●</span> gbest</span>
+        <span><span className="fp-dot fp-dot-gbest">●</span> gbest tour</span>
         <span><span className="fp-dot fp-dot-active">●</span> active flower</span>
         <span><span className="fp-dot fp-dot-ghost">●</span> population</span>
         <span><span className="fp-dot fp-dot-city">●</span> city</span>
+        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>▌</span> active flower</span>
+        <span><span style={{ color: "#16a34a", fontWeight: 700 }}>▌</span> global best</span>
       </div>
 
       {/* Mode chip */}
@@ -516,6 +577,7 @@ const CSS = `
 .fp-root {
   --bg: #ffffff;
   --panel: #f6f8fa;
+  --accent: #0969da;
   --line: #d0d7de;
   --text: #1f2328;
   --muted: #656d76;
@@ -548,7 +610,7 @@ const CSS = `
 .fp-eyebrow {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--gbest); margin-bottom: 6px;
+  color: var(--accent); margin-bottom: 6px;
 }
 .fp-title { font-size: 1.25rem; font-weight: 650; margin: 0 0 6px; line-height: 1.3; }
 .fp-sub {
@@ -561,9 +623,45 @@ const CSS = `
 }
 
 /* Canvas */
-.fp-canvas-wrap { position: relative; display: inline-block; width: 100%; max-width: 340px; }
+/* Viz row */
+.fp-viz-row { display: flex; gap: 10px; align-items: stretch; }
+.fp-canvas-wrap { position: relative; flex: 1; min-width: 0; }
+
+/* Flower heatmap */
+.fp-heatmap {
+  width: 100px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.fp-heatmap-title {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin-bottom: 2px;
+}
+.fp-heatmap-cell {
+  flex: 1; border-radius: 5px; min-height: 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 7px; position: relative; overflow: hidden;
+  transition: background 0.35s ease;
+}
+.fp-heatmap-idx {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.9);
+}
+.fp-heatmap-cost {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem; color: rgba(255,255,255,0.7);
+}
+.fp-heatmap-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.48); border-radius: 5px;
+  font-size: 0.68rem; font-weight: 700; color: #fff;
+  white-space: nowrap; letter-spacing: 0.02em;
+  opacity: 0; transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+.fp-heatmap-cell:hover .fp-heatmap-overlay { opacity: 1; }
 .fp-canvas {
-  width: 100%; max-width: 340px; display: block;
+  width: 100%; display: block;
   border-radius: 8px; border: 1px solid var(--line);
 }
 .fp-bg { fill: var(--panel); }
@@ -571,6 +669,11 @@ const CSS = `
 .fp-active { fill: none; stroke: var(--active); stroke-width: 1.8; stroke-linejoin: round; }
 .fp-gbest { fill: none; stroke: var(--gbest); stroke-width: 2.5; stroke-linejoin: round; }
 .fp-city { fill: var(--city); stroke: var(--bg); stroke-width: 1.5; }
+.fp-city-label {
+  font-size: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  fill: #374151; stroke: white; stroke-width: 2.5; paint-order: stroke fill;
+  dominant-baseline: auto; pointer-events: none; user-select: none;
+}
 
 /* Icon overlay */
 .fp-icon {
