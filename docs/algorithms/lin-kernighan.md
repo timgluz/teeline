@@ -53,9 +53,9 @@ teeline solve lk -i ./data/tsplib/berlin52.tsp --n_nearest=5 --epochs=50000
 
 ## Benchmark
 
-| Instance | Optimal | This solver | Gap |
-|----------|---------|-------------|-----|
-| berlin52 | 7 542 | ~8 100–8 300 | ~8–9% |
+| Instance | Optimal | This solver  | Gap   |
+|----------|---------|--------------|-------|
+| berlin52 | 7 542   | ~8 100–8 300 | ~8–9% |
 
 The gap reflects the 2-opt depth of the inner optimizer. True LK moves use sequential edge exchanges of depth ≥ 3, which this implementation approximates with the LK gain criterion applied to 2-opt moves. A depth-3 LK pass would reduce the gap to ≈ 1–2% (tracked in GH #184).
 

@@ -29,9 +29,9 @@ procedure ThreeOpt(tour):
 
 ## Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--epochs` | Maximum passes (0 = until convergence) | 0 |
+| Flag       | Description                            | Default |
+|------------|----------------------------------------|---------|
+| `--epochs` | Maximum passes (0 = until convergence) | 0       |
 
 ## Usage
 

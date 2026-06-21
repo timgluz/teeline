@@ -119,7 +119,7 @@ optimise via gradient descent. The key differences:
 | | Elastic Net | This implementation |
 | --- | --- | --- |
 | Curve representation | M explicit node positions | 2K+1 Fourier coefficients |
-| Tension term | Sum of squared edge lengths | `λ(2πk)² | c_k | ²` (diagonal in coefficient space) |
+| Tension term | Sum of squared edge lengths | `λ(2πk)²` \|c_k\|² (diagonal in coefficient space) |
 | Mode schedule | Simultaneous + temperature annealing | Coarse-to-fine frequency unlocking |
 | Tour decode | Explicit node ordering | Argsort of nearest-sample parameter `s_i` |
 

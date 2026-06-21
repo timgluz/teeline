@@ -42,10 +42,10 @@ procedure GravitationalSearch(cities, n_agents, epochs):
 
 ## Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--epochs` | Maximum iterations | 10 000 |
-| `--n_nearest` | Number of agents (floored at 25) | 25 |
+| Flag          | Description                      | Default |
+|---------------|----------------------------------|---------|
+| `--epochs`    | Maximum iterations               | 10 000  |
+| `--n_nearest` | Number of agents (floored at 25) | 25      |
 
 ## Usage
 

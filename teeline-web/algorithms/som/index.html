@@ -49,16 +49,21 @@ wraps around all the cities; the ordering of neurons on the ring then gives the 
 centred at the normalised centroid.</p>
 <p>Each epoch:</p>
 <ol>
-<li>Anneal learning rate and neighbourhood radius:<pre><code>η  = learning_rate × exp(−t / epochs)
+<li><p>Anneal learning rate and neighbourhood radius:</p>
+<pre><code class="language-text">η  = learning_rate × exp(−t / epochs)
 σ  = max(radius_fraction × N × exp(−t / epochs), 1.0)
 </code></pre>
 </li>
-<li>Pick a random city <code>c</code> (with replacement).</li>
-<li>Find the <strong>Best Matching Unit</strong> (BMU) — the neuron nearest to <code>c</code>; ties broken by lowest index.</li>
-<li>Pull every neuron toward <code>c</code> weighted by a Gaussian over ring distance:<pre><code>h(i) = exp(−ring_dist(i, bmu)² / 2σ²)
+<li><p>Pick a random city <code>c</code> (with replacement).</p>
+</li>
+<li><p>Find the <strong>Best Matching Unit</strong> (BMU) — the neuron nearest to <code>c</code>; ties broken by lowest index.</p>
+</li>
+<li><p>Pull every neuron toward <code>c</code> weighted by a Gaussian over ring distance:</p>
+<pre><code class="language-text">h(i) = exp(−ring_dist(i, bmu)² / 2σ²)
 neurons[i] += η · h(i) · (c − neurons[i])
 </code></pre>
-Neurons with <code>h &lt; 0.001</code> are skipped for performance.</li>
+<p>Neurons with <code>h &lt; 0.001</code> are skipped for performance.</p>
+</li>
 </ol>
 <h3>Tour extraction</h3>
 <p>After training, each city is assigned to its closest neuron (BMU). Cities are sorted by their

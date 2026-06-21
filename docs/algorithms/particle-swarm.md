@@ -39,10 +39,10 @@ procedure ParticleSwarm(cities, n_particles, epochs):
 
 ## Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--epochs` | Maximum iterations | 10 000 |
-| `--n_nearest` | Number of particles (floored at 30) | 30 |
+| Flag          | Description                         | Default |
+|---------------|-------------------------------------|---------|
+| `--epochs`    | Maximum iterations                  | 10 000  |
+| `--n_nearest` | Number of particles (floored at 30) | 30      |
 
 ## Usage
 
