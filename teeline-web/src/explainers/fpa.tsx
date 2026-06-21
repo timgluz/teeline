@@ -119,6 +119,52 @@ function polyPts(tour: number[]): string {
 }
 
 // ---------------------------------------------------------------
+// FlowerHeatmap — population quality panel beside the canvas
+// ---------------------------------------------------------------
+interface FlowerHeatmapProps {
+  costs: number[]
+  activeIdx: number
+  gbestIdx: number
+}
+
+function FlowerHeatmap({ costs, activeIdx, gbestIdx }: FlowerHeatmapProps) {
+  if (!costs.length) return null
+  const minC = Math.min(...costs)
+  const maxC = Math.max(...costs)
+  const range = maxC - minC || 1
+
+  return (
+    <div className="fp-heatmap" aria-label="Flower quality heatmap">
+      <div className="fp-heatmap-title">Flowers</div>
+      {costs.map((c, i) => {
+        const norm = (maxC - c) / range
+        const hue = Math.round(norm * 120)
+        const bg = `hsl(${hue},55%,42%)`
+        const border =
+          i === activeIdx ? "2px solid #3b82f6" :
+          i === gbestIdx  ? "2px solid #16a34a" : "2px solid transparent"
+        const status =
+          i === activeIdx && i === gbestIdx ? "active · best" :
+          i === activeIdx ? "active flower" :
+          i === gbestIdx  ? "global best" :
+          `quality ${Math.round(norm * 100)}%`
+        return (
+          <div
+            key={i}
+            className="fp-heatmap-cell"
+            style={{ background: bg, outline: border, outlineOffset: "1px" }}
+          >
+            <span className="fp-heatmap-idx">{i}</span>
+            <span className="fp-heatmap-cost">{c.toFixed(0)}</span>
+            <span className="fp-heatmap-overlay">{status}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------
 // TourSVG
 // ---------------------------------------------------------------
 interface TourSVGProps {
@@ -197,6 +243,7 @@ export default function FPAExplainer() {
 
   // Display state — mirrors simRef for rendering
   const [flowers, setFlowers] = useState<number[][]>(() => simRef.current.flowers)
+  const [costs, setCosts] = useState<number[]>(() => simRef.current.costs)
   const [gbest, setGbest] = useState<number[]>(() => simRef.current.gbest)
   const [gbestCost, setGbestCost] = useState(() => simRef.current.gbestCost)
   const [iter, setIter] = useState(0)
@@ -217,6 +264,7 @@ export default function FPAExplainer() {
     const s = makeInitState(n)
     simRef.current = s
     setFlowers(s.flowers.slice())
+    setCosts(s.costs.slice())
     setGbest(s.gbest.slice())
     setGbestCost(s.gbestCost)
     setIter(0)
@@ -310,6 +358,7 @@ export default function FPAExplainer() {
     }
 
     setFlowers(newFlowers)
+    setCosts(newCosts.slice())
     setGbest(newGbest)
     setGbestCost(newGbestCost)
     setIter(newIter)
@@ -362,22 +411,31 @@ export default function FPAExplainer() {
         </p>
       </header>
 
-      {/* Tour canvas + emoji icon overlay */}
-      <div className="fp-canvas-wrap">
-        <TourSVG flowers={flowers} gbest={gbest} activeIdx={activeIdx} />
-        {iconPos && (
-          <span className="fp-icon" style={{ left: `${iconPos.x}%`, top: `${iconPos.y}%` }}>
-            {iconPos.icon}
-          </span>
-        )}
+      {/* Tour canvas + flower heatmap side by side */}
+      <div className="fp-viz-row">
+        <div className="fp-canvas-wrap">
+          <TourSVG flowers={flowers} gbest={gbest} activeIdx={activeIdx} />
+          {iconPos && (
+            <span className="fp-icon" style={{ left: `${iconPos.x}%`, top: `${iconPos.y}%` }}>
+              {iconPos.icon}
+            </span>
+          )}
+        </div>
+        <FlowerHeatmap
+          costs={costs}
+          activeIdx={activeIdx}
+          gbestIdx={costs.indexOf(Math.min(...costs))}
+        />
       </div>
 
       {/* Canvas legend */}
       <div className="fp-legend">
-        <span><span className="fp-dot fp-dot-gbest">●</span> gbest</span>
+        <span><span className="fp-dot fp-dot-gbest">●</span> gbest tour</span>
         <span><span className="fp-dot fp-dot-active">●</span> active flower</span>
         <span><span className="fp-dot fp-dot-ghost">●</span> population</span>
         <span><span className="fp-dot fp-dot-city">●</span> city</span>
+        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>▌</span> active flower</span>
+        <span><span style={{ color: "#16a34a", fontWeight: 700 }}>▌</span> global best</span>
       </div>
 
       {/* Mode chip */}
@@ -564,7 +622,43 @@ const CSS = `
 }
 
 /* Canvas */
-.fp-canvas-wrap { position: relative; display: block; width: 100%; }
+/* Viz row */
+.fp-viz-row { display: flex; gap: 10px; align-items: stretch; }
+.fp-canvas-wrap { position: relative; flex: 1; min-width: 0; }
+
+/* Flower heatmap */
+.fp-heatmap {
+  width: 100px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.fp-heatmap-title {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin-bottom: 2px;
+}
+.fp-heatmap-cell {
+  flex: 1; border-radius: 5px; min-height: 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 7px; position: relative; overflow: hidden;
+  transition: background 0.35s ease;
+}
+.fp-heatmap-idx {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.9);
+}
+.fp-heatmap-cost {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem; color: rgba(255,255,255,0.7);
+}
+.fp-heatmap-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.48); border-radius: 5px;
+  font-size: 0.68rem; font-weight: 700; color: #fff;
+  white-space: nowrap; letter-spacing: 0.02em;
+  opacity: 0; transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+.fp-heatmap-cell:hover .fp-heatmap-overlay { opacity: 1; }
 .fp-canvas {
   width: 100%; display: block;
   border-radius: 8px; border: 1px solid var(--line);
