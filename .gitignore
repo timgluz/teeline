@@ -25,3 +25,4 @@ node_modules/
 # visual companion brainstorm files
 .superpowers/
 .worktrees/
+.claude/projects/
