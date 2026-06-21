@@ -135,45 +135,46 @@ function makeInitState(nNests: number): SimState {
 // ---------------------------------------------------------------
 // QualityBars — standalone, reusable for population explainers
 // ---------------------------------------------------------------
-interface QualityBarsProps {
+interface NestHeatmapProps {
   costs: number[]
   activeIdx: number
   targetIdx: number
   abandonedIdxs: number[]
 }
 
-function QualityBars({ costs, activeIdx, targetIdx, abandonedIdxs }: QualityBarsProps) {
+function NestHeatmap({ costs, activeIdx, targetIdx, abandonedIdxs }: NestHeatmapProps) {
   if (!costs.length) return null
   const minC = Math.min(...costs)
   const maxC = Math.max(...costs)
   const range = maxC - minC || 1
-  const H = 56
 
   return (
-    <div className="cs-bars-wrap" aria-label="Nest quality bars">
+    <div className="cs-heatmap" aria-label="Nest quality heatmap">
+      <div className="cs-heatmap-title">Nests</div>
       {costs.map((c, i) => {
         const norm = (maxC - c) / range          // 1 = best, 0 = worst
-        const barH = Math.max(4, Math.round(norm * (H - 6)) + 6)
         const hue = Math.round(norm * 120)       // 120=green, 0=red
         const isAbandoned = abandonedIdxs.includes(i)
-        const fill = isAbandoned ? "#cbd5e1" : `hsl(${hue},55%,42%)`
-        const borderColor =
-          i === activeIdx ? "#3b82f6" :
-          i === targetIdx ? "#d97706" : "transparent"
+        const bg = isAbandoned ? "#cbd5e1" : `hsl(${hue},55%,42%)`
+        const border =
+          i === activeIdx ? "2px solid #3b82f6" :
+          i === targetIdx ? "2px solid #d97706" : "2px solid transparent"
         return (
           <div
             key={i}
-            className="cs-bar"
+            className="cs-heatmap-cell"
             title={`Nest ${i}: ${c.toFixed(0)}`}
-            style={{
-              height: `${barH}px`,
-              background: fill,
-              outline: `2px solid ${borderColor}`,
-              outlineOffset: "1px",
-            }}
-          />
+            style={{ background: bg, outline: border, outlineOffset: "1px" }}
+          >
+            <span className="cs-heatmap-idx">{i}</span>
+            <span className="cs-heatmap-cost">{c.toFixed(0)}</span>
+          </div>
         )
       })}
+      <div className="cs-heatmap-legend">
+        <span style={{ color: "#3b82f6" }}>▌</span> cuckoo &nbsp;
+        <span style={{ color: "#d97706" }}>▌</span> host
+      </div>
     </div>
   )
 }
@@ -484,8 +485,16 @@ export default function CSExplainer() {
         </p>
       </header>
 
-      {/* Tour canvas */}
-      <TourSVG tour={tour} best={best} diff={diff} />
+      {/* Tour canvas + nest heatmap side by side */}
+      <div className="cs-viz-row">
+        <TourSVG tour={tour} best={best} diff={diff} />
+        <NestHeatmap
+          costs={costs}
+          activeIdx={activeIdx}
+          targetIdx={targetIdx}
+          abandonedIdxs={abandonedIdxs}
+        />
+      </div>
 
       {/* Canvas legend — directly under the visualization */}
       <div className="cs-canvas-legend">
@@ -494,22 +503,6 @@ export default function CSExplainer() {
         <span><span className="cs-swatch cs-swatch-added">—</span> added edges</span>
         <span><span className="cs-swatch cs-swatch-removed">- -</span> removed edges</span>
         <span><span className="cs-ring-demo">◎</span> reversal endpoint</span>
-      </div>
-
-      {/* Quality bars */}
-      <div>
-        <div className="cs-bars-label">Nest quality (green = shorter tour)</div>
-        <QualityBars
-          costs={costs}
-          activeIdx={activeIdx}
-          targetIdx={targetIdx}
-          abandonedIdxs={abandonedIdxs}
-        />
-        <div className="cs-bars-legend">
-          <span><span className="cs-dot" style={{ background: "#3b82f6" }}>●</span> active cuckoo</span>
-          <span><span className="cs-dot" style={{ color: "#d97706" }}>■</span> target host (orange border)</span>
-          <span><span className="cs-dot" style={{ background: "#cbd5e1" }}>●</span> abandoned</span>
-        </div>
       </div>
 
       {/* Event chip */}
@@ -675,9 +668,12 @@ const CSS = `
   padding: 1px 4px; border-radius: 4px;
 }
 
+/* Viz row: canvas fills space, heatmap sits beside it */
+.cs-viz-row { display: flex; gap: 10px; align-items: stretch; }
+
 /* Tour canvas */
 .cs-canvas {
-  width: 100%; max-width: 340px; display: block;
+  flex: 1; min-width: 0; display: block;
   border-radius: 8px; border: 1px solid var(--line);
 }
 .cs-bg { fill: var(--panel); }
@@ -703,22 +699,32 @@ const CSS = `
   dominant-baseline: auto; pointer-events: none; user-select: none;
 }
 
-/* Quality bars */
-.cs-bars-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
-.cs-bars-wrap {
-  display: flex; gap: 3px; align-items: flex-end;
-  height: 60px; padding: 2px 0;
+/* Nest heatmap */
+.cs-heatmap {
+  width: 100px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 3px;
 }
-.cs-bar {
-  flex: 1; border-radius: 3px 3px 0 0;
-  transition: background 0.3s ease, height 0.3s ease;
-  cursor: default;
+.cs-heatmap-title {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin-bottom: 2px;
 }
-.cs-bars-legend {
-  display: flex; gap: 14px; flex-wrap: wrap;
-  font-size: 0.75rem; color: var(--muted); margin-top: 4px;
+.cs-heatmap-cell {
+  flex: 1; border-radius: 5px; min-height: 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 7px;
+  transition: background 0.35s ease;
 }
-.cs-dot { font-size: 0.9em; margin-right: 2px; }
+.cs-heatmap-idx {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.9);
+}
+.cs-heatmap-cost {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem; color: rgba(255,255,255,0.7);
+}
+.cs-heatmap-legend {
+  font-size: 0.7rem; color: var(--muted); margin-top: 4px; line-height: 1.4;
+}
 
 /* Event chip */
 .cs-mode {
