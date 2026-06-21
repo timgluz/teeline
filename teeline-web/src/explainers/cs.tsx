@@ -171,10 +171,6 @@ function NestHeatmap({ costs, activeIdx, targetIdx, abandonedIdxs }: NestHeatmap
           </div>
         )
       })}
-      <div className="cs-heatmap-legend">
-        <span style={{ color: "#3b82f6" }}>▌</span> cuckoo &nbsp;
-        <span style={{ color: "#d97706" }}>▌</span> host
-      </div>
     </div>
   )
 }
@@ -503,6 +499,8 @@ export default function CSExplainer() {
         <span><span className="cs-swatch cs-swatch-added">—</span> added edges</span>
         <span><span className="cs-swatch cs-swatch-removed">- -</span> removed edges</span>
         <span><span className="cs-ring-demo">◎</span> reversal endpoint</span>
+        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>▌</span> active cuckoo</span>
+        <span><span style={{ color: "#d97706", fontWeight: 700 }}>▌</span> target host</span>
       </div>
 
       {/* Event chip */}
