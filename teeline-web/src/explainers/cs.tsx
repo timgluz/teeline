@@ -482,6 +482,15 @@ export default function CSExplainer() {
       {/* Tour canvas */}
       <TourSVG tour={tour} best={best} diff={diff} />
 
+      {/* Canvas legend — directly under the visualization */}
+      <div className="cs-canvas-legend">
+        <span><span className="cs-swatch cs-swatch-tour">—</span> current tour</span>
+        <span><span className="cs-swatch cs-swatch-best">- -</span> best tour</span>
+        <span><span className="cs-swatch cs-swatch-added">—</span> added edges</span>
+        <span><span className="cs-swatch cs-swatch-removed">- -</span> removed edges</span>
+        <span><span className="cs-ring-demo">◎</span> reversal endpoint</span>
+      </div>
+
       {/* Quality bars */}
       <div>
         <div className="cs-bars-label">Nest quality (green = shorter tour)</div>
@@ -601,15 +610,6 @@ export default function CSExplainer() {
           {running ? "⏸ Pause" : "▶ Run"}
         </button>
         <button className="cs-btn" onClick={() => reinit(nNests)}>↺ Reset</button>
-      </div>
-
-      {/* Canvas legend */}
-      <div className="cs-canvas-legend">
-        <span><span className="cs-swatch cs-swatch-tour">—</span> current tour</span>
-        <span><span className="cs-swatch cs-swatch-best">- -</span> best tour</span>
-        <span><span className="cs-swatch cs-swatch-added">—</span> added edges</span>
-        <span><span className="cs-swatch cs-swatch-removed">- -</span> removed edges</span>
-        <span><span className="cs-ring-demo">◎</span> reversal endpoint</span>
       </div>
 
       <footer className="cs-footer">
