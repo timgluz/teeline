@@ -577,6 +577,7 @@ const CSS = `
 .fp-root {
   --bg: #ffffff;
   --panel: #f6f8fa;
+  --accent: #0969da;
   --line: #d0d7de;
   --text: #1f2328;
   --muted: #656d76;
@@ -609,7 +610,7 @@ const CSS = `
 .fp-eyebrow {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--gbest); margin-bottom: 6px;
+  color: var(--accent); margin-bottom: 6px;
 }
 .fp-title { font-size: 1.25rem; font-weight: 650; margin: 0 0 6px; line-height: 1.3; }
 .fp-sub {
