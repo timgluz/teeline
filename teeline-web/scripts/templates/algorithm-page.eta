@@ -10,6 +10,7 @@
     <meta property="og:title" content="<%= it.name %> — Teeline" />
     <meta property="og:description" content="<%= it.description %>" />
     <link rel="canonical" href="https://tspsolver.com/algorithms/<%= it.solverId %>/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
     <div id="topbar"></div>
