@@ -49,7 +49,7 @@ fn shared_component() -> &'static Component {
     COMPONENT.get_or_init(|| {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../target/wasm32-wasip2/debug/teeline_wasm.wasm"
+            "/target/wasm32-wasip2/debug/teeline_wasm.wasm"
         );
         Component::from_file(shared_engine(), path).expect(
             "WASM component not found — run: cargo component build --manifest-path teeline-wasm/Cargo.toml --target wasm32-wasip2",
