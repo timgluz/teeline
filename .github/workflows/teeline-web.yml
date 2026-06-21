@@ -1,12 +1,12 @@
 name: teeline-web
 
-on:
+"on":
   push:
-    branches: [ master ]
-    paths: [ 'teeline-web/**' ]
+    branches: [master]
+    paths: ['teeline-web/**']
   pull_request:
-    branches: [ master ]
-    paths: [ 'teeline-web/**' ]
+    branches: [master]
+    paths: ['teeline-web/**']
 
 defaults:
   run:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Transpile WASM to JS bindings (jco)
         working-directory: teeline-web
-        run: npx --yes @bytecodealliance/jco@1.20.0 transpile ../target/wasm32-wasip1/debug/teeline_wasm.wasm --name teeline_wasm -o ../teeline-wasm/js-bindings
+        run: npx --yes @bytecodealliance/jco@1.20.0 transpile ../teeline-wasm/target/wasm32-wasip1/debug/teeline_wasm.wasm --name teeline_wasm -o ../teeline-wasm/js-bindings
 
       - name: Install dependencies
         run: npm ci
