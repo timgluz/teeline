@@ -19,45 +19,22 @@ function getEdgeDiff(tour: number[], move: Move): {
 }
 
 // ---------------------------------------------------------------
-// BestTourSVG — full-width, green tour
-// ---------------------------------------------------------------
-interface BestTourSVGProps {
-  best: number[]
-  lastMove: Move | null
-}
-function BestTourSVG({ best, lastMove }: BestTourSVGProps) {
-  const changedCities = lastMove ? new Set([lastMove[0], lastMove[1]]) : new Set<number>()
-  return (
-    <svg viewBox="0 0 300 300" className="tabu-canvas tabu-canvas-full" role="img" aria-label="Best tour">
-      <rect x={0} y={0} width={300} height={300} className="tabu-bg" />
-      <polyline points={polyPts(best)} className="tabu-best-tour" />
-      {CITIES.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y}
-          r={changedCities.has(i) ? 7 : 4}
-          className={changedCities.has(i) ? "tabu-city tabu-city-changed" : "tabu-city"}
-        />
-      ))}
-      {CITIES.map(([x, y], i) => (
-        <text key={i} x={x + 6} y={y - 5} className="tabu-city-label">{i}</text>
-      ))}
-    </svg>
-  )
-}
-
-// ---------------------------------------------------------------
-// CurrentTourSVG — gray tour, edge diff highlighted
+// CurrentTourSVG — gray tour, edge diff; best tour underlay when paused
 // ---------------------------------------------------------------
 interface CurrentTourSVGProps {
   tour: number[]
+  best: number[]
   lastMove: Move | null
+  showBest: boolean
 }
-function CurrentTourSVG({ tour, lastMove }: CurrentTourSVGProps) {
+function CurrentTourSVG({ tour, best, lastMove, showBest }: CurrentTourSVGProps) {
   const diff = lastMove ? getEdgeDiff(tour, lastMove) : null
   const changedCities = lastMove ? new Set([lastMove[0], lastMove[1]]) : new Set<number>()
   return (
     <svg viewBox="0 0 300 300" className="tabu-canvas" role="img" aria-label="Current tour">
       <rect x={0} y={0} width={300} height={300} className="tabu-bg" />
-      <polyline points={polyPts(tour)} className="tabu-current-tour" />
+      {showBest && <polyline points={polyPts(best)} className="tabu-best-tour" />}
+      <polyline points={polyPts(tour)} className={showBest ? "tabu-current-tour tabu-current-faded" : "tabu-current-tour"} />
       {diff && diff.removed.map(([a, b], i) => (
         <line key={i}
           x1={CITIES[a][0]} y1={CITIES[a][1]}
@@ -96,7 +73,8 @@ interface TabuListPanelProps {
 function TabuListPanel({ tabuList, tenure, step }: TabuListPanelProps) {
   return (
     <div className="tabu-list-panel">
-      <div className="tabu-list-title">Tabu List (tenure={tenure})</div>
+      <div className="tabu-list-title">Tabu List</div>
+      <div className="tabu-list-subtitle">(tenure={tenure})</div>
       {tabuList.length === 0
         ? <div className="tabu-list-empty">no forbidden moves yet</div>
         : tabuList.map((entry, idx) => {
@@ -159,7 +137,7 @@ export default function TabuExplainer() {
   const simRef = useRef<SimState>(makeInitState(7, 10))
 
   const [tour, setTour] = useState(() => simRef.current.tour)
-  const [best, setBest] = useState(() => simRef.current.best)
+  const [best, setBest] = useState<number[]>(() => simRef.current.best)
   const [bestCost, setBestCost] = useState(() => simRef.current.bestCost)
   const [currentCost, setCurrentCost] = useState(() => simRef.current.currentCost)
   const [tabuList, setTabuList] = useState<TabuEntry[]>([])
@@ -227,22 +205,18 @@ export default function TabuExplainer() {
         </p>
       </header>
 
-      <div className="tabu-section-label">Best tour</div>
-      <BestTourSVG best={best} lastMove={lastMove} />
-
       <div className="tabu-viz-row">
         <div className="tabu-canvas-wrap">
-          <div className="tabu-section-label">Current tour</div>
-          <CurrentTourSVG tour={tour} lastMove={lastMove} />
+          <CurrentTourSVG tour={tour} best={best} lastMove={lastMove} showBest={!running && step > 0} />
         </div>
         <TabuListPanel tabuList={tabuList} tenure={tenure} step={step} />
       </div>
 
       <div className="tabu-legend">
-        <span><span className="tabu-swatch tabu-swatch-best" /> best tour</span>
         <span><span className="tabu-swatch tabu-swatch-current" /> current tour</span>
         <span><span className="tabu-swatch tabu-swatch-removed" /> removed edge</span>
         <span><span className="tabu-swatch tabu-swatch-added" /> added edge</span>
+        {!running && step > 0 && <span><span className="tabu-swatch tabu-swatch-best" /> best tour</span>}
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -384,10 +358,10 @@ const CSS = `
   width: 100%; display: block; border-radius: 8px;
   border: 1px solid var(--line);
 }
-.tabu-canvas-full { width: 100%; }
 .tabu-bg { fill: var(--panel); }
 .tabu-best-tour { fill: none; stroke: var(--improve); stroke-width: 2.5; stroke-linejoin: round; }
 .tabu-current-tour { fill: none; stroke: var(--tour-current); stroke-width: 1.8; stroke-linejoin: round; }
+.tabu-current-faded { opacity: 0.3; }
 .tabu-edge-removed { stroke: var(--removed); stroke-width: 2; stroke-dasharray: 4 3; }
 .tabu-edge-added { stroke: var(--accent); stroke-width: 2.5; }
 .tabu-city { fill: var(--city); }
@@ -410,7 +384,11 @@ const CSS = `
 }
 .tabu-list-title {
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
-  color: var(--muted); margin-bottom: 2px; white-space: nowrap;
+  color: var(--muted); margin-bottom: 0;
+}
+.tabu-list-subtitle {
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); margin-bottom: 4px;
 }
 .tabu-list-empty { font-size: 0.75rem; color: var(--muted); font-style: italic; }
 .tabu-badge {
