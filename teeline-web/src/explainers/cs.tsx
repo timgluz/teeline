@@ -159,15 +159,20 @@ function NestHeatmap({ costs, activeIdx, targetIdx, abandonedIdxs }: NestHeatmap
         const border =
           i === activeIdx ? "2px solid #3b82f6" :
           i === targetIdx ? "2px solid #d97706" : "2px solid transparent"
+        const status =
+          isAbandoned ? "abandoned" :
+          i === activeIdx ? "active cuckoo" :
+          i === targetIdx ? "target host" :
+          `quality ${Math.round(norm * 100)}%`
         return (
           <div
             key={i}
             className="cs-heatmap-cell"
-            title={`Nest ${i}: ${c.toFixed(0)}`}
             style={{ background: bg, outline: border, outlineOffset: "1px" }}
           >
             <span className="cs-heatmap-idx">{i}</span>
             <span className="cs-heatmap-cost">{c.toFixed(0)}</span>
+            <span className="cs-heatmap-overlay">{status}</span>
           </div>
         )
       })}
@@ -709,9 +714,19 @@ const CSS = `
 .cs-heatmap-cell {
   flex: 1; border-radius: 5px; min-height: 20px;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 7px;
+  padding: 0 7px; position: relative; overflow: hidden;
   transition: background 0.35s ease;
 }
+.cs-heatmap-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.48); border-radius: 5px;
+  font-size: 0.68rem; font-weight: 700; color: #fff;
+  white-space: nowrap; letter-spacing: 0.02em;
+  opacity: 0; transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+.cs-heatmap-cell:hover .cs-heatmap-overlay { opacity: 1; }
 .cs-heatmap-idx {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.72rem; font-weight: 700; color: rgba(255,255,255,0.9);
