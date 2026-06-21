@@ -1,12 +1,12 @@
 name: Rust
 
-on:
+"on":
   push:
-    branches: [ master ]
+    branches: [master]
     paths-ignore:
       - 'teeline-web/**'
   pull_request:
-    branches: [ master ]
+    branches: [master]
     paths-ignore:
       - 'teeline-web/**'
 
@@ -15,66 +15,65 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v6
-      with:
-        submodules: true
-    - name: Build
-      run: cargo build -p teeline -p teeline-cli --verbose
-    - name: Run tests
-      run: cargo test -p teeline -p teeline-cli --verbose
-    - name: Run e2e tests (BATS)
-      run: ./tests/bats/bin/bats tests/e2e/
-    - name: Clippy
-      run: cargo clippy -p teeline -p teeline-cli -- -D warnings
-    - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@cargo-llvm-cov
-    - name: Coverage
-      run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
-    - name: Upload coverage
-      uses: codecov/codecov-action@v7
-      with:
-        files: lcov.info
-      env:
-        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Build
+        run: cargo build -p teeline -p teeline-cli --verbose
+      - name: Run tests
+        run: cargo test -p teeline -p teeline-cli --verbose
+      - name: Run e2e tests (BATS)
+        run: ./tests/bats/bin/bats tests/e2e/
+      - name: Clippy
+        run: cargo clippy -p teeline -p teeline-cli -- -D warnings
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Coverage
+        run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        with:
+          files: lcov.info
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build-wasm:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
-      with:
-        submodules: true
-    - name: Install cargo-component
-      uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-component
-    - name: Add wasm32-wasip2 target
-      run: rustup target add wasm32-wasip2
-    - name: Build WASM component
-      run: cd teeline-wasm && cargo component build --target wasm32-wasip2
-    - name: Upload WASM artifact
-      uses: actions/upload-artifact@v7
-      with:
-        name: teeline-wasm-debug
-        path: target/wasm32-wasip2/debug/teeline_wasm.wasm
-    - name: Run wasm_component integration tests
-      run: cargo test -p teeline-wasm --test wasm_component --target x86_64-unknown-linux-gnu
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
+      - name: Install cargo-component
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
+      - name: Add wasm32-wasip2 target
+        run: rustup target add wasm32-wasip2
+      - name: Build WASM component
+        run: cd teeline-wasm && cargo component build --target wasm32-wasip2
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: teeline-wasm-debug
+          path: teeline-wasm/target/wasm32-wasip2/debug/teeline_wasm.wasm
+      - name: Run wasm_component integration tests
+        run: cd teeline-wasm && cargo test --test wasm_component --target x86_64-unknown-linux-gnu
 
   build-qt:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
-    - name: Install build dependencies
-      run: sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev
-    - name: Install Qt 6
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: '6.11.*'
-        cache: true
-    - name: Build teeline-qt
-      run: cargo build --manifest-path teeline-qt/Cargo.toml 2>&1
-      env:
-        RUST_LOG: debug
+      - uses: actions/checkout@v6
+      - name: Install build dependencies
+        run: sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.*'
+          cache: true
+      - name: Build teeline-qt
+        run: cargo build --manifest-path teeline-qt/Cargo.toml 2>&1
+        env:
+          RUST_LOG: debug
