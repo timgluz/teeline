@@ -3,10 +3,14 @@ name: teeline-web
 "on":
   push:
     branches: [master]
-    paths: ['teeline-web/**']
+    paths:
+      - 'teeline-web/**'
+      - '.github/workflows/teeline-web.yml'
   pull_request:
     branches: [master]
-    paths: ['teeline-web/**']
+    paths:
+      - 'teeline-web/**'
+      - '.github/workflows/teeline-web.yml'
 
 defaults:
   run:
