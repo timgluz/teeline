@@ -41,7 +41,16 @@
 <h2>Description</h2>
 <p>Greedy construction heuristic: start from an arbitrary city and repeatedly move to the closest unvisited city until all cities have been visited. Uses a KD-tree for efficient nearest-neighbor queries.</p>
 <p>Produces a complete tour quickly. Tour quality is typically 20–25 % above optimal on benchmark instances, but it serves as an excellent warm-start seed for local-search algorithms (2-opt, 3-opt, tabu search).</p>
-<h2>Usage</h2>
+<pre><code class="shj-lang-plain">procedure NearestNeighbor(cities):
+    unvisited ← all cities
+    tour ← [random start city]
+    remove start from unvisited
+    while unvisited is not empty:
+        next ← nearest city in unvisited to tour.last
+        tour.append(next)
+        remove next from unvisited
+    tour.append(tour[0])   // close the loop
+    return tour</code></pre><h2>Usage</h2>
 <pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> solve nn<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
 <span class="shj-syn-func">teeline</span> solve nn<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --verbose</code></pre><h2>References</h2>
 <ul>

@@ -1,7 +1,7 @@
 # 3-opt
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `3opt`, `three_opt` |
 | **Type** | Heuristic — local search |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
@@ -14,11 +14,24 @@ Finds deeper local optima than 2-opt at the cost of O(n³) per pass. Typical tou
 
 Auto-expands to `pipeline(nn, 3opt)`.
 
+```text
+procedure ThreeOpt(tour):
+    improved ← true
+    while improved:
+        improved ← false
+        for each triple of edges (e1, e2, e3):
+            best ← best_reconnection(tour, e1, e2, e3)
+            if length(best) < length(tour):
+                tour ← best
+                improved ← true
+    return tour
+```
+
 ## Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--epochs` | Maximum passes (0 = until convergence) | 0 |
+| Flag       | Description                            | Default |
+|------------|----------------------------------------|---------|
+| `--epochs` | Maximum passes (0 = until convergence) | 0       |
 
 ## Usage
 

@@ -42,7 +42,16 @@
 <p>Extension of 2-opt that removes three edges per iteration and reconnects the three segments in the best of the eight possible reconnection configurations. Each pass tries every triple of edges, keeps the single best improvement found, and repeats until no triple yields improvement.</p>
 <p>Finds deeper local optima than 2-opt at the cost of O(n³) per pass. Typical tour quality is a few percentage points better than <code>nn → 2opt</code> at the expense of longer runtime.</p>
 <p>Auto-expands to <code>pipeline(nn, 3opt)</code>.</p>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure ThreeOpt(tour):
+    improved ← true
+    while improved:
+        improved ← false
+        for each triple of edges (e1, e2, e3):
+            best ← best_reconnection(tour, e1, e2, e3)
+            if length(best) &lt; length(tour):
+                tour ← best
+                improved ← true
+    return tour</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>

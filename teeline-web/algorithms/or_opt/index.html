@@ -56,7 +56,18 @@ Or-3 — relocate a triple:
   Before: ... A → [B → C → D] → E ... X → Y ...
   After:  ... A → E ... X → [B → C → D] → Y ...</code></pre><h3>When to use</h3>
 <p>Or-opt works well as a post-processing step after any constructive or metaheuristic solver. Because it catches improvements that 2-opt misses (and vice versa), combining them via the pipeline is more effective than either alone:</p>
-<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> pipeline --steps<span class="shj-syn-oper">=</span>nn,2opt,or_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><h2>Options</h2>
+<pre><code class="shj-lang-bash"><span class="shj-syn-func">teeline</span> pipeline --steps<span class="shj-syn-oper">=</span>nn,2opt,or_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp</code></pre><pre><code class="shj-lang-plain">procedure OrOpt(tour):
+    improved ← true
+    while improved:
+        improved ← false
+        for segment_len in {1, 2, 3}:
+            for each segment S of length segment_len in tour:
+                for each insertion position p not adjacent to S:
+                    new_tour ← remove_and_insert(tour, S, p)
+                    if length(new_tour) &lt; length(tour):
+                        tour ← new_tour
+                        improved ← true
+    return tour</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>

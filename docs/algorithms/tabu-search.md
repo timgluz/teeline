@@ -1,7 +1,7 @@
 # Tabu Search
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `tabu_search` |
 | **Type** | Heuristic — local search |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
@@ -14,9 +14,9 @@ Auto-expands to `pipeline(nn, tabu_search)`.
 
 ## Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--epochs` | Maximum iterations | — |
+| Flag       | Description        | Default |
+|------------|--------------------|---------|
+| `--epochs` | Maximum iterations | —       |
 
 ## Usage
 

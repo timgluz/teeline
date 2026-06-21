@@ -1,7 +1,7 @@
 # Cuckoo Search
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `cs`, `cuckoo_search` |
 | **Type** | Heuristic — nature-inspired metaheuristic |
 | **Auto-seeds from** | `shuffle` (random nests) |
@@ -17,7 +17,7 @@ Nature-inspired metaheuristic that models brood parasitism in cuckoos. Maintains
 **TSP-specific adaptations** (deviations from Yang & Deb 2009):
 
 | Adaptation | Reason |
-|---|---|
+| --- | --- |
 | Lévy flight → k random 2-opt reversals | Maps continuous step magnitude to a discrete tour perturbation; preserves permutation validity |
 | k capped at n/2 | Prevents full-tour scrambles from very large Lévy draws |
 | β=1.5 fixed; σ_u≈0.6966 precomputed | Standard Lévy exponent (Mantegna 1994); constant avoids repeated gamma evaluation |
@@ -25,10 +25,26 @@ Nature-inspired metaheuristic that models brood parasitism in cuckoos. Maintains
 
 Auto-expands to `pipeline(shuffle, cs)`.
 
+```text
+procedure CuckooSearch(cities, n_nests, pa, epochs):
+    nests ← initialize_nests(n_nests, cities)
+    best ← best_tour(nests)
+    for epoch in 1..epochs:
+        for each nest i:
+            step ← levy_flight()
+            candidate ← apply_2opt_reversals(nests[i], step)
+            j ← random_nest_index()
+            if length(candidate) < length(nests[j]):
+                nests[j] ← candidate
+        abandon_worst_fraction(nests, pa)
+        best ← min(best, best_tour(nests))
+    return best
+```
+
 ## Options
 
 | Flag | Description | Default |
-|------|-------------|---------|
+| ------ | ------------- | --------- |
 | `--epochs` | Maximum iterations | 10 000 |
 | `--n_nearest` | Number of nests (floored at 25) | 25 |
 | `--mutation_probability` | Per-nest abandonment probability `pa` | 0.001 |

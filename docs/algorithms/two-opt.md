@@ -1,7 +1,7 @@
 # 2-opt
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `2opt`, `two_opt` |
 | **Type** | Heuristic — local search |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
@@ -11,6 +11,19 @@
 Local search algorithm that iteratively improves a tour by removing two edges and reconnecting the resulting segments in the only other valid way (reversing the segment between the two removed edges). Repeats until no improving swap exists — a local optimum.
 
 Auto-expands to `pipeline(nn, 2opt)`: the nearest-neighbor tour seeds the search so the local optimizer starts in a good region rather than wasting iterations escaping a random tour.
+
+```text
+procedure TwoOpt(tour):
+    improved ← true
+    while improved:
+        improved ← false
+        for each pair (i, j) with i < j:
+            new_tour ← reverse_segment(tour, i, j)
+            if length(new_tour) < length(tour):
+                tour ← new_tour
+                improved ← true
+    return tour
+```
 
 ## Usage
 

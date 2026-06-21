@@ -41,7 +41,16 @@
 <h2>Description</h2>
 <p>Local search algorithm that iteratively improves a tour by removing two edges and reconnecting the resulting segments in the only other valid way (reversing the segment between the two removed edges). Repeats until no improving swap exists — a local optimum.</p>
 <p>Auto-expands to <code>pipeline(nn, 2opt)</code>: the nearest-neighbor tour seeds the search so the local optimizer starts in a good region rather than wasting iterations escaping a random tour.</p>
-<h2>Usage</h2>
+<pre><code class="shj-lang-plain">procedure TwoOpt(tour):
+    improved ← true
+    while improved:
+        improved ← false
+        for each pair (i, j) with i &lt; j:
+            new_tour ← reverse_segment(tour, i, j)
+            if length(new_tour) &lt; length(tour):
+                tour ← new_tour
+                improved ← true
+    return tour</code></pre><h2>Usage</h2>
 <pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># auto-expands to pipeline(nn, 2opt)</span>
 <span class="shj-syn-func">teeline</span> solve 2opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp
 <span class="shj-syn-func">teeline</span> solve two_opt<span class="shj-syn-kwd"> -i</span> <span class="shj-syn-oper">./data/tsplib/berlin</span>52.tsp --verbose

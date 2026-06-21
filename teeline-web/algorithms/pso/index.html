@@ -51,7 +51,20 @@
   </tbody>
 </table>
 <p>Auto-expands to <code>pipeline(shuffle, pso)</code>.</p>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure ParticleSwarm(cities, n_particles, epochs):
+    particles ← initialize_particles(n_particles, cities)
+    gbest ← best_tour(particles)
+    for epoch in 1..epochs:
+        ω ← inertia_decay(epoch)
+        for each particle p:
+            v ← ω × p.velocity
+              + c1 × toward(p.position, p.best)
+              + c2 × toward(p.position, gbest)
+            p.position ← apply_swaps(p.position, v)
+            if length(p.position) &lt; length(p.best):
+                p.best ← p.position
+        gbest ← best_tour(particles)
+    return gbest</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>

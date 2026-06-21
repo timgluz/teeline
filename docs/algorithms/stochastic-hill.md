@@ -1,7 +1,7 @@
 # Stochastic Hill Climbing
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `stochastic_hill` |
 | **Type** | Heuristic — local search |
 | **Auto-seeds from** | `shuffle` (random tour) |
@@ -14,10 +14,10 @@ Auto-expands to `pipeline(shuffle, stochastic_hill)`.
 
 ## Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--epochs` | Maximum iterations total (0 = unlimited) | 0 |
-| `--platoo_epochs` | Steps without improvement before restart | — |
+| Flag              | Description                              | Default |
+|-------------------|------------------------------------------|---------|
+| `--epochs`        | Maximum iterations total (0 = unlimited) | 0       |
+| `--platoo_epochs` | Steps without improvement before restart | —       |
 
 ## Usage
 

@@ -42,7 +42,19 @@
 <h2>Description</h2>
 <p>Probabilistic local search inspired by the annealing process in metallurgy. Each iteration proposes a random tour modification. Improvements are always accepted; worsenings are accepted with probability exp(−Δ/T), where T is the current &quot;temperature&quot;. Temperature decreases each step according to the cooling rate, so the algorithm transitions from broad exploration at high temperature to fine-tuned exploitation at low temperature.</p>
 <p>Auto-expands to <code>pipeline(shuffle, sa)</code>. The temperature schedule is calibrated for cold starts — seeding SA from a greedy NN tour constrains early exploration and typically worsens the final result. For a warm-started SA run use the <code>classic</code> preset (<code>nn → 2opt → sa</code>): the 2-opt stage removes edge crossings before SA fine-tunes the result.</p>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure SimulatedAnnealing(cities, T_start, T_end, cooling):
+    tour ← random_tour(cities)
+    best ← tour
+    T ← T_start
+    while T &gt; T_end:
+        neighbour ← random_2opt_swap(tour)
+        Δ ← length(neighbour) − length(tour)
+        if Δ &lt; 0 or random() &lt; exp(−Δ / T):
+            tour ← neighbour
+        if length(tour) &lt; length(best):
+            best ← tour
+        T ← T × cooling
+    return best</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>

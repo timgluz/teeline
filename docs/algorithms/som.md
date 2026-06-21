@@ -1,7 +1,7 @@
 # Kohonen Self-Organizing Map
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `som`, `kohonen` |
 | **Type** | Heuristic — constructive |
 | **Complexity** | O(epochs · N · n) per run |
@@ -22,17 +22,21 @@ centred at the normalised centroid.
 Each epoch:
 
 1. Anneal learning rate and neighbourhood radius:
-   ```
+
+   ```text
    η  = learning_rate × exp(−t / epochs)
    σ  = max(radius_fraction × N × exp(−t / epochs), 1.0)
    ```
+
 2. Pick a random city `c` (with replacement).
 3. Find the **Best Matching Unit** (BMU) — the neuron nearest to `c`; ties broken by lowest index.
 4. Pull every neuron toward `c` weighted by a Gaussian over ring distance:
-   ```
+
+   ```text
    h(i) = exp(−ring_dist(i, bmu)² / 2σ²)
    neurons[i] += η · h(i) · (c − neurons[i])
    ```
+
    Neurons with `h < 0.001` are skipped for performance.
 
 ### Tour extraction
@@ -45,7 +49,7 @@ Hamiltonian tour regardless of convergence quality.
 ## Options
 
 | Field | Default | Range | Description |
-|-------|---------|-------|-------------|
+| ------- | --------- | ------- | ------------- |
 | `epochs` | 100 000 | ≥ 1 | Number of training iterations |
 | `learning_rate` | 0.8 | (0, 1] | Initial learning rate η₀ |
 | `radius_fraction` | 0.1 | (0, 1] | Initial neighbourhood radius as fraction of neuron count |
