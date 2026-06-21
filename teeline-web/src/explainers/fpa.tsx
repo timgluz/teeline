@@ -4,9 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "preact/hooks"
 // Fixed demo instance: 18 cities on a 300×300 canvas.
 // ---------------------------------------------------------------
 const CITIES: [number, number][] = [
-  [50, 50], [150, 20], [260, 60], [290, 160], [240, 260], [140, 280],
-  [40, 250], [20, 140], [100, 110], [200, 90], [250, 170], [190, 230],
-  [110, 210], [60, 170], [150, 140], [220, 140], [130, 80], [175, 195],
+  [45, 45], [155, 18], [265, 45], [285, 150],
+  [255, 265], [150, 285], [40, 260], [18, 150],
+  [110, 115], [200, 95], [220, 210], [95, 215],
 ]
 const N_CITIES = CITIES.length
 
@@ -140,6 +140,9 @@ function TourSVG({ flowers, gbest, activeIdx }: TourSVGProps) {
       {gbest.length > 0 && <polyline className="fp-gbest" points={polyPts(gbest)} />}
       {CITIES.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r={4} className="fp-city" />
+      ))}
+      {CITIES.map(([x, y], i) => (
+        <text key={i} x={x + 6} y={y - 5} className="fp-city-label">{i}</text>
       ))}
     </svg>
   )
@@ -561,9 +564,9 @@ const CSS = `
 }
 
 /* Canvas */
-.fp-canvas-wrap { position: relative; display: inline-block; width: 100%; max-width: 340px; }
+.fp-canvas-wrap { position: relative; display: block; width: 100%; }
 .fp-canvas {
-  width: 100%; max-width: 340px; display: block;
+  width: 100%; display: block;
   border-radius: 8px; border: 1px solid var(--line);
 }
 .fp-bg { fill: var(--panel); }
@@ -571,6 +574,11 @@ const CSS = `
 .fp-active { fill: none; stroke: var(--active); stroke-width: 1.8; stroke-linejoin: round; }
 .fp-gbest { fill: none; stroke: var(--gbest); stroke-width: 2.5; stroke-linejoin: round; }
 .fp-city { fill: var(--city); stroke: var(--bg); stroke-width: 1.5; }
+.fp-city-label {
+  font-size: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  fill: #374151; stroke: white; stroke-width: 2.5; paint-order: stroke fill;
+  dominant-baseline: auto; pointer-events: none; user-select: none;
+}
 
 /* Icon overlay */
 .fp-icon {
