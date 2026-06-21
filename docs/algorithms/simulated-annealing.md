@@ -1,7 +1,7 @@
 # Simulated Annealing
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `sa`, `simulated_annealing` |
 | **Type** | Heuristic — local search (stochastic) |
 | **Auto-seeds from** | `shuffle` (random tour) |
@@ -12,10 +12,26 @@ Probabilistic local search inspired by the annealing process in metallurgy. Each
 
 Auto-expands to `pipeline(shuffle, sa)`. The temperature schedule is calibrated for cold starts — seeding SA from a greedy NN tour constrains early exploration and typically worsens the final result. For a warm-started SA run use the `classic` preset (`nn → 2opt → sa`): the 2-opt stage removes edge crossings before SA fine-tunes the result.
 
+```text
+procedure SimulatedAnnealing(cities, T_start, T_end, cooling):
+    tour ← random_tour(cities)
+    best ← tour
+    T ← T_start
+    while T > T_end:
+        neighbour ← random_2opt_swap(tour)
+        Δ ← length(neighbour) − length(tour)
+        if Δ < 0 or random() < exp(−Δ / T):
+            tour ← neighbour
+        if length(tour) < length(best):
+            best ← tour
+        T ← T × cooling
+    return best
+```
+
 ## Options
 
 | Flag | Description | Default |
-|------|-------------|---------|
+| ------ | ------------- | --------- |
 | `--max_temperature` | Starting temperature | 1000.0 |
 | `--min_temperature` | Stopping temperature | 0.001 |
 | `--cooling_rate` | Fractional temperature drop per step | — |

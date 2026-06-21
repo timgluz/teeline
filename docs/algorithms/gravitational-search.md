@@ -1,7 +1,7 @@
 # Gravitational Search Algorithm
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `gsa`, `gravitational_search` |
 | **Type** | Heuristic — swarm metaheuristic |
 | **Auto-seeds from** | `shuffle` (random swarm) |
@@ -13,7 +13,7 @@ Physics-inspired swarm metaheuristic where each agent is a candidate tour with a
 **TSP-specific adaptations** (deviations from Rashedi et al. 2009):
 
 | Adaptation | Reason |
-|---|---|
+| --- | --- |
 | Discrete velocity as swap list | TSP has no continuous position space; swap sequences from `swap_sequence(i,j)` approximate the continuous update |
 | Spread-based mass: `m_i = (worst − cost_i) / Σ(worst − cost_j)` | Directly from Rashedi 2009; maps fitness to mass with guaranteed [0,1] range |
 | Uniform-mass fallback when all costs equal | Prevents NaN when the population converges to identical tour costs |
@@ -23,6 +23,22 @@ Physics-inspired swarm metaheuristic where each agent is a candidate tour with a
 | PSO-style always-accept position | Simplifies update loop; gbest tracked separately |
 
 Auto-expands to `pipeline(shuffle, gsa)`.
+
+```text
+procedure GravitationalSearch(cities, n_agents, epochs):
+    agents ← initialize_agents(n_agents, cities)
+    gbest ← best_tour(agents)
+    for epoch in 1..epochs:
+        G ← gravitational_constant_decay(epoch)
+        masses ← compute_masses(agents)
+        kbest ← top_half_by_mass(agents, masses)
+        for each agent i:
+            force ← sum of G × masses[j] × swaps_toward(agents[i], agents[j])
+                     for j in kbest, j ≠ i
+            agents[i] ← apply_swap_moves(agents[i], force)
+        gbest ← best_tour(agents)
+    return gbest
+```
 
 ## Options
 

@@ -1,7 +1,7 @@
 # Christofides
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `christofides`, `chr` |
 | **Type** | Heuristic — constructive approximation |
 | **Approximation bound** | ≤ 1.5× optimal (EUC_2D only) |
@@ -12,7 +12,7 @@ The only TSP heuristic with a **provable worst-case bound**: the output tour is 
 
 The algorithm builds a tour from scratch through six deterministic steps:
 
-```
+```text
 1. Minimum Spanning Tree (Prim's, O(n²))
 2. Identify odd-degree MST vertices
 3. Greedy min-weight perfect matching on odd-degree vertices
@@ -44,6 +44,17 @@ On berlin52 this reduces the tour from 8707 (Christofides alone) to 8156 (+8.1% 
 - You need a **guaranteed quality bound** (not just empirical quality).
 - You need a **reproducible constructive tour** to seed another solver.
 - You want to study classic approximation algorithm theory in a concrete implementation.
+
+```text
+procedure Christofides(cities):
+    T ← minimum_spanning_tree(cities)
+    O ← odd_degree_vertices(T)
+    M ← minimum_weight_matching(O)
+    G ← multigraph_union(T, M)
+    circuit ← eulerian_circuit(G)
+    tour ← shortcut_repeated_visits(circuit)
+    return tour
+```
 
 ## Options
 

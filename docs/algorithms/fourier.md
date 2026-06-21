@@ -1,7 +1,7 @@
 # Fourier-basis Constructive Solver
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `fourier` |
 | **Type** | Heuristic — constructive |
 | **Complexity** | O(K_max · epochs · n · M) per run |
@@ -16,7 +16,7 @@ no repair step, and no possibility of producing an invalid tour.
 
 The tour is the closed curve
 
-```
+```text
 γ(s) = Σ_{k=-K}^{K} c_k · exp(2πi · k · s),   s ∈ [0, 1)
 ```
 
@@ -25,7 +25,7 @@ the only free variables; gradient descent moves them so the curve passes near ea
 
 ### Energy
 
-```
+```text
 E(c) = Σ_i  min_j |city_i − γ(s_j)|²   +   λ Σ_k (2πk)² |c_k|²
          attraction                              tension
 ```
@@ -36,7 +36,7 @@ E(c) = Σ_i  min_j |city_i − γ(s_j)|²   +   λ Σ_k (2πk)² |c_k|²
 
 ### Coarse-to-fine optimisation loop
 
-```
+```text
 initialise c[0] = centroid, c[1] = radius/2, all others = 0
 λ ← opts.lambda
 
@@ -58,7 +58,7 @@ when all modes compete simultaneously.
 
 ### Decode (always valid)
 
-```
+```text
 s_i = argmin_j |city_i − γ(s_j)|     // nearest curve sample per city
 tour = argsort(s_i)                    // sort cities by their curve position
 ```
@@ -67,10 +67,19 @@ The argsort gives **array positions** in `cities[]`, which are then mapped to th
 fields — the same pattern used by Christofides. This guarantees a valid Hamiltonian tour
 regardless of convergence quality.
 
+```text
+procedure FourierSolver(cities):
+    coeffs ← fit_fourier_basis_to_cities(cities)
+    curve ← reconstruct_closed_curve(coeffs)
+    tour ← argsort_cities_by_curve_parameter(cities, curve)
+    tour ← two_opt_polish(tour)
+    return tour
+```
+
 ## Options
 
 | Field | Default | Range | Description |
-|-------|---------|-------|-------------|
+| ------- | --------- | ------- | ------------- |
 | `k_max` | 4 | ≥ 1 | Maximum Fourier mode (number of frequency stages) |
 | `m` | 200 | ≥ 2 | Curve sampling resolution (points on γ) |
 | `lambda` | 0.05 | > 0 | Initial tension weight |
@@ -108,9 +117,9 @@ This algorithm is a Fourier-parameterised variant of the **Elastic Net** (Durbin
 optimise via gradient descent. The key differences:
 
 | | Elastic Net | This implementation |
-|---|---|---|
+| --- | --- | --- |
 | Curve representation | M explicit node positions | 2K+1 Fourier coefficients |
-| Tension term | Sum of squared edge lengths | `λ(2πk)²|c_k|²` (diagonal in coefficient space) |
+| Tension term | Sum of squared edge lengths | `λ(2πk)² | c_k | ²` (diagonal in coefficient space) |
 | Mode schedule | Simultaneous + temperature annealing | Coarse-to-fine frequency unlocking |
 | Tour decode | Explicit node ordering | Argsort of nearest-sample parameter `s_i` |
 

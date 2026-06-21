@@ -57,7 +57,19 @@
   </tbody>
 </table>
 <p>Auto-expands to <code>pipeline(shuffle, cs)</code>.</p>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure CuckooSearch(cities, n_nests, pa, epochs):
+    nests ← initialize_nests(n_nests, cities)
+    best ← best_tour(nests)
+    for epoch in 1..epochs:
+        for each nest i:
+            step ← levy_flight()
+            candidate ← apply_2opt_reversals(nests[i], step)
+            j ← random_nest_index()
+            if length(candidate) &lt; length(nests[j]):
+                nests[j] ← candidate
+        abandon_worst_fraction(nests, pa)
+        best ← min(best, best_tour(nests))
+    return best</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>

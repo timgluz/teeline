@@ -1,7 +1,7 @@
 # 3-opt
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `3opt`, `three_opt` |
 | **Type** | Heuristic — local search |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
@@ -13,6 +13,19 @@ Extension of 2-opt that removes three edges per iteration and reconnects the thr
 Finds deeper local optima than 2-opt at the cost of O(n³) per pass. Typical tour quality is a few percentage points better than `nn → 2opt` at the expense of longer runtime.
 
 Auto-expands to `pipeline(nn, 3opt)`.
+
+```text
+procedure ThreeOpt(tour):
+    improved ← true
+    while improved:
+        improved ← false
+        for each triple of edges (e1, e2, e3):
+            best ← best_reconnection(tour, e1, e2, e3)
+            if length(best) < length(tour):
+                tour ← best
+                improved ← true
+    return tour
+```
 
 ## Options
 

@@ -48,7 +48,17 @@
 <li><strong>Elitism</strong> — the top <code>n_elite</code> individuals are passed unchanged to the next generation.</li>
 </ol>
 <p>The population is seeded with a mix of NN-derived tours and random mutations (RSM mutants) for diversity. Auto-expands to <code>pipeline(shuffle, ga)</code>.</p>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure GeneticAlgorithm(cities, pop_size, epochs):
+    population ← initialize_population(pop_size, cities)
+    best ← fittest(population)
+    for epoch in 1..epochs:
+        parents ← tournament_selection(population)
+        offspring ← order_crossover(parents)
+        offspring ← mutate_each(offspring)
+        population ← select_survivors(population ∪ offspring)
+        if fittest(population) &lt; best:
+            best ← fittest(population)
+    return best</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>

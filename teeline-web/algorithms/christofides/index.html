@@ -59,7 +59,14 @@
 <li>You need a <strong>reproducible constructive tour</strong> to seed another solver.</li>
 <li>You want to study classic approximation algorithm theory in a concrete implementation.</li>
 </ul>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure Christofides(cities):
+    T ← minimum_spanning_tree(cities)
+    O ← odd_degree_vertices(T)
+    M ← minimum_weight_matching(O)
+    G ← multigraph_union(T, M)
+    circuit ← eulerian_circuit(G)
+    tour ← shortcut_repeated_visits(circuit)
+    return tour</code></pre><h2>Options</h2>
 <p>Christofides is parameter-free. <code>--epochs</code> and other options are accepted but ignored.</p>
 <h2>Usage</h2>
 <pre><code class="shj-lang-bash"><span class="shj-syn-cmnt"># standalone</span>

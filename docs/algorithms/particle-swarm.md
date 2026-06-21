@@ -1,7 +1,7 @@
 # Particle Swarm Optimisation
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `pso`, `particle_swarm` |
 | **Type** | Heuristic — swarm metaheuristic |
 | **Auto-seeds from** | `shuffle` (random swarm) |
@@ -13,12 +13,29 @@ Swarm metaheuristic where each particle is a candidate tour with a velocity — 
 **TSP-specific adaptations** (deviations from Clerc 2004):
 
 | Adaptation | Reason |
-|---|---|
+| --- | --- |
 | Velocity cap at `⌈0.35 · n⌉` swaps | Without a cap, velocity grows to ~5n swaps per epoch, scrambling tours into noise |
 | Linear inertia decay W: 0.9 → 0.4 | High inertia early for broad exploration; decays like a cooling schedule for late fine-tuning |
 | All particles initialised randomly | Seeding via the pipeline; PSO itself stays a pure algorithm |
 
 Auto-expands to `pipeline(shuffle, pso)`.
+
+```text
+procedure ParticleSwarm(cities, n_particles, epochs):
+    particles ← initialize_particles(n_particles, cities)
+    gbest ← best_tour(particles)
+    for epoch in 1..epochs:
+        ω ← inertia_decay(epoch)
+        for each particle p:
+            v ← ω × p.velocity
+              + c1 × toward(p.position, p.best)
+              + c2 × toward(p.position, gbest)
+            p.position ← apply_swaps(p.position, v)
+            if length(p.position) < length(p.best):
+                p.best ← p.position
+        gbest ← best_tour(particles)
+    return gbest
+```
 
 ## Options
 

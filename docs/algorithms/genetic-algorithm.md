@@ -1,7 +1,7 @@
 # Genetic Algorithm
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `ga`, `genetic_algorithm` |
 | **Type** | Heuristic — evolutionary metaheuristic |
 | **Auto-seeds from** | `shuffle` (random population) |
@@ -17,10 +17,24 @@ Evolutionary metaheuristic that maintains a population of candidate tours. Each 
 
 The population is seeded with a mix of NN-derived tours and random mutations (RSM mutants) for diversity. Auto-expands to `pipeline(shuffle, ga)`.
 
+```text
+procedure GeneticAlgorithm(cities, pop_size, epochs):
+    population ← initialize_population(pop_size, cities)
+    best ← fittest(population)
+    for epoch in 1..epochs:
+        parents ← tournament_selection(population)
+        offspring ← order_crossover(parents)
+        offspring ← mutate_each(offspring)
+        population ← select_survivors(population ∪ offspring)
+        if fittest(population) < best:
+            best ← fittest(population)
+    return best
+```
+
 ## Options
 
 | Flag | Description | Default |
-|------|-------------|---------|
+| ------ | ------------- | --------- |
 | `--epochs` | Maximum generations | 10 000 |
 | `--mutation_probability` | Probability of random swap per child | 0.001 |
 | `--n_elite` | Individuals carried unchanged to next generation | 3 |

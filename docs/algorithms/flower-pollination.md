@@ -1,7 +1,7 @@
 # Flower Pollination Algorithm
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `fpa`, `flower_pollination` |
 | **Type** | Heuristic — nature-inspired metaheuristic |
 | **Auto-seeds from** | `shuffle` (random flowers) |
@@ -18,17 +18,36 @@ The switch probability controls the balance between exploitation (global) and ex
 **TSP-specific adaptations** (deviations from Yang 2012):
 
 | Adaptation | Reason |
-|---|---|
+| --- | --- |
 | Global pollination → Lévy-scaled prefix of swap sequence toward gbest | Permutation analogue of the continuous update; preserves tour validity |
 | Local pollination → ε-scaled prefix of swap diff between two random flowers | Permutation analogue of local cross-pollination |
 | `switch_prob` floored at 0.8 when `mutation_probability < 0.01` | Prevents degeneration to 99.9 % local-only search under default CLI options |
 
 Auto-expands to `pipeline(shuffle, fpa)`.
 
+```text
+procedure FlowerPollination(cities, n_flowers, p, epochs):
+    flowers ← initialize_flowers(n_flowers, cities)
+    gbest ← best_tour(flowers)
+    for epoch in 1..epochs:
+        for each flower i:
+            if random() < p:
+                step ← levy_flight()
+                candidate ← move_toward(flowers[i], gbest, step)
+            else:
+                j, k ← two random flower indices
+                ε ← random()
+                candidate ← local_crossover(flowers[i], flowers[j], flowers[k], ε)
+            if length(candidate) < length(flowers[i]):
+                flowers[i] ← candidate
+        gbest ← best_tour(flowers)
+    return gbest
+```
+
 ## Options
 
 | Flag | Description | Default |
-|------|-------------|---------|
+| ------ | ------------- | --------- |
 | `--epochs` | Maximum iterations | 10 000 |
 | `--n_nearest` | Number of flowers (floored at 25) | 25 |
 | `--mutation_probability` | Switch probability (global vs local pollination) | 0.8 |

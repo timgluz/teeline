@@ -55,7 +55,19 @@
   </tbody>
 </table>
 <p>Auto-expands to <code>pipeline(shuffle, gsa)</code>.</p>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure GravitationalSearch(cities, n_agents, epochs):
+    agents ← initialize_agents(n_agents, cities)
+    gbest ← best_tour(agents)
+    for epoch in 1..epochs:
+        G ← gravitational_constant_decay(epoch)
+        masses ← compute_masses(agents)
+        kbest ← top_half_by_mass(agents, masses)
+        for each agent i:
+            force ← sum of G × masses[j] × swaps_toward(agents[i], agents[j])
+                     for j in kbest, j ≠ i
+            agents[i] ← apply_swap_moves(agents[i], force)
+        gbest ← best_tour(agents)
+    return gbest</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>

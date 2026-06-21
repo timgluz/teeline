@@ -1,7 +1,7 @@
 # Or-opt
 
 | | |
-|---|---|
+| --- | --- |
 | **Alias** | `or_opt`, `or-opt` |
 | **Type** | Heuristic — local search |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
@@ -18,7 +18,7 @@ Auto-expands to `pipeline(nn, or_opt)`.
 
 ### Move structure
 
-```
+```text
 Or-1 — relocate a single city:
   Before: ... A → [B] → C ... X → Y ...
   After:  ... A → C ... X → [B] → Y ...
@@ -38,6 +38,21 @@ Or-opt works well as a post-processing step after any constructive or metaheuris
 
 ```bash
 teeline pipeline --steps=nn,2opt,or_opt -i ./data/tsplib/berlin52.tsp
+```
+
+```text
+procedure OrOpt(tour):
+    improved ← true
+    while improved:
+        improved ← false
+        for segment_len in {1, 2, 3}:
+            for each segment S of length segment_len in tour:
+                for each insertion position p not adjacent to S:
+                    new_tour ← remove_and_insert(tour, S, p)
+                    if length(new_tour) < length(tour):
+                        tour ← new_tour
+                        improved ← true
+    return tour
 ```
 
 ## Options

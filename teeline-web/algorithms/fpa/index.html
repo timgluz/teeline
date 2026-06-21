@@ -56,7 +56,22 @@
   </tbody>
 </table>
 <p>Auto-expands to <code>pipeline(shuffle, fpa)</code>.</p>
-<h2>Options</h2>
+<pre><code class="shj-lang-plain">procedure FlowerPollination(cities, n_flowers, p, epochs):
+    flowers ← initialize_flowers(n_flowers, cities)
+    gbest ← best_tour(flowers)
+    for epoch in 1..epochs:
+        for each flower i:
+            if random() &lt; p:
+                step ← levy_flight()
+                candidate ← move_toward(flowers[i], gbest, step)
+            else:
+                j, k ← two random flower indices
+                ε ← random()
+                candidate ← local_crossover(flowers[i], flowers[j], flowers[k], ε)
+            if length(candidate) &lt; length(flowers[i]):
+                flowers[i] ← candidate
+        gbest ← best_tour(flowers)
+    return gbest</code></pre><h2>Options</h2>
 <table>
   <thead><tr><th>Flag</th><th>Description</th><th>Default</th></tr></thead>
   <tbody>
