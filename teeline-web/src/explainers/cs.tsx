@@ -237,6 +237,11 @@ function TourSVG({ tour, best, diff }: TourSVGProps) {
           <circle key={i} cx={x} cy={y} r={4} className="cs-city" />
         )
       })}
+
+      {/* City labels — rendered last so they sit above edges */}
+      {CITIES.map(([x, y], i) => (
+        <text key={i} x={x + 6} y={y - 5} className="cs-city-label">{i}</text>
+      ))}
     </svg>
   )
 }
@@ -692,6 +697,11 @@ const CSS = `
 .cs-city { fill: var(--city); stroke: var(--bg); stroke-width: 1.5; }
 .cs-city-active { fill: #f97316; stroke: var(--bg); stroke-width: 1.5; }
 .cs-city-ring { fill: none; stroke: #f97316; stroke-width: 1.5; stroke-opacity: 0.45; }
+.cs-city-label {
+  font-size: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  fill: #374151; stroke: white; stroke-width: 2.5; paint-order: stroke fill;
+  dominant-baseline: auto; pointer-events: none; user-select: none;
+}
 
 /* Quality bars */
 .cs-bars-label { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
