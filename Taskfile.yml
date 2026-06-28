@@ -48,9 +48,10 @@ tasks:
       - ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
 
   api:stop:
-    desc: Stop the background teeline-api server (kills PID from /tmp/teeline-api.pid)
+    desc: Stop the background teeline-api server (kills by PID file and any stale instances)
     cmds:
       - kill $(cat /tmp/teeline-api.pid) 2>/dev/null || true
+      - pkill -f target/debug/teeline-api 2>/dev/null || true
 
   api:wait:
     desc: Poll until teeline-api health endpoint is ready (max 10s)
