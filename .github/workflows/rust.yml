@@ -22,17 +22,21 @@ jobs:
         with:
           submodules: true
       - name: Build
-        run: cargo build -p teeline -p teeline-cli --verbose
+        run: cargo build -p teeline -p teeline-cli -p teeline-api --verbose
       - name: Run tests
-        run: cargo test -p teeline -p teeline-cli --verbose
+        run: cargo test -p teeline -p teeline-cli -p teeline-api --verbose
       - name: Run e2e tests (BATS)
         run: ./tests/bats/bin/bats tests/e2e/
+      - name: Install mise tools (hurl)
+        uses: jdx/mise-action@v2
+      - name: Run hurl e2e tests (teeline-api)
+        run: task test:e2e:api
       - name: Clippy
-        run: cargo clippy -p teeline -p teeline-cli -- -D warnings
+        run: cargo clippy -p teeline -p teeline-cli -p teeline-api -- -D warnings
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Coverage
-        run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
+        run: cargo llvm-cov -p teeline -p teeline-cli -p teeline-api --lcov --output-path lcov.info
       - name: Upload coverage
         uses: codecov/codecov-action@v7
         with:
