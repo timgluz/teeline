@@ -16,5 +16,6 @@ pub fn build_router(state: AppState) -> axum::Router {
             "/api/v1/health",
             axum::routing::get(routes::health::handler),
         )
+        .route("/healthz", axum::routing::get(routes::health::handler))
         .with_state(state)
 }
