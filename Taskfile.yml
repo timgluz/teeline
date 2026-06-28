@@ -55,8 +55,6 @@ tasks:
   test:e2e:api:
     desc: Build, start, wait, run hurl e2e tests, then shut down teeline-api
     deps: [build:api]
-    env:
-      LD_LIBRARY_PATH: "{{.HOME}}/lib:{{.LD_LIBRARY_PATH}}"
     cmds:
       - defer: kill $(cat /tmp/teeline-api.pid) 2>/dev/null || true
       - task: api:serve
