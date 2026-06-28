@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "preact/hooks"
 import type { SomState, Phase } from "./som-algo"
 import {
-  CITIES, ALPHA0, SIGMA0, MAX_STEPS,
+  CITIES, ALPHA0, SIGMA0, MAX_STEPS, N_CITIES, N_NEURONS,
   makeInitState, stepOnce, neighbourRadiusPx, phaseLabel,
 } from "./som-algo"
 
@@ -239,7 +239,7 @@ export default function SomExplainer() {
       </div>
 
       <footer class="som-footer">
-        12 cities · 18 neurons · η₀={ALPHA0} · σ₀={SIGMA0} · {MAX_STEPS} steps
+        {N_CITIES} cities · {N_NEURONS} neurons · η₀={ALPHA0} · σ₀={SIGMA0} · {MAX_STEPS} steps
       </footer>
     </div>
   )
