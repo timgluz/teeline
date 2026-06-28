@@ -37,6 +37,32 @@ tasks:
     cmds:
       - ./tests/bats/bin/bats tests/e2e/
 
+  build:api:
+    desc: Compile debug binary (teeline-api)
+    cmds:
+      - cargo build -p teeline-api
+
+  api:serve:
+    desc: Start teeline-api server in background (writes PID to /tmp/teeline-api.pid)
+    cmds:
+      - ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+
+  api:wait:
+    desc: Poll until teeline-api health endpoint is ready (max 10s)
+    cmds:
+      - for i in $(seq 10); do curl -sf http://127.0.0.1:8080/api/v1/health && break || sleep 1; done
+
+  test:e2e:api:
+    desc: Build, start, wait, run hurl e2e tests, then shut down teeline-api
+    deps: [build:api]
+    env:
+      LD_LIBRARY_PATH: "{{.HOME}}/lib:{{.LD_LIBRARY_PATH}}"
+    cmds:
+      - defer: kill $(cat /tmp/teeline-api.pid) 2>/dev/null || true
+      - task: api:serve
+      - task: api:wait
+      - hurl --test teeline-api/tests/hurl/*.hurl
+
   test:all:
     desc: Run unit tests and e2e tests
     deps: [test, test:e2e]
