@@ -1,7 +1,7 @@
 import { describe, test, expect } from 'vitest'
 import {
   N_CITIES, N_NEURONS, SIGMA0, MAX_STEPS,
-  makeInitState, stepOnce, tourLength, neighbourRadiusPx,
+  makeInitState, stepOnce, tourLength, neighbourRadiusPx, phaseLabel,
 } from './som-algo'
 
 describe('tourLength', () => {
@@ -67,7 +67,7 @@ describe('stepOnce', () => {
     for (let i = 0; i <= MAX_STEPS; i++) s = stepOnce(s)
     // sigma is clamped on each step; check the training steps
     // (after MAX_STEPS, phase is done and sigma is from last training step)
-    expect(s.sigma === null || s.sigma >= 1.0).toBe(true)
+    expect(s.sigma).toBeGreaterThanOrEqual(1.0)
   })
   test('phase becomes done after MAX_STEPS+1 calls', () => {
     let s = makeInitState()
@@ -95,5 +95,36 @@ describe('neighbourRadiusPx', () => {
   test('larger sigma gives larger radius', () => {
     const { neurons } = makeInitState()
     expect(neighbourRadiusPx(4, neurons)).toBeGreaterThan(neighbourRadiusPx(2, neurons))
+  })
+})
+
+describe('phaseLabel', () => {
+  test('init phase returns non-empty string', () => {
+    const label = phaseLabel('init', null)
+    expect(label).toBeTruthy()
+    expect(typeof label).toBe('string')
+  })
+  test('expanding phase returns non-empty string', () => {
+    const label = phaseLabel('expanding', null)
+    expect(label).toBeTruthy()
+    expect(typeof label).toBe('string')
+  })
+  test('converging phase returns non-empty string', () => {
+    const label = phaseLabel('converging', null)
+    expect(label).toBeTruthy()
+    expect(typeof label).toBe('string')
+  })
+  test('fine-tuning phase returns non-empty string', () => {
+    const label = phaseLabel('fine-tuning', null)
+    expect(label).toBeTruthy()
+    expect(typeof label).toBe('string')
+  })
+  test('done phase interpolates lastTourLength when provided', () => {
+    const label = phaseLabel('done', 123.456)
+    expect(label).toContain('123')
+  })
+  test('done phase shows — when lastTourLength is null', () => {
+    const label = phaseLabel('done', null)
+    expect(label).toContain('—')
   })
 })

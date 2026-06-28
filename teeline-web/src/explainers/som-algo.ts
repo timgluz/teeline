@@ -127,7 +127,7 @@ export function stepOnce(s: SomState): SomState {
 
   const phase: Phase =
     sigma > SIGMA0 * 0.5 ? 'expanding'
-    : sigma > SIGMA_FLOOR * 2 ? 'converging'
+    : sigma > SIGMA_FLOOR * 1.5 ? 'converging'
     : 'fine-tuning'
 
   return { ...s, neurons: newNeurons, step: t, alpha, sigma, bmu, neighbors, lastCityIdx: cityIdx, phase }
