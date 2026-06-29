@@ -132,6 +132,7 @@ mod tests {
         let json = serde_json::to_string(&resp).unwrap();
         let back: SolveResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(back.solver, "nn");
+        assert_eq!(back.total, 1234.5_f32);
         assert_eq!(back.route, vec![1, 3, 2]);
         assert_eq!(back.duration_ms, 42);
     }

@@ -239,6 +239,16 @@ pub struct CompareRequest {
     pub configs: Option<SolverConfigs>,
 }
 
+impl SolveRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        self.input.validate()?;
+        if self.solver.trim().is_empty() {
+            return Err("`solver` must not be empty".to_string());
+        }
+        Ok(())
+    }
+}
+
 impl CompareRequest {
     pub fn validate(&self) -> Result<(), String> {
         self.input.validate()?;
@@ -417,6 +427,40 @@ mod tests {
             configs: None,
         };
         assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn solve_request_validate_rejects_blank_solver() {
+        let req = SolveRequest {
+            input: TspInput {
+                cities: Some(vec![CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                }]),
+                tsplib: None,
+            },
+            solver: "   ".to_string(),
+            configs: None,
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn solve_request_validate_accepts_valid() {
+        let req = SolveRequest {
+            input: TspInput {
+                cities: Some(vec![CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                }]),
+                tsplib: None,
+            },
+            solver: "nn".to_string(),
+            configs: None,
+        };
+        assert!(req.validate().is_ok());
     }
 
     #[test]
