@@ -17,11 +17,11 @@
     "@sentry/browser": "^10.62.0",
     "@sentry/vite-plugin": "^5.3.0",
     "htmx.org": "2.0.10",
-    "preact": "^10.29.2",
+    "preact": "^10.29.3",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.0",
+    "@playwright/test": "^1.61.1",
     "eta": "^4.6.0",
     "marked": "^18.0.5",
     "typescript": "6.0.3",
