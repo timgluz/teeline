@@ -177,6 +177,78 @@ pub struct SolverConfigs {
     pub fourier: Option<FourierConfig>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct CityInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<usize>,
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct TspInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cities: Option<Vec<CityInput>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tsplib: Option<String>,
+}
+
+impl TspInput {
+    pub fn validate(&self) -> Result<(), String> {
+        match (&self.cities, &self.tsplib) {
+            (Some(cities), None) => {
+                if cities.is_empty() {
+                    Err("`cities` must not be empty".to_string())
+                } else {
+                    Ok(())
+                }
+            }
+            (None, Some(tsplib)) => {
+                if tsplib.trim().is_empty() {
+                    Err("`tsplib` must not be empty".to_string())
+                } else {
+                    Ok(())
+                }
+            }
+            (Some(_), Some(_)) => {
+                Err("exactly one of `cities` or `tsplib` must be set, not both".to_string())
+            }
+            (None, None) => Err("one of `cities` or `tsplib` must be set".to_string()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct ParseRequest {
+    pub input: TspInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SolveRequest {
+    pub input: TspInput,
+    pub solver: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub configs: Option<SolverConfigs>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct CompareRequest {
+    pub input: TspInput,
+    pub solvers: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub configs: Option<SolverConfigs>,
+}
+
+impl CompareRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        self.input.validate()?;
+        if self.solvers.is_empty() {
+            return Err("`solvers` must contain at least one solver name".to_string());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,5 +272,157 @@ mod tests {
         let back: SolverConfigs = serde_json::from_str(&json).unwrap();
         assert_eq!(back.sa.as_ref().unwrap().cooling_rate, Some(0.0005));
         assert_eq!(back.sa.as_ref().unwrap().min_temperature, None);
+    }
+
+    #[test]
+    fn solve_request_cities_round_trip() {
+        let req = SolveRequest {
+            input: TspInput {
+                cities: Some(vec![
+                    CityInput {
+                        id: Some(1),
+                        x: 0.0,
+                        y: 0.0,
+                    },
+                    CityInput {
+                        id: Some(2),
+                        x: 1.0,
+                        y: 0.0,
+                    },
+                    CityInput {
+                        id: Some(3),
+                        x: 0.5,
+                        y: 1.0,
+                    },
+                ]),
+                tsplib: None,
+            },
+            solver: "nn".to_string(),
+            configs: None,
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: SolveRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.solver, "nn");
+        assert_eq!(back.input.cities.as_ref().unwrap().len(), 3);
+        assert!(back.input.tsplib.is_none());
+    }
+
+    #[test]
+    fn solve_request_with_configs_round_trip() {
+        let req = SolveRequest {
+            input: TspInput {
+                cities: Some(vec![CityInput {
+                    id: None,
+                    x: 1.0,
+                    y: 2.0,
+                }]),
+                tsplib: None,
+            },
+            solver: "sa".to_string(),
+            configs: Some(SolverConfigs {
+                sa: Some(SaConfig {
+                    heuristic: Some(HeuristicConfig {
+                        epochs: Some(1000),
+                        platoo_epochs: None,
+                        n_nearest: None,
+                    }),
+                    cooling_rate: Some(0.001),
+                    min_temperature: None,
+                    max_temperature: None,
+                }),
+                ..SolverConfigs::default()
+            }),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: SolveRequest = serde_json::from_str(&json).unwrap();
+        let sa = back.configs.unwrap().sa.unwrap();
+        assert_eq!(sa.cooling_rate, Some(0.001));
+        assert_eq!(sa.heuristic.unwrap().epochs, Some(1000));
+    }
+
+    #[test]
+    fn tsp_input_validate_rejects_both() {
+        let input = TspInput {
+            cities: Some(vec![CityInput {
+                id: Some(1),
+                x: 0.0,
+                y: 0.0,
+            }]),
+            tsplib: Some("NAME: test".to_string()),
+        };
+        assert!(input.validate().is_err());
+    }
+
+    #[test]
+    fn tsp_input_validate_rejects_neither() {
+        let input = TspInput {
+            cities: None,
+            tsplib: None,
+        };
+        assert!(input.validate().is_err());
+    }
+
+    #[test]
+    fn tsp_input_validate_rejects_empty_cities() {
+        let input = TspInput {
+            cities: Some(vec![]),
+            tsplib: None,
+        };
+        assert!(input.validate().is_err());
+    }
+
+    #[test]
+    fn tsp_input_validate_rejects_blank_tsplib() {
+        let input = TspInput {
+            cities: None,
+            tsplib: Some("   ".to_string()),
+        };
+        assert!(input.validate().is_err());
+    }
+
+    #[test]
+    fn tsp_input_validate_accepts_cities_only() {
+        let input = TspInput {
+            cities: Some(vec![CityInput {
+                id: Some(1),
+                x: 0.0,
+                y: 0.0,
+            }]),
+            tsplib: None,
+        };
+        assert!(input.validate().is_ok());
+    }
+
+    #[test]
+    fn tsp_input_validate_accepts_tsplib_only() {
+        let input = TspInput {
+            cities: None,
+            tsplib: Some("NAME: test".to_string()),
+        };
+        assert!(input.validate().is_ok());
+    }
+
+    #[test]
+    fn compare_request_validate_rejects_empty_solvers() {
+        let req = CompareRequest {
+            input: TspInput {
+                cities: Some(vec![CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                }]),
+                tsplib: None,
+            },
+            solvers: vec![],
+            configs: None,
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn solve_request_schema_builds() {
+        use utoipa::ToSchema;
+        let name = SolveRequest::name();
+        assert_eq!(name, "SolveRequest");
     }
 }
