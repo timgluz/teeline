@@ -21,7 +21,7 @@
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
-    "@playwright/test": "^1.61.0",
+    "@playwright/test": "^1.61.1",
     "eta": "^4.6.0",
     "marked": "^18.0.5",
     "typescript": "6.0.3",
