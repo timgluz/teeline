@@ -28,7 +28,7 @@ jobs:
       - name: Run e2e tests (BATS)
         run: ./tests/bats/bin/bats tests/e2e/
       - name: Install mise tools (hurl)
-        uses: jdx/mise-action@v2
+        uses: jdx/mise-action@v4
       - name: Run hurl e2e tests (teeline-api)
         run: task test:e2e:api
       - name: Clippy
