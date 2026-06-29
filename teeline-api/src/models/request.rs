@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct HeuristicConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epochs: Option<usize>,
