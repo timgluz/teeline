@@ -1,3 +1,5 @@
+use std::sync::OnceLock;
+
 use teeline::tsp::list_solvers;
 
 use super::SolverRegistryService;
@@ -5,20 +7,26 @@ use crate::models::response::AlgorithmInfo;
 
 pub struct SolverRegistry;
 
+static SOLVER_LIST_CACHE: OnceLock<Vec<AlgorithmInfo>> = OnceLock::new();
+
 impl SolverRegistryService for SolverRegistry {
     fn list(&self) -> Vec<AlgorithmInfo> {
-        list_solvers()
-            .iter()
-            .map(|si| AlgorithmInfo {
-                name: si.name.to_string(),
-                alias: si.alias.to_string(),
-                category: si.category.to_string(),
-                desc: si.desc.to_string(),
-                complexity: si.complexity.to_string(),
-                has_options: si.has_options,
-                exact: si.exact,
+        SOLVER_LIST_CACHE
+            .get_or_init(|| {
+                list_solvers()
+                    .iter()
+                    .map(|si| AlgorithmInfo {
+                        name: si.name.to_string(),
+                        alias: si.alias.to_string(),
+                        category: si.category.to_string(),
+                        desc: si.desc.to_string(),
+                        complexity: si.complexity.to_string(),
+                        has_options: si.has_options,
+                        exact: si.exact,
+                    })
+                    .collect()
             })
-            .collect()
+            .clone()
     }
 }
 
