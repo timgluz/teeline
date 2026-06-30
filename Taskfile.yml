@@ -63,7 +63,7 @@ tasks:
     deps: [build:api]
     cmds:
       - defer: kill $(cat /tmp/teeline-api.pid) 2>/dev/null || true
-      - task: api:serve
+      - RATE_LIMIT_RPM=0 ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
       - task: api:wait
       - hurl --test teeline-api/tests/hurl/*.hurl
 

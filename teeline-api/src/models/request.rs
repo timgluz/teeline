@@ -252,8 +252,8 @@ impl SolveRequest {
 impl CompareRequest {
     pub fn validate(&self) -> Result<(), String> {
         self.input.validate()?;
-        if self.solvers.is_empty() {
-            return Err("`solvers` must contain at least one solver name".to_string());
+        if self.solvers.len() < 2 {
+            return Err("`solvers` must contain at least 2 solver names".to_string());
         }
         Ok(())
     }
@@ -430,6 +430,31 @@ mod tests {
             tsplib: Some("NAME: test".to_string()),
         };
         assert!(input.validate().is_ok());
+    }
+
+    #[test]
+    fn compare_request_validate_rejects_single_solver() {
+        let two_cities = TspInput {
+            cities: Some(vec![
+                CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                },
+                CityInput {
+                    id: Some(2),
+                    x: 1.0,
+                    y: 0.0,
+                },
+            ]),
+            tsplib: None,
+        };
+        let req = CompareRequest {
+            input: two_cities,
+            solvers: vec!["nn".to_string()],
+            configs: None,
+        };
+        assert!(req.validate().is_err());
     }
 
     #[test]
