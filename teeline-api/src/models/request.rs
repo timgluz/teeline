@@ -252,8 +252,8 @@ impl SolveRequest {
 impl CompareRequest {
     pub fn validate(&self) -> Result<(), String> {
         self.input.validate()?;
-        if self.solvers.is_empty() {
-            return Err("`solvers` must contain at least one solver name".to_string());
+        if self.solvers.len() < 2 {
+            return Err("`solvers` must contain at least 2 solver names".to_string());
         }
         Ok(())
     }
