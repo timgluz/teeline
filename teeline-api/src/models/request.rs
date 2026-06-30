@@ -197,8 +197,8 @@ impl TspInput {
     pub fn validate(&self) -> Result<(), String> {
         match (&self.cities, &self.tsplib) {
             (Some(cities), None) => {
-                if cities.is_empty() {
-                    Err("`cities` must not be empty".to_string())
+                if cities.len() < 2 {
+                    Err("`cities` must contain at least 2 cities".to_string())
                 } else {
                     Ok(())
                 }
@@ -382,6 +382,19 @@ mod tests {
     }
 
     #[test]
+    fn tsp_input_validate_rejects_single_city() {
+        let input = TspInput {
+            cities: Some(vec![CityInput {
+                id: Some(1),
+                x: 0.0,
+                y: 0.0,
+            }]),
+            tsplib: None,
+        };
+        assert!(input.validate().is_err());
+    }
+
+    #[test]
     fn tsp_input_validate_rejects_blank_tsplib() {
         let input = TspInput {
             cities: None,
@@ -393,11 +406,18 @@ mod tests {
     #[test]
     fn tsp_input_validate_accepts_cities_only() {
         let input = TspInput {
-            cities: Some(vec![CityInput {
-                id: Some(1),
-                x: 0.0,
-                y: 0.0,
-            }]),
+            cities: Some(vec![
+                CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                },
+                CityInput {
+                    id: Some(2),
+                    x: 1.0,
+                    y: 0.0,
+                },
+            ]),
             tsplib: None,
         };
         assert!(input.validate().is_ok());
@@ -416,11 +436,18 @@ mod tests {
     fn compare_request_validate_rejects_empty_solvers() {
         let req = CompareRequest {
             input: TspInput {
-                cities: Some(vec![CityInput {
-                    id: Some(1),
-                    x: 0.0,
-                    y: 0.0,
-                }]),
+                cities: Some(vec![
+                    CityInput {
+                        id: Some(1),
+                        x: 0.0,
+                        y: 0.0,
+                    },
+                    CityInput {
+                        id: Some(2),
+                        x: 1.0,
+                        y: 0.0,
+                    },
+                ]),
                 tsplib: None,
             },
             solvers: vec![],
@@ -433,11 +460,18 @@ mod tests {
     fn solve_request_validate_rejects_blank_solver() {
         let req = SolveRequest {
             input: TspInput {
-                cities: Some(vec![CityInput {
-                    id: Some(1),
-                    x: 0.0,
-                    y: 0.0,
-                }]),
+                cities: Some(vec![
+                    CityInput {
+                        id: Some(1),
+                        x: 0.0,
+                        y: 0.0,
+                    },
+                    CityInput {
+                        id: Some(2),
+                        x: 1.0,
+                        y: 0.0,
+                    },
+                ]),
                 tsplib: None,
             },
             solver: "   ".to_string(),
@@ -450,11 +484,18 @@ mod tests {
     fn solve_request_validate_accepts_valid() {
         let req = SolveRequest {
             input: TspInput {
-                cities: Some(vec![CityInput {
-                    id: Some(1),
-                    x: 0.0,
-                    y: 0.0,
-                }]),
+                cities: Some(vec![
+                    CityInput {
+                        id: Some(1),
+                        x: 0.0,
+                        y: 0.0,
+                    },
+                    CityInput {
+                        id: Some(2),
+                        x: 1.0,
+                        y: 0.0,
+                    },
+                ]),
                 tsplib: None,
             },
             solver: "nn".to_string(),

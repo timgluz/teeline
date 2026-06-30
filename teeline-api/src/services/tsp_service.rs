@@ -25,11 +25,17 @@ pub struct TspService;
 // ---------------------------------------------------------------------------
 
 fn map_heuristic(h: &HeuristicConfig) -> HeuristicOptions {
-    let d = HeuristicOptions::default();
+    map_heuristic_onto(h, HeuristicOptions::default())
+}
+
+// Maps partial HeuristicConfig onto a caller-supplied base so that solver-specific
+// defaults (e.g. LKOptions has n_nearest=5 vs the global default of 3) are preserved
+// when the caller omits a field.
+fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicOptions {
     HeuristicOptions {
-        epochs: h.epochs.unwrap_or(d.epochs),
-        platoo_epochs: h.platoo_epochs.unwrap_or(d.platoo_epochs),
-        n_nearest: h.n_nearest.unwrap_or(d.n_nearest),
+        epochs: h.epochs.unwrap_or(base.epochs),
+        platoo_epochs: h.platoo_epochs.unwrap_or(base.platoo_epochs),
+        n_nearest: h.n_nearest.unwrap_or(base.n_nearest),
         verbose: false,
     }
 }
@@ -68,17 +74,17 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
     // nn, 2opt, 3opt, or_opt, tabu_search, stochastic_hill, pso, gsa.
     // SA/GA/CS/FPA/LK embed heuristic inside their own options structs.
     let heuristic: Option<HeuristicOptions> = match solver_name {
-        "nn" => cfg.nn.as_ref().and_then(|c| c.heuristic.as_ref()),
-        "2opt" => cfg.two_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
-        "3opt" => cfg.three_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
-        "or_opt" => cfg.or_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
+        "nn" | "nearest_neighbor" => cfg.nn.as_ref().and_then(|c| c.heuristic.as_ref()),
+        "2opt" | "two_opt" => cfg.two_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
+        "3opt" | "three_opt" => cfg.three_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
+        "or_opt" | "or-opt" => cfg.or_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
         "tabu_search" => cfg.tabu.as_ref().and_then(|c| c.heuristic.as_ref()),
         "stochastic_hill" => cfg
             .stochastic_hill
             .as_ref()
             .and_then(|c| c.heuristic.as_ref()),
-        "pso" => cfg.pso.as_ref().and_then(|c| c.heuristic.as_ref()),
-        "gsa" => cfg.gsa.as_ref().and_then(|c| c.heuristic.as_ref()),
+        "pso" | "particle_swarm" => cfg.pso.as_ref().and_then(|c| c.heuristic.as_ref()),
+        "gsa" | "gravitational_search" => cfg.gsa.as_ref().and_then(|c| c.heuristic.as_ref()),
         _ => None,
     }
     .map(map_heuristic);
@@ -140,7 +146,7 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             heuristic: c
                 .heuristic
                 .as_ref()
-                .map(map_heuristic)
+                .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
                 .unwrap_or(d.heuristic),
             max_depth: c.max_depth.unwrap_or(d.max_depth),
         }
@@ -207,7 +213,11 @@ impl TspSolverService for TspService {
                 cities,
             })
         } else {
-            let input_cities = req.input.cities.as_ref().unwrap();
+            let input_cities = req
+                .input
+                .cities
+                .as_ref()
+                .ok_or_else(|| "input requires `cities` or `tsplib`".to_string())?;
             let cities = input_cities
                 .iter()
                 .enumerate()
