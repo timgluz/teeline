@@ -1,5 +1,6 @@
 pub mod error;
 pub mod models;
+pub mod openapi;
 pub mod routes;
 pub mod services;
 
@@ -28,5 +29,6 @@ pub fn build_router(state: AppState) -> axum::Router {
             "/api/v1/compare",
             axum::routing::post(routes::compare::compare),
         )
+        .merge(openapi::openapi_router())
         .with_state(state)
 }
