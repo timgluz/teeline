@@ -3,15 +3,15 @@ use axum::http::{Request, StatusCode};
 use std::sync::Arc;
 use teeline_api::{
     AppState,
-    services::{StubSolverRegistryService, StubTspSolverService},
+    services::{SolverRegistry, TspService},
 };
 use tower::ServiceExt;
 
 #[tokio::test]
 async fn health_returns_ok() {
     let state = AppState {
-        solver_service: Arc::new(StubTspSolverService),
-        registry_service: Arc::new(StubSolverRegistryService),
+        solver_service: Arc::new(TspService),
+        registry_service: Arc::new(SolverRegistry),
     };
     let app = teeline_api::build_router(state);
 
