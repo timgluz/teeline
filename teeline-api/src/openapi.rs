@@ -61,8 +61,8 @@ pub fn openapi_router() -> Router<AppState> {
             "/openapi.json",
             axum::routing::get({
                 let openapi = openapi.clone();
-                move || async move { axum::Json(openapi.clone()) }
+                move || async move { axum::Json(openapi) }
             }),
         )
-        .merge(Router::from(Scalar::with_url("/docs", openapi)))
+        .merge(Scalar::with_url("/docs", openapi))
 }
