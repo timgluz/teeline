@@ -22,7 +22,6 @@ jsonpath "$.route" isCollection
 jsonpath "$.route" count == 3
 jsonpath "$.duration_ms" isInteger
 
----
 
 # POST /api/v1/solve — unknown solver returns 400
 POST http://127.0.0.1:8080/api/v1/solve
@@ -43,7 +42,6 @@ HTTP 400
 [Asserts]
 jsonpath "$.error" isString
 
----
 
 # POST /api/v1/solve — both input fields returns 400
 POST http://127.0.0.1:8080/api/v1/solve

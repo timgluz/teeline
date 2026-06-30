@@ -21,7 +21,6 @@ jsonpath "$.entries" count == 2
 jsonpath "$.entries[*].status" isCollection
 jsonpath "$.entries[*].solver" isCollection
 
----
 
 # POST /api/v1/compare — fewer than 2 solvers returns 400
 POST http://127.0.0.1:8080/api/v1/compare
@@ -36,7 +35,6 @@ Content-Type: application/json
 ```
 HTTP 400
 
----
 
 # POST /api/v1/compare — empty solvers returns 400
 POST http://127.0.0.1:8080/api/v1/compare

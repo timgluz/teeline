@@ -19,7 +19,6 @@ jsonpath "$.cities[*].id" isCollection
 jsonpath "$.cities[*].x" isCollection
 jsonpath "$.cities[*].y" isCollection
 
----
 
 # POST /api/v1/parse — JSON cities input
 POST http://127.0.0.1:8080/api/v1/parse
@@ -40,7 +39,6 @@ HTTP 200
 jsonpath "$.distance_type" == "EUC_2D"
 jsonpath "$.cities" count == 3
 
----
 
 # POST /api/v1/parse — both fields returns 400
 POST http://127.0.0.1:8080/api/v1/parse
@@ -55,7 +53,6 @@ Content-Type: application/json
 ```
 HTTP 400
 
----
 
 # POST /api/v1/parse — neither field returns 400
 POST http://127.0.0.1:8080/api/v1/parse
