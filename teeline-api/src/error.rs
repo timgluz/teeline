@@ -21,11 +21,3 @@ impl IntoResponse for ApiError {
         (status, body).into_response()
     }
 }
-
-pub fn bad_request(msg: impl Into<String>) -> ApiResult<std::convert::Infallible> {
-    Err(ApiError::BadRequest(msg.into()))
-}
-
-pub fn internal_error(msg: impl Into<String>) -> ApiResult<std::convert::Infallible> {
-    Err(ApiError::Internal(msg.into()))
-}

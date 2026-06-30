@@ -433,6 +433,31 @@ mod tests {
     }
 
     #[test]
+    fn compare_request_validate_rejects_single_solver() {
+        let two_cities = TspInput {
+            cities: Some(vec![
+                CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                },
+                CityInput {
+                    id: Some(2),
+                    x: 1.0,
+                    y: 0.0,
+                },
+            ]),
+            tsplib: None,
+        };
+        let req = CompareRequest {
+            input: two_cities,
+            solvers: vec!["nn".to_string()],
+            configs: None,
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
     fn compare_request_validate_rejects_empty_solvers() {
         let req = CompareRequest {
             input: TspInput {

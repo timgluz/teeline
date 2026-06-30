@@ -16,14 +16,24 @@ async fn main() -> anyhow::Result<()> {
 
     let rpm: u64 = std::env::var("RATE_LIMIT_RPM")
         .ok()
-        .and_then(|v| v.parse().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&v| v > 0 && v <= 60_000)
         .unwrap_or(100);
     let period_ms = 60_000u64 / rpm;
     let governor_conf = GovernorConfigBuilder::default()
         .per_millisecond(period_ms)
         .burst_size(10)
         .finish()
-        .unwrap();
+        .expect("rate limiter config is valid (period_ms > 0 guaranteed by rpm filter)");
+
+    let limiter = governor_conf.limiter().clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            interval.tick().await;
+            limiter.retain_recent();
+        }
+    });
 
     let state = AppState {
         solver_service: Arc::new(TspService),
