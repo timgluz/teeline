@@ -236,7 +236,7 @@ impl TspSolverService for TspService {
         let solution = tokio::task::spawn_blocking(move || solve_problem(solver, &problem, &opts))
             .await
             .map_err(|e| format!("task panic: {e}"))??;
-        let duration_ms = start.elapsed().as_millis() as u64;
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
 
         Ok(SolveResponse {
             solver: req.solver.clone(),
@@ -265,7 +265,7 @@ impl TspSolverService for TspService {
                 let solver = find_solver(&sname)?;
                 let start = Instant::now();
                 let solution = solve_problem(solver, &prob, &opts)?;
-                let duration_ms = start.elapsed().as_millis() as u64;
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                 Ok((
                     sname,
                     solution.total,
