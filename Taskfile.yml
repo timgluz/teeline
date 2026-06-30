@@ -44,8 +44,12 @@ tasks:
 
   api:serve:
     desc: Start teeline-api server in background (writes PID to /tmp/teeline-api.pid)
+    vars:
+      API_PORT:
+        sh: echo "${PORT:-8080}"
     cmds:
       - ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+      - echo "teeline-api → http://127.0.0.1:{{.API_PORT}}"
 
   api:stop:
     desc: Stop the background teeline-api server (kills by PID file and any stale instances)
