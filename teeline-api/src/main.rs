@@ -1,8 +1,12 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use axum::Router;
+use axum::routing::get;
 use teeline_api::{
     AppState,
+    metrics::MetricsState,
+    middleware::MetricsLayer,
     services::{SolverRegistry, TspService},
 };
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
@@ -23,17 +27,19 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt().init();
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_owned());
-    let addr = format!("127.0.0.1:{port}");
+    let addr = format!("0.0.0.0:{port}");
     let rpm = rate_limit_rpm();
 
     let state = AppState {
         solver_service: Arc::new(TspService),
         registry_service: Arc::new(SolverRegistry),
+        metrics: Arc::new(MetricsState::new()),
     };
-    let mut app = teeline_api::build_router(state);
 
-    // rpm=0 disables rate limiting (checked_div returns None for divisor 0).
+    // Rate limiting scoped to /api/v1/* only — Fly.io's scraper must not be throttled on /metrics.
+    let mut api: Router<AppState> = teeline_api::build_api_router();
     if let Some(period_ms) = 60_000u64.checked_div(rpm) {
+        tracing::info!("rate limiting enabled: {rpm} RPM");
         let governor_conf = GovernorConfigBuilder::default()
             .per_millisecond(period_ms)
             .burst_size(10)
@@ -47,8 +53,19 @@ async fn main() -> anyhow::Result<()> {
                 limiter.retain_recent();
             }
         });
-        app = app.layer(GovernorLayer::new(governor_conf));
+        api = api.layer(GovernorLayer::new(governor_conf));
+    } else {
+        tracing::info!("rate limiting disabled (RATE_LIMIT_RPM=0)");
     }
+
+    let app = Router::new()
+        .route("/", get(teeline_api::routes::index::handler))
+        .route("/healthz", get(teeline_api::routes::health::handler))
+        .route("/metrics", get(teeline_api::routes::metrics::handler))
+        .merge(teeline_api::openapi::openapi_router())
+        .merge(api)
+        .layer(MetricsLayer::new(Arc::clone(&state.metrics)))
+        .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     tracing::info!("listening on {addr}");

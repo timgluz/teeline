@@ -5,6 +5,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use teeline_api::{
     AppState,
+    metrics::MetricsState,
     models::{
         request::{ParseRequest, SolveRequest},
         response::{AlgorithmInfo, CityDto, ParseResponse, SolveResponse},
@@ -75,6 +76,7 @@ fn make_app() -> axum::Router {
     let state = AppState {
         solver_service: Arc::new(MockSolverService),
         registry_service: Arc::new(MockRegistry),
+        metrics: Arc::new(MetricsState::new()),
     };
     teeline_api::build_router(state)
 }
