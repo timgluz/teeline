@@ -11,12 +11,14 @@ use crate::{
 #[derive(OpenApi)]
 #[openapi(
     paths(
+        routes::index::handler,
         routes::health::handler,
         routes::solvers::list_solvers,
         routes::parse::parse,
         routes::solve::solve,
     ),
     components(schemas(
+        routes::index::IndexResponse,
         routes::health::HealthResponse,
         request::HeuristicConfig,
         request::NnConfig,

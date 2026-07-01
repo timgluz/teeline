@@ -14,6 +14,7 @@ pub struct AppState {
 
 pub fn build_router(state: AppState) -> axum::Router {
     axum::Router::new()
+        .route("/", axum::routing::get(routes::index::handler))
         .route(
             "/api/v1/health",
             axum::routing::get(routes::health::handler),
