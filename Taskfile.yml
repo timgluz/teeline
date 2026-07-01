@@ -65,14 +65,7 @@ tasks:
       - defer: kill $(cat /tmp/teeline-api.pid) 2>/dev/null || true
       - RATE_LIMIT_RPM=0 ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
       - task: api:wait
-      - hurl --test
-          teeline-api/tests/hurl/health.hurl
-          teeline-api/tests/hurl/index.hurl
-          teeline-api/tests/hurl/openapi.hurl
-          teeline-api/tests/hurl/solvers.hurl
-          teeline-api/tests/hurl/parse.hurl
-          teeline-api/tests/hurl/solve.hurl
-          teeline-api/tests/hurl/metrics.hurl
+      - hurl --test teeline-api/tests/hurl/*.hurl
 
   test:all:
     desc: Run unit tests and e2e tests
