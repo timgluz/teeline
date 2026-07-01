@@ -48,7 +48,7 @@ async fn openapi_json_is_valid_json() {
 }
 
 #[tokio::test]
-async fn openapi_json_contains_all_five_paths() {
+async fn openapi_json_contains_all_four_paths() {
     let resp = make_app()
         .oneshot(
             Request::builder()
@@ -73,10 +73,6 @@ async fn openapi_json_contains_all_five_paths() {
     );
     assert!(paths.contains_key("/api/v1/parse"), "missing /api/v1/parse");
     assert!(paths.contains_key("/api/v1/solve"), "missing /api/v1/solve");
-    assert!(
-        paths.contains_key("/api/v1/compare"),
-        "missing /api/v1/compare"
-    );
 }
 
 #[tokio::test]
@@ -99,10 +95,6 @@ async fn openapi_json_has_schemas_in_components() {
     assert!(
         schemas.contains_key("SolveRequest"),
         "missing SolveRequest schema"
-    );
-    assert!(
-        schemas.contains_key("CompareRequest"),
-        "missing CompareRequest schema"
     );
     assert!(
         schemas.contains_key("ParseResponse"),

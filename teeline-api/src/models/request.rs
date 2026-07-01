@@ -231,29 +231,11 @@ pub struct SolveRequest {
     pub configs: Option<SolverConfigs>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct CompareRequest {
-    pub input: TspInput,
-    pub solvers: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub configs: Option<SolverConfigs>,
-}
-
 impl SolveRequest {
     pub fn validate(&self) -> Result<(), String> {
         self.input.validate()?;
         if self.solver.trim().is_empty() {
             return Err("`solver` must not be empty".to_string());
-        }
-        Ok(())
-    }
-}
-
-impl CompareRequest {
-    pub fn validate(&self) -> Result<(), String> {
-        self.input.validate()?;
-        if self.solvers.len() < 2 {
-            return Err("`solvers` must contain at least 2 solver names".to_string());
         }
         Ok(())
     }
@@ -430,55 +412,6 @@ mod tests {
             tsplib: Some("NAME: test".to_string()),
         };
         assert!(input.validate().is_ok());
-    }
-
-    #[test]
-    fn compare_request_validate_rejects_single_solver() {
-        let two_cities = TspInput {
-            cities: Some(vec![
-                CityInput {
-                    id: Some(1),
-                    x: 0.0,
-                    y: 0.0,
-                },
-                CityInput {
-                    id: Some(2),
-                    x: 1.0,
-                    y: 0.0,
-                },
-            ]),
-            tsplib: None,
-        };
-        let req = CompareRequest {
-            input: two_cities,
-            solvers: vec!["nn".to_string()],
-            configs: None,
-        };
-        assert!(req.validate().is_err());
-    }
-
-    #[test]
-    fn compare_request_validate_rejects_empty_solvers() {
-        let req = CompareRequest {
-            input: TspInput {
-                cities: Some(vec![
-                    CityInput {
-                        id: Some(1),
-                        x: 0.0,
-                        y: 0.0,
-                    },
-                    CityInput {
-                        id: Some(2),
-                        x: 1.0,
-                        y: 0.0,
-                    },
-                ]),
-                tsplib: None,
-            },
-            solvers: vec![],
-            configs: None,
-        };
-        assert!(req.validate().is_err());
     }
 
     #[test]

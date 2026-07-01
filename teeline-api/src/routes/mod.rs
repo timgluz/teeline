@@ -1,4 +1,3 @@
-pub mod compare;
 pub mod health;
 pub mod parse;
 pub mod solve;

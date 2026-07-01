@@ -45,29 +45,6 @@ pub struct SolveResponse {
     pub duration_ms: u64,
 }
 
-/// A per-solver result in a compare response.
-///
-/// Tagged enum: JSON carries `"status": "ok"` or `"status": "error"`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-#[serde(tag = "status", rename_all = "lowercase")]
-pub enum CompareEntry {
-    Ok {
-        solver: String,
-        total: f32,
-        route: Vec<usize>,
-        duration_ms: u64,
-    },
-    Error {
-        solver: String,
-        error: String,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
-pub struct CompareResponse {
-    pub entries: Vec<CompareEntry>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,61 +115,9 @@ mod tests {
     }
 
     #[test]
-    fn compare_entry_ok_has_status_ok() {
-        let entry = CompareEntry::Ok {
-            solver: "nn".to_string(),
-            total: 100.0,
-            route: vec![1, 2, 3],
-            duration_ms: 5,
-        };
-        let json = serde_json::to_string(&entry).unwrap();
-        assert!(json.contains(r#""status":"ok""#));
-        assert!(!json.contains("error"));
-    }
-
-    #[test]
-    fn compare_entry_error_has_status_error() {
-        let entry = CompareEntry::Error {
-            solver: "bhk".to_string(),
-            error: "timeout".to_string(),
-        };
-        let json = serde_json::to_string(&entry).unwrap();
-        assert!(json.contains(r#""status":"error""#));
-        assert!(json.contains("timeout"));
-    }
-
-    #[test]
-    fn compare_response_round_trip() {
-        let resp = CompareResponse {
-            entries: vec![
-                CompareEntry::Ok {
-                    solver: "nn".to_string(),
-                    total: 100.0,
-                    route: vec![1, 2, 3],
-                    duration_ms: 5,
-                },
-                CompareEntry::Error {
-                    solver: "bhk".to_string(),
-                    error: "too many cities".to_string(),
-                },
-            ],
-        };
-        let json = serde_json::to_string(&resp).unwrap();
-        let back: CompareResponse = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.entries.len(), 2);
-    }
-
-    #[test]
     fn solve_response_schema_builds() {
         use utoipa::ToSchema;
         let name = SolveResponse::name();
         assert_eq!(name, "SolveResponse");
-    }
-
-    #[test]
-    fn compare_entry_schema_builds() {
-        use utoipa::ToSchema;
-        let name = CompareEntry::name();
-        assert_eq!(name, "CompareEntry");
     }
 }

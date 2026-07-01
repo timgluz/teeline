@@ -15,7 +15,6 @@ use crate::{
         routes::solvers::list_solvers,
         routes::parse::parse,
         routes::solve::solve,
-        routes::compare::compare,
     ),
     components(schemas(
         routes::health::HealthResponse,
@@ -40,13 +39,10 @@ use crate::{
         request::TspInput,
         request::ParseRequest,
         request::SolveRequest,
-        request::CompareRequest,
         response::AlgorithmInfo,
         response::CityDto,
         response::ParseResponse,
         response::SolveResponse,
-        response::CompareEntry,
-        response::CompareResponse,
     )),
     tags(
         (name = "tsp", description = "Traveling Salesman Problem solver endpoints")

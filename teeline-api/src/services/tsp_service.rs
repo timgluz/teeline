@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -12,10 +11,8 @@ use teeline::tsp::{
 
 use super::TspSolverService;
 use crate::models::{
-    request::{
-        CompareRequest, HeuristicConfig, ParseRequest, SolveRequest, SolverConfigs, TspInput,
-    },
-    response::{CityDto, CompareEntry, CompareResponse, ParseResponse, SolveResponse},
+    request::{HeuristicConfig, ParseRequest, SolveRequest, SolverConfigs, TspInput},
+    response::{CityDto, ParseResponse, SolveResponse},
 };
 
 pub struct TspService;
@@ -254,75 +251,6 @@ impl TspSolverService for TspService {
             route: solution.route().to_vec(),
             duration_ms,
         })
-    }
-
-    async fn compare(&self, req: &CompareRequest) -> Result<CompareResponse, String> {
-        req.validate()?;
-        let problem = Arc::new(input_to_problem(&req.input)?);
-
-        let mut handles: Vec<(
-            String,
-            tokio::task::JoinHandle<Result<(String, f32, Vec<usize>, u64), String>>,
-        )> = Vec::new();
-
-        for solver_name in &req.solvers {
-            let sname = solver_name.clone();
-            let fallback = solver_name.clone();
-            let prob = Arc::clone(&problem);
-            let opts = make_app_options(solver_name, req.configs.as_ref());
-
-            let handle = tokio::task::spawn_blocking(move || {
-                let solver = find_solver(&sname)?;
-                let start = Instant::now();
-                let solution = solve_problem(solver, &prob, &opts)?;
-                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
-                Ok((
-                    sname,
-                    solution.total,
-                    solution.route().to_vec(),
-                    duration_ms,
-                ))
-            });
-            handles.push((fallback, handle));
-        }
-
-        let mut entries: Vec<CompareEntry> = Vec::new();
-        for (fallback, handle) in handles {
-            match handle.await {
-                Ok(Ok((solver, total, route, duration_ms))) => {
-                    entries.push(CompareEntry::Ok {
-                        solver,
-                        total,
-                        route,
-                        duration_ms,
-                    });
-                }
-                Ok(Err(e)) => {
-                    entries.push(CompareEntry::Error {
-                        solver: fallback,
-                        error: e,
-                    });
-                }
-                Err(join_err) => {
-                    entries.push(CompareEntry::Error {
-                        solver: fallback,
-                        error: format!("task panic: {join_err}"),
-                    });
-                }
-            }
-        }
-
-        // Ok entries sorted by cost ascending; Error entries appended last.
-        entries.sort_by(|a, b| match (a, b) {
-            (CompareEntry::Ok { total: ta, .. }, CompareEntry::Ok { total: tb, .. }) => {
-                ta.partial_cmp(tb).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (CompareEntry::Ok { .. }, CompareEntry::Error { .. }) => std::cmp::Ordering::Less,
-            (CompareEntry::Error { .. }, CompareEntry::Ok { .. }) => std::cmp::Ordering::Greater,
-            (CompareEntry::Error { .. }, CompareEntry::Error { .. }) => std::cmp::Ordering::Equal,
-        });
-
-        Ok(CompareResponse { entries })
     }
 }
 

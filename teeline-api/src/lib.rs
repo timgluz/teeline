@@ -25,10 +25,6 @@ pub fn build_router(state: AppState) -> axum::Router {
         )
         .route("/api/v1/parse", axum::routing::post(routes::parse::parse))
         .route("/api/v1/solve", axum::routing::post(routes::solve::solve))
-        .route(
-            "/api/v1/compare",
-            axum::routing::post(routes::compare::compare),
-        )
         .merge(openapi::openapi_router())
         .with_state(state)
 }
