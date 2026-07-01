@@ -8,14 +8,18 @@ use teeline_api::{
 };
 use tower::ServiceExt;
 
-#[tokio::test]
-async fn health_returns_ok() {
+fn make_app() -> axum::Router {
     let state = AppState {
         solver_service: Arc::new(TspService),
         registry_service: Arc::new(SolverRegistry),
         metrics: Arc::new(MetricsState::new()),
     };
-    let app = teeline_api::build_router(state);
+    teeline_api::build_router(state)
+}
+
+#[tokio::test]
+async fn health_returns_ok() {
+    let app = make_app();
 
     let response = app
         .oneshot(

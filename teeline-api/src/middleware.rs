@@ -68,8 +68,6 @@ where
             .unwrap_or_else(|| req.uri().path().to_owned());
         let method = req.method().as_str().to_owned();
 
-        // Standard Tower pattern: swap inner with a clone so we can move it into
-        // the async block while satisfying the borrow checker.
         let clone = self.inner.clone();
         let mut inner = std::mem::replace(&mut self.inner, clone);
 

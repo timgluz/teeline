@@ -7,7 +7,7 @@ use crate::AppState;
 
 pub async fn handler(State(state): State<AppState>) -> impl IntoResponse {
     let mut body = String::new();
-    encode(&mut body, &state.metrics.registry).expect("metrics encode must not fail");
+    let _ = encode(&mut body, &state.metrics.registry);
     (
         [(
             header::CONTENT_TYPE,

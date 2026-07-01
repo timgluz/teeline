@@ -19,8 +19,8 @@ pub struct AppState {
     pub metrics: Arc<MetricsState>,
 }
 
-/// The /api/v1/* routes without state, so callers (e.g. main.rs) can apply
-/// a rate-limiting layer before providing state and merging into the full app.
+/// The /api/v1/* routes without state, so a rate-limiting layer can be applied
+/// before providing state and merging into the full app.
 pub fn build_api_router() -> axum::Router<AppState> {
     axum::Router::new()
         .route("/api/v1/health", get(routes::health::handler))
@@ -29,9 +29,8 @@ pub fn build_api_router() -> axum::Router<AppState> {
         .route("/api/v1/solve", post(routes::solve::solve))
 }
 
-/// Full router used by integration tests. GovernorLayer is not applied here;
-/// main.rs applies it to the api sub-router only before calling this, or the
-/// test harness omits it entirely.
+/// Full router with MetricsLayer applied. GovernorLayer is intentionally absent
+/// here; apply it to the api sub-router before merging when needed.
 pub fn build_router(state: AppState) -> axum::Router {
     axum::Router::new()
         .route("/", get(routes::index::handler))

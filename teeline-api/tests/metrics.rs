@@ -89,7 +89,12 @@ async fn metrics_body_contains_http_requests_total() {
 #[tokio::test]
 async fn solver_metrics_present_after_successful_solve() {
     let app = make_app();
-    app.clone().oneshot(solve_req("nn")).await.unwrap();
+    let solve_resp = app.clone().oneshot(solve_req("nn")).await.unwrap();
+    assert_eq!(
+        solve_resp.status(),
+        StatusCode::OK,
+        "solve must succeed before solver metrics are populated"
+    );
     let body = body_text(app.oneshot(metrics_req()).await.unwrap()).await;
     assert!(
         body.contains("teeline_solver_requests_total"),
@@ -118,10 +123,14 @@ async fn solver_error_metric_increments_for_known_solver_error() {
         .await
         .unwrap();
     let body = body_text(app.oneshot(metrics_req()).await.unwrap()).await;
-    // http_requests_total with a 400 status should appear
     assert!(
         body.contains("http_requests_total"),
         "missing http_requests_total after failed solve:\n{body}"
+    );
+    // solver error metric must be incremented for a known alias even on failure
+    assert!(
+        body.contains("teeline_solver_requests_total"),
+        "missing teeline_solver_requests_total after failed solve:\n{body}"
     );
 }
 

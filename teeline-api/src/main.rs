@@ -36,11 +36,10 @@ async fn main() -> anyhow::Result<()> {
         metrics: Arc::new(MetricsState::new()),
     };
 
-    // Build the /api/v1/* sub-router (still Router<AppState>, no with_state yet)
-    // and apply rate limiting only to those routes. /metrics, /, /healthz, and
-    // /docs are excluded — Fly.io's scraper must not hit a rate limit on /metrics.
+    // Rate limiting scoped to /api/v1/* only — Fly.io's scraper must not be throttled on /metrics.
     let mut api: Router<AppState> = teeline_api::build_api_router();
     if let Some(period_ms) = 60_000u64.checked_div(rpm) {
+        tracing::info!("rate limiting enabled: {rpm} RPM");
         let governor_conf = GovernorConfigBuilder::default()
             .per_millisecond(period_ms)
             .burst_size(10)
@@ -55,11 +54,10 @@ async fn main() -> anyhow::Result<()> {
             }
         });
         api = api.layer(GovernorLayer::new(governor_conf));
+    } else {
+        tracing::info!("rate limiting disabled (RATE_LIMIT_RPM=0)");
     }
 
-    // Assemble the full app. MetricsLayer wraps all routes so every request
-    // (including rate-limited and infrastructure routes) is counted.
-    // with_state() converts Router<AppState> → Router<()> ready to serve.
     let app = Router::new()
         .route("/", get(teeline_api::routes::index::handler))
         .route("/healthz", get(teeline_api::routes::health::handler))
