@@ -3,6 +3,7 @@ use axum::http::{Request, StatusCode};
 use std::sync::Arc;
 use teeline_api::{
     AppState,
+    metrics::MetricsState,
     services::{SolverRegistry, TspService},
 };
 use tower::ServiceExt;
@@ -11,6 +12,7 @@ fn make_app() -> axum::Router {
     let state = AppState {
         solver_service: Arc::new(TspService),
         registry_service: Arc::new(SolverRegistry),
+        metrics: Arc::new(MetricsState::new()),
     };
     teeline_api::build_router(state)
 }

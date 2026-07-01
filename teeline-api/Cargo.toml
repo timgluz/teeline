@@ -16,6 +16,7 @@ teeline = { path = ".." }
 axum = "0.8.9"
 tokio = { version = "1", features = ["full"] }
 utoipa = "5.5.0"
+tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.7.0", features = ["trace"] }
 tower_governor = "0.8.0"
 serde = { version = "1", features = ["derive"] }
@@ -25,6 +26,7 @@ async-trait = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
+prometheus-client = "0.22"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
