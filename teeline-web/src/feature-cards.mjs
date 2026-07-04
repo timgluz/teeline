@@ -16,7 +16,7 @@ const FEATURES = [
     icon: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5 L2.5 10 L7 15"/><path d="M13 5 L17.5 10 L13 15"/></svg>',
     links: [
       { href: 'https://api.tspsolver.com/docs', text: 'View API docs ↗', external: true },
-      { href: 'https://lasting-stag-95.accounts.dev/sign-in', text: 'Get your API key ↗', external: true },
+      { href: 'https://accounts.tspsolver.com/sign-in', text: 'Get your API key ↗', external: true },
     ],
   },
   {
