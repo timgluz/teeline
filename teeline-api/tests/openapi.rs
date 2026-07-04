@@ -145,6 +145,42 @@ async fn all_protected_paths_have_security_requirement_except_health() {
 }
 
 #[tokio::test]
+async fn solve_and_parse_request_bodies_have_named_examples() {
+    // /solve and /parse both accept either `cities` or `tsplib` input — named
+    // examples in the OpenAPI spec are what let Scalar's "Try it" panel offer
+    // a dropdown of ready-to-run payloads instead of an empty body. This
+    // guards against someone accidentally dropping the examples() block
+    // later.
+    let resp = make_app()
+        .oneshot(
+            Request::builder()
+                .uri("/openapi.json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+
+    let solve_examples = &json["paths"]["/api/v1/solve"]["post"]["requestBody"]["content"]["application/json"]
+        ["examples"];
+    assert!(
+        solve_examples.as_object().is_some_and(|o| o.len() >= 2),
+        "/api/v1/solve should document at least 2 named examples"
+    );
+
+    let parse_examples = &json["paths"]["/api/v1/parse"]["post"]["requestBody"]["content"]["application/json"]
+        ["examples"];
+    assert!(
+        parse_examples.as_object().is_some_and(|o| o.len() >= 2),
+        "/api/v1/parse should document at least 2 named examples"
+    );
+}
+
+#[tokio::test]
 async fn scalar_docs_returns_html() {
     let resp = make_app()
         .oneshot(Request::builder().uri("/docs").body(Body::empty()).unwrap())
