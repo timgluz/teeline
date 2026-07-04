@@ -14,8 +14,7 @@ const FEATURES = [
     title: 'API',
     description: 'A REST API for solving TSP problems programmatically, with OpenAPI docs and rate limiting built in.',
     icon: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5 L2.5 10 L7 15"/><path d="M13 5 L17.5 10 L13 15"/></svg>',
-    // TODO: link to the teeline-api docs once it's deployed and has a public URL.
-    link: null,
+    link: { href: 'https://api.tspsolver.com/docs', text: 'View API docs ↗', external: true },
   },
   {
     slug: 'tools',
