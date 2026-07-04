@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -5,6 +6,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use teeline_api::{
     AppState,
+    clerk::{ApiKeyVerifier, NullVerifier, VerifiedKey},
     metrics::MetricsState,
     middleware,
     models::{
@@ -69,6 +71,17 @@ impl SolverRegistryService for MockRegistry {
     }
 }
 
+/// Test double for `ApiKeyVerifier` — looks up presented keys in a fixed
+/// map, so tests never need a real network call to Clerk.
+struct StaticVerifier(HashMap<String, VerifiedKey>);
+
+#[async_trait]
+impl ApiKeyVerifier for StaticVerifier {
+    async fn verify(&self, key: &str) -> Option<VerifiedKey> {
+        self.0.get(key).cloned()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -84,14 +97,20 @@ fn make_app() -> axum::Router {
 
 const TEST_TOKEN: &str = "test-secret-token";
 
-fn make_authed_app() -> axum::Router {
+fn make_authed_app_with_verifier(verifier: Arc<dyn ApiKeyVerifier>) -> axum::Router {
     let state = AppState {
         solver_service: Arc::new(MockSolverService),
         registry_service: Arc::new(MockRegistry),
         metrics: Arc::new(MetricsState::new()),
     };
-    let api = middleware::require_auth(teeline_api::build_api_router(), TEST_TOKEN);
+    let api = middleware::require_auth(teeline_api::build_api_router(), TEST_TOKEN, verifier);
     teeline_api::build_router(state, api)
+}
+
+/// Static-key-only auth (no Clerk verifier configured) — used by all the
+/// existing tests below that only exercise the break-glass credential.
+fn make_authed_app() -> axum::Router {
+    make_authed_app_with_verifier(Arc::new(NullVerifier))
 }
 
 fn get_with_header(uri: &str, header: &str, value: &str) -> Request<Body> {
@@ -388,7 +407,7 @@ async fn empty_configured_token_never_matches_empty_presented_token() {
         registry_service: Arc::new(MockRegistry),
         metrics: Arc::new(MetricsState::new()),
     };
-    let api = middleware::require_auth(teeline_api::build_api_router(), "");
+    let api = middleware::require_auth(teeline_api::build_api_router(), "", Arc::new(NullVerifier));
     let app = teeline_api::build_router(state, api);
 
     let resp = app
@@ -409,4 +428,75 @@ async fn unmatched_path_returns_404_not_401_when_auth_enabled() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+// ---------------------------------------------------------------------------
+// Auth — Clerk verifier path (StaticVerifier stands in for a real Clerk call)
+// ---------------------------------------------------------------------------
+
+const CLERK_TEST_KEY: &str = "ak_validkeyforintegrationtests";
+
+fn clerk_verifier_with(key: &str, subject: &str) -> Arc<dyn ApiKeyVerifier> {
+    let mut keys = HashMap::new();
+    keys.insert(
+        key.to_string(),
+        VerifiedKey {
+            subject: subject.to_string(),
+        },
+    );
+    Arc::new(StaticVerifier(keys))
+}
+
+#[tokio::test]
+async fn solvers_with_valid_clerk_key_returns_200() {
+    let app = make_authed_app_with_verifier(clerk_verifier_with(CLERK_TEST_KEY, "user_test123"));
+    let resp = app
+        .oneshot(get_with_header(
+            "/api/v1/solvers",
+            "Authorization",
+            &format!("Bearer {CLERK_TEST_KEY}"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn solvers_with_unknown_clerk_shaped_key_returns_401() {
+    // A key the verifier doesn't recognize (not revoked — simply never
+    // issued) must still 401, not be treated as valid by default.
+    let app = make_authed_app_with_verifier(Arc::new(StaticVerifier(HashMap::new())));
+    let resp = app
+        .oneshot(get_with_header(
+            "/api/v1/solvers",
+            "Authorization",
+            "Bearer ak_unknownkeyneverissued",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn solvers_with_static_break_glass_key_still_works_alongside_clerk_verifier() {
+    // Even with a Clerk verifier configured, the static break-glass key
+    // must still authorize independently — the two credentials are OR'd,
+    // not one replacing the other.
+    let app = make_authed_app_with_verifier(Arc::new(StaticVerifier(HashMap::new())));
+    let resp = app
+        .oneshot(get_with_header(
+            "/api/v1/solvers",
+            "Authorization",
+            &format!("Bearer {TEST_TOKEN}"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn solvers_with_neither_static_nor_clerk_credential_returns_401() {
+    let app = make_authed_app_with_verifier(clerk_verifier_with(CLERK_TEST_KEY, "user_test123"));
+    let resp = app.oneshot(get("/api/v1/solvers")).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
