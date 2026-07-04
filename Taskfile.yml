@@ -42,11 +42,35 @@ tasks:
     cmds:
       - cargo build -p teeline-api
 
+  api:_launch:
+    internal: true
+    desc: "(internal) Launch teeline-api in the background; shared by api:serve, test:e2e:api, test:e2e:auth"
+    vars:
+      API_KEY: '{{.API_KEY | default ""}}'
+      RATE_LIMIT_RPM: '{{.RATE_LIMIT_RPM | default ""}}'
+    # Values are threaded through as opaque env vars (never interpolated
+    # into the bash -c string itself) so a token containing a quote or
+    # `$(...)` can't break out and inject commands — same reasoning as the
+    # TEST_API_TOKEN handling in test:e2e:auth below.
+    env:
+      TASK_API_KEY: '{{.API_KEY}}'
+      TASK_RATE_LIMIT_RPM: '{{.RATE_LIMIT_RPM}}'
+    cmds:
+      # go-task's bundled shell interpreter doesn't preserve backgrounded
+      # processes past the end of the task run, and mis-captures $!.
+      # bash -c ... & disown bypasses it so the server actually survives.
+      - bash -c 'API_KEY="$TASK_API_KEY" RATE_LIMIT_RPM="$TASK_RATE_LIMIT_RPM" nohup ./target/debug/teeline-api >/tmp/teeline-api.log 2>&1 & echo $! > /tmp/teeline-api.pid; disown'
+
   api:serve:
     desc: Start teeline-api server in background (writes PID to /tmp/teeline-api.pid)
     cmds:
-      - ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+      - task: api:_launch
 
+  # NOTE: api:serve, test:e2e:api, and test:e2e:auth all share the single
+  # /tmp/teeline-api.pid file. This is only safe because they're never run
+  # concurrently (CI runs the two e2e tasks as separate sequential steps).
+  # Running two of these at the same time would let the second one's PID
+  # write clobber the first's, and api:stop could then kill the wrong server.
   api:stop:
     desc: Stop the background teeline-api server (kills by PID file and any stale instances)
     cmds:
@@ -62,10 +86,34 @@ tasks:
     desc: Build, start, wait, run hurl e2e tests, then shut down teeline-api
     deps: [build:api]
     cmds:
-      - defer: kill $(cat /tmp/teeline-api.pid) 2>/dev/null || true
-      - RATE_LIMIT_RPM=0 ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+      - defer:
+          task: api:stop
+      - task: api:_launch
+        vars:
+          RATE_LIMIT_RPM: "0"
       - task: api:wait
       - hurl --test teeline-api/tests/hurl/*.hurl
+
+  test:e2e:auth:
+    desc: Build, start with API_KEY set, wait, run hurl auth e2e tests, then shut down teeline-api
+    deps: [build:api]
+    vars:
+      API_TOKEN: test-secret-token
+    # Passed as a real env var (not interpolated into the hurl command
+    # below) so the token's value is never re-parsed as shell syntax —
+    # {{.API_TOKEN}} directly inline would let a value containing a quote
+    # or `$(...)` break out and inject commands.
+    env:
+      TEST_API_TOKEN: '{{.API_TOKEN}}'
+    cmds:
+      - defer:
+          task: api:stop
+      - task: api:_launch
+        vars:
+          API_KEY: "{{.API_TOKEN}}"
+          RATE_LIMIT_RPM: "0"
+      - task: api:wait
+      - hurl --test --variable api_token="$TEST_API_TOKEN" teeline-api/tests/hurl/auth/*.hurl
 
   test:all:
     desc: Run unit tests and e2e tests

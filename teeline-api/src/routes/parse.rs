@@ -9,10 +9,15 @@ use crate::{
 #[utoipa::path(
     post,
     path = "/api/v1/parse",
+    security(
+        ("bearer_token" = []),
+        ("api_key" = [])
+    ),
     request_body = ParseRequest,
     responses(
         (status = 200, description = "Parsed city list", body = ParseResponse),
-        (status = 400, description = "Invalid input or malformed TSPLIB")
+        (status = 400, description = "Invalid input or malformed TSPLIB"),
+        (status = 401, description = "Missing or invalid API key")
     )
 )]
 pub async fn parse(

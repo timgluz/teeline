@@ -1,5 +1,8 @@
 use axum::Router;
-use utoipa::OpenApi;
+use utoipa::{
+    Modify, OpenApi,
+    openapi::security::{ApiKey, ApiKeyValue, HttpAuthScheme, HttpBuilder, SecurityScheme},
+};
 use utoipa_scalar::{Scalar, Servable};
 
 use crate::{
@@ -7,6 +10,25 @@ use crate::{
     models::{request, response},
     routes,
 };
+
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        let components = openapi
+            .components
+            .as_mut()
+            .expect("components are registered via #[openapi(components(...))]");
+        components.add_security_scheme(
+            "bearer_token",
+            SecurityScheme::Http(HttpBuilder::new().scheme(HttpAuthScheme::Bearer).build()),
+        );
+        components.add_security_scheme(
+            "api_key",
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-Api-Key"))),
+        );
+    }
+}
 
 #[derive(OpenApi)]
 #[openapi(
@@ -48,7 +70,8 @@ use crate::{
     )),
     tags(
         (name = "tsp", description = "Traveling Salesman Problem solver endpoints")
-    )
+    ),
+    modifiers(&SecurityAddon)
 )]
 pub struct ApiDoc;
 

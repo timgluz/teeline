@@ -14,7 +14,7 @@ fn make_app() -> axum::Router {
         registry_service: Arc::new(SolverRegistry),
         metrics: Arc::new(MetricsState::new()),
     };
-    teeline_api::build_router(state)
+    teeline_api::build_router(state, teeline_api::build_api_router())
 }
 
 const TINY_TSPLIB: &str = "\
