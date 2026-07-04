@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { SOLVER_META, SOLVER_GROUPS, PAGED_SOLVERS } from './solver-groups'
+import { SOLVER_META, SOLVER_GROUPS, PAGED_SOLVERS, renderSidebarHtml, renderTopbarHtml } from './nav-html.mjs'
 
 describe('SOLVER_META', () => {
   it('contains exactly 17 solvers', () => {
@@ -50,6 +50,32 @@ describe('PAGED_SOLVERS', () => {
   it('every paged ID exists in SOLVER_META', () => {
     for (const id of PAGED_SOLVERS) {
       expect(SOLVER_META, `PAGED_SOLVERS has "${id}" but SOLVER_META does not`).toHaveProperty(id)
+    }
+  })
+})
+
+// These two are server-rendered at build time (see vite.config.ts's ssr-nav-html plugin)
+// so Googlebot's initial HTML fetch sees real links, not just JS-injected ones.
+describe('renderSidebarHtml', () => {
+  it('emits a real <a href> for every paged solver', () => {
+    const html = renderSidebarHtml(null)
+    for (const id of PAGED_SOLVERS) {
+      expect(html).toContain(`<a href="/algorithms/${id}/">`)
+    }
+  })
+
+  it('marks the current solver as a non-link', () => {
+    const html = renderSidebarHtml('2opt')
+    expect(html).not.toContain('<a href="/algorithms/2opt/">')
+    expect(html).toContain('aria-current="page"')
+  })
+})
+
+describe('renderTopbarHtml', () => {
+  it('emits a real <a href> for every paged solver', () => {
+    const html = renderTopbarHtml()
+    for (const id of PAGED_SOLVERS) {
+      expect(html).toContain(`<a href="/algorithms/${id}/">`)
     }
   })
 })
