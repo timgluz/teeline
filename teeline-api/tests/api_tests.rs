@@ -6,6 +6,7 @@ use axum::http::{Request, StatusCode};
 use teeline_api::{
     AppState,
     metrics::MetricsState,
+    middleware::AuthLayer,
     models::{
         request::{ParseRequest, SolveRequest},
         response::{AlgorithmInfo, CityDto, ParseResponse, SolveResponse},
@@ -78,7 +79,27 @@ fn make_app() -> axum::Router {
         registry_service: Arc::new(MockRegistry),
         metrics: Arc::new(MetricsState::new()),
     };
-    teeline_api::build_router(state)
+    teeline_api::build_router(state, teeline_api::build_api_router())
+}
+
+const TEST_TOKEN: &str = "test-secret-token";
+
+fn make_authed_app() -> axum::Router {
+    let state = AppState {
+        solver_service: Arc::new(MockSolverService),
+        registry_service: Arc::new(MockRegistry),
+        metrics: Arc::new(MetricsState::new()),
+    };
+    let api = teeline_api::build_api_router().layer(AuthLayer::new(TEST_TOKEN));
+    teeline_api::build_router(state, api)
+}
+
+fn get_with_header(uri: &str, header: &str, value: &str) -> Request<Body> {
+    Request::builder()
+        .uri(uri)
+        .header(header, value)
+        .body(Body::empty())
+        .unwrap()
 }
 
 fn get(uri: &str) -> Request<Body> {
@@ -223,4 +244,86 @@ async fn docs_returns_html() {
         body.contains("<!doctype html>") || body.contains("<!DOCTYPE html>"),
         "expected HTML doctype in /docs response"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Auth (AuthLayer applied on top of build_api_router() — see make_authed_app)
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn health_open_without_token_when_auth_enabled() {
+    let resp = make_authed_app()
+        .oneshot(get("/api/v1/health"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn solvers_without_token_returns_401() {
+    let resp = make_authed_app()
+        .oneshot(get("/api/v1/solvers"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    let json = json_body(resp).await;
+    assert_eq!(json["error"], "Unauthorized");
+}
+
+#[tokio::test]
+async fn solvers_with_wrong_token_returns_401() {
+    let resp = make_authed_app()
+        .oneshot(get_with_header(
+            "/api/v1/solvers",
+            "Authorization",
+            "Bearer wrong-token",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn solvers_with_correct_bearer_token_returns_200() {
+    let resp = make_authed_app()
+        .oneshot(get_with_header(
+            "/api/v1/solvers",
+            "Authorization",
+            &format!("Bearer {TEST_TOKEN}"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn solvers_with_correct_x_api_key_returns_200() {
+    let resp = make_authed_app()
+        .oneshot(get_with_header("/api/v1/solvers", "X-Api-Key", TEST_TOKEN))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn solvers_with_non_bearer_auth_scheme_returns_401() {
+    // Locks in that a non-Bearer Authorization scheme (e.g. Basic) is rejected
+    // rather than silently falling through to the X-Api-Key branch unverified.
+    let resp = make_authed_app()
+        .oneshot(get_with_header(
+            "/api/v1/solvers",
+            "Authorization",
+            "Basic dXNlcjpwYXNz",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn parse_without_token_returns_401() {
+    let body = format!(r#"{{"input":{TINY_CITIES}}}"#);
+    let req = post_json("/api/v1/parse", &body);
+    let resp = make_authed_app().oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }

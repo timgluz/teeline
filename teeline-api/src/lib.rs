@@ -29,15 +29,17 @@ pub fn build_api_router() -> axum::Router<AppState> {
         .route("/api/v1/solve", post(routes::solve::solve))
 }
 
-/// Full router with MetricsLayer applied. GovernorLayer is intentionally absent
-/// here; apply it to the api sub-router before merging when needed.
-pub fn build_router(state: AppState) -> axum::Router {
+/// Full router with MetricsLayer applied. `api` is the already-assembled
+/// (and optionally layered, e.g. with GovernorLayer/AuthLayer) `/api/v1/*`
+/// sub-router — callers build it via `build_api_router()` plus whatever
+/// layers they need, then pass it here so route wiring lives in one place.
+pub fn build_router(state: AppState, api: axum::Router<AppState>) -> axum::Router {
     axum::Router::new()
         .route("/", get(routes::index::handler))
         .route("/healthz", get(routes::health::handler))
         .route("/metrics", get(routes::metrics::handler))
         .merge(openapi::openapi_router())
-        .merge(build_api_router())
+        .merge(api)
         .layer(middleware::MetricsLayer::new(Arc::clone(&state.metrics)))
         .with_state(state)
 }

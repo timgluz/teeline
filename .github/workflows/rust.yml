@@ -31,6 +31,8 @@ jobs:
         uses: jdx/mise-action@v4
       - name: Run hurl e2e tests (teeline-api)
         run: task test:e2e:api
+      - name: Run hurl e2e auth tests (teeline-api)
+        run: task test:e2e:auth
       - name: Clippy
         run: cargo clippy -p teeline -p teeline-cli -p teeline-api -- -D warnings
       - name: Install cargo-llvm-cov

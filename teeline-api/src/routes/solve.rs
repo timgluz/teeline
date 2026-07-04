@@ -12,10 +12,15 @@ use crate::{
 #[utoipa::path(
     post,
     path = "/api/v1/solve",
+    security(
+        ("bearer_token" = []),
+        ("api_key" = [])
+    ),
     request_body = SolveRequest,
     responses(
         (status = 200, description = "Solved tour", body = SolveResponse),
         (status = 400, description = "Invalid input or unknown solver"),
+        (status = 401, description = "Missing or invalid API key"),
         (status = 500, description = "Solver failure")
     )
 )]

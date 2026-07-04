@@ -67,6 +67,18 @@ tasks:
       - task: api:wait
       - hurl --test teeline-api/tests/hurl/*.hurl
 
+  test:e2e:auth:
+    desc: Build, start with API_KEY set, wait, run hurl auth e2e tests, then shut down teeline-api
+    deps: [build:api]
+    vars:
+      API_TOKEN: test-secret-token
+    cmds:
+      - defer:
+          task: api:stop
+      - API_KEY={{.API_TOKEN}} RATE_LIMIT_RPM=0 ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+      - task: api:wait
+      - hurl --test --variable api_token={{.API_TOKEN}} teeline-api/tests/hurl/auth/*.hurl
+
   test:all:
     desc: Run unit tests and e2e tests
     deps: [test, test:e2e]

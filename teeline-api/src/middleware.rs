@@ -3,9 +3,12 @@ use std::task::{Context, Poll};
 use std::time::Instant;
 
 use axum::extract::MatchedPath;
-use axum::http::{Request, Response};
+use axum::http::{HeaderMap, Request, Response};
+use axum::response::IntoResponse;
+use subtle::ConstantTimeEq;
 use tower::{Layer, Service};
 
+use crate::error::ApiError;
 use crate::metrics::{HttpDurationLabels, HttpLabels, MetricsState};
 
 #[derive(Clone)]
@@ -94,4 +97,101 @@ where
             Ok(resp)
         })
     }
+}
+
+const AUTH_EXEMPT_PATH: &str = "/api/v1/health";
+
+#[derive(Clone)]
+pub struct AuthLayer {
+    token: Arc<str>,
+}
+
+impl AuthLayer {
+    pub fn new(token: impl Into<Arc<str>>) -> Self {
+        Self {
+            token: token.into(),
+        }
+    }
+}
+
+impl<S> Layer<S> for AuthLayer {
+    type Service = AuthService<S>;
+
+    fn layer(&self, inner: S) -> AuthService<S> {
+        AuthService {
+            inner,
+            token: Arc::clone(&self.token),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct AuthService<S> {
+    inner: S,
+    token: Arc<str>,
+}
+
+impl<S, B> Service<Request<B>> for AuthService<S>
+where
+    S: Service<Request<B>, Response = Response<axum::body::Body>> + Clone + Send + 'static,
+    S::Future: Send + 'static,
+    S::Error: Send,
+    B: Send + 'static,
+{
+    type Response = S::Response;
+    type Error = S::Error;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Request<B>) -> Self::Future {
+        // MatchedPath is populated by axum's routing layer before middleware
+        // added via Router::layer() runs (same ordering MetricsService above
+        // already relies on). The api sub-router only ever matches
+        // "/api/v1/health" as the exempt path.
+        let is_health = req
+            .extensions()
+            .get::<MatchedPath>()
+            .is_some_and(|m| m.as_str() == AUTH_EXEMPT_PATH);
+
+        if is_health || self.token_ok(req.headers()) {
+            let clone = self.inner.clone();
+            let mut inner = std::mem::replace(&mut self.inner, clone);
+            return Box::pin(async move { inner.call(req).await });
+        }
+
+        Box::pin(async move { Ok(ApiError::Unauthorized.into_response()) })
+    }
+}
+
+impl<S> AuthService<S> {
+    fn token_ok(&self, headers: &HeaderMap) -> bool {
+        extract_token(headers).is_some_and(|presented| {
+            let expected = self.token.as_bytes();
+            let presented = presented.as_bytes();
+            // Constant-time comparison to avoid timing side-channels. Token
+            // length is not itself secret, so a plain length check first is
+            // fine; ct_eq handles the equal-length byte comparison.
+            expected.len() == presented.len() && expected.ct_eq(presented).into()
+        })
+    }
+}
+
+/// Extracts the bearer/api-key token from either `Authorization: Bearer <token>`
+/// or `X-Api-Key: <token>`, preferring `Authorization` if both are present.
+fn extract_token(headers: &HeaderMap) -> Option<String> {
+    if let Some(v) = headers.get(axum::http::header::AUTHORIZATION)
+        && let Ok(s) = v.to_str()
+        && let Some(token) = s.strip_prefix("Bearer ")
+    {
+        return Some(token.to_string());
+    }
+    headers
+        .get("X-Api-Key")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
 }
