@@ -2,6 +2,19 @@ body {
   padding-top: 48px;
 }
 
+/* ---- Header tagline ---- */
+.tagline {
+  max-width: 60ch;
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+  color: var(--pico-muted-color);
+}
+
+.tagline-link {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
+
 /* PicoCSS 2.x has no built-in stepper — minimal custom layout */
 .stepper {
   display: flex;

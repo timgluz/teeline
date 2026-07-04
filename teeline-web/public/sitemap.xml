@@ -2,6 +2,7 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://tspsolver.com/</loc></url>
   <url><loc>https://tspsolver.com/webmcp/</loc></url>
+  <url><loc>https://tspsolver.com/tsp/</loc></url>
   <url><loc>https://tspsolver.com/algorithms/bhk/</loc></url>
   <url><loc>https://tspsolver.com/algorithms/branch_bound/</loc></url>
   <url><loc>https://tspsolver.com/algorithms/nn/</loc></url>

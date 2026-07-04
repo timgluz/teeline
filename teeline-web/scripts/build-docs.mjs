@@ -142,6 +142,7 @@ const BASE = 'https://tspsolver.com'
 const sitemapUrls = [
   `${BASE}/`,
   `${BASE}/webmcp/`,
+  `${BASE}/tsp/`,
   ...Object.keys(SOLVER_DOCS).map(id => `${BASE}/algorithms/${id}/`),
   ...Object.keys(SOLVER_DOCS)
     .filter(id => existsSync(join(WEB_ROOT, `algorithms/${id}/explainer/index.html`)))
