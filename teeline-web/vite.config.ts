@@ -119,22 +119,5 @@ export default defineConfig({
         },
       },
     },
-    // Make CSS non-blocking on the main SPA page.
-    // Static content pages (algorithm docs, webmcp, tsp, api-key) keep blocking CSS
-    // since they need immediate styling and have no heavy SPA bundle to defer for.
-    {
-      name: 'async-css-main',
-      transformIndexHtml: {
-        order: 'post' as const,
-        handler(html: string, ctx: { filename: string }) {
-          if (ctx.filename.includes('/algorithms/') || ctx.filename.includes('/webmcp/') || ctx.filename.includes('/tsp/') || ctx.filename.includes('/api-key/')) return html
-          return html.replace(
-            /<link rel="stylesheet" crossorigin href="([^"]+)">/g,
-            `<link rel="preload" as="style" crossorigin href="$1" onload="this.onload=null;this.rel='stylesheet'">` +
-            `<noscript><link rel="stylesheet" crossorigin href="$1"></noscript>`
-          )
-        },
-      },
-    },
   ],
 })
