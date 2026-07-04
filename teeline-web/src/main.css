@@ -417,12 +417,13 @@ body {
 .status-dot--ready   { background: #2da44e; }
 .status-dot--error   { background: #cf222e; }
 
-/* ---- Algorithm family cards (homepage "Explore the algorithms") ----
+/* ---- Card grid (homepage "Features" and "Explore the algorithms") ----
    Shared-border grid: each cell owns its own right/bottom hairline, so the
-   4 cells read as one bordered block instead of four floating cards.
-   Mobile-first: single column with bottom hairlines only; the 2-column
-   layout (and its right hairline) is added back at the wider breakpoint. */
-.algo-cards {
+   cells read as one bordered block instead of floating cards.
+   Mobile-first: single column with bottom hairlines only; the --2col
+   modifier adds the 2-column layout (and its right hairline) back at the
+   wider breakpoint, so this one component serves both 4-card sections. */
+.card-grid {
   display: grid;
   grid-template-columns: 1fr;
   border: 1px solid var(--pico-muted-border-color);
@@ -431,7 +432,7 @@ body {
   margin: 1.5rem 0 var(--pico-spacing);
 }
 
-.algo-card {
+.card {
   /* Pico gives <article> a default bottom margin — zero it so the grid
      rows sit flush against the shared-border hairlines, not 20px apart. */
   margin: 0;
@@ -440,34 +441,39 @@ body {
   border-bottom: 1px solid var(--pico-muted-border-color);
 }
 
-.algo-card:last-child {
+.card:last-child {
   border-bottom: none;
 }
 
 @media (min-width: 641px) {
-  .algo-cards {
+  .card-grid--2col {
     grid-template-columns: 1fr 1fr;
   }
 
-  .algo-card {
+  .card-grid--2col .card {
     border-right: 1px solid var(--pico-muted-border-color);
   }
 
-  .algo-card:nth-child(2n) {
+  .card-grid--2col .card:nth-child(2n) {
     border-right: none;
   }
 
-  .algo-card:nth-last-child(-n+2) {
+  .card-grid--2col .card:nth-last-child(-n+2) {
     border-bottom: none;
   }
 }
 
-.algo-card--exact         { --algo-accent: #2563eb; }
-.algo-card--constructive  { --algo-accent: var(--pico-color-jade-500, #2a9d8f); }
-.algo-card--local-search  { --algo-accent: var(--pico-color-orange-500, #e67e22); }
-.algo-card--metaheuristic { --algo-accent: #7c5cbf; }
+.card--exact         { --card-accent: #2563eb; }
+.card--constructive  { --card-accent: var(--pico-color-jade-500, #2a9d8f); }
+.card--local-search  { --card-accent: var(--pico-color-orange-500, #e67e22); }
+.card--metaheuristic { --card-accent: #7c5cbf; }
 
-.algo-card-icon {
+.card--webmcp { --card-accent: var(--pico-color-jade-500, #2a9d8f); }
+.card--api    { --card-accent: #2563eb; }
+.card--tools  { --card-accent: var(--pico-color-orange-500, #e67e22); }
+.card--wasm   { --card-accent: #7c5cbf; }
+
+.card-icon {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -475,27 +481,27 @@ body {
   height: 2.25rem;
   margin-bottom: 0.75rem;
   border-radius: 0.6rem;
-  background: color-mix(in srgb, var(--algo-accent) 14%, transparent);
-  color: var(--algo-accent);
+  background: color-mix(in srgb, var(--card-accent) 14%, transparent);
+  color: var(--card-accent);
 }
 
-.algo-card-icon svg {
+.card-icon svg {
   width: 20px;
   height: 20px;
 }
 
-.algo-card-title {
+.card-title {
   margin: 0 0 0.35rem;
   font-size: 1.05rem;
 }
 
-.algo-card-desc {
+.card-desc {
   margin: 0 0 1rem;
   color: var(--pico-muted-color);
   font-size: 0.875rem;
 }
 
-.algo-card-links {
+.card-links {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -506,23 +512,23 @@ body {
 
 /* Chrome/Firefox still generate a marker box for <li> inside a flex
    container unless list-style is also reset on the item itself. */
-.algo-card-links li {
+.card-links li {
   list-style: none;
 }
 
-.algo-card-links a {
+.card-links a {
   display: inline-block;
   padding: 0.25rem 0.65rem;
-  border: 1px solid color-mix(in srgb, var(--algo-accent) 25%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-accent) 25%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--algo-accent) 8%, transparent);
+  background: color-mix(in srgb, var(--card-accent) 8%, transparent);
   color: var(--pico-color);
   font-size: 0.8rem;
   text-decoration: none;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.algo-card-links a:hover {
-  border-color: var(--algo-accent);
-  background: color-mix(in srgb, var(--algo-accent) 25%, transparent);
+.card-links a:hover {
+  border-color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 25%, transparent);
 }

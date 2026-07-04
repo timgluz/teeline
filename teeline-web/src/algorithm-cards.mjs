@@ -40,12 +40,12 @@ export function renderAlgorithmCardsHtml() {
         : `<li><span>${meta.name}</span></li>`
     }).join('')
     return `
-      <article class="algo-card algo-card--${info.slug}">
-        <div class="algo-card-icon" aria-hidden="true">${info.icon}</div>
-        <h3 class="algo-card-title">${g.label}</h3>
-        <p class="algo-card-desc">${info.description}</p>
-        <ul class="algo-card-links">${links}</ul>
+      <article class="card card--${info.slug}">
+        <div class="card-icon" aria-hidden="true">${info.icon}</div>
+        <h3 class="card-title">${g.label}</h3>
+        <p class="card-desc">${info.description}</p>
+        <ul class="card-links">${links}</ul>
       </article>`
   }).join('')
-  return `<div class="algo-cards">${cards}</div>`
+  return `<div class="card-grid card-grid--2col">${cards}</div>`
 }

@@ -141,6 +141,7 @@ for (const [solverId, filename] of Object.entries(SOLVER_DOCS)) {
 const BASE = 'https://tspsolver.com'
 const sitemapUrls = [
   `${BASE}/`,
+  `${BASE}/webmcp/`,
   ...Object.keys(SOLVER_DOCS).map(id => `${BASE}/algorithms/${id}/`),
   ...Object.keys(SOLVER_DOCS)
     .filter(id => existsSync(join(WEB_ROOT, `algorithms/${id}/explainer/index.html`)))

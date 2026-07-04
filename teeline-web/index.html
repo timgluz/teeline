@@ -153,40 +153,6 @@
             </div>
           </fieldset>
 
-          <details id="webmcp-guide" open>
-            <summary>AI agent access via WebMCP <span id="webmcp-chrome-status"></span></summary>
-            <p>
-              This page exposes its solver tools via the
-              <a href="https://developer.chrome.com/docs/ai/webmcp" target="_blank" rel="noopener">WebMCP declarative API</a>,
-              allowing AI agents to call <code>solveTSP</code>, <code>listAlgorithms</code>,
-              <code>parseProblem</code>, and <code>compareTours</code> directly in the browser.
-            </p>
-            <ol>
-              <li>
-                <strong>Chrome ≥ 149 required</strong>
-                <span id="webmcp-chrome-badge"></span>
-                — check your version at <code>chrome://version</code>.
-              </li>
-              <li>
-                Enable the testing flag: open
-                <code>chrome://flags/#enable-webmcp-testing</code>,
-                set it to <strong>Enabled</strong>, and relaunch Chrome.
-              </li>
-              <li>
-                Install the
-                <a href="https://chromewebstore.google.com/detail/gbpdfapgefenggkahomfgkhfehlcenpd?utm_source=item-share-cb"
-                   target="_blank" rel="noopener">WebMCP Inspector extension</a>
-                from the Chrome Web Store.
-              </li>
-              <li>
-                Follow
-                <a href="https://developer.chrome.com/docs/ai/webmcp#get_started"
-                   target="_blank" rel="noopener">Google's official getting started guide</a>
-                to connect your AI agent.
-              </li>
-            </ol>
-          </details>
-
           <div class="step-actions">
             <button type="button" id="btn-continue" hidden>Continue →</button>
           </div>
@@ -363,6 +329,11 @@
       </section>
       <!-- /#step-content -->
     </main>
+
+    <section class="container" aria-labelledby="features-heading">
+      <h2 id="features-heading">Features</h2>
+      <div id="features-index"></div>
+    </section>
 
     <section class="container" aria-labelledby="algorithms-index-heading">
       <h2 id="algorithms-index-heading">Explore the algorithms</h2>

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { globSync } from 'tinyglobby'
 import { renderTopbarHtml, renderSidebarHtml } from './src/nav-html.mjs'
 import { renderAlgorithmCardsHtml } from './src/algorithm-cards.mjs'
+import { renderFeatureCardsHtml } from './src/feature-cards.mjs'
 
 const configDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -30,6 +31,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        webmcp: 'webmcp/index.html',
         ...algoPages,
         ...explainerPages,
       },
@@ -107,18 +109,23 @@ export default defineConfig({
             '<div id="algorithms-index"></div>',
             `<div id="algorithms-index">${renderAlgorithmCardsHtml()}</div>`
           )
+          out = out.replace(
+            '<div id="features-index"></div>',
+            `<div id="features-index">${renderFeatureCardsHtml()}</div>`
+          )
           return out
         },
       },
     },
     // Make CSS non-blocking on the main SPA page.
-    // Algorithm docs pages keep blocking CSS (static HTML needs immediate styling).
+    // Static content pages (algorithm docs, webmcp) keep blocking CSS since
+    // they need immediate styling and have no heavy SPA bundle to defer for.
     {
       name: 'async-css-main',
       transformIndexHtml: {
         order: 'post' as const,
         handler(html: string, ctx: { filename: string }) {
-          if (ctx.filename.includes('/algorithms/')) return html
+          if (ctx.filename.includes('/algorithms/') || ctx.filename.includes('/webmcp/')) return html
           return html.replace(
             /<link rel="stylesheet" crossorigin href="([^"]+)">/g,
             `<link rel="preload" as="style" crossorigin href="$1" onload="this.onload=null;this.rel='stylesheet'">` +
