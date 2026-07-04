@@ -2083,7 +2083,7 @@ dependencies = [
 
 [[package]]
 name = "teeline"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "clap",
  "num-complex",
@@ -2121,7 +2121,7 @@ dependencies = [
 
 [[package]]
 name = "teeline-cli"
-version = "1.0.10"
+version = "1.0.11"
 dependencies = [
  "clap",
  "serde_json",
