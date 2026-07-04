@@ -82,6 +82,11 @@ tasks:
     cmds:
       - for i in $(seq 10); do curl -sf http://127.0.0.1:8080/api/v1/health && break || sleep 1; done
 
+  api:release:
+    desc: Deploy teeline-api to Fly.io (requires flyctl auth; app must exist, see fly.toml)
+    cmds:
+      - flyctl deploy --config fly.toml --remote-only
+
   test:e2e:api:
     desc: Build, start, wait, run hurl e2e tests, then shut down teeline-api
     deps: [build:api]
