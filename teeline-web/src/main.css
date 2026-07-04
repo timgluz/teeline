@@ -2,6 +2,19 @@ body {
   padding-top: 48px;
 }
 
+/* ---- Header tagline ---- */
+.tagline {
+  max-width: 60ch;
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+  color: var(--pico-muted-color);
+}
+
+.tagline-link {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+}
+
 /* PicoCSS 2.x has no built-in stepper — minimal custom layout */
 .stepper {
   display: flex;
@@ -416,3 +429,119 @@ body {
 .status-dot--loading { background: #888; }
 .status-dot--ready   { background: #2da44e; }
 .status-dot--error   { background: #cf222e; }
+
+/* ---- Card grid (homepage "Features" and "Explore the algorithms") ----
+   Shared-border grid: each cell owns its own right/bottom hairline, so the
+   cells read as one bordered block instead of floating cards.
+   Mobile-first: single column with bottom hairlines only; the --2col
+   modifier adds the 2-column layout (and its right hairline) back at the
+   wider breakpoint, so this one component serves both 4-card sections. */
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  overflow: hidden;
+  margin: 1.5rem 0 var(--pico-spacing);
+}
+
+.card {
+  /* Pico gives <article> a default bottom margin — zero it so the grid
+     rows sit flush against the shared-border hairlines, not 20px apart. */
+  margin: 0;
+  background: var(--pico-background-color, #fff);
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--pico-muted-border-color);
+}
+
+.card:last-child {
+  border-bottom: none;
+}
+
+@media (min-width: 641px) {
+  .card-grid--2col {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .card-grid--2col .card {
+    border-right: 1px solid var(--pico-muted-border-color);
+  }
+
+  .card-grid--2col .card:nth-child(2n) {
+    border-right: none;
+  }
+
+  .card-grid--2col .card:nth-last-child(-n+2) {
+    border-bottom: none;
+  }
+}
+
+.card--exact         { --card-accent: #2563eb; }
+.card--constructive  { --card-accent: var(--pico-color-jade-500, #2a9d8f); }
+.card--local-search  { --card-accent: var(--pico-color-orange-500, #e67e22); }
+.card--metaheuristic { --card-accent: #7c5cbf; }
+
+.card--webmcp { --card-accent: var(--pico-color-jade-500, #2a9d8f); }
+.card--api    { --card-accent: #2563eb; }
+.card--tools  { --card-accent: var(--pico-color-orange-500, #e67e22); }
+.card--wasm   { --card-accent: #7c5cbf; }
+
+.card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: 0.75rem;
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--card-accent) 14%, transparent);
+  color: var(--card-accent);
+}
+
+.card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.card-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
+
+.card-desc {
+  margin: 0 0 1rem;
+  color: var(--pico-muted-color);
+  font-size: 0.875rem;
+}
+
+.card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Chrome/Firefox still generate a marker box for <li> inside a flex
+   container unless list-style is also reset on the item itself. */
+.card-links li {
+  list-style: none;
+}
+
+.card-links a {
+  display: inline-block;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--card-accent) 25%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-accent) 8%, transparent);
+  color: var(--pico-color);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.card-links a:hover {
+  border-color: var(--card-accent);
+  background: color-mix(in srgb, var(--card-accent) 25%, transparent);
+}

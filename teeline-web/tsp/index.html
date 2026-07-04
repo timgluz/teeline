@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Traveling Salesman Problem — Teeline</title>
+    <meta name="description" content="What the Traveling Salesman Problem is, why it's hard, where it shows up in the real world, and where to read more." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://tspsolver.com/tsp/" />
+    <meta property="og:title" content="The Traveling Salesman Problem — Teeline" />
+    <meta property="og:description" content="What the Traveling Salesman Problem is, why it's hard, where it shows up in the real world, and where to read more." />
+    <link rel="canonical" href="https://tspsolver.com/tsp/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
+      <p style="margin-bottom: 1rem;">
+        <a href="/">← Back to Teeline</a>
+      </p>
+
+      <h1>The Traveling Salesman Problem</h1>
+      <p>
+        Given a list of cities and the distances between them, find the shortest possible
+        route that visits every city exactly once and returns to the start. That's the
+        whole problem — easy to state to a child, and still, after decades of research, one
+        of the most studied problems in computer science.
+      </p>
+
+      <h2>Why it's hard</h2>
+      <p>
+        The number of possible routes grows factorially with the number of cities: 10
+        cities have 181,440 distinct tours; 20 cities have over 60 quadrillion. Checking
+        every one isn't an option, so exact algorithms
+        (like the <a href="/algorithms/bhk/">Bellman-Held-Karp</a> and
+        <a href="/algorithms/branch_bound/">Branch and Bound</a> solvers here) only stay
+        practical for a few dozen cities. TSP is
+        <a href="https://en.wikipedia.org/wiki/NP-hardness" target="_blank" rel="noopener">NP-hard</a>:
+        no known algorithm solves every instance quickly, and most researchers believe none
+        exists. Beyond that scale, the field turns to heuristics and metaheuristics —
+        <a href="/algorithms/2opt/">local search</a>,
+        <a href="/algorithms/sa/">simulated annealing</a>,
+        <a href="/algorithms/ga/">genetic algorithms</a>, and more — that trade the guarantee
+        of optimality for a solution that's good enough, fast enough. Teeline implements 17
+        of them; see <a href="/#algorithms-index-heading">the algorithm docs</a> for how each one works.
+      </p>
+
+      <h2>Where it shows up</h2>
+      <p>
+        Despite the toy-sounding name, the same structure appears anywhere something has to
+        visit a set of points in the best order: delivery and courier route planning,
+        drilling holes in a circuit board, positioning a telescope or a robotic arm,
+        picking items in a warehouse, even sequencing DNA fragments. Any time "visit all of
+        these, minimize the cost of moving between them" comes up, it's a TSP variant
+        underneath.
+      </p>
+
+      <h2>Further reading</h2>
+      <ul>
+        <li>
+          <a href="https://en.wikipedia.org/wiki/Travelling_salesman_problem" target="_blank" rel="noopener">Travelling salesman problem</a>
+          (Wikipedia) — formulations, algorithms, and complexity, with a full reference list.
+        </li>
+        <li>
+          <a href="https://www.math.uwaterloo.ca/tsp/" target="_blank" rel="noopener">The Traveling Salesman Problem</a>
+          (University of Waterloo) — history, applications, and record-setting tours, maintained
+          by researcher William Cook.
+        </li>
+        <li>
+          <a href="https://www.math.uwaterloo.ca/tsp/concorde.html" target="_blank" rel="noopener">Concorde</a>
+          — the reference exact TSP solver, which has proven optimality on instances with
+          tens of thousands of cities.
+        </li>
+        <li>
+          <a href="http://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/" target="_blank" rel="noopener">TSPLIB</a>
+          — the benchmark instance library Teeline reads (<code>.tsp</code> files), with problems
+          sourced from real applications and research.
+        </li>
+      </ul>
+
+      <p>
+        Ready to see it solved? <a href="/">Load a dataset</a> and try a few algorithms
+        against each other.
+      </p>
+    </main>
+    <script type="module" src="/src/docs-init.ts"></script>
+  </body>
+</html>

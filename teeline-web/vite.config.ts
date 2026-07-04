@@ -5,6 +5,9 @@ import { existsSync } from 'fs'
 import { resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { globSync } from 'tinyglobby'
+import { renderTopbarHtml, renderSidebarHtml } from './src/nav-html.mjs'
+import { renderAlgorithmCardsHtml } from './src/algorithm-cards.mjs'
+import { renderFeatureCardsHtml } from './src/feature-cards.mjs'
 
 const configDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -28,6 +31,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: 'index.html',
+        webmcp: 'webmcp/index.html',
+        tsp: 'tsp/index.html',
         ...algoPages,
         ...explainerPages,
       },
@@ -79,14 +84,49 @@ export default defineConfig({
       org: "timo-sulg",
       project: "javascript"
     }),
+    // Server-render the topbar/sidebar nav into every HTML entry at build time.
+    // Previously these were injected client-side only (el.innerHTML = ...), so
+    // Googlebot's initial (non-JS) crawl saw zero internal links between algorithm
+    // pages — they were reachable only via sitemap.xml, which reads as orphan pages
+    // and hurts indexing priority. Client-side init still runs (see docs-init.ts) for
+    // dropdown interactivity; it just re-renders identical markup on top of this.
+    {
+      name: 'ssr-nav-html',
+      transformIndexHtml: {
+        order: 'pre' as const,
+        handler(html: string, ctx: { filename: string }) {
+          let out = html.replace(
+            '<div id="topbar"></div>',
+            `<div id="topbar">${renderTopbarHtml()}</div>`
+          )
+          const algoMatch = ctx.filename.match(/\/algorithms\/([^/]+)\//)
+          if (algoMatch) {
+            out = out.replace(
+              '<nav id="algo-sidebar" aria-label="Algorithms"></nav>',
+              `<nav id="algo-sidebar" aria-label="Algorithms">${renderSidebarHtml(algoMatch[1])}</nav>`
+            )
+          }
+          out = out.replace(
+            '<div id="algorithms-index"></div>',
+            `<div id="algorithms-index">${renderAlgorithmCardsHtml()}</div>`
+          )
+          out = out.replace(
+            '<div id="features-index"></div>',
+            `<div id="features-index">${renderFeatureCardsHtml()}</div>`
+          )
+          return out
+        },
+      },
+    },
     // Make CSS non-blocking on the main SPA page.
-    // Algorithm docs pages keep blocking CSS (static HTML needs immediate styling).
+    // Static content pages (algorithm docs, webmcp, tsp) keep blocking CSS since
+    // they need immediate styling and have no heavy SPA bundle to defer for.
     {
       name: 'async-css-main',
       transformIndexHtml: {
         order: 'post' as const,
         handler(html: string, ctx: { filename: string }) {
-          if (ctx.filename.includes('/algorithms/')) return html
+          if (ctx.filename.includes('/algorithms/') || ctx.filename.includes('/webmcp/') || ctx.filename.includes('/tsp/')) return html
           return html.replace(
             /<link rel="stylesheet" crossorigin href="([^"]+)">/g,
             `<link rel="preload" as="style" crossorigin href="$1" onload="this.onload=null;this.rel='stylesheet'">` +
