@@ -6,6 +6,7 @@ import { resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { globSync } from 'tinyglobby'
 import { renderTopbarHtml, renderSidebarHtml } from './src/nav-html.mjs'
+import { renderAlgorithmCardsHtml } from './src/algorithm-cards.mjs'
 
 const configDir = fileURLToPath(new URL('.', import.meta.url))
 
@@ -104,7 +105,7 @@ export default defineConfig({
           }
           out = out.replace(
             '<div id="algorithms-index"></div>',
-            `<div id="algorithms-index">${renderSidebarHtml(null)}</div>`
+            `<div id="algorithms-index">${renderAlgorithmCardsHtml()}</div>`
           )
           return out
         },
