@@ -382,6 +382,42 @@ impl Guest for Component {
             optimal_only_edges: stats.optimal_only_edges as u32,
         })
     }
+
+    fn tour_distance(route: Vec<u32>, cities: Vec<City>) -> Result<f32, String> {
+        // tour_cost computes route[(i+1) % n], so a route of 0 or 1 silently
+        // produces a meaningless (0.0) result rather than an error — reject
+        // it explicitly rather than returning a wrong-looking answer.
+        if route.len() < 2 {
+            return Err("route must contain at least 2 city ids".to_string());
+        }
+
+        // Convert WIT City -> KDPoint
+        let kd_cities: Vec<KDPoint> = cities
+            .iter()
+            .map(|c| KDPoint::new_with_id(c.id as usize, &[c.x, c.y]))
+            .collect();
+
+        // Build city ID set for membership validation. tour_cost's HashMap
+        // build silently collapses duplicate ids (last write wins), which
+        // would compute against the wrong coordinate with no error — reject
+        // duplicates instead of letting that happen quietly.
+        let city_ids: std::collections::HashSet<usize> = kd_cities.iter().map(|c| c.id).collect();
+        if city_ids.len() != kd_cities.len() {
+            return Err("cities list contains duplicate city ids".to_string());
+        }
+
+        // Validate that every route id exists in the cities list — tour_cost
+        // does a raw HashMap index with no bounds check, so an unknown id
+        // would panic across the WASM boundary instead of erroring cleanly.
+        for &id in route.iter() {
+            if !city_ids.contains(&(id as usize)) {
+                return Err(format!("unknown city id {id} in route"));
+            }
+        }
+
+        let route: Vec<usize> = route.iter().map(|&x| x as usize).collect();
+        Ok(comparison::tour_cost(&route, &kd_cities))
+    }
 }
 
 bindings::export!(Component with_types_in bindings);

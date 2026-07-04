@@ -99,4 +99,11 @@ world solver {
         opt-route:    list<u32>,
         cities:       list<city>,
     ) -> result<comparison-stats, string>;
+
+    // Measures the closed-loop distance of `route` as given — no solving,
+    // no reordering. Every id in `route` must exist in `cities`.
+    export tour-distance: func(
+        route:  list<u32>,
+        cities: list<city>,
+    ) -> result<f32, string>;
 }

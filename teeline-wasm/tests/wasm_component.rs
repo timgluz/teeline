@@ -198,6 +198,43 @@ fn run_compare_tours(
         .unwrap()
 }
 
+fn run_tour_distance(
+    route: &[u32],
+    cities: &[crate::teeline::solver::types::City],
+) -> Result<f32, String> {
+    let (mut store, instance) = make_instance();
+    instance
+        .call_tour_distance(&mut store, route, cities)
+        .unwrap()
+}
+
+// Unit square, side 10: closed-loop perimeter is exactly 40.0.
+fn square_cities() -> Vec<crate::teeline::solver::types::City> {
+    use crate::teeline::solver::types::City;
+    vec![
+        City {
+            id: 0,
+            x: 0.0,
+            y: 0.0,
+        },
+        City {
+            id: 1,
+            x: 10.0,
+            y: 0.0,
+        },
+        City {
+            id: 2,
+            x: 10.0,
+            y: 10.0,
+        },
+        City {
+            id: 3,
+            x: 0.0,
+            y: 10.0,
+        },
+    ]
+}
+
 // ── solve tests ───────────────────────────────────────────────────────────────
 
 #[test]
@@ -836,4 +873,63 @@ fn test_list_algorithms_ga_params() {
     assert!(keys.contains(&"nElite"), "ga must have nElite");
     let n_elite = ga.params.iter().find(|p| p.key == "nElite").unwrap();
     assert_eq!(n_elite.value_type, "int", "nElite must be int type");
+}
+
+// ── tour_distance tests ───────────────────────────────────────────────────────
+
+#[test]
+fn test_tour_distance_square_perimeter() {
+    let cities = square_cities();
+    let route: Vec<u32> = cities.iter().map(|c| c.id).collect();
+    let distance = run_tour_distance(&route, &cities).expect("square perimeter must succeed");
+    assert!(
+        (distance - 40.0).abs() < 0.001,
+        "expected closed-loop perimeter of 40.0, got {distance}"
+    );
+}
+
+#[test]
+fn test_tour_distance_unknown_city_id_returns_error() {
+    let cities = square_cities(); // IDs 0..3
+    let bad_route: Vec<u32> = vec![0, 1, 2, 100]; // 100 doesn't exist
+    let result = run_tour_distance(&bad_route, &cities);
+    assert!(result.is_err(), "unknown city id must return Err");
+    let msg = result.unwrap_err();
+    assert!(
+        msg.contains("unknown city"),
+        "error must mention 'unknown city', got: {msg}"
+    );
+}
+
+#[test]
+fn test_tour_distance_empty_route_returns_error() {
+    let cities = square_cities();
+    let result = run_tour_distance(&[], &cities);
+    assert!(result.is_err(), "empty route must return Err");
+}
+
+#[test]
+fn test_tour_distance_single_city_route_returns_error() {
+    let cities = square_cities();
+    let result = run_tour_distance(&[0], &cities);
+    assert!(result.is_err(), "single-city route must return Err");
+}
+
+#[test]
+fn test_tour_distance_duplicate_city_id_returns_error() {
+    use crate::teeline::solver::types::City;
+    let mut cities = square_cities();
+    cities.push(City {
+        id: 0, // duplicate of the first city's id
+        x: 999.0,
+        y: 999.0,
+    });
+    let route: Vec<u32> = vec![0, 1, 2, 3];
+    let result = run_tour_distance(&route, &cities);
+    assert!(result.is_err(), "duplicate city id must return Err");
+    let msg = result.unwrap_err();
+    assert!(
+        msg.contains("duplicate"),
+        "error must mention 'duplicate', got: {msg}"
+    );
 }
