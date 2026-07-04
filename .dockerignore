@@ -1,0 +1,34 @@
+# Build artifacts
+target/
+teeline-wasm/target/
+
+# Sibling projects/workspaces not needed to build teeline-api
+# (teeline-cli/ and root src/ are kept: they're workspace members/deps
+# needed for `cargo build -p teeline-api` to resolve the workspace)
+teeline-web/
+teeline-qt/
+teeline-wasm/
+
+# VCS / KB / editor / tooling state
+.git/
+.kb/
+.claude/
+.superpowers/
+.remember/
+.playwright-mcp/
+.worktrees/
+.githooks/
+
+# Node/JS
+node_modules/
+
+# Secrets and local env
+.env
+.env.*
+
+# Docs, data, misc not needed for the build
+docs/
+data/
+tests/
+solver.py
+download_data.sh
