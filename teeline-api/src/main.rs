@@ -5,7 +5,7 @@ use axum::Router;
 use teeline_api::{
     AppState,
     metrics::MetricsState,
-    middleware::AuthLayer,
+    middleware,
     services::{SolverRegistry, TspService},
 };
 use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
@@ -21,10 +21,16 @@ fn rate_limit_rpm() -> u64 {
         .unwrap_or(100)
 }
 
-/// Returns the configured API key, if any. When unset, auth is disabled
-/// entirely (back-compat with the original no-auth MVP behavior).
+/// Returns the configured API key, if any. When unset OR empty, auth is
+/// disabled entirely (back-compat with the original no-auth MVP behavior).
+/// `std::env::var(...).ok()` alone would treat `API_KEY=""` as "set" (an
+/// empty-but-present token), silently enabling auth with a trivially
+/// guessable blank credential — worse than disabled, since operators
+/// wouldn't know from the logs.
 fn api_key() -> Option<String> {
-    std::env::var("API_KEY").ok()
+    std::env::var("API_KEY")
+        .ok()
+        .filter(|token| !token.is_empty())
 }
 
 #[tokio::main]
@@ -66,12 +72,15 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("rate limiting disabled (RATE_LIMIT_RPM=0)");
     }
 
-    // Applied after GovernorLayer, so AuthLayer wraps outermost (each
-    // subsequent .layer() call wraps the previous stack) — unauthenticated
-    // requests are rejected before consuming rate-limit budget.
+    // Applied after GovernorLayer, so auth wraps outermost for matched
+    // routes (each subsequent .layer()/.route_layer() call wraps the
+    // previous stack) — unauthenticated requests are rejected before
+    // consuming rate-limit budget. require_auth uses route_layer
+    // internally (not layer) so it only runs for requests that actually
+    // match a route.
     if let Some(token) = api_key() {
         tracing::info!("API key auth enabled");
-        api = api.layer(AuthLayer::new(token));
+        api = middleware::require_auth(api, token);
     } else {
         tracing::info!("API key auth disabled (API_KEY unset)");
     }

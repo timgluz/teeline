@@ -101,97 +101,67 @@ where
 
 const AUTH_EXEMPT_PATH: &str = "/api/v1/health";
 
-#[derive(Clone)]
-pub struct AuthLayer {
-    token: Arc<str>,
+/// Wraps `router` so every request must present a valid bearer/API-key
+/// token matching `token`, except `AUTH_EXEMPT_PATH`. Uses `route_layer`
+/// (not `layer`) so requests that don't match any route on `router` fall
+/// through to axum's normal 404 instead of getting a 401 — `.layer()`
+/// would also wrap the router's fallback, turning every unmatched path
+/// into a 401 (axum's `route_layer` docs call this exact scenario out).
+pub fn require_auth(
+    router: axum::Router<crate::AppState>,
+    token: impl Into<Arc<str>>,
+) -> axum::Router<crate::AppState> {
+    let token: Arc<str> = token.into();
+    router.route_layer(axum::middleware::from_fn(
+        move |matched_path: Option<MatchedPath>,
+              headers: HeaderMap,
+              request: axum::extract::Request,
+              next: axum::middleware::Next| {
+            let token = Arc::clone(&token);
+            async move {
+                // MatchedPath is populated by axum's routing before route_layer
+                // middleware runs. The api sub-router only ever matches
+                // "/api/v1/health" as the exempt path.
+                let is_health = matched_path.is_some_and(|m| m.as_str() == AUTH_EXEMPT_PATH);
+                if is_health || token_matches(&token, &headers) {
+                    return next.run(request).await;
+                }
+                ApiError::Unauthorized.into_response()
+            }
+        },
+    ))
 }
 
-impl AuthLayer {
-    pub fn new(token: impl Into<Arc<str>>) -> Self {
-        Self {
-            token: token.into(),
-        }
+fn token_matches(token: &str, headers: &HeaderMap) -> bool {
+    // Defense in depth: an empty configured token must never match, even
+    // though the real fix is api_key() in main.rs never producing one.
+    // Without this, an empty configured token would authenticate any
+    // request presenting an empty (but present) credential.
+    if token.is_empty() {
+        return false;
     }
-}
-
-impl<S> Layer<S> for AuthLayer {
-    type Service = AuthService<S>;
-
-    fn layer(&self, inner: S) -> AuthService<S> {
-        AuthService {
-            inner,
-            token: Arc::clone(&self.token),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct AuthService<S> {
-    inner: S,
-    token: Arc<str>,
-}
-
-impl<S, B> Service<Request<B>> for AuthService<S>
-where
-    S: Service<Request<B>, Response = Response<axum::body::Body>> + Clone + Send + 'static,
-    S::Future: Send + 'static,
-    S::Error: Send,
-    B: Send + 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
-    >;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), S::Error>> {
-        self.inner.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: Request<B>) -> Self::Future {
-        // MatchedPath is populated by axum's routing layer before middleware
-        // added via Router::layer() runs (same ordering MetricsService above
-        // already relies on). The api sub-router only ever matches
-        // "/api/v1/health" as the exempt path.
-        let is_health = req
-            .extensions()
-            .get::<MatchedPath>()
-            .is_some_and(|m| m.as_str() == AUTH_EXEMPT_PATH);
-
-        if is_health || self.token_ok(req.headers()) {
-            let clone = self.inner.clone();
-            let mut inner = std::mem::replace(&mut self.inner, clone);
-            return Box::pin(async move { inner.call(req).await });
-        }
-
-        Box::pin(async move { Ok(ApiError::Unauthorized.into_response()) })
-    }
-}
-
-impl<S> AuthService<S> {
-    fn token_ok(&self, headers: &HeaderMap) -> bool {
-        extract_token(headers).is_some_and(|presented| {
-            let expected = self.token.as_bytes();
-            let presented = presented.as_bytes();
-            // Constant-time comparison to avoid timing side-channels. Token
-            // length is not itself secret, so a plain length check first is
-            // fine; ct_eq handles the equal-length byte comparison.
-            expected.len() == presented.len() && expected.ct_eq(presented).into()
-        })
-    }
+    extract_token(headers).is_some_and(|presented| {
+        let expected = token.as_bytes();
+        let presented = presented.as_bytes();
+        // Constant-time comparison to avoid timing side-channels. Token
+        // length is not itself secret, so a plain length check first is
+        // fine; ct_eq handles the equal-length byte comparison.
+        expected.len() == presented.len() && expected.ct_eq(presented).into()
+    })
 }
 
 /// Extracts the bearer/api-key token from either `Authorization: Bearer <token>`
 /// or `X-Api-Key: <token>`, preferring `Authorization` if both are present.
-fn extract_token(headers: &HeaderMap) -> Option<String> {
+/// The `Bearer` scheme name is matched case-insensitively per RFC 7235 §2.1.
+/// Borrows from `headers` rather than allocating — this runs on every
+/// authenticated request.
+fn extract_token(headers: &HeaderMap) -> Option<&str> {
     if let Some(v) = headers.get(axum::http::header::AUTHORIZATION)
         && let Ok(s) = v.to_str()
-        && let Some(token) = s.strip_prefix("Bearer ")
+        && let Some((scheme, token)) = s.split_once(' ')
+        && scheme.eq_ignore_ascii_case("bearer")
     {
-        return Some(token.to_string());
+        return Some(token);
     }
-    headers
-        .get("X-Api-Key")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string())
+    headers.get("X-Api-Key").and_then(|v| v.to_str().ok())
 }

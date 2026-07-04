@@ -6,7 +6,7 @@ use axum::http::{Request, StatusCode};
 use teeline_api::{
     AppState,
     metrics::MetricsState,
-    middleware::AuthLayer,
+    middleware,
     models::{
         request::{ParseRequest, SolveRequest},
         response::{AlgorithmInfo, CityDto, ParseResponse, SolveResponse},
@@ -90,7 +90,7 @@ fn make_authed_app() -> axum::Router {
         registry_service: Arc::new(MockRegistry),
         metrics: Arc::new(MetricsState::new()),
     };
-    let api = teeline_api::build_api_router().layer(AuthLayer::new(TEST_TOKEN));
+    let api = middleware::require_auth(teeline_api::build_api_router(), TEST_TOKEN);
     teeline_api::build_router(state, api)
 }
 
@@ -247,7 +247,7 @@ async fn docs_returns_html() {
 }
 
 // ---------------------------------------------------------------------------
-// Auth (AuthLayer applied on top of build_api_router() — see make_authed_app)
+// Auth (require_auth applied on top of build_api_router() — see make_authed_app)
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -260,12 +260,43 @@ async fn health_open_without_token_when_auth_enabled() {
 }
 
 #[tokio::test]
+async fn health_path_documented_in_openapi_matches_auth_exemption() {
+    // Ties AUTH_EXEMPT_PATH (a private const in middleware.rs) to the actual
+    // health route via an independent source of truth: the OpenAPI spec
+    // generated from routes/health.rs's #[utoipa::path] annotation, rather
+    // than re-hardcoding "/api/v1/health" a third time in this test. If the
+    // route is ever renamed in one place but not the others, this fails
+    // instead of the exemption silently breaking in production.
+    let openapi_resp = make_authed_app()
+        .oneshot(get("/openapi.json"))
+        .await
+        .unwrap();
+    let openapi = json_body(openapi_resp).await;
+    let paths = openapi["paths"].as_object().unwrap();
+    let health_path = paths
+        .keys()
+        .find(|p| p.contains("health"))
+        .expect("openapi spec must document a health path");
+
+    let resp = make_authed_app().oneshot(get(health_path)).await.unwrap();
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "path {health_path} documented in OpenAPI spec must be exempt from auth"
+    );
+}
+
+#[tokio::test]
 async fn solvers_without_token_returns_401() {
     let resp = make_authed_app()
         .oneshot(get("/api/v1/solvers"))
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+    assert!(
+        resp.headers().contains_key("www-authenticate"),
+        "401 response must include WWW-Authenticate per RFC 7235 §3.1"
+    );
     let json = json_body(resp).await;
     assert_eq!(json["error"], "Unauthorized");
 }
@@ -321,9 +352,61 @@ async fn solvers_with_non_bearer_auth_scheme_returns_401() {
 }
 
 #[tokio::test]
+async fn solvers_with_lowercase_bearer_scheme_returns_200() {
+    // RFC 7235 §2.1: the auth-scheme token is case-insensitive, so
+    // "bearer" (lowercase, as some HTTP clients default to) must be
+    // accepted just like "Bearer".
+    let resp = make_authed_app()
+        .oneshot(get_with_header(
+            "/api/v1/solvers",
+            "Authorization",
+            &format!("bearer {TEST_TOKEN}"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn parse_without_token_returns_401() {
     let body = format!(r#"{{"input":{TINY_CITIES}}}"#);
     let req = post_json("/api/v1/parse", &body);
     let resp = make_authed_app().oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn empty_configured_token_never_matches_empty_presented_token() {
+    // Regression test for a real bypass: an empty configured token must
+    // never authenticate an empty (but present) credential. This is a
+    // defense-in-depth check at the require_auth/token_matches level — the
+    // actual fix is api_key() in main.rs never producing an empty
+    // Some(String) in the first place, which isn't unit-testable here
+    // since it reads a process-wide env var.
+    let state = AppState {
+        solver_service: Arc::new(MockSolverService),
+        registry_service: Arc::new(MockRegistry),
+        metrics: Arc::new(MetricsState::new()),
+    };
+    let api = middleware::require_auth(teeline_api::build_api_router(), "");
+    let app = teeline_api::build_router(state, api);
+
+    let resp = app
+        .oneshot(get_with_header("/api/v1/solvers", "X-Api-Key", ""))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn unmatched_path_returns_404_not_401_when_auth_enabled() {
+    // Regression test: require_auth must apply the middleware via
+    // route_layer (not layer), or it wraps the router's fallback too and
+    // turns every unmatched path into a 401 instead of axum's normal 404 —
+    // including paths entirely outside /api/v1/* once merged into the full app.
+    let resp = make_authed_app()
+        .oneshot(get("/api/v1/this-route-does-not-exist"))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
 }
