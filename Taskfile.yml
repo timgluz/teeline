@@ -45,7 +45,10 @@ tasks:
   api:serve:
     desc: Start teeline-api server in background (writes PID to /tmp/teeline-api.pid)
     cmds:
-      - ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+      # go-task's bundled shell interpreter doesn't preserve backgrounded
+      # processes past the end of the task run, and mis-captures $!.
+      # bash -c ... & disown bypasses it so the server actually survives.
+      - bash -c 'nohup ./target/debug/teeline-api >/tmp/teeline-api.log 2>&1 & echo $! > /tmp/teeline-api.pid; disown'
 
   api:stop:
     desc: Stop the background teeline-api server (kills by PID file and any stale instances)
@@ -62,8 +65,9 @@ tasks:
     desc: Build, start, wait, run hurl e2e tests, then shut down teeline-api
     deps: [build:api]
     cmds:
-      - defer: kill $(cat /tmp/teeline-api.pid) 2>/dev/null || true
-      - RATE_LIMIT_RPM=0 ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+      - defer:
+          task: api:stop
+      - bash -c 'RATE_LIMIT_RPM=0 nohup ./target/debug/teeline-api >/tmp/teeline-api.log 2>&1 & echo $! > /tmp/teeline-api.pid; disown'
       - task: api:wait
       - hurl --test teeline-api/tests/hurl/*.hurl
 
@@ -75,7 +79,7 @@ tasks:
     cmds:
       - defer:
           task: api:stop
-      - API_KEY={{.API_TOKEN}} RATE_LIMIT_RPM=0 ./target/debug/teeline-api & echo $! > /tmp/teeline-api.pid
+      - bash -c 'API_KEY={{.API_TOKEN}} RATE_LIMIT_RPM=0 nohup ./target/debug/teeline-api >/tmp/teeline-api.log 2>&1 & echo $! > /tmp/teeline-api.pid; disown'
       - task: api:wait
       - hurl --test --variable api_token={{.API_TOKEN}} teeline-api/tests/hurl/auth/*.hurl
 
