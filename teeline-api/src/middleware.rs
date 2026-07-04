@@ -8,6 +8,7 @@ use axum::response::IntoResponse;
 use subtle::ConstantTimeEq;
 use tower::{Layer, Service};
 
+use crate::clerk::ApiKeyVerifier;
 use crate::error::ApiError;
 use crate::metrics::{HttpDurationLabels, HttpLabels, MetricsState};
 
@@ -101,15 +102,19 @@ where
 
 const AUTH_EXEMPT_PATH: &str = "/api/v1/health";
 
-/// Wraps `router` so every request must present a valid bearer/API-key
-/// token matching `token`, except `AUTH_EXEMPT_PATH`. Uses `route_layer`
-/// (not `layer`) so requests that don't match any route on `router` fall
-/// through to axum's normal 404 instead of getting a 401 — `.layer()`
-/// would also wrap the router's fallback, turning every unmatched path
-/// into a 401 (axum's `route_layer` docs call this exact scenario out).
+/// Wraps `router` so every request must present a valid credential, except
+/// `AUTH_EXEMPT_PATH`. A request is authorized if it presents either the
+/// static break-glass `token` (operator credential, works even if Clerk is
+/// unreachable) or a key that `verifier` confirms is a live, non-revoked,
+/// non-expired Clerk-issued API key. Uses `route_layer` (not `layer`) so
+/// requests that don't match any route on `router` fall through to axum's
+/// normal 404 instead of getting a 401 — `.layer()` would also wrap the
+/// router's fallback, turning every unmatched path into a 401 (axum's
+/// `route_layer` docs call this exact scenario out).
 pub fn require_auth(
     router: axum::Router<crate::AppState>,
     token: impl Into<Arc<str>>,
+    verifier: Arc<dyn ApiKeyVerifier>,
 ) -> axum::Router<crate::AppState> {
     let token: Arc<str> = token.into();
     router.route_layer(axum::middleware::from_fn(
@@ -118,12 +123,23 @@ pub fn require_auth(
               request: axum::extract::Request,
               next: axum::middleware::Next| {
             let token = Arc::clone(&token);
+            let verifier = Arc::clone(&verifier);
             async move {
                 // MatchedPath is populated by axum's routing before route_layer
                 // middleware runs. The api sub-router only ever matches
                 // "/api/v1/health" as the exempt path.
                 let is_health = matched_path.is_some_and(|m| m.as_str() == AUTH_EXEMPT_PATH);
-                if is_health || token_matches(&token, &headers) {
+                if is_health {
+                    return next.run(request).await;
+                }
+                if token_matches(&token, &headers) {
+                    tracing::info!("request authorized via static break-glass API_KEY");
+                    return next.run(request).await;
+                }
+                if let Some(presented) = extract_token(&headers)
+                    && let Some(verified) = verifier.verify(presented).await
+                {
+                    tracing::info!(subject = %verified.subject, "request authorized via Clerk API key");
                     return next.run(request).await;
                 }
                 ApiError::Unauthorized.into_response()
