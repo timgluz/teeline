@@ -32,6 +32,9 @@ impl Modify for SecurityAddon {
 
 #[derive(OpenApi)]
 #[openapi(
+    info(
+        description = "Don't have an API key yet? [Sign in to get one](https://accounts.tspsolver.com/sign-in) — takes about a minute, no password required. See the [full guide](https://tspsolver.com/api-key/) for step-by-step instructions."
+    ),
     paths(
         routes::index::handler,
         routes::health::handler,

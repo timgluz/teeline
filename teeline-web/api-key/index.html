@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Get an API key — Teeline</title>
+    <meta name="description" content="How to sign in and generate a personal API key for the Teeline TSP solver REST API." />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="https://tspsolver.com/api-key/" />
+    <meta property="og:title" content="Get an API key — Teeline" />
+    <meta property="og:description" content="How to sign in and generate a personal API key for the Teeline TSP solver REST API." />
+    <link rel="canonical" href="https://tspsolver.com/api-key/" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <div id="topbar"></div>
+    <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
+      <p style="margin-bottom: 1rem;">
+        <a href="/">← Back to Teeline</a>
+      </p>
+
+      <h1>Get an API key</h1>
+      <p>
+        The <a href="https://api.tspsolver.com/docs" target="_blank" rel="noopener">Teeline REST API</a>
+        requires a personal API key for every endpoint except <code>/api/v1/health</code>.
+        Getting one takes about a minute — no separate Teeline account or password to create,
+        and no request to us.
+      </p>
+
+      <h2>1. Sign in</h2>
+      <p>
+        Go to <a href="https://accounts.tspsolver.com/sign-in" target="_blank" rel="noopener">accounts.tspsolver.com/sign-in</a>
+        and continue with GitHub, GitLab, Google, or an email address — whichever's easiest.
+        There's nothing to install and no separate signup form.
+      </p>
+
+      <h2>2. Create a key</h2>
+      <p>
+        Signing in takes you straight to the <strong>API keys</strong> page. From there:
+      </p>
+      <ol>
+        <li>Click <strong>Add new key</strong>.</li>
+        <li>
+          Give it a name you'll recognize later — e.g. <code>my-laptop</code> or
+          <code>ci-pipeline</code>. An expiration date is optional; leave it blank for a
+          key that never expires.
+        </li>
+        <li>Click <strong>Create key</strong>.</li>
+      </ol>
+
+      <h2>3. Save it now — it's shown once</h2>
+      <p>
+        Your new key (it looks like <code>ak_&hellip;</code>) is revealed exactly once,
+        immediately after you create it. Clerk (the identity provider we use) cannot show it
+        to you again.
+      </p>
+      <p>
+        <strong>Copy it straight into a password manager</strong> (1Password, Bitwarden, or
+        similar) before you navigate away. If you lose it, there's no way to recover it — you'll
+        need to revoke it from the same page and create a new one.
+      </p>
+
+      <h2>4. Use it</h2>
+      <p>Send it as a bearer token on every request:</p>
+      <pre><code>curl -H "Authorization: Bearer ak_your_key_here" \
+  https://api.tspsolver.com/api/v1/solvers</code></pre>
+      <p>
+        An <code>X-Api-Key</code> header works the same way, if that fits your tooling better:
+      </p>
+      <pre><code>curl -H "X-Api-Key: ak_your_key_here" \
+  https://api.tspsolver.com/api/v1/solvers</code></pre>
+
+      <h2>Managing or revoking a key</h2>
+      <p>
+        Sign back in at the same
+        <a href="https://accounts.tspsolver.com/sign-in" target="_blank" rel="noopener">sign-in link</a> any
+        time — you'll land on the API keys page, where you can add more keys or revoke ones
+        you no longer use.
+      </p>
+
+      <p>
+        For the full list of endpoints, request/response shapes, and to try requests
+        directly in the browser, see the
+        <a href="https://api.tspsolver.com/docs" target="_blank" rel="noopener">API reference (Scalar docs)</a>.
+      </p>
+    </main>
+  </body>
+</html>
