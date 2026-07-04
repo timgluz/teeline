@@ -7,7 +7,7 @@ const FEATURES = [
     title: 'WebMCP',
     description: 'Solve TSP problems directly from an AI agent in the browser — no server, no API key, just a page an agent can call.',
     icon: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="10" cy="5" r="2"/><circle cx="4.5" cy="15.5" r="2"/><circle cx="15.5" cy="15.5" r="2"/><path d="M8.6 6.8 L5.9 13.7"/><path d="M11.4 6.8 L14.1 13.7"/></svg>',
-    links: [{ href: '/webmcp/', text: 'Learn more' }],
+    links: [{ href: '/webmcp/', text: 'Learn about AI agent access' }],
   },
   {
     slug: 'api',
