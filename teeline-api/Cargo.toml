@@ -27,7 +27,7 @@ subtle = "2.6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 utoipa-scalar = { version = "0.3.0", features = ["axum"] }
-prometheus-client = "0.22"
+prometheus-client = "0.25"
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
