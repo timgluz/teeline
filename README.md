@@ -12,6 +12,7 @@ It is a work in progress. It already implements all algorithms typically covered
 | --- | --- |
 | [teeline-api](teeline-api/README.md) | REST API at [api.tspsolver.com](https://api.tspsolver.com) — solve TSP problems over HTTP, with OpenAPI/Scalar docs and self-serve API keys |
 | [teeline-cli](teeline-cli/README.md) | Command-line solver — reads TSPLIB files, prints the best tour found |
+| [teeline-excel](teeline-excel/README.md) | Excel add-in — `TSPSOLVER.SOLVE`/`SOLVE_DISTANCE`/`DISTANCE_EUC`/`SOLVERS` custom functions on a selected range of coordinates |
 | [teeline-qt](teeline-qt/README.md) | Qt 6 desktop GUI with live solver visualization and a pipeline builder |
 | [teeline-wasm](teeline-wasm/README.md) | WebAssembly Component Model build — callable from JS, Python, Go, and Rust |
 | [teeline-web](teeline-web/README.md) | Browser-based solver at [tspsolver.com](https://tspsolver.com) — upload a `.tsp` file, configure a solver, and download the optimised tour |

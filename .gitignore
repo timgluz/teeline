@@ -22,6 +22,11 @@ teeline-web/dist/
 node_modules/
 .playwright-mcp/
 
+# teeline-excel
+teeline-excel/dist/
+teeline-excel/lib/
+teeline-excel/lib-amd/
+
 # visual companion brainstorm files
 .superpowers/
 .worktrees/
