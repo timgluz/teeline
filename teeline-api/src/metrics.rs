@@ -47,18 +47,15 @@ impl MetricsState {
         let http_requests_total = Family::<HttpLabels, Counter>::default();
         let http_request_duration_seconds =
             Family::<HttpDurationLabels, Histogram>::new_with_constructor(|| {
-                Histogram::new(
-                    [
-                        0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512,
-                        1.024, 2.048,
-                    ]
-                    .into_iter(),
-                )
+                Histogram::new([
+                    0.001, 0.002, 0.004, 0.008, 0.016, 0.032, 0.064, 0.128, 0.256, 0.512, 1.024,
+                    2.048,
+                ])
             });
         let solver_requests_total = Family::<SolverLabels, Counter>::default();
         let solver_duration_seconds =
             Family::<SolverDurationLabels, Histogram>::new_with_constructor(|| {
-                Histogram::new([0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0].into_iter())
+                Histogram::new([0.01, 0.05, 0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0])
             });
 
         let mut registry = Registry::default();
