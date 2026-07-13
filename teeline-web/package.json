@@ -17,7 +17,7 @@
     "@sentry/browser": "^10.63.0",
     "@sentry/vite-plugin": "^5.3.0",
     "htmx.org": "2.0.10",
-    "preact": "^10.29.4",
+    "preact": "^10.29.7",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
