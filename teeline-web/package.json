@@ -24,7 +24,7 @@
     "@playwright/test": "^1.61.1",
     "eta": "^4.6.0",
     "marked": "^18.0.6",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vite": "8.1.4",
     "vitest": "4.1.10",
     "wrangler": "4.110.0"
