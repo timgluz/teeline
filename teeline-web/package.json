@@ -27,7 +27,7 @@
     "typescript": "7.0.2",
     "vite": "8.1.4",
     "vitest": "4.1.10",
-    "wrangler": "4.110.0"
+    "wrangler": "4.112.0"
   },
   "overrides": {
     "esbuild": "0.28.1"
