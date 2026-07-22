@@ -14,7 +14,7 @@
   "dependencies": {
     "@bytecodealliance/preview2-shim": "^0.17.9",
     "@picocss/pico": "2.1.1",
-    "@sentry/browser": "^10.65.0",
+    "@sentry/browser": "^10.66.0",
     "@sentry/vite-plugin": "^5.4.0",
     "htmx.org": "2.0.10",
     "preact": "^10.29.7",
@@ -25,9 +25,9 @@
     "eta": "^4.6.0",
     "marked": "^18.0.6",
     "typescript": "7.0.2",
-    "vite": "8.1.4",
+    "vite": "8.1.5",
     "vitest": "4.1.10",
-    "wrangler": "4.110.0"
+    "wrangler": "4.112.0"
   },
   "overrides": {
     "esbuild": "0.28.1"
