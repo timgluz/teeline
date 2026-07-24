@@ -6,11 +6,15 @@ name: Rust
     paths-ignore:
       - 'teeline-web/**'
       - 'teeline-api/**'
+      - 'teeline-qt/**'
+      - 'teeline-wasm/**'
   pull_request:
     branches: [master]
     paths-ignore:
       - 'teeline-web/**'
       - 'teeline-api/**'
+      - 'teeline-qt/**'
+      - 'teeline-wasm/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -42,41 +46,3 @@ jobs:
           flags: core
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  build-wasm:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: true
-      - name: Install cargo-component
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-component
-      - name: Add wasm32-wasip2 target
-        run: rustup target add wasm32-wasip2
-      - name: Build WASM component
-        run: cd teeline-wasm && cargo component build --target wasm32-wasip2
-      - name: Upload WASM artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: teeline-wasm-debug
-          path: teeline-wasm/target/wasm32-wasip2/debug/teeline_wasm.wasm
-      - name: Run wasm_component integration tests
-        run: cd teeline-wasm && cargo test --test wasm_component --target x86_64-unknown-linux-gnu
-
-  build-qt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install build dependencies
-        run: sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev
-      - name: Install Qt 6
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.*'
-          cache: true
-      - name: Build teeline-qt
-        run: cargo build --manifest-path teeline-qt/Cargo.toml 2>&1
-        env:
-          RUST_LOG: debug
