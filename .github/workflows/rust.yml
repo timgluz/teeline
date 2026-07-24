@@ -5,10 +5,12 @@ name: Rust
     branches: [master]
     paths-ignore:
       - 'teeline-web/**'
+      - 'teeline-api/**'
   pull_request:
     branches: [master]
     paths-ignore:
       - 'teeline-web/**'
+      - 'teeline-api/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -22,27 +24,22 @@ jobs:
         with:
           submodules: true
       - name: Build
-        run: cargo build -p teeline -p teeline-cli -p teeline-api --verbose
+        run: cargo build -p teeline -p teeline-cli --verbose
       - name: Run tests
-        run: cargo test -p teeline -p teeline-cli -p teeline-api --verbose
+        run: cargo test -p teeline -p teeline-cli --verbose
       - name: Run e2e tests (BATS)
         run: ./tests/bats/bin/bats tests/e2e/
-      - name: Install mise tools (hurl)
-        uses: jdx/mise-action@v4
-      - name: Run hurl e2e tests (teeline-api)
-        run: task test:e2e:api
-      - name: Run hurl e2e auth tests (teeline-api)
-        run: task test:e2e:auth
       - name: Clippy
-        run: cargo clippy -p teeline -p teeline-cli -p teeline-api -- -D warnings
+        run: cargo clippy -p teeline -p teeline-cli -- -D warnings
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Coverage
-        run: cargo llvm-cov -p teeline -p teeline-cli -p teeline-api --lcov --output-path lcov.info
+        run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
       - name: Upload coverage
         uses: codecov/codecov-action@v7
         with:
           files: lcov.info
+          flags: core
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
