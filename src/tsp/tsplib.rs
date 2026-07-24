@@ -175,10 +175,8 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
             TspReaderStates::Insection(section_id)
                 if (section_id == COORD_SECTION_KEY || section_id == DISPLAY_DATA_SECTION_KEY) =>
             {
-                match coords_from_text(line_no, &line) {
-                    Err(msg) => return Err(msg),
-                    Ok(pt) => cities.push(pt),
-                }
+                let pt = coords_from_text(line_no, &line)?;
+                cities.push(pt)
             }
             TspReaderStates::Insection(section_id) if section_id == EDGE_WEIGHT_SECTION_KEY => {
                 raw_weight_tokens.extend(

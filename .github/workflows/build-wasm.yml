@@ -1,0 +1,45 @@
+name: build-wasm
+
+"on":
+  push:
+    branches: [master]
+    paths:
+      - 'teeline-wasm/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/build-wasm.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'teeline-wasm/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/build-wasm.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Install cargo-component
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
+      - name: Add wasm32-wasip2 target
+        run: rustup target add wasm32-wasip2
+      - name: Build WASM component
+        run: cd teeline-wasm && cargo component build --target wasm32-wasip2
+      - name: Upload WASM artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: teeline-wasm-debug
+          path: teeline-wasm/target/wasm32-wasip2/debug/teeline_wasm.wasm
+      - name: Run wasm_component integration tests
+        run: cd teeline-wasm && cargo test --test wasm_component --target x86_64-unknown-linux-gnu

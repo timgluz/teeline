@@ -1,0 +1,52 @@
+name: build-api
+
+"on":
+  push:
+    branches: [master]
+    paths:
+      - 'teeline-api/**'
+      - 'Taskfile.yml'
+      - 'src/**'
+      - '.github/workflows/build-api.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'teeline-api/**'
+      - 'Taskfile.yml'
+      - 'src/**'
+      - '.github/workflows/build-api.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-api:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - name: Build
+        run: cargo build -p teeline-api --verbose
+      - name: Run tests
+        run: cargo test -p teeline-api --verbose
+      - name: Install mise tools (hurl)
+        uses: jdx/mise-action@v4
+      - name: Run hurl e2e tests (teeline-api)
+        run: task test:e2e:api
+      - name: Run hurl e2e auth tests (teeline-api)
+        run: task test:e2e:auth
+      - name: Clippy
+        run: cargo clippy -p teeline-api -- -D warnings
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Coverage
+        run: cargo llvm-cov -p teeline-api --lcov --output-path lcov.info
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        with:
+          files: lcov.info
+          flags: api
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
