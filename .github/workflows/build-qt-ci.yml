@@ -1,0 +1,39 @@
+name: build-qt-ci
+
+"on":
+  push:
+    branches: [master]
+    paths:
+      - 'teeline-qt/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/build-qt-ci.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'teeline-qt/**'
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/build-qt-ci.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-qt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install build dependencies
+        run: sudo apt-get install -y libgl1-mesa-dev libglib2.0-dev
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.*'
+          cache: true
+      - name: Build teeline-qt
+        run: cargo build --manifest-path teeline-qt/Cargo.toml 2>&1
+        env:
+          RUST_LOG: debug
