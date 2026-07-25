@@ -10,6 +10,19 @@ export async function getStaticPaths() {
 const { post } = Astro.props
 const { Content } = await render(post)
 const dateLabel = post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+const canonicalUrl = `https://tspsolver.com/blog/${post.id}/`
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'BlogPosting',
+  headline: post.data.title,
+  description: post.data.description,
+  datePublished: post.data.pubDate.toISOString(),
+  ...(post.data.updatedDate && { dateModified: post.data.updatedDate.toISOString() }),
+  url: canonicalUrl,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+  author: { '@type': 'Person', name: 'Timo Sulg' },
+}
 ---
 <BaseLayout
   title={`${post.data.title} — Teeline`}
@@ -17,7 +30,14 @@ const dateLabel = post.data.pubDate.toLocaleDateString('en-US', { year: 'numeric
   path={`/blog/${post.id}/`}
   ogType="article"
 >
-  <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
+  <Fragment slot="head">
+    <meta property="article:published_time" content={post.data.pubDate.toISOString()} />
+    {post.data.updatedDate && (
+      <meta property="article:modified_time" content={post.data.updatedDate.toISOString()} />
+    )}
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
+  <main class="container">
     <p style="margin-bottom: 1rem;">
       <a href="/blog/">← Back to Blog</a>
     </p>
