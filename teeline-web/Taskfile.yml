@@ -6,6 +6,11 @@ tasks:
     cmds:
       - npm run dev
 
+  serve:
+    desc: Alias for dev — start Astro dev server (matches `task api:serve` naming)
+    cmds:
+      - task: dev
+
   build:
     desc: Type-check and build production bundle to dist/
     cmds:
