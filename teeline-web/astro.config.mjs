@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config'
 import preact from '@astrojs/preact'
+import sitemap from '@astrojs/sitemap'
 import { resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
@@ -9,7 +10,7 @@ const configDir = fileURLToPath(new URL('.', import.meta.url))
 export default defineConfig({
   site: 'https://tspsolver.com',
   output: 'static',
-  integrations: [preact()],
+  integrations: [preact(), sitemap()],
   vite: {
     envPrefix: ['VITE_', 'WEBMCP_'],
     resolve: {
