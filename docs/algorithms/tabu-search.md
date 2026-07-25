@@ -1,3 +1,11 @@
+---
+id: "tabu"
+name: "Tabu Search"
+typeBadge: "Heuristic — local search"
+description: "Local search with short-term memory. Maintains a tabu list of recently visited solutions (or recently applied moves) to prevent cycling."
+hasExplainer: true
+---
+
 # Tabu Search
 
 | | |

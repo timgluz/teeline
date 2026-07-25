@@ -1,0 +1,52 @@
+---
+// Replaces the 10 hand-authored algorithms/<id>/explainer/index.html shells +
+// their *-page.ts mount scripts (manual preact.render() calls). One dynamic
+// route over a fixed id->component map; client:visible defers hydration
+// until the explainer scrolls into view (below-the-fold interactive demo,
+// not immediately-needed UI). Explainer .tsx components and their *-algo.ts
+// simulation logic are unchanged — only the mounting mechanism moves.
+//
+// Astro does not support dynamically rendering a UI-framework component that
+// has a client:* directive — the hydrated component must be a literal JSX
+// tag naming a statically-imported identifier directly, not a variable
+// indexed out of a map (tried that first; compiles fine, fails at render
+// time with "NoMatchingImport" because Astro can't statically resolve which
+// client bundle to ship). Hence the explicit per-id branches below instead
+// of a single `<ExplainerComponent client:visible />`.
+import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import { EXPLAINER_META, EXPLAINER_IDS } from '../../../../explainers/registry'
+import PsoExplainer from '../../../../explainers/pso'
+import GsaExplainer from '../../../../explainers/gsa'
+import TabuExplainer from '../../../../explainers/tabu'
+import GaExplainer from '../../../../explainers/ga'
+import CsExplainer from '../../../../explainers/cs'
+import FpaExplainer from '../../../../explainers/fpa'
+import LkExplainer from '../../../../explainers/lk.tsx'
+import SaExplainer from '../../../../explainers/sa'
+import SomExplainer from '../../../../explainers/som'
+import FourierExplainer from '../../../../explainers/fourier'
+
+export function getStaticPaths() {
+  return EXPLAINER_IDS.map((id) => ({ params: { id } }))
+}
+
+const { id } = Astro.params as { id: string }
+const meta = EXPLAINER_META[id]
+---
+<BaseLayout title={meta.title} description={meta.description} path={`/algorithms/${id}/explainer/`} ogType="article">
+  <main style="padding: 1.5rem 2rem; max-width: 900px; margin: 0 auto;">
+    <p style="margin-bottom: 1rem;">
+      <a href={`/algorithms/${id}/`}>← Back to {meta.backLabel} docs</a>
+    </p>
+    {id === 'pso' && <PsoExplainer client:visible />}
+    {id === 'gsa' && <GsaExplainer client:visible />}
+    {id === 'tabu' && <TabuExplainer client:visible />}
+    {id === 'ga' && <GaExplainer client:visible />}
+    {id === 'cs' && <CsExplainer client:visible />}
+    {id === 'fpa' && <FpaExplainer client:visible />}
+    {id === 'lk' && <LkExplainer client:visible />}
+    {id === 'sa' && <SaExplainer client:visible />}
+    {id === 'som' && <SomExplainer client:visible />}
+    {id === 'fourier' && <FourierExplainer client:visible />}
+  </main>
+</BaseLayout>

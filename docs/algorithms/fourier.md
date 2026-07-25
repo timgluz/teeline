@@ -1,3 +1,11 @@
+---
+id: "fourier"
+name: "Fourier-basis Constructive Solver"
+typeBadge: "Heuristic — constructive"
+description: "Encodes a TSP tour as a closed curve in the complex plane and optimises the Fourier coefficients of that curve with gradient descent. Decoding is a pure argsort: no penalty, no repair step, and no possibility of producing an invalid tour."
+hasExplainer: true
+---
+
 # Fourier-basis Constructive Solver
 
 | | |

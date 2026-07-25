@@ -1,0 +1,29 @@
+---
+// Replaces scripts/build-docs.mjs + scripts/templates/algorithm-page.eta.
+// One dynamic route generates all 18 algorithm doc pages from the `docs`
+// content collection (src/content.config.ts, sourced directly from
+// docs/algorithms/*.md — no copying, no separate generation step).
+import { getCollection, render } from 'astro:content'
+import DocsLayout from '../../../layouts/DocsLayout.astro'
+
+export async function getStaticPaths() {
+  const entries = await getCollection('docs')
+  return entries.map((entry) => ({ params: { id: entry.data.id }, props: { entry } }))
+}
+
+const { entry } = Astro.props
+const { Content } = await render(entry)
+---
+<DocsLayout
+  title={`${entry.data.name} — Teeline`}
+  description={entry.data.description}
+  path={`/algorithms/${entry.data.id}/`}
+  currentId={entry.data.id}
+  name={entry.data.name}
+>
+  {entry.data.typeBadge && <p class="docs-type-badge">{entry.data.typeBadge}</p>}
+  {entry.data.hasExplainer && (
+    <a class="docs-explainer-cta" href={`/algorithms/${entry.data.id}/explainer/`}>▶ Open interactive explainer →</a>
+  )}
+  <Content />
+</DocsLayout>

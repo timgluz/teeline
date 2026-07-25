@@ -1,3 +1,11 @@
+---
+id: "pso"
+name: "Particle Swarm Optimisation"
+typeBadge: "Heuristic — swarm metaheuristic"
+description: "Swarm metaheuristic where each particle is a candidate tour with a velocity — an ordered list of position swaps."
+hasExplainer: true
+---
+
 # Particle Swarm Optimisation
 
 | | |

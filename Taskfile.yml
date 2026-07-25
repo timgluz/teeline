@@ -4,6 +4,9 @@ includes:
   qt:
     taskfile: ./teeline-qt/Taskfile.yml
     dir: ./teeline-qt
+  web:
+    taskfile: ./teeline-web/Taskfile.yml
+    dir: ./teeline-web
 
 tasks:
   build:

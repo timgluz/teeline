@@ -1,3 +1,11 @@
+---
+id: "cs"
+name: "Cuckoo Search"
+typeBadge: "Heuristic — nature-inspired metaheuristic"
+description: "Nature-inspired metaheuristic that models brood parasitism in cuckoos. Maintains a population of nests (candidate tours). Each epoch:"
+hasExplainer: true
+---
+
 # Cuckoo Search
 
 | | |

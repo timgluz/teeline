@@ -1,3 +1,11 @@
+---
+id: "christofides"
+name: "Christofides"
+typeBadge: "Heuristic — constructive approximation"
+description: "The only TSP heuristic with a provable worst-case bound: the output tour is always within 1.5× the optimal length, provided the distance matrix satisfies the triangle inequality (TSPLIB EUC_2D instances do; arbitrary FULL_MATRIX instances may not)."
+hasExplainer: false
+---
+
 # Christofides
 
 | | |

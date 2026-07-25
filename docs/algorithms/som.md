@@ -1,3 +1,11 @@
+---
+id: "som"
+name: "Kohonen Self-Organizing Map"
+typeBadge: "Heuristic — constructive"
+description: "Uses a 1-D ring of neurons — a neural network — that learns a topology-preserving mapping from 2-D city space onto a cyclic ordering. Each neuron holds a position in the same plane as the cities."
+hasExplainer: true
+---
+
 # Kohonen Self-Organizing Map
 
 | | |

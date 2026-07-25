@@ -1,3 +1,11 @@
+---
+id: "gsa"
+name: "Gravitational Search Algorithm"
+typeBadge: "Heuristic — swarm metaheuristic"
+description: "Physics-inspired swarm metaheuristic where each agent is a candidate tour with a mass proportional to its fitness and a velocity (an ordered list of position swaps)."
+hasExplainer: true
+---
+
 # Gravitational Search Algorithm
 
 | | |

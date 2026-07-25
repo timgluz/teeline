@@ -1,3 +1,11 @@
+---
+id: "ga"
+name: "Genetic Algorithm"
+typeBadge: "Heuristic — evolutionary metaheuristic"
+description: "Evolutionary metaheuristic that maintains a population of candidate tours. Each generation applies:"
+hasExplainer: true
+---
+
 # Genetic Algorithm
 
 | | |

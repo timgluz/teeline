@@ -1,3 +1,11 @@
+---
+id: "3opt"
+name: "3-opt"
+typeBadge: "Heuristic — local search"
+description: "Extension of 2-opt that removes three edges per iteration and reconnects the three segments in the best of the eight possible reconnection configurations."
+hasExplainer: false
+---
+
 # 3-opt
 
 | | |

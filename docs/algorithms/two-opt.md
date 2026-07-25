@@ -1,3 +1,11 @@
+---
+id: "2opt"
+name: "2-opt"
+typeBadge: "Heuristic — local search"
+description: "Local search algorithm that iteratively improves a tour by removing two edges and reconnecting the resulting segments in the only other valid way (reversing the segment between the two removed edges)."
+hasExplainer: false
+---
+
 # 2-opt
 
 | | |
