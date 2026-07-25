@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://tspsolver.com/sitemap.xml
+Sitemap: https://tspsolver.com/sitemap-index.xml

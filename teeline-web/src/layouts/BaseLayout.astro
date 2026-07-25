@@ -24,9 +24,15 @@ const canonicalUrl = `https://tspsolver.com${path}`
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={ogDescription ?? description} />
+    <meta property="og:image" content="https://tspsolver.com/og-image.png" />
+    <meta property="og:image:width" content="540" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="teeline — TSPSolver, find your path" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={ogDescription ?? description} />
+    <meta name="twitter:image" content="https://tspsolver.com/og-image.png" />
+    <meta name="twitter:image:alt" content="teeline — TSPSolver, find your path" />
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <slot name="head" />

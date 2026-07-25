@@ -8,8 +8,22 @@ const description =
   "Browser-based Traveling Salesman Problem solver. Upload a TSPLIB .tsp file, pick an algorithm — Nearest Neighbor, 2-opt, Lin-Kernighan, Simulated Annealing and more — and download the optimised tour. Runs entirely in-browser via WebAssembly."
 const ogDescription =
   "Browser-based Traveling Salesman Problem solver. Upload a TSPLIB .tsp file, pick an algorithm and download the optimised tour — runs entirely in-browser via WebAssembly."
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'teeline',
+  description: ogDescription,
+  url: 'https://tspsolver.com/',
+  applicationCategory: 'DeveloperApplication',
+  operatingSystem: 'Any (runs in-browser via WebAssembly)',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+}
 ---
 <BaseLayout title="Teeline TSP Solver" description={description} ogDescription={ogDescription} path="/">
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <header class="container">
     <h1>Teeline TSP Solver</h1>
     <p class="tagline">

@@ -9,12 +9,29 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 
 const allPosts = await getCollection('blog', ({ data }) => !data.draft)
 const posts = allPosts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Blog',
+  name: 'teeline Blog',
+  description: 'Notes on TSP algorithms, teeline development, and the occasional deep dive.',
+  url: 'https://tspsolver.com/blog/',
+  blogPost: posts.map((post) => ({
+    '@type': 'BlogPosting',
+    headline: post.data.title,
+    url: `https://tspsolver.com/blog/${post.id}/`,
+    datePublished: post.data.pubDate.toISOString(),
+  })),
+}
 ---
 <BaseLayout
   title="Blog — Teeline"
   description="Notes on TSP algorithms, teeline development, and the occasional deep dive."
   path="/blog/"
 >
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <main class="container">
     <p style="margin-bottom: 1rem;">
       <a href="/">← Back to Teeline</a>
