@@ -1,0 +1,38 @@
+---
+// Blog listing page. The plan's Phase 2 only called for a placeholder post
+// to prove the `blog` content collection resolves — building the actual
+// /blog/ and /blog/[slug]/ routes wasn't assigned to any phase, even though
+// shipping a working blog was the original motivation for this whole
+// migration. Filling that gap here in Phase 7 alongside RSS/sitemap work.
+import { getCollection } from 'astro:content'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+
+const allPosts = await getCollection('blog', ({ data }) => !data.draft)
+const posts = allPosts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
+---
+<BaseLayout
+  title="Blog — Teeline"
+  description="Notes on TSP algorithms, teeline development, and the occasional deep dive."
+  path="/blog/"
+>
+  <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
+    <p style="margin-bottom: 1rem;">
+      <a href="/">← Back to Teeline</a>
+    </p>
+
+    <h1>Blog</h1>
+
+    {posts.length === 0 && <p class="muted">No posts yet — check back soon.</p>}
+
+    <ul class="blog-list">
+      {
+        posts.map((post) => (
+          <li>
+            <a href={`/blog/${post.id}/`}>{post.data.title}</a>
+            <p>{post.data.description}</p>
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+</BaseLayout>
