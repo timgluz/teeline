@@ -251,6 +251,17 @@ pub struct PipelineStageRequest {
     pub configs: Option<SolverConfigs>,
 }
 
+/// Upper bound on the number of stages a single pipeline request may chain.
+/// Each stage is a full solver run (potentially an exact, exponential-time
+/// solver per CLAUDE.md's guidance on `bellman_karp`/`branch_bound`), and
+/// `run_pipeline_stages` runs them strictly sequentially inside one
+/// `spawn_blocking` task — with no per-stage or per-request timeout elsewhere
+/// in teeline-api, an unbounded `stages` array is an unmetered compute-cost
+/// amplifier for a single HTTP request. 20 comfortably covers every
+/// documented/realistic pipeline (the docs' examples top out at 3 stages)
+/// while capping worst-case cost.
+pub const MAX_PIPELINE_STAGES: usize = 20;
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct PipelineRequest {
     pub input: TspInput,
@@ -262,6 +273,11 @@ impl PipelineRequest {
         self.input.validate()?;
         if self.stages.len() < 2 {
             return Err("`stages` must contain at least 2 solver stages".to_string());
+        }
+        if self.stages.len() > MAX_PIPELINE_STAGES {
+            return Err(format!(
+                "`stages` must contain at most {MAX_PIPELINE_STAGES} solver stages"
+            ));
         }
         if self.stages.iter().any(|s| s.solver.trim().is_empty()) {
             return Err("`solver` must not be empty".to_string());
@@ -526,6 +542,34 @@ mod tests {
             }],
         };
         assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn pipeline_request_validate_rejects_too_many_stages() {
+        let req = PipelineRequest {
+            input: tiny_cities_input(),
+            stages: (0..=MAX_PIPELINE_STAGES)
+                .map(|_| PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                })
+                .collect(),
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn pipeline_request_validate_accepts_max_stages() {
+        let req = PipelineRequest {
+            input: tiny_cities_input(),
+            stages: (0..MAX_PIPELINE_STAGES)
+                .map(|_| PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                })
+                .collect(),
+        };
+        assert!(req.validate().is_ok());
     }
 
     #[test]

@@ -98,11 +98,23 @@ pub fn stage_warnings(solvers: &[Solvers]) -> Vec<String> {
                 "nn at stage {i} discards the warm-start seed from the previous stage"
             ));
         }
-        if i != last && matches!(solver, Solvers::BellmanKarp | Solvers::BranchBound) {
-            warnings.push(format!(
-                "{solver:?} at stage {i} does not consume a warm-start seed and its result \
-                 will be discarded by later stages"
-            ));
+        if i != last {
+            match solver {
+                Solvers::BellmanKarp => warnings.push(format!(
+                    "BellmanKarp at stage {i} ignores the warm-start seed entirely (the exact \
+                     DP has no use for a partial/seed tour) and its optimal result will be \
+                     superseded by later stages"
+                )),
+                // Unlike BellmanKarp, BranchBound *does* consume the warm-start seed — it uses
+                // it to prime the pruning upper bound (see branch_bound::solve) — so the warning
+                // wording must not claim it ignores the seed the way BellmanKarp does.
+                Solvers::BranchBound => warnings.push(format!(
+                    "BranchBound at stage {i} only uses the warm-start seed to prime its \
+                     pruning bound, not as a tour to refine, and its optimal result will be \
+                     superseded by later stages"
+                )),
+                _ => {}
+            }
         }
     }
     warnings
