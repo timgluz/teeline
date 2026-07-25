@@ -41,6 +41,7 @@ impl Modify for SecurityAddon {
         routes::solvers::list_solvers,
         routes::parse::parse,
         routes::solve::solve,
+        routes::pipeline::pipeline,
     ),
     components(schemas(
         routes::index::IndexResponse,
@@ -66,10 +67,14 @@ impl Modify for SecurityAddon {
         request::TspInput,
         request::ParseRequest,
         request::SolveRequest,
+        request::PipelineStageRequest,
+        request::PipelineRequest,
         response::AlgorithmInfo,
         response::CityDto,
         response::ParseResponse,
         response::SolveResponse,
+        response::PipelineStageResult,
+        response::PipelineResponse,
     )),
     tags(
         (name = "tsp", description = "Traveling Salesman Problem solver endpoints")

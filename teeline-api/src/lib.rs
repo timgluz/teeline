@@ -28,6 +28,7 @@ pub fn build_api_router() -> axum::Router<AppState> {
         .route("/api/v1/solvers", get(routes::solvers::list_solvers))
         .route("/api/v1/parse", post(routes::parse::parse))
         .route("/api/v1/solve", post(routes::solve::solve))
+        .route("/api/v1/pipeline", post(routes::pipeline::pipeline))
 }
 
 /// Full router with MetricsLayer applied. `api` is the already-assembled

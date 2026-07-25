@@ -45,6 +45,29 @@ pub struct SolveResponse {
     pub duration_ms: u64,
 }
 
+/// One stage's result within a `PipelineResponse`. Named `PipelineStageResult` to
+/// avoid colliding with `teeline::tsp::pipeline::PipelineStage` (the lib's
+/// stage-input type) and with `pipeline::StageOutcome` (the lib's own output type,
+/// which has no `solver` field — this DTO's `solver` is echoed straight from the
+/// request, same convention as `SolveResponse.solver`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PipelineStageResult {
+    pub solver: String,
+    pub cost: f32,
+    pub tour: Vec<usize>,
+    pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PipelineResponse {
+    pub stages: Vec<PipelineStageResult>,
+    pub final_cost: f32,
+    pub final_tour: Vec<usize>,
+    /// Non-fatal composition warnings, e.g. an `nn` stage discarding the
+    /// warm-start seed, or an exact solver in a non-terminal position.
+    pub warnings: Vec<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,5 +142,42 @@ mod tests {
         use utoipa::ToSchema;
         let name = SolveResponse::name();
         assert_eq!(name, "SolveResponse");
+    }
+
+    #[test]
+    fn pipeline_response_round_trip() {
+        let resp = PipelineResponse {
+            stages: vec![
+                PipelineStageResult {
+                    solver: "nn".to_string(),
+                    cost: 2000.0,
+                    tour: vec![1, 2, 3],
+                    duration_ms: 1,
+                },
+                PipelineStageResult {
+                    solver: "2opt".to_string(),
+                    cost: 1500.0,
+                    tour: vec![1, 3, 2],
+                    duration_ms: 5,
+                },
+            ],
+            final_cost: 1500.0,
+            final_tour: vec![1, 3, 2],
+            warnings: vec![],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: PipelineResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.stages.len(), 2);
+        assert_eq!(back.stages[0].solver, "nn");
+        assert_eq!(back.final_cost, 1500.0_f32);
+        assert_eq!(back.final_tour, vec![1, 3, 2]);
+        assert!(back.warnings.is_empty());
+    }
+
+    #[test]
+    fn pipeline_response_schema_builds() {
+        use utoipa::ToSchema;
+        assert_eq!(PipelineResponse::name(), "PipelineResponse");
+        assert_eq!(PipelineStageResult::name(), "PipelineStageResult");
     }
 }

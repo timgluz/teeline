@@ -3,6 +3,7 @@ use std::time::Instant;
 use async_trait::async_trait;
 use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
+use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings};
 use teeline::tsp::tsplib;
 use teeline::tsp::{
     AppOptions, CSOptions, DistanceType, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
@@ -11,8 +12,10 @@ use teeline::tsp::{
 
 use super::TspSolverService;
 use crate::models::{
-    request::{HeuristicConfig, ParseRequest, SolveRequest, SolverConfigs, TspInput},
-    response::{CityDto, ParseResponse, SolveResponse},
+    request::{
+        HeuristicConfig, ParseRequest, PipelineRequest, SolveRequest, SolverConfigs, TspInput,
+    },
+    response::{CityDto, ParseResponse, PipelineResponse, PipelineStageResult, SolveResponse},
 };
 
 pub struct TspService;
@@ -252,6 +255,50 @@ impl TspSolverService for TspService {
             duration_ms,
         })
     }
+
+    async fn pipeline(&self, req: &PipelineRequest) -> Result<PipelineResponse, String> {
+        req.validate()?;
+        let solvers: Vec<Solvers> = req
+            .stages
+            .iter()
+            .map(|s| find_solver(&s.solver))
+            .collect::<Result<_, _>>()?;
+        let problem = input_to_problem(&req.input)?;
+        let warnings = stage_warnings(&solvers);
+
+        let stages: Vec<PipelineStage> = req
+            .stages
+            .iter()
+            .zip(&solvers)
+            .map(|(s, &solver)| {
+                let opts = make_app_options(&s.solver, s.configs.as_ref());
+                PipelineStage::new(solver, opts, problem.clone(), None)
+            })
+            .collect();
+
+        let outcomes = tokio::task::spawn_blocking(move || run_pipeline_stages(&stages))
+            .await
+            .map_err(|e| format!("task panic: {e}"))??;
+
+        let stage_results: Vec<PipelineStageResult> = outcomes
+            .iter()
+            .zip(&req.stages)
+            .map(|(o, s)| PipelineStageResult {
+                solver: s.solver.clone(),
+                cost: o.solution.total,
+                tour: o.solution.route().to_vec(),
+                duration_ms: o.duration_ms,
+            })
+            .collect();
+        let last = outcomes.last().expect("validated >= 2 stages");
+
+        Ok(PipelineResponse {
+            stages: stage_results,
+            final_cost: last.solution.total,
+            final_tour: last.solution.route().to_vec(),
+            warnings,
+        })
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +308,7 @@ impl TspSolverService for TspService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::request::{CityInput, TspInput};
+    use crate::models::request::{CityInput, PipelineStageRequest, TspInput};
 
     const TINY_TSPLIB: &str = "\
 NAME: test
@@ -356,5 +403,118 @@ EOF
         assert_eq!(resp.cities[0].id, 1);
         assert_eq!(resp.cities[1].id, 2);
         assert_eq!(resp.cities[2].id, 3);
+    }
+
+    fn small_pipeline_cities() -> TspInput {
+        TspInput {
+            cities: Some(vec![
+                CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                },
+                CityInput {
+                    id: Some(2),
+                    x: 1.0,
+                    y: 0.0,
+                },
+                CityInput {
+                    id: Some(3),
+                    x: 1.0,
+                    y: 1.0,
+                },
+                CityInput {
+                    id: Some(4),
+                    x: 0.0,
+                    y: 1.0,
+                },
+            ]),
+            tsplib: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_two_stages_returns_ordered_results() {
+        let service = TspService;
+        let req = PipelineRequest {
+            input: small_pipeline_cities(),
+            stages: vec![
+                PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                },
+                PipelineStageRequest {
+                    solver: "2opt".to_string(),
+                    configs: None,
+                },
+            ],
+        };
+        let resp = service.pipeline(&req).await.unwrap();
+        assert_eq!(resp.stages.len(), 2);
+        assert_eq!(resp.stages[0].solver, "nn");
+        assert_eq!(resp.stages[1].solver, "2opt");
+        assert_eq!(resp.final_cost, resp.stages[1].cost);
+        assert_eq!(resp.final_tour, resp.stages[1].tour);
+        assert!(resp.stages[1].cost <= resp.stages[0].cost * 1.001);
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_unknown_solver_errors() {
+        let service = TspService;
+        let req = PipelineRequest {
+            input: small_pipeline_cities(),
+            stages: vec![
+                PipelineStageRequest {
+                    solver: "does_not_exist".to_string(),
+                    configs: None,
+                },
+                PipelineStageRequest {
+                    solver: "2opt".to_string(),
+                    configs: None,
+                },
+            ],
+        };
+        assert!(service.pipeline(&req).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_nn_mid_pipeline_produces_warning() {
+        let service = TspService;
+        let req = PipelineRequest {
+            input: small_pipeline_cities(),
+            stages: vec![
+                PipelineStageRequest {
+                    solver: "2opt".to_string(),
+                    configs: None,
+                },
+                PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                },
+            ],
+        };
+        let resp = service.pipeline(&req).await.unwrap();
+        assert!(!resp.warnings.is_empty());
+        assert!(resp.warnings[0].contains("nn"));
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_well_formed_has_no_warnings() {
+        let service = TspService;
+        let req = PipelineRequest {
+            input: small_pipeline_cities(),
+            stages: vec![
+                PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                },
+                PipelineStageRequest {
+                    solver: "2opt".to_string(),
+                    configs: None,
+                },
+            ],
+        };
+        let resp = service.pipeline(&req).await.unwrap();
+        assert!(resp.warnings.is_empty());
     }
 }

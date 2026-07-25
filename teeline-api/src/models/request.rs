@@ -241,6 +241,35 @@ impl SolveRequest {
     }
 }
 
+/// One stage in a `PipelineRequest`. Named `PipelineStageRequest` (not just
+/// `PipelineStage`) to avoid colliding with `teeline::tsp::pipeline::PipelineStage`,
+/// which is a different, already-resolved type used internally by the service layer.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PipelineStageRequest {
+    pub solver: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub configs: Option<SolverConfigs>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct PipelineRequest {
+    pub input: TspInput,
+    pub stages: Vec<PipelineStageRequest>,
+}
+
+impl PipelineRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        self.input.validate()?;
+        if self.stages.len() < 2 {
+            return Err("`stages` must contain at least 2 solver stages".to_string());
+        }
+        if self.stages.iter().any(|s| s.solver.trim().is_empty()) {
+            return Err("`solver` must not be empty".to_string());
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,5 +496,118 @@ mod tests {
         use utoipa::ToSchema;
         let name = SolveRequest::name();
         assert_eq!(name, "SolveRequest");
+    }
+
+    fn tiny_cities_input() -> TspInput {
+        TspInput {
+            cities: Some(vec![
+                CityInput {
+                    id: Some(1),
+                    x: 0.0,
+                    y: 0.0,
+                },
+                CityInput {
+                    id: Some(2),
+                    x: 1.0,
+                    y: 0.0,
+                },
+            ]),
+            tsplib: None,
+        }
+    }
+
+    #[test]
+    fn pipeline_request_validate_rejects_single_stage() {
+        let req = PipelineRequest {
+            input: tiny_cities_input(),
+            stages: vec![PipelineStageRequest {
+                solver: "nn".to_string(),
+                configs: None,
+            }],
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn pipeline_request_validate_rejects_blank_solver() {
+        let req = PipelineRequest {
+            input: tiny_cities_input(),
+            stages: vec![
+                PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                },
+                PipelineStageRequest {
+                    solver: "   ".to_string(),
+                    configs: None,
+                },
+            ],
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn pipeline_request_validate_accepts_valid() {
+        let req = PipelineRequest {
+            input: tiny_cities_input(),
+            stages: vec![
+                PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                },
+                PipelineStageRequest {
+                    solver: "2opt".to_string(),
+                    configs: None,
+                },
+            ],
+        };
+        assert!(req.validate().is_ok());
+    }
+
+    #[test]
+    fn pipeline_request_round_trip_with_per_stage_configs() {
+        let req = PipelineRequest {
+            input: tiny_cities_input(),
+            stages: vec![
+                PipelineStageRequest {
+                    solver: "nn".to_string(),
+                    configs: None,
+                },
+                PipelineStageRequest {
+                    solver: "sa".to_string(),
+                    configs: Some(SolverConfigs {
+                        sa: Some(SaConfig {
+                            heuristic: None,
+                            cooling_rate: Some(0.0005),
+                            min_temperature: None,
+                            max_temperature: Some(200.0),
+                        }),
+                        ..SolverConfigs::default()
+                    }),
+                },
+            ],
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: PipelineRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.stages.len(), 2);
+        assert_eq!(back.stages[0].configs, None);
+        assert_eq!(
+            back.stages[1]
+                .configs
+                .as_ref()
+                .unwrap()
+                .sa
+                .as_ref()
+                .unwrap()
+                .cooling_rate,
+            Some(0.0005)
+        );
+    }
+
+    #[test]
+    fn pipeline_request_schema_builds() {
+        use utoipa::ToSchema;
+        assert_eq!(PipelineRequest::name(), "PipelineRequest");
+        assert_eq!(PipelineStageRequest::name(), "PipelineStageRequest");
     }
 }

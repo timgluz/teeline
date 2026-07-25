@@ -12,7 +12,7 @@ use teeline::config::{
 use teeline::tsp::{
     self, AppOptions, SOMOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
     list_solvers,
-    pipeline::{PipelineStage, run_pipeline},
+    pipeline::{PipelineStage, run_pipeline, stage_warnings},
     tsplib,
 };
 use tracing_subscriber::EnvFilter;
@@ -393,10 +393,9 @@ fn run_as_pipeline_stages(
         .with_writer(std::io::stderr)
         .try_init();
 
-    for (i, (solver, _)) in stage_configs.iter().enumerate() {
-        if i > 0 && *solver == Solvers::NearestNeighbor {
-            eprintln!("warning: nn at pipeline stage {i} discards the warm-start seed");
-        }
+    let solvers: Vec<Solvers> = stage_configs.iter().map(|(s, _)| *s).collect();
+    for warning in stage_warnings(&solvers) {
+        eprintln!("warning: {warning}");
     }
 
     let tsp_data = if let Some(input_file_path) = args.get_one::<String>("input") {
