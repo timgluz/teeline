@@ -1,0 +1,33 @@
+---
+import BaseLayout from './BaseLayout.astro'
+import Sidebar from '../components/Sidebar.astro'
+
+interface Props {
+  title: string
+  description: string
+  path: string
+  currentId: string | null
+  name: string
+}
+
+const { title, description, path, currentId, name } = Astro.props
+---
+<BaseLayout title={title} description={description} path={path} ogType="article">
+  <div class="docs-layout">
+    <aside class="docs-sidebar">
+      <nav aria-label="Algorithms">
+        <Sidebar currentId={currentId} />
+      </nav>
+    </aside>
+    <main class="docs-main">
+      <nav aria-label="breadcrumb">
+        <ul>
+          <li><a href="/">teeline</a></li>
+          <li>Algorithms</li>
+          <li>{name}</li>
+        </ul>
+      </nav>
+      <slot />
+    </main>
+  </div>
+</BaseLayout>

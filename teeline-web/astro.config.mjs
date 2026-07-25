@@ -11,6 +11,21 @@ export default defineConfig({
   site: 'https://tspsolver.com',
   output: 'static',
   integrations: [preact(), sitemap()],
+  // Astro's default output asset directory is dist/_astro/, not Vite's
+  // dist/assets/. Pin it to 'assets' so scripts/copy-wasm.mjs and
+  // public/_headers' Content-Type rule for *.wasm (both hardcode "assets/")
+  // don't need to change.
+  build: {
+    assets: 'assets',
+  },
+  // Site is light-themed (data-theme="light", PicoCSS light) — match Shiki's
+  // theme to what the old @speed-highlight/core + github-light.css pipeline
+  // used. Astro's own default is github-dark, which would mismatch.
+  markdown: {
+    shikiConfig: {
+      theme: 'github-light',
+    },
+  },
   vite: {
     envPrefix: ['VITE_', 'WEBMCP_'],
     resolve: {

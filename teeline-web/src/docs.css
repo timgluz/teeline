@@ -140,19 +140,28 @@
 
 .docs-explainer-cta:hover { opacity: 0.88; }
 
-.docs-meta-table {
+/* .docs-meta-table is applied by the legacy build-docs.mjs pipeline's custom
+   marked table renderer (first table only). The Astro content-collections
+   pipeline has no equivalent build-time class injection, so it styles the
+   same "first table = metadata table" convention with a plain CSS selector
+   instead — one fewer piece of custom markdown-processing code. */
+.docs-meta-table,
+.docs-main table:first-of-type {
   border-collapse: collapse;
   margin-bottom: 1.75rem;
   font-size: 0.9rem;
 }
 
 .docs-meta-table th,
-.docs-meta-table td {
+.docs-meta-table td,
+.docs-main table:first-of-type th,
+.docs-main table:first-of-type td {
   padding: 0.3rem 0;
   vertical-align: top;
 }
 
-.docs-meta-table th {
+.docs-meta-table th,
+.docs-main table:first-of-type th {
   color: var(--pico-muted-color);
   font-weight: 500;
   white-space: nowrap;
