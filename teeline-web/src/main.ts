@@ -1,7 +1,6 @@
 import '@picocss/pico/css/pico.min.css'
 import './main.css'
 import './docs.css'
-import { initTopbar } from './topbar'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage, CompareToursResult } from './worker'
@@ -11,7 +10,6 @@ import { initWebMCP } from './webmcp'
 import { initResults, updateOptRoute, showRunning, showResult, patchComparison } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
-initTopbar()
 window.addEventListener('load', () => import('./sentry'), { once: true })
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
