@@ -13,6 +13,7 @@ interface Props {
 const { title, description, path, currentId, name } = Astro.props
 ---
 <BaseLayout title={title} description={description} path={path} ogType="article">
+  <Fragment slot="head"><slot name="head" /></Fragment>
   <div class="docs-layout">
     <aside class="docs-sidebar">
       <nav aria-label="Algorithms">

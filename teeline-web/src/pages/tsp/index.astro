@@ -3,6 +3,16 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 
 const description =
   "What the Traveling Salesman Problem is, why it's hard, where it shows up in the real world, and where to read more."
+const canonicalUrl = 'https://tspsolver.com/tsp/'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: 'The Traveling Salesman Problem',
+  description,
+  url: canonicalUrl,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+}
 ---
 <BaseLayout
   title="The Traveling Salesman Problem — Teeline"
@@ -10,6 +20,9 @@ const description =
   path="/tsp/"
   ogType="article"
 >
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
     <p style="margin-bottom: 1rem;">
       <a href="/">← Back to Teeline</a>

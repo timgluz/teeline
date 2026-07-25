@@ -22,8 +22,12 @@
 - [Tabu Search](https://tspsolver.com/algorithms/tabu/): Local search with a memory structure to avoid revisiting solutions.
 - [Bellman-Held-Karp](https://tspsolver.com/algorithms/bhk/): Exact dynamic programming; optimal but exponential (<=20 cities).
 - [Branch and Bound](https://tspsolver.com/algorithms/branch_bound/): Exact branch-and-bound search (small instances only).
-- [Stochastic Hill Climbing](https://tspsolver.com/algorithms/sa/): Random restarts with uphill moves to escape local optima.
+- [Stochastic Hill Climbing](https://tspsolver.com/algorithms/stochastic_hill/): Random restarts with uphill moves to escape local optima.
 - [Gravitational Search](https://tspsolver.com/algorithms/gsa/): Mass-weighted swap-velocity swarm inspired by gravitational physics.
+
+## Blog
+
+- [Blog](https://tspsolver.com/blog/): Notes on TSP algorithms, teeline development, and the occasional deep dive.
 
 ## Optional
 

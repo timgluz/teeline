@@ -3,6 +3,16 @@ import BaseLayout from '../../layouts/BaseLayout.astro'
 
 const description =
   'Solve TSP problems from an AI agent — in the browser via the WebMCP declarative API, or natively inside Claude via a Wassette MCP component.'
+const canonicalUrl = 'https://tspsolver.com/webmcp/'
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: 'AI agent access',
+  description,
+  url: canonicalUrl,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+}
 ---
 <BaseLayout
   title="AI agent access — Teeline"
@@ -10,6 +20,9 @@ const description =
   path="/webmcp/"
   ogType="article"
 >
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
     <p style="margin-bottom: 1rem;">
       <a href="/">← Back to Teeline</a>

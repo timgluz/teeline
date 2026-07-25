@@ -32,8 +32,21 @@ export function getStaticPaths() {
 
 const { id } = Astro.params as { id: string }
 const meta = EXPLAINER_META[id]
+const canonicalUrl = `https://tspsolver.com/algorithms/${id}/explainer/`
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: meta.title.replace(/ — Teeline$/, ''),
+  description: meta.description,
+  url: canonicalUrl,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+}
 ---
 <BaseLayout title={meta.title} description={meta.description} path={`/algorithms/${id}/explainer/`} ogType="article">
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   <main style="padding: 1.5rem 2rem; max-width: 900px; margin: 0 auto;">
     <p style="margin-bottom: 1rem;">
       <a href={`/algorithms/${id}/`}>← Back to {meta.backLabel} docs</a>

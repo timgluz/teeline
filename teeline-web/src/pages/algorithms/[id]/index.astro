@@ -13,6 +13,16 @@ export async function getStaticPaths() {
 
 const { entry } = Astro.props
 const { Content } = await render(entry)
+const canonicalUrl = `https://tspsolver.com/algorithms/${entry.data.id}/`
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: entry.data.name,
+  description: entry.data.description,
+  url: canonicalUrl,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': canonicalUrl },
+}
 ---
 <DocsLayout
   title={`${entry.data.name} — Teeline`}
@@ -21,6 +31,9 @@ const { Content } = await render(entry)
   currentId={entry.data.id}
   name={entry.data.name}
 >
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
   {entry.data.typeBadge && <p class="docs-type-badge">{entry.data.typeBadge}</p>}
   {entry.data.hasExplainer && (
     <a class="docs-explainer-cta" href={`/algorithms/${entry.data.id}/explainer/`}>▶ Open interactive explainer →</a>
