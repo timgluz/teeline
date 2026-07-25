@@ -12,6 +12,22 @@ pub enum ApiError {
     Unauthorized,
 }
 
+impl ApiError {
+    /// Maps a service-layer error string to the right HTTP status: solver
+    /// panics (surfaced from `tokio::task::spawn_blocking`'s `JoinError` as
+    /// `format!("task panic: {e}")`) are a server-side fault, everything else
+    /// (validation failures, unknown solver names) is a client error. Shared
+    /// by `routes::solve::solve` and `routes::pipeline::pipeline`, which both
+    /// call solver-service methods with this exact error convention.
+    pub fn from_solver_error(e: String) -> Self {
+        if e.starts_with("task panic:") {
+            ApiError::Internal(e)
+        } else {
+            ApiError::BadRequest(e)
+        }
+    }
+}
+
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         // RFC 7235 §3.1: a 401 response must include WWW-Authenticate

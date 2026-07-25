@@ -9,6 +9,7 @@ const ROUTES: &[&str] = &[
     "GET /api/v1/solvers",
     "POST /api/v1/parse",
     "POST /api/v1/solve",
+    "POST /api/v1/pipeline",
     "GET /openapi.json",
     "GET /docs",
 ];

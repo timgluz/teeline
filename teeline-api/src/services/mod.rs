@@ -1,14 +1,15 @@
 use async_trait::async_trait;
 
 use crate::models::{
-    request::{ParseRequest, SolveRequest},
-    response::{AlgorithmInfo, ParseResponse, SolveResponse},
+    request::{ParseRequest, PipelineRequest, SolveRequest},
+    response::{AlgorithmInfo, ParseResponse, PipelineResponse, SolveResponse},
 };
 
 #[async_trait]
 pub trait TspSolverService: Send + Sync {
     async fn parse(&self, req: &ParseRequest) -> Result<ParseResponse, String>;
     async fn solve(&self, req: &SolveRequest) -> Result<SolveResponse, String>;
+    async fn pipeline(&self, req: &PipelineRequest) -> Result<PipelineResponse, String>;
 }
 
 pub trait SolverRegistryService: Send + Sync {

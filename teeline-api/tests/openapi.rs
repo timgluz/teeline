@@ -50,7 +50,7 @@ async fn openapi_json_is_valid_json() {
 }
 
 #[tokio::test]
-async fn openapi_json_contains_all_four_paths() {
+async fn openapi_json_contains_all_documented_paths() {
     let resp = make_app()
         .oneshot(
             Request::builder()
@@ -75,6 +75,10 @@ async fn openapi_json_contains_all_four_paths() {
     );
     assert!(paths.contains_key("/api/v1/parse"), "missing /api/v1/parse");
     assert!(paths.contains_key("/api/v1/solve"), "missing /api/v1/solve");
+    assert!(
+        paths.contains_key("/api/v1/pipeline"),
+        "missing /api/v1/pipeline"
+    );
 }
 
 #[tokio::test]
@@ -177,6 +181,13 @@ async fn solve_and_parse_request_bodies_have_named_examples() {
     assert!(
         parse_examples.as_object().is_some_and(|o| o.len() >= 2),
         "/api/v1/parse should document at least 2 named examples"
+    );
+
+    let pipeline_examples = &json["paths"]["/api/v1/pipeline"]["post"]["requestBody"]["content"]["application/json"]
+        ["examples"];
+    assert!(
+        pipeline_examples.as_object().is_some_and(|o| o.len() >= 2),
+        "/api/v1/pipeline should document at least 2 named examples"
     );
 }
 

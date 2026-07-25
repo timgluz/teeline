@@ -107,11 +107,5 @@ pub async fn solve(
         }
     }
 
-    result.map(Json).map_err(|e| {
-        if e.starts_with("task panic:") {
-            ApiError::Internal(e)
-        } else {
-            ApiError::BadRequest(e)
-        }
-    })
+    result.map(Json).map_err(ApiError::from_solver_error)
 }

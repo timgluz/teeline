@@ -10,8 +10,11 @@ use teeline_api::{
     metrics::MetricsState,
     middleware,
     models::{
-        request::{ParseRequest, SolveRequest},
-        response::{AlgorithmInfo, CityDto, ParseResponse, SolveResponse},
+        request::{ParseRequest, PipelineRequest, SolveRequest},
+        response::{
+            AlgorithmInfo, CityDto, ParseResponse, PipelineResponse, PipelineStageResult,
+            SolveResponse,
+        },
     },
     services::{SolverRegistryService, TspSolverService},
 };
@@ -52,6 +55,33 @@ impl TspSolverService for MockSolverService {
                 duration_ms: 0,
             }),
         }
+    }
+
+    async fn pipeline(&self, req: &PipelineRequest) -> Result<PipelineResponse, String> {
+        // Same error-simulation convention as solve(): the first stage's solver
+        // name drives error simulation; full validation is covered by real-service
+        // tests in pipeline.rs.
+        match req.stages.first().map(|s| s.solver.as_str()) {
+            Some("__error__") => return Err("unknown solver: __error__".to_string()),
+            Some("__panic__") => return Err("task panic: simulated".to_string()),
+            _ => {}
+        }
+        let stages: Vec<PipelineStageResult> = req
+            .stages
+            .iter()
+            .map(|s| PipelineStageResult {
+                solver: s.solver.clone(),
+                cost: 1.0,
+                tour: vec![1],
+                duration_ms: 0,
+            })
+            .collect();
+        Ok(PipelineResponse {
+            stages,
+            final_cost: 1.0,
+            final_tour: vec![1],
+            warnings: vec![],
+        })
     }
 }
 

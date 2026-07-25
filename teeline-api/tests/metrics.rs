@@ -37,6 +37,16 @@ fn solve_req(solver: &str) -> Request<Body> {
         .unwrap()
 }
 
+fn pipeline_req() -> Request<Body> {
+    let body = r#"{"input":{"cities":[{"x":0.0,"y":0.0},{"x":1.0,"y":0.0},{"x":1.0,"y":1.0},{"x":0.0,"y":1.0}]},"stages":[{"solver":"nn"},{"solver":"2opt"}]}"#;
+    Request::builder()
+        .method("POST")
+        .uri("/api/v1/pipeline")
+        .header("content-type", "application/json")
+        .body(Body::from(body))
+        .unwrap()
+}
+
 async fn body_text(resp: axum::response::Response) -> String {
     let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
         .await
@@ -131,6 +141,29 @@ async fn solver_error_metric_increments_for_known_solver_error() {
     assert!(
         body.contains("teeline_solver_requests_total"),
         "missing teeline_solver_requests_total after failed solve:\n{body}"
+    );
+}
+
+#[tokio::test]
+async fn solver_metrics_present_after_successful_pipeline() {
+    let app = make_app();
+    let pipeline_resp = app.clone().oneshot(pipeline_req()).await.unwrap();
+    assert_eq!(
+        pipeline_resp.status(),
+        StatusCode::OK,
+        "pipeline must succeed before solver metrics are populated"
+    );
+    let body = body_text(app.oneshot(metrics_req()).await.unwrap()).await;
+    // Regression check: the pipeline endpoint chains multiple solver stages
+    // and must record per-solver metrics the same way /api/v1/solve does —
+    // it previously recorded none at all.
+    assert!(
+        body.contains("teeline_solver_requests_total"),
+        "missing teeline_solver_requests_total after pipeline:\n{body}"
+    );
+    assert!(
+        body.contains("teeline_solver_duration_seconds"),
+        "missing teeline_solver_duration_seconds after pipeline:\n{body}"
     );
 }
 
