@@ -48,6 +48,7 @@ tasks:
     vars:
       API_KEY: '{{.API_KEY | default ""}}'
       RATE_LIMIT_RPM: '{{.RATE_LIMIT_RPM | default ""}}'
+      PORT: '{{.PORT | default "8080"}}'
     # Values are threaded through as opaque env vars (never interpolated
     # into the bash -c string itself) so a token containing a quote or
     # `$(...)` can't break out and inject commands — same reasoning as the
@@ -55,16 +56,22 @@ tasks:
     env:
       TASK_API_KEY: '{{.API_KEY}}'
       TASK_RATE_LIMIT_RPM: '{{.RATE_LIMIT_RPM}}'
+      TASK_PORT: '{{.PORT}}'
     cmds:
       # go-task's bundled shell interpreter doesn't preserve backgrounded
       # processes past the end of the task run, and mis-captures $!.
       # bash -c ... & disown bypasses it so the server actually survives.
-      - bash -c 'API_KEY="$TASK_API_KEY" RATE_LIMIT_RPM="$TASK_RATE_LIMIT_RPM" nohup ./target/debug/teeline-api >/tmp/teeline-api.log 2>&1 & echo $! > /tmp/teeline-api.pid; disown'
+      - bash -c 'API_KEY="$TASK_API_KEY" RATE_LIMIT_RPM="$TASK_RATE_LIMIT_RPM" PORT="$TASK_PORT" nohup ./target/debug/teeline-api >/tmp/teeline-api.log 2>&1 & echo $! > /tmp/teeline-api.pid; disown'
+      - 'echo "teeline-api starting on http://127.0.0.1:{{.PORT}} (PID $(cat /tmp/teeline-api.pid)); logs: /tmp/teeline-api.log"'
 
   api:serve:
-    desc: Start teeline-api server in background (writes PID to /tmp/teeline-api.pid)
+    desc: Start teeline-api server in background (writes PID to /tmp/teeline-api.pid). Override port with PORT=<n>.
+    vars:
+      PORT: '{{.PORT | default "8080"}}'
     cmds:
       - task: api:_launch
+        vars:
+          PORT: "{{.PORT}}"
 
   # NOTE: api:serve, test:e2e:api, and test:e2e:auth all share the single
   # /tmp/teeline-api.pid file. This is only safe because they're never run
@@ -78,9 +85,11 @@ tasks:
       - pkill -f target/debug/teeline-api 2>/dev/null || true
 
   api:wait:
-    desc: Poll until teeline-api health endpoint is ready (max 10s)
+    desc: Poll until teeline-api health endpoint is ready (max 10s). Override port with PORT=<n>.
+    vars:
+      PORT: '{{.PORT | default "8080"}}'
     cmds:
-      - for i in $(seq 10); do curl -sf http://127.0.0.1:8080/api/v1/health && break || sleep 1; done
+      - for i in $(seq 10); do curl -sf http://127.0.0.1:{{.PORT}}/api/v1/health && break || sleep 1; done
 
   api:release:
     desc: Deploy teeline-api to Fly.io (requires flyctl auth; app must exist, see fly.toml)
