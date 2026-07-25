@@ -69,6 +69,8 @@ function wireSolveTSP(worker: Worker): void {
 
 The `agentInvoked`/`respondWith()` pair is the actual WebMCP contract: when an agent submits the form, Chrome sets `agentInvoked: true` and gives the event a `respondWith(promise)` method. Whatever that promise resolves to goes back to the agent as the tool's result; a rejection becomes a tool error.
 
+That `typeof ae.respondWith !== 'function'` check is doing more than satisfying TypeScript. A regular human `submit` event has no `respondWith` method, so the handler returns before it ever calls `e.preventDefault()`, leaving normal form handling untouched. Skip that check and this pattern breaks the moment it's reused on a form humans can actually see and submit: a human click would get hijacked into the agent-only worker path, `preventDefault()` would stop the page from doing anything visible, and the eventual result would only ever reach an agent that isn't there. The guard is what makes one handler safe for both submission paths.
+
 Everything else here (`crypto.randomUUID()` as a correlation id, a one-shot `message` listener matched by that id) is just "how do I turn a single-shot worker round-trip into a promise," the same pattern you'd use for any other async bridge.
 
 ## Testing it against a real agent
