@@ -8,9 +8,10 @@ Live at **[tspsolver.com](https://tspsolver.com)** (Cloudflare Pages).
 
 ```bash
 npm ci
-npm run dev      # Vite dev server at http://localhost:5173
+npm run dev      # Astro dev server at http://localhost:4321
 npm test         # Vitest unit tests
-npm run build    # TypeScript check + production build → dist/
+npm run test:e2e # Playwright e2e tests
+npm run build    # astro check + TypeScript check + production build → dist/
 ```
 
 ## Deployment
@@ -22,7 +23,7 @@ Pushes to `master` that touch `teeline-web/**` automatically trigger the [`deplo
 Add these in **GitHub → repo Settings → Secrets and variables → Actions**:
 
 | Secret | How to obtain |
-|--------|--------------|
+| --- | --- |
 | `CLOUDFLARE_API_TOKEN` | [CF Dashboard](https://dash.cloudflare.com) → My Profile → API Tokens → **Create Token** → use the **Edit Cloudflare Pages** template (or custom token with *Cloudflare Pages: Edit* permission) |
 | `CLOUDFLARE_ACCOUNT_ID` | [CF Dashboard](https://dash.cloudflare.com) → select your account → the Account ID appears in the right sidebar |
 
@@ -51,16 +52,26 @@ On first use, Claude Code will prompt you to authenticate with your Cloudflare a
 
 ## Architecture
 
-```
+Built with [Astro 7](https://astro.build) — file-based routing, content collections for the algorithm docs + blog, server-rendered by default (no client-side nav re-render needed). The main solver app and its Web Worker bridge are plain TypeScript, unaffected by the framework choice.
+
+```text
 teeline-web/
+├── astro.config.mjs
 ├── src/
-│   ├── main.ts          # app bootstrap + state
-│   ├── upload.ts        # Step 01 — drag-drop file upload
-│   ├── solver-form.ts   # Step 02 — solver config + checklist
-│   ├── canvas.ts        # SVG tour rendering
-│   ├── results.ts       # Step 03 — results table + run history
-│   ├── download.ts      # .tour / .csv / .json / .svg export
-│   └── worker.ts        # WASM Web Worker bridge
+│   ├── pages/            # file-based routes (index, tsp, webmcp, api-key,
+│   │                      #  algorithms/[id], algorithms/[id]/explainer, blog/*)
+│   ├── layouts/           # BaseLayout, DocsLayout
+│   ├── components/        # Topbar, Sidebar, AlgorithmCards, FeatureCards
+│   ├── content.config.ts  # `docs` (sourced from ../docs/algorithms/*.md) +
+│   │                       #  `blog` (src/content/blog/*.md) collections
+│   ├── explainers/         # 10 interactive Preact islands (client:visible)
+│   ├── main.ts             # app bootstrap + state
+│   ├── upload.ts           # Step 01 — drag-drop file upload
+│   ├── solver-form.ts      # Step 02 — solver config + checklist
+│   ├── canvas.ts           # SVG tour rendering
+│   ├── results.ts          # Step 03 — results table + run history
+│   ├── download.ts         # .tour / .csv / .json / .svg export
+│   └── worker.ts           # WASM Web Worker bridge
 ├── functions/
 │   └── tunnel.js        # Cloudflare Pages Function — Sentry event proxy
 └── public/

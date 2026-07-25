@@ -4,11 +4,12 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build-docs.mjs && vite",
-    "build": "node scripts/build-docs.mjs && tsc && vite build && node scripts/copy-wasm.mjs",
-    "build:check": "node scripts/build-docs.mjs && tsc && vite build",
-    "preview": "vite preview",
+    "dev": "astro dev",
+    "build": "astro check && tsc --noEmit && astro build && node scripts/copy-wasm.mjs",
+    "build:check": "astro check && tsc --noEmit && astro build",
+    "preview": "astro preview",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "deploy": "npm run build && wrangler pages deploy dist/"
   },
   "dependencies": {
@@ -20,17 +21,13 @@
     "@sentry/browser": "^10.66.0",
     "@sentry/vite-plugin": "^5.4.0",
     "astro": "^7.1.3",
-    "htmx.org": "2.0.10",
     "preact": "^10.29.7",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@playwright/test": "^1.61.1",
-    "eta": "^4.6.0",
-    "marked": "^18.0.6",
     "typescript": "6.0.3",
-    "vite": "8.1.5",
     "vitest": "4.1.10",
     "wrangler": "4.114.0"
   },

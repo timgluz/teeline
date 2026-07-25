@@ -2,7 +2,7 @@ version: '3'
 
 tasks:
   dev:
-    desc: Start Vite dev server at http://localhost:5173
+    desc: Start Astro dev server at http://localhost:4321
     cmds:
       - npm run dev
 
@@ -26,9 +26,15 @@ tasks:
     cmds:
       - npx vitest
 
-  lint:
-    desc: Type-check with tsc (no emit)
+  test:e2e:
+    desc: Run Playwright e2e tests
     cmds:
+      - npm run test:e2e
+
+  lint:
+    desc: Type-check with astro check + tsc (no emit)
+    cmds:
+      - npx astro check
       - npx tsc --noEmit
 
   deploy:preview:
