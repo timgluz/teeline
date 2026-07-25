@@ -11,7 +11,17 @@ import { SOLVER_GROUPS, SOLVER_META, PAGED_SOLVERS } from '../nav-data'
   <ul>
     <li><a class="topbar-logo" href="/">teeline</a></li>
   </ul>
-  <ul>
+  <button
+    type="button"
+    id="topbar-toggle"
+    class="topbar-hamburger"
+    aria-label="Toggle menu"
+    aria-expanded="false"
+    aria-controls="topbar-menu"
+  >
+    <span aria-hidden="true">☰</span>
+  </button>
+  <ul id="topbar-menu" class="topbar-menu">
     <li>
       <details class="dropdown">
         <summary>Algorithms</summary>
@@ -50,10 +60,22 @@ import { SOLVER_GROUPS, SOLVER_META, PAGED_SOLVERS } from '../nav-data'
 
 <script>
   const nav = document.querySelector('nav.topbar')
+  const toggle = document.getElementById('topbar-toggle')
+  const menu = document.getElementById('topbar-menu')
+
+  toggle?.addEventListener('click', () => {
+    const open = menu?.classList.toggle('topbar-menu--open') ?? false
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false')
+  })
+
   document.addEventListener('click', (event) => {
     const details = nav?.querySelector<HTMLDetailsElement>('details.dropdown')
     if (details && nav && !nav.contains(event.target as Node)) {
       details.removeAttribute('open')
+    }
+    if (nav && !nav.contains(event.target as Node)) {
+      menu?.classList.remove('topbar-menu--open')
+      toggle?.setAttribute('aria-expanded', 'false')
     }
   })
 </script>

@@ -24,19 +24,6 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <header class="container">
-    <h1>Teeline TSP Solver</h1>
-    <p class="tagline">
-      Find the shortest route through your cities — one of computing's oldest hard
-      problems, solved live in your browser with 18 algorithms, from exact search to
-      genetic algorithms and swarm intelligence.
-    </p>
-    <p class="tagline-link">
-      New to the problem? <a href="/tsp/">Read the TSP overview</a> — history, real-world
-      uses, and further reading.
-    </p>
-  </header>
-
   <main class="container">
     <nav aria-label="Solver steps">
       <ol class="stepper" role="list">
@@ -201,6 +188,28 @@ const jsonLd = {
     </section>
     <!-- /#step-content -->
   </main>
+
+  <header class="container hero">
+    <img
+      src="/hero-logo.png"
+      width="130"
+      height="152"
+      alt="Teeline logo: a Big Dipper constellation forming a route, with the tagline Find your path"
+      class="hero-logo"
+    />
+    <div class="hero-text">
+      <h1>Teeline TSP Solver</h1>
+      <p class="tagline">
+        Find the shortest route through your cities — one of computing's oldest hard
+        problems, solved live in your browser with 18 algorithms, from exact search to
+        genetic algorithms and swarm intelligence.
+      </p>
+      <p class="tagline-link">
+        New to the problem? <a href="/tsp/">Read the TSP overview</a> — history, real-world
+        uses, and further reading.
+      </p>
+    </div>
+  </header>
 
   <section class="container" aria-labelledby="features-heading">
     <h2 id="features-heading">Features</h2>

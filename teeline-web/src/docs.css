@@ -28,6 +28,49 @@
   left: auto;
 }
 
+.topbar-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  color: var(--pico-primary);
+}
+
+@media (max-width: 600px) {
+  .topbar-hamburger {
+    display: block;
+  }
+
+  .topbar-menu {
+    display: none;
+    position: absolute;
+    top: 48px;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem var(--pico-spacing);
+    background: var(--pico-card-background-color, #fff);
+    border-bottom: 1px solid var(--pico-muted-border-color);
+  }
+
+  .topbar-menu--open {
+    display: flex;
+  }
+
+  /* Nested Algorithms dropdown renders inline instead of as a floating panel */
+  .topbar-menu details.dropdown > ul {
+    position: static;
+    box-shadow: none;
+    border: none;
+    padding-left: 0.75rem;
+  }
+}
+
 /* Group headers inside the Algorithms dropdown */
 .algo-group-label {
   display: block;
