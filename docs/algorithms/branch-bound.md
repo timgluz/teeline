@@ -1,3 +1,11 @@
+---
+id: "branch_bound"
+name: "Branch and Bound"
+typeBadge: "Exact"
+description: "Systematic enumeration of candidate tours that prunes any branch whose lower-bound cost already exceeds the best complete tour found so far."
+hasExplainer: false
+---
+
 # Branch and Bound
 
 | | |

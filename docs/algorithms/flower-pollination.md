@@ -1,3 +1,11 @@
+---
+id: "fpa"
+name: "Flower Pollination Algorithm"
+typeBadge: "Heuristic — nature-inspired metaheuristic"
+description: "Nature-inspired metaheuristic modelling the pollination process of flowering plants. Maintains a population of flowers (candidate tours). Each epoch, each flower applies either:"
+hasExplainer: true
+---
+
 # Flower Pollination Algorithm
 
 | | |

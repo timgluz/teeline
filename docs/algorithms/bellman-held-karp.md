@@ -1,3 +1,11 @@
+---
+id: "bhk"
+name: "Bellman–Held–Karp"
+typeBadge: "Exact"
+description: "Dynamic programming algorithm that solves TSP exactly. It builds up solutions for subsets of cities, combining the optimal sub-tour results to find the globally optimal tour. Returns the provably shortest Hamiltonian circuit."
+hasExplainer: false
+---
+
 # Bellman–Held–Karp
 
 | | |

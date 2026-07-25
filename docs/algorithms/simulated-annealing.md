@@ -1,3 +1,11 @@
+---
+id: "sa"
+name: "Simulated Annealing"
+typeBadge: "Heuristic — local search (stochastic)"
+description: "Probabilistic local search inspired by the annealing process in metallurgy. Each iteration proposes a random tour modification."
+hasExplainer: true
+---
+
 # Simulated Annealing
 
 | | |

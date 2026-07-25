@@ -1,3 +1,11 @@
+---
+id: "or_opt"
+name: "Or-opt"
+typeBadge: "Heuristic — local search"
+description: "Local search algorithm that relocates segments of 1, 2, or 3 consecutive cities to a better position elsewhere in the tour."
+hasExplainer: false
+---
+
 # Or-opt
 
 | | |

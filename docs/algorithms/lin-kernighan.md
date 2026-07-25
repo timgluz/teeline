@@ -1,3 +1,11 @@
+---
+id: "lk"
+name: "Lin-Kernighan ILS"
+typeBadge: "Heuristic — iterated local search"
+description: "Iterated Local Search (ILS) built around a candidate-list 2-opt move with the Lin-Kernighan gain criterion."
+hasExplainer: true
+---
+
 # Lin-Kernighan ILS
 
 | | |
