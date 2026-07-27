@@ -27,7 +27,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
     "@playwright/test": "^1.62.0",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "vitest": "4.1.10",
     "wrangler": "4.114.0"
   },
