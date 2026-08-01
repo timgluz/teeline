@@ -56,12 +56,15 @@ Hamiltonian tour regardless of convergence quality.
 
 ## Options
 
-| Field | Default | Range | Description |
-| ------- | --------- | ------- | ------------- |
-| `epochs` | 100 000 | ≥ 1 | Number of training iterations |
-| `learning_rate` | 0.8 | (0, 1] | Initial learning rate η₀ |
-| `radius_fraction` | 0.1 | (0, 1] | Initial neighbourhood radius as fraction of neuron count |
-| `neuron_multiplier` | 8 | ≥ 1 | Neuron count = n_cities × multiplier; higher reduces dead neurons |
+| Field | CLI flag | Default | Range | Description |
+| ------- | ------- | --------- | ------- | ------------- |
+| `epochs` | `--epochs` | 100 000 | ≥ 1 | Number of training iterations |
+| `learning_rate` | `--learning_rate` | 0.8 | (0, 1] | Initial learning rate η₀ |
+| `radius_fraction` | `--radius_fraction` | 0.1 | (0, 1] | Initial neighbourhood radius as fraction of neuron count |
+| `neuron_multiplier` | `--neuron_multiplier` | 8 | ≥ 1 | Neuron count = n_cities × multiplier; higher reduces dead neurons |
+
+All four fields are also reachable via the REST API's `configs.som` or a
+`[som]`/`[stage.som]` TOML table (field names match the table above).
 
 ## Usage
 
@@ -75,6 +78,17 @@ teeline pipeline --steps=som,sa   -i ./data/tsplib/berlin52.tsp
 
 # custom training schedule
 teeline solve som --epochs=200000 --learning_rate=0.9 -i ./data/tsplib/berlin52.tsp
+```
+
+Per-stage TOML config (via `pipeline --config`):
+
+```toml
+[[stage]]
+solver = "som"
+
+[stage.som]
+epochs        = 50000
+learning_rate = 0.9
 ```
 
 ## Notes

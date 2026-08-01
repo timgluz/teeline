@@ -36,12 +36,19 @@ procedure LinKernighan(cities, epochs):
 
 ## Options
 
-| Flag | Description | Default |
-| ------ | ------------- | --------- |
-| `--epochs` | Number of ILS restarts | 10 000 |
-| `--platoo_epochs` | Stop after this many non-improving restarts | 500 |
-| `--n_nearest` | Candidate list size (k nearest neighbours per city) | 3 |
-| `--max_depth` | Maximum 2-opt move depth (currently unused in the inner loop) | 5 |
+| Field | CLI flag | Default | Range | Description |
+| ------- | ------- | --------- | ------- | ------------- |
+| `epochs` | `--epochs` | 100 | ≥ 0 (unvalidated) | Number of ILS restarts |
+| `platoo_epochs` | `--platoo_epochs` | 10 | ≥ 0 (unvalidated) | Stop after this many consecutive non-improving restarts |
+| `n_nearest` | `--n_nearest` | 5 | ≥ 1 | Candidate list size (k nearest neighbours per city) |
+| `max_depth` | `--max-depth` | 5 | ≥ 1 | LK chain-search depth; depth-1 ≈ 2-opt, depth-5 enables the full k-opt move space |
+
+`epochs` and `platoo_epochs` aren't rejected by validation at any value, but unlike the
+"0 = run forever" convention some other solvers use, LK's loop doesn't implement that
+convention: `epochs=0` runs zero ILS restarts (only the initial pass), and
+`platoo_epochs=0` stops after the first non-improving restart — the opposite of
+"unlimited". All four fields are also reachable via the REST API's `configs.lk` or a
+`[lk]`/`[stage.lk]` TOML table (field names match the table above).
 
 ## Usage
 
@@ -59,13 +66,28 @@ teeline solve lk --no-seed -i ./data/tsplib/berlin52.tsp
 teeline solve lk -i ./data/tsplib/berlin52.tsp --n_nearest=5 --epochs=50000
 ```
 
+Per-stage TOML config (via `pipeline --config`):
+
+```toml
+[[stage]]
+solver = "lk"
+
+[stage.lk]
+max_depth = 3
+n_nearest = 8
+```
+
 ## Benchmark
 
-| Instance | Optimal | This solver  | Gap   |
-|----------|---------|--------------|-------|
-| berlin52 | 7 542   | ~8 100–8 300 | ~8–9% |
+| Instance | Optimal | This solver (default) | Gap |
+| --- | --- | --- | --- |
+| berlin52 | 7 544.37 | 7 544.37 | 0.0% |
 
-The gap reflects the 2-opt depth of the inner optimizer. True LK moves use sequential edge exchanges of depth ≥ 3, which this implementation approximates with the LK gain criterion applied to 2-opt moves. A depth-3 LK pass would reduce the gap to ≈ 1–2% (tracked in GH #184).
+With the default `max_depth=5` (full LK chain-search depth), this solver finds the
+optimal berlin52 tour. Depth matters: over 10 runs, depth-1 (≈ 2-opt with ILS restarts)
+hits optimal 6/10 times (mean 7595), depth-2 hits 7/10 (mean 7580), and depth-5 hits
+10/10 (mean 7544) — see `docs/benchmarks.md` for the full breakdown. Full sequential
+LK chain search (issue #184) is implemented and shipped, not a future improvement.
 
 ## References
 

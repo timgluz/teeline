@@ -46,6 +46,16 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "pipeline --config with lk options exits 0" {
+    run "$BIN" pipeline "--config=${FIXTURE_DIR}/pipeline_lk.toml" -i "$GR17"
+    [ "$status" -eq 0 ]
+}
+
+@test "pipeline --config with som options exits 0" {
+    run "$BIN" pipeline "--config=${FIXTURE_DIR}/pipeline_som.toml" -i "$GR17"
+    [ "$status" -eq 0 ]
+}
+
 # ---------------------------------------------------------------------------
 # pipeline subcommand — error cases
 # ---------------------------------------------------------------------------
