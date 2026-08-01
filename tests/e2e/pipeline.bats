@@ -41,6 +41,11 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "pipeline --config with fourier options exits 0" {
+    run "$BIN" pipeline "--config=${FIXTURE_DIR}/pipeline_fourier.toml" -i "$GR17"
+    [ "$status" -eq 0 ]
+}
+
 # ---------------------------------------------------------------------------
 # pipeline subcommand — error cases
 # ---------------------------------------------------------------------------

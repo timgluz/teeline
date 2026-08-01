@@ -1,0 +1,6 @@
+[[stage]]
+solver = "fourier"
+
+[stage.fourier]
+k_max = 6
+m = 200

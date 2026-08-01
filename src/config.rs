@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::tsp::{
-    AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers,
+    AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions,
+    Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -12,7 +13,7 @@ pub trait AppOptionsProvider {
 }
 
 /// Applies recognised sub-tables from a `toml::Table` to the base `AppOptions`.
-/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, and `heuristic` are valid top-level keys.
+/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, and `heuristic` are valid top-level keys.
 /// Returns `Err` on unknown keys or mis-typed sub-tables.
 pub struct TomlTableProvider<'a>(pub &'a toml::Table);
 
@@ -37,6 +38,12 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                     let t = value.as_table().ok_or("config: `fpa` must be a table")?;
                     base.fpa = Some(FPAOptions::from_toml(t)?);
                 }
+                "fourier" => {
+                    let t = value
+                        .as_table()
+                        .ok_or("config: `fourier` must be a table")?;
+                    base.fourier = Some(FourierOptions::from_toml(t)?);
+                }
                 "heuristic" => {
                     let t = value
                         .as_table()
@@ -45,7 +52,7 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, heuristic"
+                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, heuristic"
                     ));
                 }
             }
@@ -100,6 +107,7 @@ pub fn load_pipeline_config(
             ("ga", matches!(solver, Solvers::GeneticAlgorithm)),
             ("cs", matches!(solver, Solvers::CuckooSearch)),
             ("fpa", matches!(solver, Solvers::FlowerPollination)),
+            ("fourier", matches!(solver, Solvers::Fourier)),
             (
                 "heuristic",
                 !matches!(
@@ -108,6 +116,7 @@ pub fn load_pipeline_config(
                         | Solvers::GeneticAlgorithm
                         | Solvers::CuckooSearch
                         | Solvers::FlowerPollination
+                        | Solvers::Fourier
                 ),
             ),
         ] {
@@ -218,6 +227,18 @@ mod tests {
     }
 
     #[test]
+    fn test_toml_provider_fourier_sub_table_works() {
+        let table: toml::Table =
+            toml::from_str("solver = \"fourier\"\n[fourier]\nk_max = 32\nm = 1120").unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        let fourier = opts.fourier.unwrap();
+        assert_eq!(fourier.k_max, 32);
+        assert_eq!(fourier.m, 1120);
+    }
+
+    #[test]
     fn test_toml_provider_heuristic_sub_table_works() {
         let table: toml::Table =
             toml::from_str("solver = \"2opt\"\n[heuristic]\nepochs = 500").unwrap();
@@ -319,6 +340,22 @@ mod tests {
         let toml = "[[stage]]\nsolver = \"sa\"\n\n[stage.sa]\ncooling_rate = 0.001\nmax_temperature = 100.0\nmin_temperature = 0.001\n\n[stage.heuristic]\nepochs = 5000\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_fourier_errors() {
+        // Fourier reads only opts.fourier at solve time, never opts.heuristic —
+        // [stage.heuristic] on a fourier stage is a silent no-op unless rejected here.
+        let toml = "[[stage]]\nsolver = \"fourier\"\n\n[stage.fourier]\nk_max = 32\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_fourier_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.fourier]\nk_max = 32\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("fourier"), "got: {err}");
     }
 
     #[test]
