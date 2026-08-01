@@ -111,15 +111,15 @@ I also tried a GEO-distance instance ([gr96](https://github.com/timgluz/teeline/
 
 On berlin52 (52 cities, optimal cost 7 544.37), re-run just now against the current release build:
 
-| Solver | Gap from optimal | Wall time |
-| --- | ---: | ---: |
-| Nearest Neighbour | +19.0 % | 0.00 s |
-| **Fourier** (standalone, `--no-seed`) | **+13.3 %** | 0.17 s |
-| **Fourier + 2-opt** | **+5.4 %** | 0.18 s |
-| 3-opt (best deterministic) | +2.6 % | 0.3 s |
-| Lin-Kernighan (default) | 0.0 % | 0.15 s |
+| Solver | Gap from optimal |
+| --- | ---: |
+| Nearest Neighbour | +19.0 % |
+| **Fourier** (standalone, `--no-seed`) | **+13.3 %** |
+| **Fourier + 2-opt** | **+5.4 %** |
+| 3-opt (best deterministic) | +2.6 % |
+| Lin-Kernighan (default) | 0.0 % |
 
-Those gap numbers match [`docs/benchmarks.md`](https://github.com/timgluz/teeline/blob/master/docs/benchmarks.md) almost exactly (13.3% / 5.4% / 19.0%, originally recorded against v1.0.1). The wall time doesn't: that benchmark clocked Fourier at 2.5s standalone and 1.9s piped into 2-opt, on the same CPU I just used. `src/tsp/fourier.rs` hasn't changed since it was written, so this isn't an algorithmic speedup on my part — most likely a difference in how the two runs were measured rather than anything worth reading into. I'd rather flag the discrepancy than make up a tidy explanation for it.
+Those gap numbers match [`docs/benchmarks.md`](https://github.com/timgluz/teeline/blob/master/docs/benchmarks.md) almost exactly (13.3% / 5.4% / 19.0%, originally recorded against v1.0.1). I'm leaving wall time out of this table on purpose — it's not settled enough to publish yet, since a proper cross-release benchmarking setup is still in progress.
 
 On quality, let's be direct about it: Fourier alone isn't a leaderboard-topper. 3-opt, Cuckoo Search, and Lin-Kernighan all beat it. What it does offer: it's fully deterministic (the initial coefficients come straight from the city centroid and mean radius, no RNG anywhere), so unlike SA/GA/PSO/CS it returns the exact same tour on every run. Alone, it already beats a nearest-neighbour tour. Piped into 2-opt, it lands at 5.4% — in the same tier as SOM+2-opt (5.8%, above) and SA. It's a good, principled *starting point* for local search, not a solver you'd reach for on its own.
 
