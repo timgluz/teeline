@@ -36,7 +36,8 @@ impl<'a> CliArgsProvider<'a> {
 impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         use teeline::tsp::{
-            CSOptions, FPAOptions, GAOptions, HeuristicOptions, LKOptions, SAOptions,
+            CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, LKOptions,
+            SAOptions,
         };
         match self.solver {
             Solvers::SimulatedAnnealing => {
@@ -56,6 +57,9 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
             }
             Solvers::KohonenSom => {
                 base.som = Some(SOMOptions::from_cli(self.args)?);
+            }
+            Solvers::Fourier => {
+                base.fourier = Some(FourierOptions::from_cli(self.args)?);
             }
             _ => {
                 base.heuristic = Some(HeuristicOptions::from_cli(self.args)?);
@@ -289,6 +293,28 @@ fn tuning_args() -> Vec<Arg> {
         Arg::new("neuron_multiplier")
             .long("neuron_multiplier")
             .help("SOM: neurons = n_cities × multiplier (default 8)")
+            .required(false),
+        Arg::new("k_max")
+            .long("k-max")
+            .value_name("N")
+            .help(
+                "Fourier: max coefficient count (default 4). Primary quality lever for \
+                 larger instances (a280: +103% gap at default → +25% at k_max=32). Total \
+                 gradient steps scale as k_max × epochs with no upper bound enforced, so \
+                 large values cost real wall time (measured ~45s vs ~0.7s on a280 at \
+                 k_max=32) or can hang on very large values; see docs/algorithms/fourier.md",
+            )
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("m")
+            .long("m")
+            .value_name("N")
+            .help(
+                "Fourier: curve sampling resolution (default 200). Scaling m alone \
+                 (without k_max) can worsen quality; k_max is the primary lever, see \
+                 docs/algorithms/fourier.md",
+            )
+            .action(ArgAction::Set)
             .required(false),
     ]
 }
@@ -763,6 +789,15 @@ mod tests {
         let args = options_cmd().get_matches_from(["test", "ga", "--n_elite", "7"]);
         let opts = solver_options_from_args(&args, Solvers::GeneticAlgorithm);
         assert_eq!(opts.ga.unwrap_or_default().n_elite, 7);
+    }
+
+    #[test]
+    fn test_solver_options_k_max_parsed() {
+        // Exercises the CliArgsProvider::provide match arm for Solvers::Fourier —
+        // without it, base.fourier is never populated regardless of flags.
+        let args = options_cmd().get_matches_from(["test", "fourier", "--k-max", "32"]);
+        let opts = solver_options_from_args(&args, Solvers::Fourier);
+        assert_eq!(opts.fourier.unwrap().k_max, 32);
     }
 
     #[test]

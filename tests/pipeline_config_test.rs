@@ -53,6 +53,23 @@ fn test_pipeline_config_sa_stage_epochs_applied() {
     assert_eq!(solution.route().len(), 52);
 }
 
+#[test]
+fn test_pipeline_config_fourier_stage_k_max_applied() {
+    let p = fixture("pipeline_fourier.toml");
+    let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
+    // Fourier stage should have k_max=6/m=200 from its [stage.fourier] options
+    let fourier_stage = stage_configs.iter().find(|(s, _)| *s == Solvers::Fourier);
+    assert!(fourier_stage.is_some(), "expected Fourier stage in fixture");
+    let (_, opts) = fourier_stage.unwrap();
+    let fourier_opts = opts.fourier.as_ref().unwrap();
+    assert_eq!(fourier_opts.k_max, 6);
+    assert_eq!(fourier_opts.m, 200);
+    // Also verify it runs to completion
+    let stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&stages).unwrap();
+    assert_eq!(solution.route().len(), 52);
+}
+
 // ---------------------------------------------------------------------------
 // Mutual-exclusion errors
 // ---------------------------------------------------------------------------

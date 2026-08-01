@@ -55,6 +55,14 @@ representative, not as a guarantee.
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 
+**Fourier on larger instances**: the `k_max`/`m` defaults above are tuned for
+berlin52-scale instances. On a280 (280 cities), Fourier's gap grows sharply at the
+default `k_max=4` (+103.4%), but `k_max` — not `m` — is the lever that fixes it
+(`k_max=32` brings it down to +24.6% standalone, +7.6% after a 2-opt polish). This
+table doesn't include an a280 row because it wasn't measured under this doc's exact
+methodology (release build, `GNU time -v` for CPU/RSS); see the "Tuning for larger
+instances" section in `docs/algorithms/fourier.md` for the full scaling data.
+
 ---
 
 ## How to reproduce

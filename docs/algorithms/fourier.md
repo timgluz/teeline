@@ -86,16 +86,48 @@ procedure FourierSolver(cities):
 
 ## Options
 
-| Field | Default | Range | Description |
-| ------- | --------- | ------- | ------------- |
-| `k_max` | 4 | ≥ 1 | Maximum Fourier mode (number of frequency stages) |
-| `m` | 200 | ≥ 2 | Curve sampling resolution (points on γ) |
-| `lambda` | 0.05 | > 0 | Initial tension weight |
-| `lambda_decay` | 0.5 | (0, 1) | Tension multiplier applied at each stage |
-| `lr` | 0.05 | > 0 | Gradient descent learning rate |
-| `epochs` | 400 | ≥ 1 | Gradient steps per k_active stage |
+| Field | CLI flag | Default | Range | Description |
+| ------- | ------- | --------- | ------- | ------------- |
+| `k_max` | `--k-max` | 4 | ≥ 1 | Maximum Fourier mode (number of frequency stages) |
+| `m` | `--m` | 200 | ≥ 2 | Curve sampling resolution (points on γ) |
+| `lambda` | — | 0.05 | > 0 | Initial tension weight |
+| `lambda_decay` | — | 0.5 | (0, 1) | Tension multiplier applied at each stage |
+| `lr` | — | 0.05 | > 0 | Gradient descent learning rate |
+| `epochs` | `--epochs` | 400 | ≥ 1 | Gradient steps per k_active stage |
 
-`epochs` follows the same vocabulary as all other solvers in this codebase.
+`epochs` follows the same vocabulary as all other solvers in this codebase, with one
+exception: unlike `HeuristicOptions.epochs` elsewhere, `epochs=0` is **not** a
+"run forever" sentinel here — it's rejected by validation, since it counts gradient
+steps per k_active stage, not outer solver iterations.
+
+Only `k_max` and `m` have CLI flags; `lambda`, `lambda_decay`, and `lr` are reachable
+only via the REST API's `configs.fourier` or a `[fourier]`/`[stage.fourier]` TOML table
+(field names match the table above).
+
+## Tuning for larger instances
+
+`k_max` (coefficient count) is the dominant quality lever, not `m` (curve resolution).
+On a280 (280 cities), scaling `k_max` alone took the standalone gap from **+103.4%** at
+the shipped default (`k_max=4`) down to **+24.6%** at `k_max=32` (further down to
+**+7.6%** after piping into a 2-opt polish pass, which is the more relevant number since
+Fourier is typically used as a warm-start). Scaling `m` alone, without more
+coefficients, made quality *worse*.
+
+| Config | Standalone gap | +2-opt gap | Wall time |
+| --- | ---: | ---: | ---: |
+| `k_max=4, m=200` (default) | +103.4% | — | 0.19s |
+| `k_max=32, m=200` | +24.6% | **+7.6%** | 4.25s |
+| `k_max=32, m=1120` (4n) | +15.9% | +15.8% | 19.2s |
+
+(a280, 280 cities; wall times measured after the KD-tree nearest-sample optimization
+that shipped in #370.)
+
+Cost scales as `k_max × epochs` gradient steps total, with no upper bound enforced by
+`validate()` — there's no instance-size-aware guard, so an oversized `--k-max` on a
+large instance will simply run for a long time (or, at extreme values, effectively
+hang) rather than error out. Start by scaling `k_max` alone before touching `m`; `m`
+scaling is comparatively expensive and, per the table above, doesn't reliably help
+quality on its own.
 
 ## Usage
 
@@ -108,6 +140,20 @@ teeline pipeline --steps=fourier,2opt -i ./data/tsplib/berlin52.tsp
 
 # as warm-start for LK
 teeline pipeline --steps=fourier,lk -i ./data/tsplib/berlin52.tsp
+
+# tuning k_max for a larger instance
+teeline solve fourier -i ./data/tsplib/a280.tsp --k-max 32
+```
+
+Per-stage TOML config (via `pipeline --config`):
+
+```toml
+[[stage]]
+solver = "fourier"
+
+[stage.fourier]
+k_max = 32
+m     = 200
 ```
 
 ## Notes

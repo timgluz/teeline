@@ -1202,6 +1202,16 @@ impl FourierOptions {
                 .parse::<usize>()
                 .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
         }
+        if let Some(v) = args.get_one::<String>("k_max") {
+            f.k_max = v
+                .parse::<usize>()
+                .map_err(|_| format!("--k-max: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("m") {
+            f.m = v
+                .parse::<usize>()
+                .map_err(|_| format!("--m: invalid integer `{v}`"))?;
+        }
         f.validate()?;
         Ok(f)
     }
@@ -1979,5 +1989,40 @@ mod tests {
         let args = cmd.get_matches_from(["t", "--max-depth", "3"]); // hyphen matches production CLI
         let opts = LKOptions::from_cli(&args).unwrap();
         assert_eq!(opts.max_depth, 3);
+    }
+
+    fn fourier_cli_command() -> clap::Command {
+        use clap::{Arg, ArgAction, Command};
+        Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(Arg::new("k_max").long("k-max").action(ArgAction::Set)) // hyphen matches production CLI
+            .arg(Arg::new("m").long("m").action(ArgAction::Set))
+    }
+
+    #[test]
+    fn test_fourier_from_cli_parses_k_max_and_m() {
+        let cmd = fourier_cli_command();
+        let args = cmd.get_matches_from(["t", "--k-max", "32", "--m", "1120"]);
+        let opts = FourierOptions::from_cli(&args).unwrap();
+        assert_eq!(opts.k_max, 32);
+        assert_eq!(opts.m, 1120);
+    }
+
+    #[test]
+    fn test_fourier_from_cli_errors_on_bad_integer() {
+        let cmd = fourier_cli_command();
+        let args = cmd.get_matches_from(["t", "--k-max", "abc"]);
+        let err = FourierOptions::from_cli(&args).unwrap_err();
+        assert!(err.contains("--k-max"), "got: {err}");
+    }
+
+    #[test]
+    fn test_fourier_from_cli_epochs_zero_errors() {
+        // Unlike HeuristicOptions.epochs (0 = run forever), FourierOptions.epochs is
+        // gradient steps per k_active stage and validate() rejects 0.
+        let cmd = fourier_cli_command();
+        let args = cmd.get_matches_from(["t", "--epochs", "0"]);
+        let err = FourierOptions::from_cli(&args).unwrap_err();
+        assert!(err.contains("epochs"), "got: {err}");
     }
 }
