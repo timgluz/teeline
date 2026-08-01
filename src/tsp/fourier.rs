@@ -83,8 +83,14 @@ fn build_gamma_tree(gamma: &[Complex<f64>]) -> KDTree {
     kdtree::from_cities(&points)
 }
 
+/// `NearestResult::add` skips any tree point whose `id` matches the query point's
+/// `id`, a self-match guard designed for same-id-space queries (e.g. `nearest_neighbor.rs`
+/// querying a city against the same city set). Here the query is a city and the tree is
+/// curve samples, two unrelated id spaces, so an unqualified `KDPoint::new` (which
+/// defaults `id` to `0`) would collide with curve sample 0's real id and make it
+/// permanently unselectable. `usize::MAX` can never collide with a real sample index.
 fn nearest_sample(tree: &KDTree, city: Complex<f64>) -> usize {
-    let target = KDPoint::new(&[city.re as f32, city.im as f32]);
+    let target = KDPoint::new_with_id(usize::MAX, &[city.re as f32, city.im as f32]);
     tree.nearest(&target, 1).point.id
 }
 

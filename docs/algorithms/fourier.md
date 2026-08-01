@@ -121,6 +121,10 @@ teeline pipeline --steps=fourier,lk -i ./data/tsplib/berlin52.tsp
   from the current curve samples each step, rather than a linear scan. The KD-tree module
   stores coordinates as `f32`, so the *which-sample-is-nearest* decision is made at `f32`
   precision; the gradient and decode math around the returned index still run in `f64`.
+  The query point is tagged with a sentinel id (`usize::MAX`) that can never collide with a
+  real curve-sample id, since the KD-tree's self-exclusion guard (designed for querying a
+  point against the same id space it came from, as in `nearest_neighbor.rs`) would otherwise
+  make curve sample 0 permanently unselectable whenever the query's id defaulted to `0`.
 - **WASM-compatible**: uses `num-complex = "0.4"` (no_std-compatible, no libm dependency).
 
 ## Relationship to the Elastic Net
