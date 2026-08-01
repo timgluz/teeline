@@ -12,7 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `fourier` |
 | **Type** | Heuristic — constructive |
-| **Complexity** | O(K_max · epochs · n · M) per run |
+| **Complexity** | O(K_max · epochs · (n + M) log M) per run |
 
 ## Description
 
@@ -116,6 +116,11 @@ teeline pipeline --steps=fourier,lk -i ./data/tsplib/berlin52.tsp
   benefit from a seed tour; the `--init-tour` pipeline option has no effect on this solver.
 - **f64 internally**: all gradient computation uses `f64` for numerical stability; coordinates
   are converted from `f32` at input and the final tour is `Vec<usize>` city IDs.
+- **Nearest-sample lookup uses a KD-tree**: finding each city's nearest point on the curve
+  (used in both the attraction gradient and the final decode) queries a KD-tree built fresh
+  from the current curve samples each step, rather than a linear scan. The KD-tree module
+  stores coordinates as `f32`, so the *which-sample-is-nearest* decision is made at `f32`
+  precision; the gradient and decode math around the returned index still run in `f64`.
 - **WASM-compatible**: uses `num-complex = "0.4"` (no_std-compatible, no libm dependency).
 
 ## Relationship to the Elastic Net
