@@ -6,7 +6,7 @@ The known optimal tour cost is **7 544.37** (from `berlin52.opt.tour`).
 ## Environment
 
 | Item | Value |
-|------|-------|
+| ------ | ------- |
 | CPU | AMD Ryzen 7 PRO 4750U (16 threads) |
 | RAM | 32 GB |
 | OS | Linux |
@@ -23,7 +23,7 @@ representative, not as a guarantee.
 ## Results
 
 | Algorithm | Configuration | Tour cost | Gap from optimal | Wall time | CPU | Peak RSS |
-|-----------|--------------|----------:|:----------------:|----------:|:---:|--------:|
+| ----------- | -------------- | ----------: | :----------------: | ----------: | :---: | --------: |
 | **Nearest Neighbour** | default | 8 980.92 | +19.0 % | 0.01 s | 50 % | 7.6 MB |
 | **2-opt** | default | 9 368.32 | +24.2 % | 0.01 s | 63 % | 7.4 MB |
 | **3-opt** | default | 7 742.65 | +2.6 % | 0.3 s | 55 % | 7.4 MB |
@@ -50,8 +50,8 @@ representative, not as a guarantee.
 | **Gravitational Search (GSA)** | default (`--epochs=10000 --n_nearest=25`, G0=20, α=1, W=0) | ~18 500 | ~+145 % | 1.2 s | 99 % | 7.6 MB |
 | **Fourier** | default (`k_max=4, m=200, epochs=400`) | 8 549.14 | +13.3 % | 2.5 s | 99 % | 6.6 MB |
 | **Fourier + 2-opt** | `pipeline(fourier,2opt)` | 7 948.88 | +5.4 % | 1.9 s | 99 % | 6.8 MB |
-| **Kohonen SOM** | default (`--epochs=100000`) | *to be measured* | *~5–15 %* | ~? s | ~99 % | ~7 MB |
-| **Kohonen SOM + 2-opt** | `pipeline(som,2opt)` | *to be measured* | *TBD* | ~? s | ~99 % | ~7 MB |
+| **Kohonen SOM** | default (`--epochs=100000`) | 8 560.77 | +13.5 % | 0.62 s | 99 % | 7.3 MB |
+| **Kohonen SOM + 2-opt** | `pipeline(som,2opt)` | 8 128.13 | +7.7 % | 0.60 s | 99 % | 7.3 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
 
@@ -77,7 +77,7 @@ cargo build --release
 
 ### Quality vs. speed trade-off
 
-```
+```text
 Gap from optimal
   0%  ─────────────────────────────── optimal (7 544.37)
   3%  3-opt (0.3 s)              ← best overall
@@ -158,6 +158,12 @@ likely push quality closer to SA/CS.
 
 **Tabu Search** underperforms relative to its wall time budget; the current implementation
 does not improve much beyond 1 000 epochs on this instance.
+
+**Kohonen SOM** picks a random city per training epoch, so quality varies noticeably run to run:
+across eight runs standalone gap ranged from 10.3% to 20.6% (mean ~15.5%), and piped into 2-opt
+from 4.8% to 11.5% (mean ~7.6%). The single measured run in the table above sits close to the
+standalone mean but on the higher end for the 2-opt run; treat both rows as one draw from that
+spread, not a guarantee.
 
 ### Memory
 
