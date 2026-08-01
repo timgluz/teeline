@@ -100,9 +100,9 @@ exception: unlike `HeuristicOptions.epochs` elsewhere, `epochs=0` is **not** a
 "run forever" sentinel here — it's rejected by validation, since it counts gradient
 steps per k_active stage, not outer solver iterations.
 
-Only `k_max` and `m` have CLI flags; `lambda`, `lambda_decay`, and `lr` are reachable
-only via the REST API's `configs.fourier` or a `[fourier]`/`[stage.fourier]` TOML table
-(field names match the table above).
+Only `k_max`, `m`, and `epochs` have CLI flags; `lambda`, `lambda_decay`, and `lr` are
+reachable only via the REST API's `configs.fourier` or a `[fourier]`/`[stage.fourier]`
+TOML table (field names match the table above).
 
 ## Tuning for larger instances
 

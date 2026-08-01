@@ -301,8 +301,9 @@ fn tuning_args() -> Vec<Arg> {
                 "Fourier: max coefficient count (default 4). Primary quality lever for \
                  larger instances (a280: +103% gap at default → +25% at k_max=32). Total \
                  gradient steps scale as k_max × epochs with no upper bound enforced, so \
-                 large values cost real wall time (measured ~45s vs ~0.7s on a280 at \
-                 k_max=32) or can hang on very large values; see docs/algorithms/fourier.md",
+                 large values cost real wall time (measured ~4.25s vs ~0.19s on a280 at \
+                 k_max=32 vs default, both m=200) or can hang on very large values; see \
+                 docs/algorithms/fourier.md",
             )
             .action(ArgAction::Set)
             .required(false),
