@@ -1,0 +1,5 @@
+[[stage]]
+solver = "som"
+
+[stage.som]
+epochs = 500

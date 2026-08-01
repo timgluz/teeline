@@ -70,6 +70,40 @@ fn test_pipeline_config_fourier_stage_k_max_applied() {
     assert_eq!(solution.route().len(), 52);
 }
 
+#[test]
+fn test_pipeline_config_lk_stage_max_depth_applied() {
+    let p = fixture("pipeline_lk.toml");
+    let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
+    // LK stage should have max_depth=2 from its [stage.lk] options
+    let lk_stage = stage_configs
+        .iter()
+        .find(|(s, _)| *s == Solvers::LinKernighan);
+    assert!(lk_stage.is_some(), "expected LK stage in fixture");
+    let (_, opts) = lk_stage.unwrap();
+    assert_eq!(opts.lk.as_ref().unwrap().max_depth, 2);
+    // Also verify it runs to completion
+    let stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&stages).unwrap();
+    assert_eq!(solution.route().len(), 52);
+}
+
+#[test]
+fn test_pipeline_config_som_stage_epochs_applied() {
+    let p = fixture("pipeline_som.toml");
+    let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
+    // SOM stage should have epochs=500 from its [stage.som] options
+    let som_stage = stage_configs
+        .iter()
+        .find(|(s, _)| *s == Solvers::KohonenSom);
+    assert!(som_stage.is_some(), "expected SOM stage in fixture");
+    let (_, opts) = som_stage.unwrap();
+    assert_eq!(opts.som.as_ref().unwrap().epochs, 500);
+    // Also verify it runs to completion
+    let stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&stages).unwrap();
+    assert_eq!(solution.route().len(), 52);
+}
+
 // ---------------------------------------------------------------------------
 // Mutual-exclusion errors
 // ---------------------------------------------------------------------------

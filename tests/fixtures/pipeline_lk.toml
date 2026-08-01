@@ -1,0 +1,5 @@
+[[stage]]
+solver = "lk"
+
+[stage.lk]
+max_depth = 2

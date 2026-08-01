@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::tsp::{
-    AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions,
-    Solvers,
+    AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, LKOptions,
+    SAOptions, SOMOptions, Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -13,7 +13,8 @@ pub trait AppOptionsProvider {
 }
 
 /// Applies recognised sub-tables from a `toml::Table` to the base `AppOptions`.
-/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, and `heuristic` are valid top-level keys.
+/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `lk`, `som`, and `heuristic` are
+/// valid top-level keys.
 /// Returns `Err` on unknown keys or mis-typed sub-tables.
 pub struct TomlTableProvider<'a>(pub &'a toml::Table);
 
@@ -44,6 +45,14 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                         .ok_or("config: `fourier` must be a table")?;
                     base.fourier = Some(FourierOptions::from_toml(t)?);
                 }
+                "lk" => {
+                    let t = value.as_table().ok_or("config: `lk` must be a table")?;
+                    base.lk = Some(LKOptions::from_toml(t)?);
+                }
+                "som" => {
+                    let t = value.as_table().ok_or("config: `som` must be a table")?;
+                    base.som = Some(SOMOptions::from_toml(t)?);
+                }
                 "heuristic" => {
                     let t = value
                         .as_table()
@@ -52,7 +61,7 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, heuristic"
+                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, lk, som, heuristic"
                     ));
                 }
             }
@@ -108,6 +117,8 @@ pub fn load_pipeline_config(
             ("cs", matches!(solver, Solvers::CuckooSearch)),
             ("fpa", matches!(solver, Solvers::FlowerPollination)),
             ("fourier", matches!(solver, Solvers::Fourier)),
+            ("lk", matches!(solver, Solvers::LinKernighan)),
+            ("som", matches!(solver, Solvers::KohonenSom)),
             (
                 "heuristic",
                 !matches!(
@@ -117,6 +128,8 @@ pub fn load_pipeline_config(
                         | Solvers::CuckooSearch
                         | Solvers::FlowerPollination
                         | Solvers::Fourier
+                        | Solvers::LinKernighan
+                        | Solvers::KohonenSom
                 ),
             ),
         ] {
@@ -239,6 +252,24 @@ mod tests {
     }
 
     #[test]
+    fn test_toml_provider_lk_sub_table_works() {
+        let table: toml::Table = toml::from_str("solver = \"lk\"\n[lk]\nmax_depth = 2").unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        assert_eq!(opts.lk.unwrap().max_depth, 2);
+    }
+
+    #[test]
+    fn test_toml_provider_som_sub_table_works() {
+        let table: toml::Table = toml::from_str("solver = \"som\"\n[som]\nepochs = 500").unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        assert_eq!(opts.som.unwrap().epochs, 500);
+    }
+
+    #[test]
     fn test_toml_provider_heuristic_sub_table_works() {
         let table: toml::Table =
             toml::from_str("solver = \"2opt\"\n[heuristic]\nepochs = 500").unwrap();
@@ -356,6 +387,52 @@ mod tests {
         let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.fourier]\nk_max = 32\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("fourier"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_lk_errors() {
+        // LK reads only opts.lk at solve time, never opts.heuristic —
+        // [stage.heuristic] on an lk stage is a silent no-op unless rejected here.
+        let toml = "[[stage]]\nsolver = \"lk\"\n\n[stage.lk]\nmax_depth = 2\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_som_errors() {
+        let toml = "[[stage]]\nsolver = \"som\"\n\n[stage.som]\nepochs = 500\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_lk_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.lk]\nmax_depth = 2\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("lk"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_som_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.som]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("som"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_lk_max_depth_zero_errors() {
+        // Proves validate() actually fires through load_pipeline_config -> from_toml,
+        // not just that the [stage.lk] table parses.
+        let toml = "[[stage]]\nsolver = \"lk\"\n\n[stage.lk]\nmax_depth = 0\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("max_depth"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_som_learning_rate_out_of_range_errors() {
+        let toml = "[[stage]]\nsolver = \"som\"\n\n[stage.som]\nlearning_rate = 1.5\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("learning_rate"), "got: {err}");
     }
 
     #[test]
