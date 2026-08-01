@@ -1,5 +1,8 @@
 use crate::tsp::progress::ProgressMessage;
-use crate::tsp::{FourierOptions, Solution, TspProblem, kdtree::KDPoint};
+use crate::tsp::{
+    FourierOptions, Solution, TspProblem,
+    kdtree::{self, KDPoint, KDTree},
+};
 use num_complex::Complex;
 use std::f64::consts::PI;
 use std::sync::mpsc;
@@ -66,24 +69,36 @@ fn eval_curve(c: &[Complex<f64>], ks: &[i64], m: usize) -> Vec<Complex<f64>> {
         .collect()
 }
 
-fn nearest_sample(gamma: &[Complex<f64>], city: Complex<f64>) -> usize {
-    gamma
+/// Builds a KD-tree over the curve samples so `nearest_sample` is a tree query
+/// instead of a linear scan. Coordinates are cast to `f32` (the KD-tree module's
+/// native precision); the gradient/decode math around the returned index still
+/// runs in `f64`, so this only affects which-sample-is-nearest tie-breaking at
+/// the f32 ULP level, not the numerical stability of the optimisation itself.
+fn build_gamma_tree(gamma: &[Complex<f64>]) -> KDTree {
+    let points: Vec<KDPoint> = gamma
         .iter()
         .enumerate()
-        .min_by(|&(_, a), &(_, b)| {
-            (*a - city)
-                .norm_sqr()
-                .partial_cmp(&(*b - city).norm_sqr())
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .map(|(i, _)| i)
-        .unwrap_or(0)
+        .map(|(j, g)| KDPoint::new_with_id(j, &[g.re as f32, g.im as f32]))
+        .collect();
+    kdtree::from_cities(&points)
+}
+
+/// `NearestResult::add` skips any tree point whose `id` matches the query point's
+/// `id`, a self-match guard designed for same-id-space queries (e.g. `nearest_neighbor.rs`
+/// querying a city against the same city set). Here the query is a city and the tree is
+/// curve samples, two unrelated id spaces, so an unqualified `KDPoint::new` (which
+/// defaults `id` to `0`) would collide with curve sample 0's real id and make it
+/// permanently unselectable. `usize::MAX` can never collide with a real sample index.
+fn nearest_sample(tree: &KDTree, city: Complex<f64>) -> usize {
+    let target = KDPoint::new_with_id(usize::MAX, &[city.re as f32, city.im as f32]);
+    tree.nearest(&target, 1).point.id
 }
 
 fn decode_tour(gamma: &[Complex<f64>], cities: &[KDPoint]) -> Vec<usize> {
+    let tree = build_gamma_tree(gamma);
     let sample_indices: Vec<usize> = cities
         .iter()
-        .map(|c| nearest_sample(gamma, Complex::new(c.coords[0] as f64, c.coords[1] as f64)))
+        .map(|c| nearest_sample(&tree, Complex::new(c.coords[0] as f64, c.coords[1] as f64)))
         .collect();
     let mut order: Vec<usize> = (0..cities.len()).collect();
     order.sort_by_key(|&i| sample_indices[i]);
@@ -268,10 +283,11 @@ fn gradient_step(
     let gamma = eval_curve(c, ks, m);
     let n = cities.len() as f64;
     let mut grad = vec![Complex::new(0.0, 0.0); c.len()];
+    let tree = build_gamma_tree(&gamma);
 
     // attraction gradient
     for &city in cities {
-        let j = nearest_sample(&gamma, city);
+        let j = nearest_sample(&tree, city);
         let err = gamma[j] - city;
         for (ki, gk) in grad.iter_mut().enumerate() {
             *gk += err * basis[ki][j].conj();
