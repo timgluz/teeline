@@ -8,7 +8,7 @@ draft: false
 
 [teeline](/) ships 18 TSP algorithms. Most of them look the way you'd expect a heuristic to look: a permutation, a neighbourhood move, a repair step for when the move breaks validity. One of them doesn't. The [Fourier-basis constructive solver](/algorithms/fourier/) never touches a permutation until the very last line — it optimises a handful of complex numbers instead, and the tour falls out as a side effect of sorting them.
 
-It's also the shortest solver in the codebase by a wide margin, and it started life as a brainstorming session with Claude Opus rather than a paper I was implementing. This post is about that session first, then the idea itself.
+It's also the shortest solver in the codebase by a wide margin. This post is about where it came from and how it works, in that order.
 
 ## The idea: a tour as a closed curve
 
