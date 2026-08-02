@@ -89,6 +89,35 @@ hits optimal 6/10 times (mean 7595), depth-2 hits 7/10 (mean 7580), and depth-5 
 10/10 (mean 7544) — see `docs/benchmarks.md` for the full breakdown. Full sequential
 LK chain search (issue #184) is implemented and shipped, not a future improvement.
 
+## Notes
+
+- **Candidate-list construction uses a KD-tree**: `build_candidates()` builds the
+  per-city `k`-nearest-neighbour list with a `KDTree::nearest` query per city
+  (`src/tsp/kdtree.rs`, same module used by `branch_bound.rs` and `fourier.rs`) instead
+  of a brute-force all-pairs distance scan + sort. This changes the construction cost
+  from O(n² log n) to O(n log n): a one-time tree build (O(n log n)) followed by `n`
+  queries at O(k + log n) each. Unlike `fourier.rs`'s KD-tree usage — which rebuilds the
+  tree on every gradient step and so only realizes a fraction of the theoretical speedup
+  (see `docs/algorithms/fourier.md`) — LK builds the tree once per `solve()` call, before
+  the ILS loop, so the full asymptotic win is realized *for that step*. Both the KD-tree
+  query and the prior brute-force scan route through the same `KDPoint::distance`
+  (`f32` Euclidean) function, so candidate selection is numerically identical except for
+  genuine equidistant ties, where the two algorithms may pick a different (equally
+  valid) member of the tied set — verified by diffing candidate lists computed for
+  berlin52 (exact match), a280, and pr1002 against the pre-swap brute-force
+  implementation; every differing entry corresponds to cities at provably equal exact
+  distance (e.g. pr1002 cities 11 and 17, both at distance 403.1129 from city 13).
+  Measured in isolation (`cargo test --release -- --ignored bench_build_candidates`,
+  random 2D points, k=5): n=52 → 0.54ms→0.22ms, n=280 → 11.3ms→0.91ms,
+  n=1002 → 178.5ms→5.19ms, n=5000 → 4.75s→21.9ms. In the context of a full `solve()`
+  call, this step is a small fraction of total wall time (100 ILS epochs of candidate-
+  restricted 2-opt dominate), so the end-to-end wall-clock difference is within
+  run-to-run noise at the instance sizes and epoch counts this solver is typically run
+  at (LK's ILS loop uses an unseeded RNG and a plateau-based early exit, both of which
+  add their own run-to-run variance independent of this change) — the win is real and
+  compounds for larger instances or lower epoch counts, where the one-time candidate-
+  list cost is a larger share of total work.
+
 ## References
 
 - Lin, S. & Kernighan, B. W. (1973) — "An Effective Heuristic Algorithm for the Traveling-Salesman Problem", *Operations Research*, **21**(2), 498–516. DOI: 10.1287/opre.21.2.498
