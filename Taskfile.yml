@@ -172,6 +172,12 @@ tasks:
       - echo "=== berlin52 (optimal 7542) ==="
       - for solver in $(./target/release/teeline solvers --heuristic --short); do printf "%-12s " $solver; ./target/release/teeline solve $solver -i tests/fixtures/berlin52.tsp 2>/dev/null | head -1; done
 
+  bench:solvers:
+    desc: Benchmark nn/lk/fourier/branch_bound (wall time + peak RSS via GNU time -v)
+    deps: [build:release]
+    cmds:
+      - ./scripts/bench-solvers.sh {{.CLI_ARGS}}
+
   completions:bash:
     desc: Print bash completion script (eval in .bashrc or pipe to a file)
     deps: [build]
