@@ -1555,6 +1555,13 @@ pub struct NearestResult {
 }
 
 impl NearestResult {
+    /// Creates a new k-NN accumulator for `n` nearest neighbours of `point`.
+    ///
+    /// **Id-collision footgun**: `add()` skips any candidate whose `id` matches
+    /// `point.id` (the self-exclusion guard). If the query point's `id` collides
+    /// with a tree point's `id` from a different id space, that point is silently
+    /// excluded. Callers querying a different id space should use a sentinel id
+    /// like `usize::MAX` — see `src/tsp/fourier.rs` for the workaround.
     pub fn new(point: KDPoint, distance: f32, n: usize) -> Self {
         let results = Vec::with_capacity(n);
 
@@ -1588,7 +1595,9 @@ impl NearestResult {
 
             let new_result = NearestResultItem::new(pt, new_distance);
             self.results.push(new_result);
-            self.results.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            // total_cmp is NaN-safe and gives a total ordering for f32.
+            self.results
+                .sort_by(|a, b| a.distance.total_cmp(&b.distance));
         }
     }
 
