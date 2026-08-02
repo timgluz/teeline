@@ -91,7 +91,10 @@ fn build_gamma_tree(gamma: &[Complex<f64>]) -> KDTree {
 /// permanently unselectable. `usize::MAX` can never collide with a real sample index.
 fn nearest_sample(tree: &KDTree, city: Complex<f64>) -> usize {
     let target = KDPoint::new_with_id(usize::MAX, &[city.re as f32, city.im as f32]);
-    tree.nearest(&target, 1).point.id
+    tree.nearest(&target, 1)
+        .closest_point()
+        .expect("non-empty gamma tree must yield at least one neighbour")
+        .id
 }
 
 fn decode_tour(gamma: &[Complex<f64>], cities: &[KDPoint]) -> Vec<usize> {

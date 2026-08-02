@@ -252,7 +252,7 @@ impl DistanceMatrix {
     }
 
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let mut search_result = NearestResult::new(*target, f32::INFINITY, n);
+        let mut search_result = NearestResult::new(*target, n);
 
         let city_pos = match self.city_id2pos(target.id) {
             Some(pos) => pos,
@@ -434,19 +434,19 @@ mod tests {
         let dm = from_cities(&cities);
 
         let res = dm.nearest(&cities[0], 3);
-        assert_eq!(cities[1].id, res.point.id);
+        assert_eq!(cities[1].id, res.closest_point().unwrap().id);
 
         let res2 = dm.nearest(&cities[1], 3);
-        assert_eq!(cities[0].id, res2.point.id);
+        assert_eq!(cities[0].id, res2.closest_point().unwrap().id);
 
         let res3 = dm.nearest(&cities[2], 3);
-        assert_eq!(cities[1].id, res3.point.id);
+        assert_eq!(cities[1].id, res3.closest_point().unwrap().id);
 
         let res4 = dm.nearest(&cities[3], 3);
-        assert_eq!(cities[2].id, res4.point.id);
+        assert_eq!(cities[2].id, res4.closest_point().unwrap().id);
 
         let res5 = dm.nearest(&cities[4], 2);
-        assert_eq!(cities[0].id, res5.point.id);
+        assert_eq!(cities[0].id, res5.closest_point().unwrap().id);
     }
 
     #[test]

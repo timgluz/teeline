@@ -106,8 +106,15 @@ impl KDTree {
         }
     }
 
+    /// Finds the `n` nearest neighbours of `target` in the tree.
+    ///
+    /// **Id-collision footgun**: `NearestResult::add` skips any tree point whose
+    /// `id` matches `target.id`. This is correct when query and tree share the
+    /// same id space (e.g. city-to-city queries), but silently excludes points
+    /// if the query comes from a different id space with a colliding id.
+    /// See `src/tsp/fourier.rs:nearest_sample` for the `usize::MAX` workaround.
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let mut acc = NearestResult::new(*target, f32::INFINITY, n);
+        let mut acc = NearestResult::new(*target, n);
         if let Some(root) = &self.root {
             root.nearest(target, &mut acc);
         }
@@ -246,6 +253,11 @@ pub struct KDPoint {
 
 impl KDPoint {
     pub fn new(coords: &[f32]) -> Self {
+        assert!(
+            coords.len() >= 2,
+            "KDPoint requires at least 2 coordinates, got {}",
+            coords.len()
+        );
         KDPoint {
             id: 0,
             coords: [coords[0], coords[1]],
@@ -253,6 +265,11 @@ impl KDPoint {
     }
 
     pub fn new_with_id(id: usize, coords: &[f32]) -> Self {
+        assert!(
+            coords.len() >= 2,
+            "KDPoint requires at least 2 coordinates, got {}",
+            coords.len()
+        );
         KDPoint {
             id,
             coords: [coords[0], coords[1]],
@@ -284,10 +301,15 @@ impl KDPoint {
     pub fn cmp_by_coord(&self, other: &KDPoint, coord: usize) -> Option<Ordering> {
         let a = self.coords.get(coord)?;
         let b = other.coords.get(coord)?;
-        let res = if a < b {
-            Ordering::Less
-        } else if (a - b).abs() < f32::EPSILON {
+        // Relative tolerance: scales with the magnitude of the coordinates so
+        // it works across the full TSPLIB range (fractional to ~thousands).
+        // The bare f32::EPSILON used previously is the ULP at 1.0, making the
+        // Equal branch unreachable for coords > ~16 and overly loose near 0.
+        let tol = a.abs().max(b.abs()) * f32::EPSILON;
+        let res = if (a - b).abs() <= tol {
             Ordering::Equal
+        } else if a < b {
+            Ordering::Less
         } else {
             Ordering::Greater
         };
@@ -343,6 +365,39 @@ mod tests {
 
         assert_eq!(Some(Ordering::Greater), pt.cmp_by_coord(&other_pt, 0));
         assert_eq!(Some(Ordering::Greater), other_pt.cmp_by_coord(&pt, 1));
+    }
+
+    #[test]
+    fn kdpoint_cmp_by_coord_large_magnitude_ulp_equal() {
+        // At magnitude ~5000, a 1-ULP difference falls within the relative
+        // tolerance (5000 * EPSILON ~= 5.96e-4 > ULP ~= 4.88e-4), so it
+        // returns Equal. The old bare-EPSILON code returned Greater here.
+        let base = 5000.0_f32;
+        let next = f32::from_bits(base.to_bits() + 1);
+        let pt = KDPoint::new(&[base, 0.0]);
+        assert_eq!(
+            Some(Ordering::Equal),
+            pt.cmp_by_coord(&KDPoint::new(&[next, 0.0]), 0),
+            "1-ULP diff at magnitude 5000 should be Equal with relative tolerance"
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "at least 2 coordinates")]
+    fn kdpoint_new_with_short_slice_panics() {
+        let _ = KDPoint::new(&[1.0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "at least 2 coordinates")]
+    fn kdpoint_new_with_id_with_short_slice_panics() {
+        let _ = KDPoint::new_with_id(5, &[1.0]);
+    }
+
+    #[test]
+    #[should_panic(expected = "at least 2 coordinates")]
+    fn kdpoint_new_with_empty_slice_panics() {
+        let _ = KDPoint::new(&[]);
     }
 
     #[test]
@@ -496,56 +551,56 @@ mod tests {
         let kd = from_cities(&cities);
 
         let res = kd.nearest(&cities[0], 2);
-        assert_eq!(cities[1].id, res.point.id);
+        assert_eq!(cities[1].id, res.closest_point().unwrap().id);
 
         let res2 = kd.nearest(&cities[1], 2);
-        assert_eq!(cities[2].id, res2.point.id);
+        assert_eq!(cities[2].id, res2.closest_point().unwrap().id);
 
         let res3 = kd.nearest(&cities[2], 2);
-        assert_eq!(cities[1].id, res3.point.id);
+        assert_eq!(cities[1].id, res3.closest_point().unwrap().id);
 
         let res4 = kd.nearest(&cities[3], 2);
-        assert_eq!(cities[2].id, res4.point.id);
+        assert_eq!(cities[2].id, res4.closest_point().unwrap().id);
 
         let res5 = kd.nearest(&cities[4], 2);
-        assert_eq!(cities[3].id, res5.point.id);
+        assert_eq!(cities[3].id, res5.closest_point().unwrap().id);
     }
 
     #[test]
     fn kdtree_nearest_with_points_around_node4() {
-        let points = build_points(&vec![
+        let points = build_points(&[
             vec![100.0, 100.0],
             vec![-100.0, 100.0],
             vec![100.0, -100.0],
             vec![-100.0, -100.0], // it is node 4
         ]);
 
-        let expected_coords = vec![-100.0, -100.0];
+        let expected_coords = [-100.0, -100.0];
         let tree = from_cities(&points);
         assert_eq!(4, tree.len());
 
         let pt1 = KDPoint::new(&[-110.0, -100.0]);
         let res = tree.nearest(&pt1, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
 
         let pt2 = KDPoint::new(&[-90.0, -100.0]);
         let res = tree.nearest(&pt2, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
 
         let pt3 = KDPoint::new(&[-100.0, -90.0]);
         let res = tree.nearest(&pt3, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
 
         let pt4 = KDPoint::new(&[-100.0, -110.0]);
         let res = tree.nearest(&pt4, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
     }
 }

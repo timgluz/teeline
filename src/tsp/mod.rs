@@ -1548,22 +1548,23 @@ impl Solution {
 #[derive(Debug, Clone)]
 pub struct NearestResult {
     pub target: KDPoint,
-    pub point: KDPoint,
-    pub distance: f32,
     pub n: usize,
     results: Vec<NearestResultItem>,
 }
 
 impl NearestResult {
-    pub fn new(point: KDPoint, distance: f32, n: usize) -> Self {
-        let results = Vec::with_capacity(n);
-
+    /// Creates a new k-NN accumulator for `n` nearest neighbours of `point`.
+    ///
+    /// **Id-collision footgun**: `add()` skips any candidate whose `id` matches
+    /// `point.id` (the self-exclusion guard). If the query point's `id` collides
+    /// with a tree point's `id` from a different id space, that point is silently
+    /// excluded. Callers querying a different id space should use a sentinel id
+    /// like `usize::MAX` — see `src/tsp/fourier.rs` for the workaround.
+    pub fn new(point: KDPoint, n: usize) -> Self {
         NearestResult {
             target: point,
-            point,
-            distance,
             n,
-            results,
+            results: Vec::with_capacity(n),
         }
     }
 
@@ -1572,32 +1573,36 @@ impl NearestResult {
             return;
         }
 
-        if new_distance < self.closest_distance() {
-            self.distance = new_distance;
-            self.point = pt;
-        }
-
         // Use search_radius so we always fill the buffer before applying the
         // farthest-distance gate. Without this, farthest_distance() returns the
         // distance of the current last item (not INFINITY) and subsequent farther
         // candidates are rejected even when the buffer is not yet full.
         if new_distance < self.search_radius() {
-            if self.results.len() >= self.n {
-                self.results.pop();
-            }
-
-            let new_result = NearestResultItem::new(pt, new_distance);
-            self.results.push(new_result);
-            self.results.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            // Binary-search insertion: O(log k) to find position + O(k) memmove,
+            // replacing the previous pop + push + full sort_by which was O(k log k).
+            let pos = self.results.partition_point(|r| r.distance <= new_distance);
+            self.results
+                .insert(pos, NearestResultItem::new(pt, new_distance));
+            self.results.truncate(self.n);
         }
     }
 
-    pub fn nearest(&self) -> Vec<&NearestResultItem> {
-        self.results.iter().collect::<Vec<&NearestResultItem>>()
+    /// Returns the sorted k-NN buffer as a slice — no allocation.
+    pub fn nearest(&self) -> &[NearestResultItem] {
+        &self.results
     }
 
+    /// The closest point found so far, or `None` if the buffer is empty.
+    pub fn closest_point(&self) -> Option<KDPoint> {
+        self.results.first().map(|r| r.point)
+    }
+
+    /// Distance to the closest point, or `INFINITY` if the buffer is empty.
     pub fn closest_distance(&self) -> f32 {
-        self.distance
+        self.results
+            .first()
+            .map(|r| r.distance)
+            .unwrap_or(f32::INFINITY)
     }
 
     pub fn farthest_distance(&self) -> f32 {

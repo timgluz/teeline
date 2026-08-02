@@ -3,6 +3,19 @@ use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::{distance_matrix, kdtree};
 
+/// Local float-comparison helper (mirrors `src/test/helpers.rs` semantics).
+/// The crate's `assert_approx` is behind `#[cfg(test)]` and not reachable from
+/// integration tests.
+fn assert_approx(expected: f32, actual: f32) {
+    let abs = (expected - actual).abs();
+    let magnitude = expected.abs().max(actual.abs());
+    let tol = 1e-5_f32.max(magnitude * 1e-5);
+    assert!(
+        abs <= tol,
+        "assert_approx: expected {expected}, got {actual} (diff {abs} > tol {tol})"
+    );
+}
+
 /// Regression: nearest(n > 1) must return the correct k nearest, not just the closest.
 ///
 /// Bug: KDNode::nearest() propagates only the single closest point back up per
@@ -179,4 +192,167 @@ fn test_kdtree_vs_distance_matrix() {
     let dm_res1 = dm.nearest(&pt1, 1);
 
     assert_eq!(kd_res1.closest_distance(), dm_res1.closest_distance());
+}
+
+// ── KD-tree k-NN buffer coverage (Issue: results[1..n] were never asserted) ──
+
+/// The KD-tree's k-NN buffer must return the same *ordered* sequence as the
+/// DistanceMatrix oracle — not just the same set. Catches sort/insertion bugs
+/// in the buffer that set-membership checks miss.
+#[test]
+fn test_kdtree_knn_full_buffer_matches_oracle_ordered() {
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0],  // id=0  <- target
+        vec![1.0, 0.0],  // id=1  d=1
+        vec![2.0, 0.0],  // id=2  d=2
+        vec![3.0, 0.0],  // id=3  d=3
+        vec![10.0, 0.0], // id=4  d=10
+        vec![0.0, 5.0],  // id=5  d=5
+    ]);
+
+    let kd = kdtree::from_cities(&cities);
+    let dm = distance_matrix::from_cities(&cities);
+
+    for n in 1usize..=5 {
+        let kd_res = kd.nearest(&cities[0], n);
+        let dm_res = dm.nearest(&cities[0], n);
+
+        let kd_ids: Vec<usize> = kd_res.nearest().iter().map(|r| r.point.id).collect();
+        let dm_ids: Vec<usize> = dm_res.nearest().iter().map(|r| r.point.id).collect();
+
+        assert_eq!(
+            kd_res.nearest().len(),
+            n,
+            "n={n}: buffer returned {} items",
+            kd_res.nearest().len()
+        );
+        assert_eq!(
+            kd_ids, dm_ids,
+            "n={n}: ordered IDs differ — kd={kd_ids:?} oracle={dm_ids:?}"
+        );
+
+        // Distances must be monotonically non-decreasing (buffer invariant).
+        let dists: Vec<f32> = kd_res.nearest().iter().map(|r| r.distance).collect();
+        for w in dists.windows(2) {
+            assert!(
+                w[0] <= w[1],
+                "n={n}: buffer not sorted ascending: {dists:?}"
+            );
+        }
+    }
+}
+
+/// n=1 path: buffer holds exactly one item, and it must be the true closest.
+#[test]
+fn test_kdtree_nearest_n_equals_1() {
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0], // id=0  <- target
+        vec![0.5, 0.0], // id=1  d=0.5  (closest)
+        vec![1.0, 0.0], // id=2  d=1.0
+    ]);
+
+    let kd = kdtree::from_cities(&cities);
+    let res = kd.nearest(&cities[0], 1);
+
+    assert_eq!(
+        1,
+        res.nearest().len(),
+        "n=1: buffer must hold exactly 1 item"
+    );
+    assert_eq!(1, res.nearest()[0].point.id, "n=1: closest must be id=1");
+    assert_approx(0.5, res.closest_distance());
+}
+
+/// n=0 path: `NearestResult::add` early-returns when n==0. The result must be
+/// empty and must not panic, regardless of how many nodes the tree visits.
+#[test]
+fn test_kdtree_nearest_with_n_zero() {
+    let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
+    let kd = kdtree::from_cities(&cities);
+
+    let res = kd.nearest(&cities[0], 0);
+    assert_eq!(0, res.nearest().len(), "n=0: result must be empty");
+}
+
+/// Duplicate-coordinate trees: all points at (0,0) with distinct ids. The
+/// query must exclude self (by id) and return the rest, all at distance 0.
+#[test]
+fn test_kdtree_duplicate_coordinates() {
+    let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![0.0, 0.0], vec![0.0, 0.0]]);
+    // ids: 0, 1, 2 — all at (0,0)
+    let kd = kdtree::from_cities(&cities);
+
+    let res = kd.nearest(&cities[0], 2);
+    assert_eq!(
+        2,
+        res.nearest().len(),
+        "duplicate coords: should return 2 of 3"
+    );
+    assert_approx(0.0, res.closest_distance());
+
+    let ids: HashSet<usize> = res.nearest().iter().map(|r| r.point.id).collect();
+    assert!(
+        !ids.contains(&0),
+        "self must be excluded even with duplicate coords"
+    );
+    assert!(
+        ids.contains(&1) && ids.contains(&2),
+        "both other ids must be present: {ids:?}"
+    );
+}
+
+/// Pruning boundary: target lies exactly on a splitting plane. The far branch
+/// must still be visited if it contains candidates closer than the k-th best.
+/// Uses collinear points so the split plane lands on an integer x-coordinate.
+#[test]
+fn test_kdtree_pruning_boundary_on_splitting_plane() {
+    // Collinear on x-axis; median split lands at x=2 or x=3.
+    let cities = kdtree::build_points(&[
+        vec![0.0, 0.0], // id=0  <- target
+        vec![1.0, 0.0], // id=1  d=1
+        vec![2.0, 0.0], // id=2  d=2  (likely splitting plane)
+        vec![3.0, 0.0], // id=3  d=3
+        vec![4.0, 0.0], // id=4  d=4
+        vec![5.0, 0.0], // id=5  d=5  (in the far subtree)
+    ]);
+
+    let kd = kdtree::from_cities(&cities);
+    let dm = distance_matrix::from_cities(&cities);
+
+    // k=4: far subtree point (id=3 or id=4) must be reached despite the
+    // splitting-plane prune check. Cross-check against the oracle.
+    let kd_res = kd.nearest(&cities[0], 4);
+    let dm_res = dm.nearest(&cities[0], 4);
+
+    let kd_ids: HashSet<usize> = kd_res.nearest().iter().map(|r| r.point.id).collect();
+    let dm_ids: HashSet<usize> = dm_res.nearest().iter().map(|r| r.point.id).collect();
+    assert_eq!(
+        kd_ids, dm_ids,
+        "pruning boundary: kd={kd_ids:?} oracle={dm_ids:?}"
+    );
+    assert_eq!(4, kd_ids.len(), "all 4 slots must be filled");
+}
+
+/// Documents the id-collision footgun (C2): querying with `KDPoint::new`
+/// (which defaults `id = 0`) against a tree containing an `id = 0` point
+/// silently excludes that point from the results. Callers in a different id
+/// space must use `KDPoint::new_with_id(usize::MAX, ...)` — see
+/// `src/tsp/fourier.rs:86-95` for the workaround.
+#[test]
+fn test_kdtree_id_collision_excludes_zero_id() {
+    let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
+    // ids: 0, 1, 2
+    let kd = kdtree::from_cities(&cities);
+
+    // Query with default id=0 — collides with cities[0].id
+    let target = KDPoint::new(&[0.0, 0.0]); // id defaults to 0
+    let res = kd.nearest(&target, 2);
+
+    let ids: Vec<usize> = res.nearest().iter().map(|r| r.point.id).collect();
+    assert!(
+        !ids.contains(&0),
+        "id-collision footgun: id=0 must be excluded from results (target.id == 0), got {ids:?}"
+    );
+    // The actual nearest (id=1 at distance 1.0) must still be returned.
+    assert!(ids.contains(&1), "id=1 must be present: {ids:?}");
 }
