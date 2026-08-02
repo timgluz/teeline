@@ -941,4 +941,40 @@ mod tests {
         assert!(sol.total < 9000.0, "LK should beat NN: got {}", sol.total);
         assert_eq!(sol.route().len(), 52);
     }
+
+    // ── build_candidates timing (see docs/algorithms/lin-kernighan.md "Notes") ──
+
+    fn random_points(n: usize, seed: u64) -> Vec<KDPoint> {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        (0..n)
+            .map(|i| KDPoint {
+                id: i,
+                coords: [
+                    rng.random_range(0.0..1000.0f32),
+                    rng.random_range(0.0..1000.0f32),
+                ],
+            })
+            .collect()
+    }
+
+    // Reproduces the timing referenced by docs/algorithms/lin-kernighan.md's
+    // KD-tree candidate-list note. Run with:
+    //   cargo test --release -- --ignored bench_build_candidates
+    // Prints wall time for the current (KD-tree) build_candidates at the sizes
+    // discussed in the doc; the pre-swap brute-force implementation no longer
+    // exists to compare against directly.
+    #[test]
+    #[ignore]
+    fn bench_build_candidates() {
+        use std::time::Instant;
+        for &n in &[52usize, 280, 1002, 5000] {
+            let pts = random_points(n, n as u64);
+            let start = Instant::now();
+            let candidates = build_candidates(&pts, 5);
+            let elapsed = start.elapsed();
+            assert_eq!(candidates.len(), n);
+            println!("build_candidates n={n} k=5: {elapsed:?}");
+        }
+    }
 }
