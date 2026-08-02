@@ -64,7 +64,9 @@ fn bench_nearest_k5(c: &mut Criterion) {
                 let mut checksum = 0usize;
                 for city in cities {
                     let res = tree.nearest(black_box(city), K_NEAREST);
-                    checksum = checksum.wrapping_add(res.point.id);
+                    if let Some(pt) = res.closest_point() {
+                        checksum = checksum.wrapping_add(pt.id);
+                    }
                 }
                 black_box(checksum);
             });

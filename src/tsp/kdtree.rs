@@ -114,7 +114,7 @@ impl KDTree {
     /// if the query comes from a different id space with a colliding id.
     /// See `src/tsp/fourier.rs:nearest_sample` for the `usize::MAX` workaround.
     pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let mut acc = NearestResult::new(*target, f32::INFINITY, n);
+        let mut acc = NearestResult::new(*target, n);
         if let Some(root) = &self.root {
             root.nearest(target, &mut acc);
         }
@@ -551,56 +551,56 @@ mod tests {
         let kd = from_cities(&cities);
 
         let res = kd.nearest(&cities[0], 2);
-        assert_eq!(cities[1].id, res.point.id);
+        assert_eq!(cities[1].id, res.closest_point().unwrap().id);
 
         let res2 = kd.nearest(&cities[1], 2);
-        assert_eq!(cities[2].id, res2.point.id);
+        assert_eq!(cities[2].id, res2.closest_point().unwrap().id);
 
         let res3 = kd.nearest(&cities[2], 2);
-        assert_eq!(cities[1].id, res3.point.id);
+        assert_eq!(cities[1].id, res3.closest_point().unwrap().id);
 
         let res4 = kd.nearest(&cities[3], 2);
-        assert_eq!(cities[2].id, res4.point.id);
+        assert_eq!(cities[2].id, res4.closest_point().unwrap().id);
 
         let res5 = kd.nearest(&cities[4], 2);
-        assert_eq!(cities[3].id, res5.point.id);
+        assert_eq!(cities[3].id, res5.closest_point().unwrap().id);
     }
 
     #[test]
     fn kdtree_nearest_with_points_around_node4() {
-        let points = build_points(&vec![
+        let points = build_points(&[
             vec![100.0, 100.0],
             vec![-100.0, 100.0],
             vec![100.0, -100.0],
             vec![-100.0, -100.0], // it is node 4
         ]);
 
-        let expected_coords = vec![-100.0, -100.0];
+        let expected_coords = [-100.0, -100.0];
         let tree = from_cities(&points);
         assert_eq!(4, tree.len());
 
         let pt1 = KDPoint::new(&[-110.0, -100.0]);
         let res = tree.nearest(&pt1, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
 
         let pt2 = KDPoint::new(&[-90.0, -100.0]);
         let res = tree.nearest(&pt2, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
 
         let pt3 = KDPoint::new(&[-100.0, -90.0]);
         let res = tree.nearest(&pt3, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
 
         let pt4 = KDPoint::new(&[-100.0, -110.0]);
         let res = tree.nearest(&pt4, 1);
 
-        assert_approx(10.0, res.distance);
-        assert_eq!(expected_coords, res.point.coords);
+        assert_approx(10.0, res.closest_distance());
+        assert_eq!(expected_coords, res.closest_point().unwrap().coords);
     }
 }
