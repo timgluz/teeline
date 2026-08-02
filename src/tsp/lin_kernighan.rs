@@ -2,33 +2,26 @@ use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
     HeuristicOptions, LKOptions, Solution, TspProblem,
     distance_matrix::{self, DistanceMatrix},
-    kdtree::KDPoint,
+    kdtree::{self, KDPoint},
     nearest_neighbor,
     route::Route,
 };
 use rand::RngExt;
 use std::sync::mpsc;
 
-pub(crate) fn build_candidates(
-    cities: &[KDPoint],
-    dm: &DistanceMatrix,
-    k: usize,
-) -> Vec<Vec<usize>> {
+pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> Vec<Vec<usize>> {
     let n = cities.len();
     let k = k.min(n.saturating_sub(1));
     let max_id = cities.iter().map(|c| c.id).max().unwrap_or(0);
     let mut candidates = vec![Vec::new(); max_id + 1];
+    let tree = kdtree::from_cities(cities);
     for city in cities {
-        let mut others: Vec<(usize, f32)> = cities
+        candidates[city.id] = tree
+            .nearest(city, k)
+            .nearest()
             .iter()
-            .filter(|c| c.id != city.id)
-            .map(|c| {
-                let dist = dm.distance_between(city.id, c.id).unwrap_or(f32::MAX);
-                (c.id, dist)
-            })
+            .map(|item| item.point.id)
             .collect();
-        others.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-        candidates[city.id] = others.into_iter().take(k).map(|(id, _)| id).collect();
     }
     candidates
 }
@@ -47,7 +40,7 @@ pub fn solve(
 ) -> Solution {
     let dm = distance_matrix::from_cities(&problem.cities);
     let k = opts.heuristic.n_nearest;
-    let candidates = build_candidates(&problem.cities, &dm, k);
+    let candidates = build_candidates(&problem.cities, k);
 
     let mut best_tour: Vec<usize> = if let Some(t) = init_tour {
         t.to_vec()
@@ -526,8 +519,7 @@ mod tests {
     #[test]
     fn build_candidates_returns_k_nearest_for_each_city() {
         let pts = build_points(6);
-        let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, &dm, 3);
+        let cands = build_candidates(&pts, 3);
         assert_eq!(cands.len(), 6);
         for (i, row) in cands.iter().enumerate() {
             assert_eq!(row.len(), 3, "city {i} must have 3 candidates");
@@ -539,7 +531,7 @@ mod tests {
     fn build_candidates_neighbors_are_sorted_by_distance() {
         let pts = build_points(6);
         let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, &dm, 4);
+        let cands = build_candidates(&pts, 4);
         for (i, row) in cands.iter().enumerate() {
             let dists: Vec<f32> = row
                 .iter()
@@ -554,8 +546,7 @@ mod tests {
     #[test]
     fn build_candidates_k_clamps_to_n_minus_1() {
         let pts = build_points(4);
-        let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, &dm, 10);
+        let cands = build_candidates(&pts, 10);
         for row in &cands {
             assert!(row.len() <= 3);
         }
@@ -682,7 +673,7 @@ mod tests {
             },
         ];
         let dm = distance_matrix::from_cities(&pts);
-        let candidates = build_candidates(&pts, &dm, 3);
+        let candidates = build_candidates(&pts, 3);
         let tour = vec![0usize, 1, 3, 2]; // crossed
         let max_id = 3;
         let (next, prev) = flat_to_next_prev(&tour, max_id);
@@ -703,7 +694,7 @@ mod tests {
             })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
-        let candidates = build_candidates(&pts, &dm, 3);
+        let candidates = build_candidates(&pts, 3);
         let tour = vec![0usize, 1, 2, 3];
         let max_id = 3;
         let (next, prev) = flat_to_next_prev(&tour, max_id);
@@ -736,7 +727,7 @@ mod tests {
             },
         ];
         let dm = distance_matrix::from_cities(&pts);
-        let candidates = build_candidates(&pts, &dm, 3);
+        let candidates = build_candidates(&pts, 3);
         let mut tour = vec![0usize, 1, 3, 2];
         let mut pos = make_pos(&tour);
         let before = tour_distance(&tour, &dm);
@@ -782,7 +773,7 @@ mod tests {
     fn find_lk_move_depth1_cannot_improve_gadget() {
         let pts = hexagon_pts();
         let dm = distance_matrix::from_cities(&pts);
-        let candidates = build_candidates(&pts, &dm, 5);
+        let candidates = build_candidates(&pts, 5);
         // This tour is constructed to be 2-opt-local but not LK-locally optimal
         let tour = vec![0usize, 2, 4, 1, 3, 5];
         let max_id = 5;
@@ -803,7 +794,7 @@ mod tests {
     fn find_lk_move_depth2_improves_gadget() {
         let pts = hexagon_pts();
         let dm = distance_matrix::from_cities(&pts);
-        let candidates = build_candidates(&pts, &dm, 5);
+        let candidates = build_candidates(&pts, 5);
         let tour = vec![0usize, 2, 4, 1, 3, 5];
         let max_id = 5;
         let before = tour_distance(&tour, &dm);
@@ -851,7 +842,7 @@ mod tests {
             },
         ];
         let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, &dm, 3);
+        let cands = build_candidates(&pts, 3);
         let mut tour = vec![0usize, 1, 3, 2];
         let mut pos = make_pos(&tour);
         let before = tour_distance(&tour, &dm);
@@ -873,7 +864,7 @@ mod tests {
             })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, &dm, 3);
+        let cands = build_candidates(&pts, 3);
         let mut tour = vec![0usize, 1, 2, 3];
         let mut pos = make_pos(&tour);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm, 5);
@@ -892,7 +883,7 @@ mod tests {
             })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, &dm, 2);
+        let cands = build_candidates(&pts, 2);
         let mut tour = vec![0usize, 1, 2];
         let mut pos = make_pos(&tour);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm, 5);
@@ -949,5 +940,41 @@ mod tests {
         let sol = solve(&problem, &opts, None, None);
         assert!(sol.total < 9000.0, "LK should beat NN: got {}", sol.total);
         assert_eq!(sol.route().len(), 52);
+    }
+
+    // ── build_candidates timing (see docs/algorithms/lin-kernighan.md "Notes") ──
+
+    fn random_points(n: usize, seed: u64) -> Vec<KDPoint> {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
+        (0..n)
+            .map(|i| KDPoint {
+                id: i,
+                coords: [
+                    rng.random_range(0.0..1000.0f32),
+                    rng.random_range(0.0..1000.0f32),
+                ],
+            })
+            .collect()
+    }
+
+    // Reproduces the timing referenced by docs/algorithms/lin-kernighan.md's
+    // KD-tree candidate-list note. Run with:
+    //   cargo test --release -- --ignored bench_build_candidates
+    // Prints wall time for the current (KD-tree) build_candidates at the sizes
+    // discussed in the doc; the pre-swap brute-force implementation no longer
+    // exists to compare against directly.
+    #[test]
+    #[ignore]
+    fn bench_build_candidates() {
+        use std::time::Instant;
+        for &n in &[52usize, 280, 1002, 5000] {
+            let pts = random_points(n, n as u64);
+            let start = Instant::now();
+            let candidates = build_candidates(&pts, 5);
+            let elapsed = start.elapsed();
+            assert_eq!(candidates.len(), n);
+            println!("build_candidates n={n} k=5: {elapsed:?}");
+        }
     }
 }

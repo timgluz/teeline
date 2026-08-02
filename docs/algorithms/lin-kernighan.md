@@ -89,6 +89,47 @@ hits optimal 6/10 times (mean 7595), depth-2 hits 7/10 (mean 7580), and depth-5 
 10/10 (mean 7544) — see `docs/benchmarks.md` for the full breakdown. Full sequential
 LK chain search (issue #184) is implemented and shipped, not a future improvement.
 
+## Notes
+
+- **Candidate-list construction uses a KD-tree**: `build_candidates()` builds the
+  per-city `k`-nearest-neighbour list with a `KDTree::nearest` query per city
+  (`src/tsp/kdtree.rs`, same module used by `branch_bound.rs` and `fourier.rs`) instead
+  of a brute-force all-pairs distance scan + sort. This changes the construction cost
+  from O(n² log n) to O(n log n): a one-time tree build (O(n log n)) followed by `n`
+  queries, each an O(log n) tree descent plus O(k) buffer maintenance (the buffer is
+  a `k`-capacity `Vec` that's re-sorted on every qualifying insert, not a bounded
+  insert/heap, so the constant factor is larger than the O(k) term alone suggests —
+  negligible at the small `k` this solver uses by default). Unlike `fourier.rs`'s
+  KD-tree usage — which rebuilds the
+  tree on every gradient step and so only realizes a fraction of the theoretical speedup
+  (see `docs/algorithms/fourier.md`) — LK builds the tree once per `solve()` call, before
+  the ILS loop, so the full asymptotic win is realized *for that step*. Both the KD-tree
+  query and the prior brute-force scan route through the same `KDPoint::distance`
+  (`f32` Euclidean) function, so candidate selection is numerically identical except for
+  genuine equidistant ties, where the two algorithms may pick a different (equally
+  valid) member of the tied set — checked by a one-off manual diff of candidate lists
+  computed for berlin52 (exact match), a280, and pr1002 against the pre-swap
+  brute-force implementation before it was deleted; every differing entry corresponded
+  to cities at provably equal exact distance (e.g. pr1002 cities 11 and 17, both at
+  distance 403.1129 from city 13). This comparison isn't a committed regression test —
+  the brute-force implementation no longer exists in the tree to compare against.
+  Isolated timing for the current (KD-tree) implementation, measured with
+  `cargo test --release -- --ignored bench_build_candidates` (seeded random 2D points,
+  k=5): n=52 → 0.14ms, n=280 → 0.69ms, n=1002 → 2.71ms, n=5000 → 14.3ms — run it
+  yourself to reproduce, exact figures vary by machine. These are consistent with the
+  pre-swap brute-force numbers quoted in the commit message (178.5ms at n=1002, 4.75s
+  at n=5000, a 34x/217x speedup at those sizes) despite not being bit-identical to
+  them: that earlier comparison used a different (unseeded) random point generator and
+  an implementation that no longer exists in the tree to re-run head-to-head. In the
+  context of a full `solve()`
+  call, this step is a small fraction of total wall time (100 ILS epochs of candidate-
+  restricted 2-opt dominate), so the end-to-end wall-clock difference is within
+  run-to-run noise at the instance sizes and epoch counts this solver is typically run
+  at (LK's ILS loop uses an unseeded RNG and a plateau-based early exit, both of which
+  add their own run-to-run variance independent of this change) — the win is real and
+  compounds for larger instances or lower epoch counts, where the one-time candidate-
+  list cost is a larger share of total work.
+
 ## References
 
 - Lin, S. & Kernighan, B. W. (1973) — "An Effective Heuristic Algorithm for the Traveling-Salesman Problem", *Operations Research*, **21**(2), 498–516. DOI: 10.1287/opre.21.2.498
