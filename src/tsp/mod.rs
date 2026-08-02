@@ -1589,15 +1589,12 @@ impl NearestResult {
         // distance of the current last item (not INFINITY) and subsequent farther
         // candidates are rejected even when the buffer is not yet full.
         if new_distance < self.search_radius() {
-            if self.results.len() >= self.n {
-                self.results.pop();
-            }
-
-            let new_result = NearestResultItem::new(pt, new_distance);
-            self.results.push(new_result);
-            // total_cmp is NaN-safe and gives a total ordering for f32.
+            // Binary-search insertion: O(log k) to find position + O(k) memmove,
+            // replacing the previous pop + push + full sort_by which was O(k log k).
+            let pos = self.results.partition_point(|r| r.distance < new_distance);
             self.results
-                .sort_by(|a, b| a.distance.total_cmp(&b.distance));
+                .insert(pos, NearestResultItem::new(pt, new_distance));
+            self.results.truncate(self.n);
         }
     }
 
