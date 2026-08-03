@@ -2399,9 +2399,9 @@ dependencies = [
 
 [[package]]
 name = "usage-lib"
-version = "4.0.0"
+version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b60d4043943b220cc7269576a383ff2d62ab00f208f10d94b2496791729f8b02"
+checksum = "dac9d9134f27ab0f25b2fad992b1bbf5c65704bb38c614f16c6ae4bfb034322c"
 dependencies = [
  "clap",
  "heck",
