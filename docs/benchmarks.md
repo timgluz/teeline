@@ -47,6 +47,8 @@ representative, not as a guarantee.
 | **Lin-Kernighan (depth-k ILS)** | default (`--max-depth=5 --epochs=100 --n_nearest=5`) | 7 544.37 | **0.0 %** | 0.15 s | 85 % | 6.5 MB |
 | **Or-opt** | default (NN seed, best-improvement) | 8 097.48 | +7.3 % | 0.03 s | 93 % | 6.6 MB |
 | **Christofides** | default (MST + greedy matching) | 8 707.66 | +15.4 % | < 0.01 s | 50 % | 6.5 MB |
+| **Greedy Edge** | default (Kruskal-style construction) | 9 954.06 | +31.9 % | < 0.01 s | 100 % | 6.9 MB |
+| **Greedy Edge + 2-opt** | `pipeline(greedy_edge,2opt)` | 8 415.55 | +11.5 % | < 0.01 s | 77 % | 7.0 MB |
 | **Gravitational Search (GSA)** | default (`--epochs=10000 --n_nearest=25`, G0=20, α=1, W=0) | ~18 500 | ~+145 % | 1.2 s | 99 % | 7.6 MB |
 | **Fourier** | default (`k_max=4, m=200, epochs=400`) | 8 549.14 | +13.3 % | 2.5 s | 99 % | 6.6 MB |
 | **Fourier + 2-opt** | `pipeline(fourier,2opt)` | 7 948.88 | +5.4 % | 1.9 s | 99 % | 6.8 MB |
@@ -54,6 +56,12 @@ representative, not as a guarantee.
 | **Kohonen SOM + 2-opt** | `pipeline(som,2opt)` | 8 128.13 | +7.7 % | 0.60 s | 99 % | 7.3 MB |
 
 *Wall time* = elapsed wall-clock time. *CPU* = percentage of one core used (>100% would indicate parallelism). *Peak RSS* = maximum resident set size reported by GNU `time -v`.
+
+**Greedy Edge measurement note**: the two Greedy Edge rows above were measured on 2026-08-07
+against Teeline **v1.0.11** (same CPU/OS as the rest of this table, `cargo build --release`,
+`GNU time -v`, `--optimal-tour` gap reporting) rather than the 2026-05-15 / v1.0.1 baseline used
+for every other row — flagged here since the solver didn't exist in v1.0.1. No other solver's
+numbers changed between versions in a way that would break cross-row comparison.
 
 **Fourier on larger instances**: the `k_max`/`m` defaults above are tuned for
 berlin52-scale instances. On a280 (280 cities), Fourier's gap grows sharply at the
@@ -92,6 +100,7 @@ Gap from optimal
   4%  CS (0.72 s)
   7%  SA (0.34 s)
   7%  Or-opt (0.03 s)            ← best value for time in local search
+ 12%  Greedy Edge + 2-opt (<0.01 s) ← SA-level quality, >30x cheaper
  15%  Christofides (<0.01 s)    ← only solver with a proven ≤1.5× bound
   8%  GA/10k (3.2 s)  ← high variance; see note
  11%  Stochastic Hill/10k (0.02 s)
@@ -102,6 +111,7 @@ Gap from optimal
  19%  NN (0.01 s)
  23%  Tabu/10k (0.47 s)
  24%  2-opt (0.01 s)
+ 32%  Greedy Edge standalone (<0.01 s)
  77%  GA/500 epochs
 ```
 
@@ -142,6 +152,14 @@ optimum already found.
 **Lin-Kernighan (depth-k ILS)** now implements full sequential LK chain search (issue #184). The `max_depth` parameter (default 5) controls the chain-search depth: depth-1 is 2-opt moves with ILS restarts, and depth-5 enables the full k-opt move space. Depth matters: over 10 runs on berlin52, depth-1 hits optimal 6/10 times (mean 7595), depth-2 hits 7/10 (mean 7580), and depth-5 hits 10/10 (mean 7544). The `chain_is_valid_tour` guard prevents subtour moves that would otherwise corrupt the tour. Distance computation is verified correct — Python EUC_2D recomputation agrees with Rust to float precision on every run.
 
 **Christofides** achieves +15.4 % in under 10 ms — slower than Or-opt in quality, but uniquely valuable: it is the **only solver with a proven ≤1.5× approximation guarantee** on EUC_2D instances. Its deterministic construction also makes it the best warm-start for Lin-Kernighan: `pipeline(christofides, lk)` now finds the optimal tour in under 50 ms.
+
+**Greedy Edge** achieves +31.9 % standalone in under 10 ms — the weakest constructive builder in
+this table (worse than NN's +19.0 %), because berlin52 has a handful of isolated cities that force
+expensive closing edges once the cheap edges are used up. Its real value shows up piped into 2-opt:
+`pipeline(greedy_edge,2opt)` lands at +11.5 %, matching Simulated Annealing's quality (+6.8–9.7 %
+range) and beating `pipeline(nn,2opt)`'s implicit 2-opt-alone result (+24.2 %) by more than half,
+all in under 10 ms versus SA's ~0.3 s. Like Christofides, it is fully deterministic — no run-to-run
+variance — which makes it a reproducible, parameter-free alternative to NN as a pipeline seed.
 
 **Or-opt** achieves +7.3 % in 0.03 s — tying SA quality at a fraction of the cost — by relocating
 segments of 1–3 cities rather than reversing segments like 2-opt does. Because the two methods

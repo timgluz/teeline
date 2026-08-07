@@ -78,7 +78,7 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
         "2opt" | "two_opt" => cfg.two_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
         "3opt" | "three_opt" => cfg.three_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
         "or_opt" | "or-opt" => cfg.or_opt.as_ref().and_then(|c| c.heuristic.as_ref()),
-        "tabu_search" => cfg.tabu.as_ref().and_then(|c| c.heuristic.as_ref()),
+        "tabu" | "tabu_search" => cfg.tabu.as_ref().and_then(|c| c.heuristic.as_ref()),
         "stochastic_hill" => cfg
             .stochastic_hill
             .as_ref()
@@ -516,5 +516,31 @@ EOF
         };
         let resp = service.pipeline(&req).await.unwrap();
         assert!(resp.warnings.is_empty());
+    }
+
+    // Regression test: `Solvers::from_str` (teeline core) accepts both "tabu" and
+    // "tabu_search", but this file's `make_app_options` maps solver-name strings to
+    // config sub-structs by hand and only recognised "tabu_search". A request using
+    // the short alias resolved fine but silently dropped `configs.tabu`, falling back
+    // to defaults with no error. Both spellings must apply the same config.
+    #[test]
+    fn test_make_app_options_tabu_alias_applies_same_config_as_tabu_search() {
+        use crate::models::request::TabuConfig;
+
+        let configs = SolverConfigs {
+            tabu: Some(TabuConfig {
+                heuristic: Some(HeuristicConfig {
+                    n_nearest: Some(7),
+                    ..Default::default()
+                }),
+            }),
+            ..Default::default()
+        };
+
+        let via_alias = make_app_options("tabu", Some(&configs));
+        let via_full_name = make_app_options("tabu_search", Some(&configs));
+
+        assert_eq!(via_alias.heuristic.as_ref().unwrap().n_nearest, 7);
+        assert_eq!(via_alias.heuristic, via_full_name.heuristic);
     }
 }

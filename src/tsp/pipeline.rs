@@ -93,10 +93,17 @@ pub fn stage_warnings(solvers: &[Solvers]) -> Vec<String> {
     let mut warnings = Vec::new();
     let last = solvers.len().saturating_sub(1);
     for (i, solver) in solvers.iter().enumerate() {
-        if i > 0 && *solver == Solvers::NearestNeighbor {
-            warnings.push(format!(
-                "nn at stage {i} discards the warm-start seed from the previous stage"
-            ));
+        if i > 0 {
+            match solver {
+                Solvers::NearestNeighbor => warnings.push(format!(
+                    "nn at stage {i} discards the warm-start seed from the previous stage"
+                )),
+                Solvers::GreedyEdge => warnings.push(format!(
+                    "greedy_edge at stage {i} discards the warm-start seed from the previous \
+                     stage (it always rebuilds from scratch)"
+                )),
+                _ => {}
+            }
         }
         if i != last {
             match solver {

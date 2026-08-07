@@ -9,7 +9,9 @@ pub mod distance_matrix;
 pub mod flower_pollination;
 pub mod fourier;
 pub mod genetic_algorithm;
+pub(crate) mod graph;
 pub mod gravitational_search;
+pub mod greedy_edge;
 pub mod kdtree;
 pub mod lin_kernighan;
 pub mod nearest_neighbor;
@@ -52,6 +54,7 @@ pub enum Solvers {
     NearestNeighbor,
     GeneticAlgorithm,
     GravitationalSearch,
+    GreedyEdge,
     OrOpt,
     ParticleSwarmOptimization,
     RandomShuffle,
@@ -85,6 +88,8 @@ impl Solvers {
             "ga",
             "gravitational_search",
             "gsa",
+            "greedy_edge",
+            "gec",
             "particle_swarm",
             "pso",
             "random_shuffle",
@@ -96,6 +101,7 @@ impl Solvers {
             "kohonen_som",
             "stochastic_hill",
             "tabu_search",
+            "tabu",
             "three_opt",
             "3opt",
             "or_opt",
@@ -249,6 +255,11 @@ impl Solvers {
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
+                name: "greedy_edge",
+                alias: Some("gec"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
                 name: "tabu_search",
                 alias: Some("tabu"),
                 kind: SolverKind::Heuristic,
@@ -316,7 +327,7 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 19] = [
+static SOLVER_LIST: [SolverInfo; 20] = [
     SolverInfo {
         name: "Bellman-Held-Karp",
         alias: "bhk",
@@ -359,6 +370,16 @@ static SOLVER_LIST: [SolverInfo; 19] = [
         category: "Constructive",
         desc: "Greedy heuristic: always visit the nearest unvisited city.",
         complexity: "O(n\u{00b2})",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Greedy Edge",
+        alias: "gec",
+        category: "Constructive",
+        desc: "Kruskal-style construction: sorts all edges shortest-first and greedily \
+               accepts each unless it creates degree 3+ or a premature sub-cycle.",
+        complexity: "O(n\u{00b2} log n) time, O(n\u{00b2}) memory",
         has_options: false,
         exact: false,
     },
@@ -509,12 +530,13 @@ impl FromStr for Solvers {
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "gsa" | "gravitational_search" => Ok(Solvers::GravitationalSearch),
+            "gec" | "greedy_edge" => Ok(Solvers::GreedyEdge),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
             "shuffle" | "random_shuffle" => Ok(Solvers::RandomShuffle),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "som" | "kohonen" | "kohonen_som" => Ok(Solvers::KohonenSom),
             "stochastic_hill" => Ok(Solvers::StochasticHill),
-            "tabu_search" => Ok(Solvers::TabuSearch),
+            "tabu" | "tabu_search" => Ok(Solvers::TabuSearch),
             "or_opt" | "or-opt" => Ok(Solvers::OrOpt),
             "3opt" | "three_opt" => Ok(Solvers::ThreeOpt),
             "2opt" | "two_opt" => Ok(Solvers::TwoOpt),
@@ -1434,6 +1456,7 @@ pub fn solve_with_context(
             genetic_algorithm::solve(problem, &ga, tx, init_tour)
         }
         Solvers::GravitationalSearch => gravitational_search::solve(problem, &h, tx, init_tour),
+        Solvers::GreedyEdge => greedy_edge::solve(problem, &h, tx, init_tour),
         Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
         Solvers::RandomShuffle => random_shuffle::solve(problem, &h, tx, init_tour),
         Solvers::KohonenSom => {
@@ -1920,6 +1943,55 @@ mod tests {
         let problem = TspProblem::new(cities, dm);
         let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
+    }
+
+    // Registration-consistency guards: a solver added to only some of
+    // `variants()`/`all_meta()`/`SOLVER_LIST` (missing `FromStr`) would otherwise
+    // compile fine and only fail at runtime when a user picks that exact alias.
+    #[test]
+    fn solver_list_aliases_all_round_trip_through_fromstr() {
+        use std::str::FromStr;
+        for info in list_solvers() {
+            assert!(
+                Solvers::from_str(info.alias).is_ok(),
+                "SOLVER_LIST alias {:?} must resolve via FromStr",
+                info.alias
+            );
+        }
+    }
+
+    #[test]
+    fn all_meta_names_and_aliases_round_trip_through_fromstr() {
+        use std::str::FromStr;
+        for meta in Solvers::all_meta() {
+            assert!(
+                Solvers::from_str(meta.name).is_ok(),
+                "all_meta name {:?} must resolve via FromStr",
+                meta.name
+            );
+            if let Some(alias) = meta.alias {
+                assert!(
+                    Solvers::from_str(alias).is_ok(),
+                    "all_meta alias {:?} must resolve via FromStr",
+                    alias
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn variants_all_round_trip_through_fromstr_except_presets() {
+        use std::str::FromStr;
+        let presets = ["classic", "fast", "thorough"];
+        for v in Solvers::variants() {
+            if presets.contains(&v) {
+                continue;
+            }
+            assert!(
+                Solvers::from_str(v).is_ok(),
+                "variants() entry {v:?} must resolve via FromStr (or be added to the presets exclusion list)"
+            );
+        }
     }
 
     #[test]
