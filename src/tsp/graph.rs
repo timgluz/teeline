@@ -66,7 +66,15 @@ pub(crate) fn sorted_edges(n: usize, distances: &DistanceMatrix) -> Vec<(f32, u3
             edges.push((d, i as u32, j as u32));
         }
     }
-    edges.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+    // `total_cmp` gives a real total order over all f32 bit patterns (including NaN),
+    // so this never panics even on malformed input (e.g. a TSPLIB file with a "nan"
+    // coordinate token, which `f32::from_str` parses successfully) — unlike
+    // `partial_cmp(...).unwrap_or(Equal)`, whose fabricated "Equal" for NaN pairs is
+    // not transitive and can make the sort's internal ordering checks panic with
+    // "user-provided comparison function does not correctly implement a total order".
+    // No caller depends on stability among tied distances (the property test below
+    // forces duplicate points), so the allocation-free unstable sort is strictly better.
+    edges.sort_unstable_by(|a, b| a.0.total_cmp(&b.0));
     edges
 }
 
@@ -118,7 +126,13 @@ pub(crate) fn hamiltonian_cycle_to_path(n: usize, edges: &[(usize, usize)]) -> V
             .iter()
             .copied()
             .find(|&x| x != prev)
-            .unwrap_or(adj[cur][0]);
+            .unwrap_or_else(|| {
+                panic!(
+                    "hamiltonian_cycle_to_path: position {cur}'s neighbors are both equal to the \
+                 previously-visited position {prev} — this is not a simple cycle (a parallel \
+                 edge between {cur} and {prev}?)"
+                )
+            });
         prev = cur;
         cur = next;
     }
