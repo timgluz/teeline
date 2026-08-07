@@ -111,6 +111,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "christofides"    => "Only solver with a proven \u{2264}1.5\u{00d7} bound; ideal warm-start for pipeline(christofides,lk)",
         "fourier"         => "Constructive Fourier-basis solver; best as warm-start: pipeline(fourier,2opt)",
         "som"             => "Topology-preserving constructive solver; best piped: pipeline(som,2opt) or pipeline(som,sa)",
+        "gec"             => "Deterministic edge-by-edge construction; usually beats nn as a warm-start: pipeline(greedy_edge,2opt) or pipeline(greedy_edge,lk)",
         _                 => info.category,
     }
     .to_string()
@@ -122,7 +123,8 @@ fn kind_for(solver: Solvers) -> String {
         Solvers::NearestNeighbor
         | Solvers::Christofides
         | Solvers::Fourier
-        | Solvers::KohonenSom => "constructive",
+        | Solvers::KohonenSom
+        | Solvers::GreedyEdge => "constructive",
         Solvers::TwoOpt | Solvers::ThreeOpt => "local-search",
         Solvers::RandomShuffle => "utility",
         _ => "metaheuristic",

@@ -98,6 +98,12 @@ pub fn stage_warnings(solvers: &[Solvers]) -> Vec<String> {
                 "nn at stage {i} discards the warm-start seed from the previous stage"
             ));
         }
+        if i > 0 && *solver == Solvers::GreedyEdge {
+            warnings.push(format!(
+                "greedy_edge at stage {i} discards the warm-start seed from the previous stage \
+                 (it always rebuilds from scratch)"
+            ));
+        }
         if i != last {
             match solver {
                 Solvers::BellmanKarp => warnings.push(format!(

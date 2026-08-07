@@ -75,6 +75,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | `christofides.rs` | Christofides ≤1.5× approximation: MST + greedy matching + Eulerian shortcut | `christofides` |
 | `gravitational_search.rs` | Gravitational Search Algorithm (Rashedi 2009): mass-weighted swap-velocity swarm (educational) | `gsa` |
 | `fourier.rs` | Fourier-basis constructive solver: closed-curve gradient descent + argsort decode | `fourier` |
+| `greedy_edge.rs` | Greedy edge construction: Kruskal-style, sorts all edges shortest-first and greedily accepts unless it creates degree 3+ or a premature sub-cycle (uses `graph.rs`'s union-find) | `gec` |
 
 **Tests:**
 

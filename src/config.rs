@@ -486,4 +486,24 @@ mod tests {
         let sa = stages[0].1.sa.as_ref().unwrap();
         assert!((sa.max_temperature - 200.0).abs() < 0.01);
     }
+
+    #[test]
+    fn test_load_pipeline_config_greedy_edge_stage_parses() {
+        let toml = "[[stage]]\nsolver = \"greedy_edge\"\n";
+        let stages = load_pipeline_config(toml, AppOptions::default()).unwrap();
+        assert_eq!(stages.len(), 1);
+        assert_eq!(stages[0].0, Solvers::GreedyEdge);
+    }
+
+    #[test]
+    fn test_load_pipeline_config_greedy_edge_as_pipeline_seed() {
+        // greedy_edge is a plain-HeuristicOptions solver like nn/two_opt/christofides —
+        // it uses the generic `[stage.heuristic]` sub-table (accepted but unused at
+        // solve time), and its short alias `gec` must resolve too.
+        let toml = "[[stage]]\nsolver = \"gec\"\n\n[[stage]]\nsolver = \"two_opt\"\n";
+        let stages = load_pipeline_config(toml, AppOptions::default()).unwrap();
+        assert_eq!(stages.len(), 2);
+        assert_eq!(stages[0].0, Solvers::GreedyEdge);
+        assert_eq!(stages[1].0, Solvers::TwoOpt);
+    }
 }
