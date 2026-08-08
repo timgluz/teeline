@@ -134,8 +134,9 @@ local-search optimum it enables, not its raw tour length.
 
 - Bentley, J. L. (1990) — "Experiments on Traveling Salesman Heuristics",
   *Proceedings of the first annual ACM-SIAM symposium on Discrete algorithms
-  (SODA)*, 91–99. (The "greedy" algorithm is one of the four classical TSP
-  heuristics benchmarked there, alongside nearest-neighbor and insertion.)
+  (SODA)*, 91–99. (Classic empirical study of constructive TSP heuristics —
+  nearest-neighbor and the insertion family — on large geometric instances; the
+  standard benchmark context for evaluating constructive methods like greedy edge.)
 - Kruskal, J. B. (1956) — "On the shortest spanning subtree of a graph and the
   traveling salesman problem", *Proceedings of the American Mathematical
   Society*, 7(1), 48–50. (The union-find MST construction this solver adapts.)
