@@ -7,7 +7,9 @@ tasks:
       - npm run dev
 
   serve:
-    desc: Alias for dev — start Astro dev server (matches `task api:serve` naming)
+    desc: Build, then start Astro dev server (matches `task api:serve` naming)
+    deps:
+      - build
     cmds:
       - task: dev
 
