@@ -1,0 +1,67 @@
+{
+  "name": "teeline-excel",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/timgluz/teeline.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "webpack --mode production",
+    "build:dev": "webpack --mode development",
+    "dev-server": "webpack serve --mode development",
+    "lint": "office-addin-lint check",
+    "lint:fix": "office-addin-lint fix",
+    "prestart": "npm run build",
+    "prettier": "office-addin-lint prettier",
+    "signin": "office-addin-dev-settings m365-account login",
+    "signout": "office-addin-dev-settings m365-account logout",
+    "start": "office-addin-debugging start manifest.xml",
+    "stop": "office-addin-debugging stop manifest.xml",
+    "test": "vitest run",
+    "validate": "office-addin-manifest validate manifest.xml",
+    "watch": "webpack --mode development --watch"
+  },
+  "dependencies": {
+    "core-js": "^3.36.0",
+    "regenerator-runtime": "^0.14.1",
+    "teeline-wasm": "file:../teeline-wasm/js-bindings"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "@babel/preset-env": "^8.0.2",
+    "@babel/preset-typescript": "^8.0.1",
+    "@types/custom-functions-runtime": "^1.6.8",
+    "@types/office-js": "^1.0.377",
+    "@types/office-runtime": "^1.0.35",
+    "acorn": "^8.5.0",
+    "babel-loader": "^10.1.1",
+    "copy-webpack-plugin": "^12.0.2",
+    "custom-functions-metadata-plugin": "^2.1.2",
+    "eslint-plugin-office-addins": "^4.0.3",
+    "file-loader": "^6.2.0",
+    "html-loader": "^5.0.0",
+    "html-webpack-plugin": "^5.6.0",
+    "office-addin-cli": "^2.0.6",
+    "office-addin-debugging": "^6.0.6",
+    "office-addin-dev-certs": "^2.0.6",
+    "office-addin-lint": "^3.0.6",
+    "office-addin-manifest": "^2.1.2",
+    "office-addin-prettier-config": "^2.0.1",
+    "os-browserify": "^0.3.0",
+    "process": "^0.11.10",
+    "request": "^2.88.2",
+    "source-map-loader": "^5.0.0",
+    "typescript": "^5.4.2",
+    "vitest": "4.1.9",
+    "webpack": "^5.105.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "5.2.5"
+  },
+  "prettier": "office-addin-prettier-config",
+  "browserslist": [
+    "last 2 Edge versions",
+    "last 2 ChromeAndroid versions",
+    "last 2 Safari versions"
+  ]
+}
