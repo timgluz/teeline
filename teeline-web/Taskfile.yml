@@ -13,6 +13,17 @@ tasks:
     cmds:
       - task: dev
 
+  # web:serve runs astro dev in the foreground, so there's no PID file to read
+  # (unlike api:stop). Stop by killing whatever holds the dev port, then sweep
+  # any stray astro process as a fallback.
+  stop:
+    desc: Stop a running Astro dev/preview server (default port 4321; override with PORT=<n>)
+    vars:
+      PORT: '{{.PORT | default "4321"}}'
+    cmds:
+      - 'kill $(lsof -ti:{{.PORT}}) 2>/dev/null || true'
+      - 'pkill -f "astro/bin/astro" 2>/dev/null || true'
+
   build:
     desc: Type-check and build production bundle to dist/
     cmds:
