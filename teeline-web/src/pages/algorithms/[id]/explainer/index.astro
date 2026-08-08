@@ -25,6 +25,7 @@ import LkExplainer from '../../../../explainers/lk.tsx'
 import SaExplainer from '../../../../explainers/sa'
 import SomExplainer from '../../../../explainers/som'
 import FourierExplainer from '../../../../explainers/fourier'
+import GreedyEdgeExplainer from '../../../../explainers/greedy-edge'
 
 export function getStaticPaths() {
   return EXPLAINER_IDS.map((id) => ({ params: { id } }))
@@ -61,5 +62,6 @@ const jsonLd = {
     {id === 'sa' && <SaExplainer client:visible />}
     {id === 'som' && <SomExplainer client:visible />}
     {id === 'fourier' && <FourierExplainer client:visible />}
+    {id === 'greedy_edge' && <GreedyEdgeExplainer client:visible />}
   </main>
 </BaseLayout>
