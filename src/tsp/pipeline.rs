@@ -102,8 +102,8 @@ pub fn stage_warnings(solvers: &[Solvers]) -> Vec<String> {
                     "greedy_edge at stage {i} discards the warm-start seed from the previous \
                      stage (it always rebuilds from scratch)"
                 )),
-                Solvers::ClarkeWright => warnings.push(format!(
-                    "clarke_wright at stage {i} discards the warm-start seed from the previous \
+                Solvers::Savings => warnings.push(format!(
+                    "savings at stage {i} discards the warm-start seed from the previous \
                      stage (it always rebuilds from scratch)"
                 )),
                 _ => {}

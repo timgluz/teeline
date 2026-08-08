@@ -7,10 +7,16 @@ use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
 
-/// Clarke-Wright savings algorithm: a constructive solver that ranks pairwise
-/// edges by the *savings* of linking two cities directly instead of routing both
-/// through a reference "hub", then greedily accepts each on the same Kruskal-style
+/// Savings construction: a constructive solver that ranks pairwise edges by the
+/// *savings* of linking two cities directly instead of routing both through a
+/// reference "hub", then greedily accepts each on the same Kruskal-style
 /// scaffolding as `greedy_edge` (degree ≤ 2, no premature sub-cycle).
+///
+/// Inspired by the Clarke-Wright savings heuristic, but **not** canonical
+/// Clarke-Wright route merging: there is no hub-edge removal or route-endpoint
+/// merge step. The hub is used *only* to compute the savings sort key —
+/// mechanically this is a savings-ordered greedy-edge construction. Reusing
+/// `graph::select_edges` unchanged is what makes that distinction precise.
 ///
 /// The hub is chosen as the city nearest the coordinate centroid, which gives a
 /// balanced savings distribution and is order-independent (unlike a fixed
@@ -35,7 +41,7 @@ pub fn solve(
     let distances = &problem.distances;
     let n = cities.len();
 
-    tracing::info!(cities = n, "clarke_wright starting");
+    tracing::info!(cities = n, "savings starting");
 
     if n <= 2 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
@@ -55,7 +61,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&identity), 0.0));
     }
 
-    // Step 2: all pairwise edges, ranked by Clarke-Wright savings (descending).
+    // Step 2: all pairwise edges, ranked by savings (descending).
     let edges = sorted_edges_by_savings(n, hub, distances);
 
     // Step 3: greedily accept edges subject to degree <= 2 and no-premature-cycle
@@ -115,7 +121,7 @@ fn hub_position(cities: &[KDPoint]) -> usize {
 // ---------------------------------------------------------------------------
 
 /// All `n*(n-1)/2` pairwise edges among position indices `0..n`, sorted
-/// **descending** by Clarke-Wright savings relative to `hub`: pairs that save the
+/// **descending** by savings relative to `hub`: pairs that save the
 /// most by being linked directly (rather than both via the hub) sort first.
 ///
 /// Hub-involving pairs (`i == hub` or `j == hub`) have savings `0.0` (since
@@ -244,14 +250,14 @@ mod tests {
     // defensively, matching `greedy_edge::solve`'s guard.
 
     #[test]
-    fn clarke_wright_n2_returns_both_cities() {
+    fn savings_n2_returns_both_cities() {
         let problem = make_problem(&[[0., 0.], [1., 0.]]);
         let sol = solve(&problem, &HeuristicOptions::default(), None, None);
         assert_eq!(sol.route().len(), 2);
     }
 
     #[test]
-    fn clarke_wright_n3_valid() {
+    fn savings_n3_valid() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [0., 1.]]);
         let sol = solve(&problem, &HeuristicOptions::default(), None, None);
         let mut visited = sol.route().to_vec();
@@ -260,7 +266,7 @@ mod tests {
     }
 
     #[test]
-    fn clarke_wright_all_cities_visited_once() {
+    fn savings_all_cities_visited_once() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [5., 5.], [2., 0.], [3., 0.], [4., 1.]]);
         let sol = solve(&problem, &HeuristicOptions::default(), None, None);
         let mut visited = sol.route().to_vec();
@@ -270,7 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn clarke_wright_tour_cost_matches_reported() {
+    fn savings_tour_cost_matches_reported() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.], [4., 0.]]);
         let sol = solve(&problem, &HeuristicOptions::default(), None, None);
         let route = sol.route();
@@ -292,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn clarke_wright_property_random_instances_form_one_cycle() {
+    fn savings_property_random_instances_form_one_cycle() {
         let mut rng = rand::rng();
         for n in 4..12 {
             let mut coords: Vec<[f32; 2]> = (0..n)

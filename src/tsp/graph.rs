@@ -83,7 +83,7 @@ pub(crate) fn sorted_edges(n: usize, distances: &DistanceMatrix) -> Vec<(f32, u3
 /// before all `n` edges have been placed.
 ///
 /// Shared by the Kruskal-style constructive solvers (`greedy_edge` sorts edges
-/// ascending by distance; `savings` sorts descending by Clarke-Wright savings).
+/// ascending by distance; `savings` sorts descending by savings value).
 /// The leading `f32` weight is unused inside the loop — only the sort order the
 /// caller established before calling matters — so this primitive is agnostic to
 /// the sort key's meaning.
