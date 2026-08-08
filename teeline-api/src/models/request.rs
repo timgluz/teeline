@@ -111,6 +111,21 @@ pub struct FpaConfig {
     pub mutation_probability: Option<f32>,
 }
 
+/// Ant Colony Optimization. Mirrors `AcoOptions`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct AcoConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub heuristic: Option<HeuristicConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alpha: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beta: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evaporation_rate: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub num_ants: Option<usize>,
+}
+
 /// Kohonen SOM. Mirrors `SOMOptions` (f64 fields match the lib).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct SomConfig {
@@ -171,6 +186,8 @@ pub struct SolverConfigs {
     pub cs: Option<CsConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fpa: Option<FpaConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aco: Option<AcoConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub som: Option<SomConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -375,6 +392,43 @@ mod tests {
         let sa = back.configs.unwrap().sa.unwrap();
         assert_eq!(sa.cooling_rate, Some(0.001));
         assert_eq!(sa.heuristic.unwrap().epochs, Some(1000));
+    }
+
+    #[test]
+    fn solve_request_with_aco_config_round_trip() {
+        let req = SolveRequest {
+            input: TspInput {
+                cities: Some(vec![CityInput {
+                    id: None,
+                    x: 1.0,
+                    y: 2.0,
+                }]),
+                tsplib: None,
+            },
+            solver: "aco".to_string(),
+            configs: Some(SolverConfigs {
+                aco: Some(AcoConfig {
+                    heuristic: Some(HeuristicConfig {
+                        epochs: Some(300),
+                        platoo_epochs: None,
+                        n_nearest: None,
+                    }),
+                    alpha: None,
+                    beta: Some(3.0),
+                    evaporation_rate: Some(0.3),
+                    num_ants: Some(40),
+                }),
+                ..SolverConfigs::default()
+            }),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: SolveRequest = serde_json::from_str(&json).unwrap();
+        let aco = back.configs.unwrap().aco.unwrap();
+        assert_eq!(aco.beta, Some(3.0));
+        assert_eq!(aco.evaporation_rate, Some(0.3));
+        assert_eq!(aco.num_ants, Some(40));
+        assert_eq!(aco.alpha, None);
+        assert_eq!(aco.heuristic.unwrap().epochs, Some(300));
     }
 
     #[test]

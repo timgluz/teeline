@@ -6,8 +6,9 @@ use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings};
 use teeline::tsp::tsplib;
 use teeline::tsp::{
-    AppOptions, CSOptions, DistanceType, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    LKOptions, SAOptions, SOMOptions, Solvers, TspProblem, find_solver, solve_problem,
+    AcoOptions, AppOptions, CSOptions, DistanceType, FPAOptions, FourierOptions, GAOptions,
+    HeuristicOptions, LKOptions, SAOptions, SOMOptions, Solvers, TspProblem, find_solver,
+    solve_problem,
 };
 
 use super::TspSolverService;
@@ -140,6 +141,26 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
         }
     });
 
+    // ACO embeds its own HeuristicOptions, but AcoOptions::default() overrides epochs to 150
+    // (the global HeuristicOptions default of 10_000 would take minutes per run at ACO's
+    // O(ants * n²) per-epoch cost). So map onto ACO's own default — like the LK block above —
+    // rather than map_heuristic, which would re-introduce the 10_000 default and the hang
+    // AcoOptions::default()'s doc comment warns about.
+    let aco = cfg.aco.as_ref().map(|c| {
+        let d = AcoOptions::default();
+        AcoOptions {
+            heuristic: c
+                .heuristic
+                .as_ref()
+                .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
+                .unwrap_or(d.heuristic),
+            alpha: c.alpha.unwrap_or(d.alpha),
+            beta: c.beta.unwrap_or(d.beta),
+            evaporation_rate: c.evaporation_rate.unwrap_or(d.evaporation_rate),
+            num_ants: c.num_ants.unwrap_or(d.num_ants),
+        }
+    });
+
     let lk = cfg.lk.as_ref().map(|c| {
         let d = LKOptions::default();
         LKOptions {
@@ -182,9 +203,7 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
         lk,
         fourier,
         som,
-        // ACO has no API-facing config yet (teeline-api wiring is a follow-up to GH #395,
-        // which shipped core solver + CLI only) — always defaults inside solve_with_context.
-        aco: None,
+        aco,
         heuristic,
     }
 }
@@ -545,5 +564,36 @@ EOF
 
         assert_eq!(via_alias.heuristic.as_ref().unwrap().n_nearest, 7);
         assert_eq!(via_alias.heuristic, via_full_name.heuristic);
+    }
+
+    // AcoOptions::default() overrides epochs to 150 (vs the global HeuristicOptions default of
+    // 10_000) because ACO's O(ants * n²) per-epoch cost would hang at 10_000. The aco mapping
+    // must preserve that override when `epochs` is omitted — i.e. map onto AcoOptions's own
+    // default via map_heuristic_onto, not map_heuristic (which would re-introduce 10_000).
+    #[test]
+    fn test_make_app_options_aco_preserves_default_epochs_when_omitted() {
+        use crate::models::request::AcoConfig;
+
+        let configs = SolverConfigs {
+            aco: Some(AcoConfig {
+                heuristic: None,
+                alpha: None,
+                beta: Some(3.0),
+                evaporation_rate: None,
+                num_ants: Some(40),
+            }),
+            ..Default::default()
+        };
+
+        let opts = make_app_options("aco", Some(&configs));
+        let aco = opts.aco.expect("aco config should map through");
+        assert_eq!(
+            aco.heuristic.epochs, 150,
+            "omitting epochs must fall back to ACO's 150 default, not the global 10_000"
+        );
+        assert_eq!(aco.beta, 3.0);
+        assert_eq!(aco.num_ants, 40);
+        assert_eq!(aco.alpha, AcoOptions::default().alpha);
+        assert_eq!(aco.evaporation_rate, AcoOptions::default().evaporation_rate);
     }
 }
