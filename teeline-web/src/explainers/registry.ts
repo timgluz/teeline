@@ -72,6 +72,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of the Fourier-basis constructive TSP solver: watch gradient descent shape a closed curve into a valid tour.',
     backLabel: 'Fourier',
   },
+  greedy_edge: {
+    title: 'Greedy Edge Construction — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of Greedy Edge Construction: watch every pairwise edge scan shortest-first, accepted unless it would create degree 3+ or a premature sub-cycle, with union-find components merging until one Hamiltonian cycle remains.',
+    backLabel: 'Greedy Edge',
+  },
 }
 
 export const EXPLAINER_IDS = Object.keys(EXPLAINER_META)
