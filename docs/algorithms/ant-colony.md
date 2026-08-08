@@ -70,6 +70,7 @@ teeline solve aco -i ./data/tsplib/berlin52.tsp --num-ants=40 --beta=3.0 --evapo
 
 ## References
 
-- Dorigo, M. (1996) — "Ant System: Optimization by a Colony of Cooperating Agents", *IEEE Transactions on Systems, Man, and Cybernetics, Part B*, 26(1), pp. 29–41
-- Dorigo, M. & Stützle, T. (2004) — *Ant Colony Optimization*, MIT Press
+- Dorigo, M., Maniezzo, V. & Colorni, A. (1996) — "Ant System: Optimization by a Colony of Cooperating Agents", *IEEE Transactions on Systems, Man, and Cybernetics, Part B: Cybernetics*, 26(1), pp. 29–41
+- Dorigo, M. & Stützle, T. (2004) — *Ant Colony Optimization*, MIT Press, ISBN 0-262-04219-3
+- Stützle, T. & Hoos, H.H. (2000) — "MAX–MIN Ant System", *Future Generation Computer Systems*, 16(8), pp. 889–914 (source of the pheromone-floor technique referenced in the adaptations table above)
 - [Ant colony optimization algorithms (Wikipedia)](https://en.wikipedia.org/wiki/Ant_colony_optimization_algorithms)
