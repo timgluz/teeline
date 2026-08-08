@@ -56,7 +56,7 @@ procedure AntColony(cities, num_ants, alpha, beta, evaporation_rate, epochs):
 | ------ | ------------- | --------- |
 | `--epochs` | Maximum iterations | 150 |
 | `--alpha` | Pheromone influence on transition probability | 1.0 |
-| `--beta` | Heuristic (1/distance) influence on transition probability (validated to `[0, 10]`) | 2.0 |
+| `--beta` | Heuristic (1/distance) influence on transition probability (validated to `[0, 6]`) | 2.0 |
 | `--evaporation-rate` | Fraction of pheromone lost per epoch, in `(0, 1)` | 0.5 |
 | `--num-ants` | Colony size — tours constructed per epoch | 25 |
 

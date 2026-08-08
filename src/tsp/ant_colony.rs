@@ -1,6 +1,7 @@
 use std::sync::mpsc;
 
 use rand::RngExt;
+use rand::seq::SliceRandom;
 
 use super::probability::roulette_select;
 use super::progress::ProgressMessage;
@@ -130,10 +131,7 @@ pub fn solve(
         Some(t) => t.iter().map(|&id| to_pos(id)).collect(),
         None => {
             let mut positions: Vec<usize> = (0..n).collect();
-            for i in (1..n).rev() {
-                let j = rng.random_range(0..=i);
-                positions.swap(i, j);
-            }
+            positions.shuffle(&mut rng);
             positions
         }
     };
@@ -193,9 +191,15 @@ pub fn solve(
             tour.push(start);
             let mut current = start;
 
+            // Reused across every step of this ant's tour construction (cleared and
+            // refilled each step) instead of freshly allocating both Vecs on every
+            // iteration — up to n-1 allocation pairs per ant, per epoch, otherwise.
+            let mut primary: Vec<(usize, f32)> = Vec::with_capacity(n);
+            let mut fallback: Vec<(usize, f32)> = Vec::with_capacity(n);
+
             for _ in 1..n {
-                let mut primary: Vec<(usize, f32)> = Vec::with_capacity(n - tour.len());
-                let mut fallback: Vec<(usize, f32)> = Vec::with_capacity(n - tour.len());
+                primary.clear();
+                fallback.clear();
                 for v in 0..n {
                     if visited[v] {
                         continue;
@@ -275,9 +279,19 @@ mod tests {
         let n = 3;
         let mut pheromone = vec![0.0; n * n];
         deposit_edge(&mut pheromone, n, 0, 2, 0.5);
-        assert!((pheromone[0 * n + 2] - 0.5).abs() < 1e-6);
-        assert!((pheromone[2 * n + 0] - 0.5).abs() < 1e-6);
-        assert!((pheromone[0 * n + 1]).abs() < 1e-9);
+        // u=0, so `u*n+v`/`v*n+u` reduce to `v`/`v*n` — written pre-reduced (rather than
+        // `0 * n + 2` / `2 * n + 0`) since clippy's `erasing_op`/`identity_op` lints (deny
+        // and warn by default respectively) flag the literal `0 * n` form as almost
+        // certainly unintentional, and this crate's CI runs clippy with `-D warnings`.
+        assert!((pheromone[2] - 0.5).abs() < 1e-6, "edge (0,2) via u*n+v");
+        assert!(
+            (pheromone[2 * n] - 0.5).abs() < 1e-6,
+            "edge (2,0) via v*n+u"
+        );
+        assert!(
+            (pheromone[1]).abs() < 1e-9,
+            "edge (0,1) must remain untouched"
+        );
     }
 
     #[test]

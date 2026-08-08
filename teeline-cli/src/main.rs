@@ -329,7 +329,7 @@ fn tuning_args() -> Vec<Arg> {
         Arg::new("beta")
             .long("beta")
             .value_name("N")
-            .help("ACO: heuristic (1/distance) influence on transition probability (default 2.0, max 10.0)")
+            .help("ACO: heuristic (1/distance) influence on transition probability (default 2.0, max 6.0)")
             .action(ArgAction::Set)
             .required(false),
         Arg::new("evaporation_rate")

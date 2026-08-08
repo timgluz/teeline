@@ -1081,25 +1081,36 @@ impl Default for AcoOptions {
 
 impl AcoOptions {
     pub fn validate(&self) -> Result<(), String> {
-        self.heuristic.validate()?;
-        if self.alpha < 0.0 {
+        // Not `self.heuristic.validate()?` — that only checks `n_nearest >= 1`, but ACO's
+        // transition rule has no candidate-list restriction (see docs/algorithms/ant-colony.md)
+        // and never reads `n_nearest`, so rejecting `n_nearest == 0` here would error on a
+        // value that has zero effect on this solver.
+        //
+        // NOTE: `<`/`<=`/`>=` comparisons are all `false` for `NaN`, so a bare `if x < 0.0`
+        // silently lets `x = NaN` through — and clippy's `neg_cmp_op_on_partial_ord` lint
+        // (deny under this crate's `-D warnings` CI) rightly rejects the tempting fix of
+        // just negating the comparison (`!(x >= 0.0)`), since a future refactor could
+        // "simplify" that back to `x < 0.0` and silently reintroduce the same NaN gap. Use
+        // `.is_finite()` (an explicit, non-comparison check) alongside plain positive
+        // comparisons instead, mirroring how `beta`'s `RangeInclusive::contains` already
+        // rejects NaN via `low <= x && x <= high`.
+        if !self.alpha.is_finite() || self.alpha < 0.0 {
             return Err(format!("alpha must be >= 0 (got {})", self.alpha));
         }
-        if !(0.0..=10.0).contains(&self.beta) {
+        if !(0.0..=6.0).contains(&self.beta) {
             // Upper bound: with the 1e-6 minimum-distance floor used during transition-weight
-            // computation, (1e6)^beta overflows f32 (~3.4e38) around beta≈7, producing inf/NaN
-            // weights — reachable with coincident cities plus a high user-supplied beta.
-            return Err(format!("beta must be in [0, 10] (got {})", self.beta));
+            // computation, (1e6)^beta overflows f32 (~3.4e38) once beta exceeds ~6.42
+            // (= log10(f32::MAX) / 6). 6.0 keeps a safety margin below that exact cutoff —
+            // the previous 10.0 ceiling was above it, so in-range values like beta=8 could
+            // already silently overflow eta_beta to +inf for ordinary close-together cities.
+            return Err(format!("beta must be in [0, 6] (got {})", self.beta));
         }
-        if self.evaporation_rate <= 0.0 {
+        if !self.evaporation_rate.is_finite()
+            || self.evaporation_rate <= 0.0
+            || self.evaporation_rate >= 1.0
+        {
             return Err(format!(
-                "evaporation_rate must be > 0 (got {})",
-                self.evaporation_rate
-            ));
-        }
-        if self.evaporation_rate >= 1.0 {
-            return Err(format!(
-                "evaporation_rate must be < 1 (got {})",
+                "evaporation_rate must be in (0, 1) (got {})",
                 self.evaporation_rate
             ));
         }
@@ -1114,21 +1125,13 @@ impl AcoOptions {
         for (k, v) in table.iter() {
             match k.as_str() {
                 "epochs" => {
-                    aco.heuristic.epochs = v
-                        .as_integer()
-                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
-                        as usize;
+                    aco.heuristic.epochs = parse_nonneg_usize(v, "epochs")?;
                 }
                 "platoo_epochs" => {
-                    aco.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `platoo_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    aco.heuristic.platoo_epochs = parse_nonneg_usize(v, "platoo_epochs")?;
                 }
                 "n_nearest" => {
-                    aco.heuristic.n_nearest = v
-                        .as_integer()
-                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))?
-                        as usize;
+                    aco.heuristic.n_nearest = parse_nonneg_usize(v, "n_nearest")?;
                 }
                 "verbose" => {
                     aco.heuristic.verbose = v
@@ -1145,9 +1148,7 @@ impl AcoOptions {
                     aco.evaporation_rate = parse_f32(v, "aco.evaporation_rate")?;
                 }
                 "num_ants" => {
-                    aco.num_ants = v.as_integer().ok_or_else(|| {
-                        format!("config: `aco.num_ants` must be an integer, got {v}")
-                    })? as usize;
+                    aco.num_ants = parse_nonneg_usize(v, "aco.num_ants")?;
                 }
                 other => {
                     return Err(format!(
@@ -1161,10 +1162,33 @@ impl AcoOptions {
     }
 
     pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
-        let mut aco = AcoOptions {
-            heuristic: HeuristicOptions::from_cli(args)?,
-            ..AcoOptions::default()
-        };
+        // Deliberately not `heuristic: HeuristicOptions::from_cli(args)?`: that helper seeds
+        // from the generic `HeuristicOptions::default()` (epochs=10_000), and since `heuristic`
+        // would be assigned explicitly in this struct literal, the trailing
+        // `..AcoOptions::default()` spread never gets a chance to apply this struct's own
+        // epochs=150 override (a functional-update spread only fills fields that aren't
+        // explicitly listed) — every CLI invocation omitting `--epochs` would silently run
+        // 10_000 epochs instead of the documented/intended 150. Building `heuristic` field by
+        // field from `AcoOptions::default()` keeps the override whenever a flag isn't passed.
+        let mut aco = AcoOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            aco.heuristic.epochs = v
+                .parse()
+                .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("platoo_epochs") {
+            aco.heuristic.platoo_epochs = v
+                .parse()
+                .map_err(|_| format!("--platoo-epochs: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("n_nearest") {
+            aco.heuristic.n_nearest = v
+                .parse()
+                .map_err(|_| format!("--n-nearest: invalid integer `{v}`"))?;
+        }
+        if args.get_flag("verbose") {
+            aco.heuristic.verbose = true;
+        }
         if let Some(v) = args.get_one::<String>("alpha") {
             aco.alpha = v
                 .parse()
@@ -1548,6 +1572,17 @@ fn parse_f32(v: &toml::Value, name: &str) -> Result<f32, String> {
         .or_else(|| v.as_integer().map(|i| i as f64))
         .ok_or_else(|| format!("config: `{name}` must be a float, got {v}"))
         .map(|f| f as f32)
+}
+
+/// Parses a non-negative TOML integer into a `usize`. `toml::Value::as_integer()` returns
+/// the raw signed `i64` with no range enforcement, so a bare `as usize` cast on a negative
+/// value would silently wrap into a huge positive number (e.g. `-5i64 as usize` is over
+/// 1.8*10^19) instead of erroring — `usize::try_from` rejects negatives cleanly instead.
+fn parse_nonneg_usize(v: &toml::Value, name: &str) -> Result<usize, String> {
+    let n = v
+        .as_integer()
+        .ok_or_else(|| format!("config: `{name}` must be an integer, got {v}"))?;
+    usize::try_from(n).map_err(|_| format!("config: `{name}` must be >= 0, got {n}"))
 }
 
 pub fn validate_tour(tour: &[usize], cities: &[KDPoint]) -> Result<(), String> {
@@ -2290,10 +2325,10 @@ mod tests {
     #[test]
     fn aco_options_validate_rejects_beta_above_upper_bound() {
         let opts = AcoOptions {
-            beta: 10.1,
+            beta: 6.1,
             ..AcoOptions::default()
         };
-        assert!(opts.validate().is_err(), "beta above 10.0 must be rejected");
+        assert!(opts.validate().is_err(), "beta above 6.0 must be rejected");
     }
 
     #[test]

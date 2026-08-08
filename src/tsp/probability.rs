@@ -57,12 +57,21 @@ pub fn sample_without_replacement(rng: &mut impl RngExt, n: usize, excluded: &[u
 /// many terms) and `r` drawn uniformly from `[0, 1)`. If the accumulation loop exhausts
 /// without crossing `r * sum` — a real, reachable path given f32 rounding, not a
 /// theoretical one — falls back to the last candidate rather than panicking.
+///
+/// Uses a strict `acc > target` test rather than `>=`: with `r = 0.0` (a legitimately
+/// reachable draw from `[0, 1)`), `target` is `0.0`, and a non-strict `>=` would return the
+/// very first candidate as soon as `acc` reaches `0.0` — true after adding *any*
+/// non-negative weight, including an explicit `0.0` weight. That would let a candidate
+/// whose weight underflowed to exactly zero (i.e. should have zero selection probability)
+/// still get picked whenever it's first in iteration order and `r` happens to land on
+/// `0.0`. The strict comparison correctly requires `acc` to exceed `target`, so a
+/// zero-width bucket can never "contain" the target.
 pub fn roulette_select(weights: &[(usize, f32)], sum: f32, r: f32) -> usize {
     let target = r * sum;
     let mut acc = 0.0f32;
     for &(id, w) in weights {
         acc += w;
-        if acc >= target {
+        if acc > target {
             return id;
         }
     }
@@ -157,5 +166,16 @@ mod tests {
         // candidate rather than panicking.
         let weights = [(0usize, 1.0f32), (1usize, 1.0f32)];
         assert_eq!(roulette_select(&weights, 3.0, 0.9999), 1);
+    }
+
+    #[test]
+    fn test_roulette_select_at_r_zero_skips_zero_weight_first_candidate() {
+        // r=0.0 -> target=0.0. A non-strict `acc >= target` would return id 0 as soon as
+        // acc reaches 0.0, which is true even after adding its own zero weight — wrongly
+        // picking a candidate with zero selection probability. The strict `acc > target`
+        // requires actually exceeding the target, so id 0's empty bucket is correctly
+        // skipped in favor of id 1, the only candidate with any real weight.
+        let weights = [(0usize, 0.0f32), (1usize, 5.0f32)];
+        assert_eq!(roulette_select(&weights, 5.0, 0.0), 1);
     }
 }
