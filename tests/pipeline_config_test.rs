@@ -71,6 +71,23 @@ fn test_pipeline_config_fourier_stage_k_max_applied() {
 }
 
 #[test]
+fn test_pipeline_config_aco_stage_num_ants_applied() {
+    let p = fixture("pipeline_aco.toml");
+    let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();
+    // ACO stage should have epochs=30/num_ants=10 from its [stage.aco] options
+    let aco_stage = stage_configs.iter().find(|(s, _)| *s == Solvers::AntColony);
+    assert!(aco_stage.is_some(), "expected ACO stage in fixture");
+    let (_, opts) = aco_stage.unwrap();
+    let aco_opts = opts.aco.as_ref().unwrap();
+    assert_eq!(aco_opts.heuristic.epochs, 30);
+    assert_eq!(aco_opts.num_ants, 10);
+    // Also verify it runs to completion
+    let stages = berlin52_stages(stage_configs);
+    let solution = run_pipeline(&stages).unwrap();
+    assert_eq!(solution.route().len(), 52);
+}
+
+#[test]
 fn test_pipeline_config_lk_stage_max_depth_applied() {
     let p = fixture("pipeline_lk.toml");
     let stage_configs = resolve_config_file(&p, &IdentityProvider).unwrap();

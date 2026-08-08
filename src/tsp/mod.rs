@@ -1,3 +1,4 @@
+pub mod ant_colony;
 pub mod bellman_karp;
 pub mod branch_bound;
 pub mod christofides;
@@ -44,6 +45,7 @@ use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Solvers {
+    AntColony,
     BellmanKarp,
     BranchBound,
     Christofides,
@@ -70,6 +72,8 @@ pub enum Solvers {
 impl Solvers {
     pub fn variants() -> Vec<&'static str> {
         vec![
+            "ant_colony",
+            "aco",
             "bellman_karp",
             "bhk",
             "branch_bound",
@@ -144,6 +148,7 @@ impl Solvers {
                 | Solvers::CuckooSearch
                 | Solvers::FlowerPollination
                 | Solvers::Fourier
+                | Solvers::AntColony
         )
     }
 }
@@ -206,6 +211,11 @@ impl SolverMeta {
 impl Solvers {
     pub fn all_meta() -> &'static [SolverMeta] {
         &[
+            SolverMeta {
+                name: "ant_colony",
+                alias: Some("aco"),
+                kind: SolverKind::Heuristic,
+            },
             SolverMeta {
                 name: "bellman_karp",
                 alias: Some("bhk"),
@@ -327,7 +337,16 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 20] = [
+static SOLVER_LIST: [SolverInfo; 21] = [
+    SolverInfo {
+        name: "Ant Colony",
+        alias: "aco",
+        category: "Metaheuristic",
+        desc: "Colony of ants probabilistically construct tours biased by a shared pheromone matrix and heuristic desirability (1/distance); pheromone evaporates and reinforces on strong edges over epochs.",
+        complexity: "O(epochs \u{00b7} ants \u{00b7} n\u{00b2})",
+        has_options: true,
+        exact: false,
+    },
     SolverInfo {
         name: "Bellman-Held-Karp",
         alias: "bhk",
@@ -520,6 +539,7 @@ impl FromStr for Solvers {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "aco" | "ant_colony" => Ok(Solvers::AntColony),
             "bhk" | "bellman_karp" => Ok(Solvers::BellmanKarp),
             "branch_bound" => Ok(Solvers::BranchBound),
             "christofides" | "chr" => Ok(Solvers::Christofides),
@@ -1028,6 +1048,149 @@ impl FPAOptions {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct AcoOptions {
+    pub heuristic: HeuristicOptions,
+    pub alpha: f32,
+    pub beta: f32,
+    pub evaporation_rate: f32,
+    pub num_ants: usize,
+}
+
+impl Default for AcoOptions {
+    fn default() -> Self {
+        AcoOptions {
+            // ACO's per-epoch cost is O(ants * n^2) — roulette-wheel construction scans
+            // every unvisited city each step, unlike CS/FPA/GA's O(pop * n). Inheriting
+            // HeuristicOptions::default()'s epochs=10_000 would take minutes on berlin52
+            // and far longer on larger instances, a real hang risk for any bare
+            // AcoOptions::default() construction (see LKOptions::default() for the same
+            // override pattern).
+            heuristic: HeuristicOptions {
+                epochs: 150,
+                platoo_epochs: 20,
+                n_nearest: 3,
+                verbose: false,
+            },
+            alpha: 1.0,
+            beta: 2.0,
+            evaporation_rate: 0.5,
+            num_ants: 25,
+        }
+    }
+}
+
+impl AcoOptions {
+    pub fn validate(&self) -> Result<(), String> {
+        self.heuristic.validate()?;
+        if self.alpha < 0.0 {
+            return Err(format!("alpha must be >= 0 (got {})", self.alpha));
+        }
+        if !(0.0..=10.0).contains(&self.beta) {
+            // Upper bound: with the 1e-6 minimum-distance floor used during transition-weight
+            // computation, (1e6)^beta overflows f32 (~3.4e38) around beta≈7, producing inf/NaN
+            // weights — reachable with coincident cities plus a high user-supplied beta.
+            return Err(format!("beta must be in [0, 10] (got {})", self.beta));
+        }
+        if self.evaporation_rate <= 0.0 {
+            return Err(format!(
+                "evaporation_rate must be > 0 (got {})",
+                self.evaporation_rate
+            ));
+        }
+        if self.evaporation_rate >= 1.0 {
+            return Err(format!(
+                "evaporation_rate must be < 1 (got {})",
+                self.evaporation_rate
+            ));
+        }
+        if self.num_ants == 0 {
+            return Err("num_ants must be >= 1".to_string());
+        }
+        Ok(())
+    }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut aco = AcoOptions::default();
+        for (k, v) in table.iter() {
+            match k.as_str() {
+                "epochs" => {
+                    aco.heuristic.epochs = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "platoo_epochs" => {
+                    aco.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
+                        format!("config: `platoo_epochs` must be an integer, got {v}")
+                    })? as usize;
+                }
+                "n_nearest" => {
+                    aco.heuristic.n_nearest = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `n_nearest` must be an integer, got {v}"))?
+                        as usize;
+                }
+                "verbose" => {
+                    aco.heuristic.verbose = v
+                        .as_bool()
+                        .ok_or_else(|| format!("config: `verbose` must be a bool, got {v}"))?;
+                }
+                "alpha" => {
+                    aco.alpha = parse_f32(v, "aco.alpha")?;
+                }
+                "beta" => {
+                    aco.beta = parse_f32(v, "aco.beta")?;
+                }
+                "evaporation_rate" => {
+                    aco.evaporation_rate = parse_f32(v, "aco.evaporation_rate")?;
+                }
+                "num_ants" => {
+                    aco.num_ants = v.as_integer().ok_or_else(|| {
+                        format!("config: `aco.num_ants` must be an integer, got {v}")
+                    })? as usize;
+                }
+                other => {
+                    return Err(format!(
+                        "config: unknown field `{other}` in [aco] — valid: epochs, platoo_epochs, n_nearest, verbose, alpha, beta, evaporation_rate, num_ants"
+                    ));
+                }
+            }
+        }
+        aco.validate()?;
+        Ok(aco)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut aco = AcoOptions {
+            heuristic: HeuristicOptions::from_cli(args)?,
+            ..AcoOptions::default()
+        };
+        if let Some(v) = args.get_one::<String>("alpha") {
+            aco.alpha = v
+                .parse()
+                .map_err(|_| format!("--alpha: invalid float `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("beta") {
+            aco.beta = v
+                .parse()
+                .map_err(|_| format!("--beta: invalid float `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("evaporation_rate") {
+            aco.evaporation_rate = v
+                .parse()
+                .map_err(|_| format!("--evaporation-rate: invalid float `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("num_ants") {
+            aco.num_ants = v
+                .parse()
+                .map_err(|_| format!("--num-ants: invalid integer `{v}`"))?;
+        }
+        aco.validate()?;
+        Ok(aco)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct LKOptions {
     pub heuristic: HeuristicOptions,
     pub max_depth: usize,
@@ -1372,6 +1535,7 @@ pub struct AppOptions {
     pub lk: Option<LKOptions>,
     pub fourier: Option<FourierOptions>,
     pub som: Option<SOMOptions>,
+    pub aco: Option<AcoOptions>,
     pub heuristic: Option<HeuristicOptions>,
 }
 
@@ -1431,6 +1595,10 @@ pub fn solve_with_context(
     let tx = progress_tx.as_ref();
     let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
     let solution = match solver {
+        Solvers::AntColony => {
+            let aco = opts.aco.as_ref().cloned().unwrap_or_default();
+            ant_colony::solve(problem, &aco, tx, init_tour)
+        }
         Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour),
         Solvers::BranchBound => branch_bound::solve(problem, &h, tx, init_tour),
         Solvers::Christofides => christofides::solve(problem, &h, tx, init_tour),
@@ -1702,6 +1870,7 @@ mod tests {
             lk: None,
             fourier: None,
             som: None,
+            aco: None,
             heuristic: None,
         };
         drop(a);
@@ -1909,6 +2078,7 @@ mod tests {
         assert!(Solvers::FlowerPollination.auto_expand_with_shuffle());
         assert!(Solvers::Fourier.auto_expand_with_shuffle());
         assert!(Solvers::GravitationalSearch.auto_expand_with_shuffle());
+        assert!(Solvers::AntColony.auto_expand_with_shuffle());
     }
 
     #[test]
@@ -2066,6 +2236,132 @@ mod tests {
         let args = cmd.get_matches_from(["t", "--max-depth", "3"]); // hyphen matches production CLI
         let opts = LKOptions::from_cli(&args).unwrap();
         assert_eq!(opts.max_depth, 3);
+    }
+
+    #[test]
+    fn aco_options_default_is_valid() {
+        AcoOptions::default()
+            .validate()
+            .expect("default AcoOptions must be valid");
+    }
+
+    #[test]
+    fn aco_options_validate_rejects_zero_evaporation_rate() {
+        let opts = AcoOptions {
+            evaporation_rate: 0.0,
+            ..AcoOptions::default()
+        };
+        assert!(
+            opts.validate().is_err(),
+            "evaporation_rate=0.0 must be rejected"
+        );
+    }
+
+    #[test]
+    fn aco_options_validate_rejects_evaporation_rate_at_or_above_one() {
+        let opts = AcoOptions {
+            evaporation_rate: 1.0,
+            ..AcoOptions::default()
+        };
+        assert!(
+            opts.validate().is_err(),
+            "evaporation_rate=1.0 must be rejected"
+        );
+    }
+
+    #[test]
+    fn aco_options_validate_rejects_zero_num_ants() {
+        let opts = AcoOptions {
+            num_ants: 0,
+            ..AcoOptions::default()
+        };
+        assert!(opts.validate().is_err(), "num_ants=0 must be rejected");
+    }
+
+    #[test]
+    fn aco_options_validate_rejects_negative_alpha() {
+        let opts = AcoOptions {
+            alpha: -0.1,
+            ..AcoOptions::default()
+        };
+        assert!(opts.validate().is_err(), "negative alpha must be rejected");
+    }
+
+    #[test]
+    fn aco_options_validate_rejects_beta_above_upper_bound() {
+        let opts = AcoOptions {
+            beta: 10.1,
+            ..AcoOptions::default()
+        };
+        assert!(opts.validate().is_err(), "beta above 10.0 must be rejected");
+    }
+
+    #[test]
+    fn aco_options_from_toml_parses_all_fields() {
+        let t: toml::Table = toml::from_str(
+            "epochs=50\nn_nearest=7\nalpha=1.5\nbeta=3.0\nevaporation_rate=0.4\nnum_ants=10",
+        )
+        .unwrap();
+        let opts = AcoOptions::from_toml(&t).unwrap();
+        assert_eq!(opts.heuristic.epochs, 50);
+        assert_eq!(opts.heuristic.n_nearest, 7);
+        assert!((opts.alpha - 1.5).abs() < 1e-6);
+        assert!((opts.beta - 3.0).abs() < 1e-6);
+        assert!((opts.evaporation_rate - 0.4).abs() < 1e-6);
+        assert_eq!(opts.num_ants, 10);
+    }
+
+    #[test]
+    fn aco_options_from_toml_rejects_unknown_field() {
+        let t: toml::Table = toml::from_str("not_a_real_field=1").unwrap();
+        let err = AcoOptions::from_toml(&t).unwrap_err();
+        assert!(err.contains("unknown field"), "got: {err}");
+    }
+
+    #[test]
+    fn aco_options_from_cli_parses_own_flags() {
+        use clap::{Arg, ArgAction, Command};
+        let cmd = Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(
+                Arg::new("platoo_epochs")
+                    .long("platoo_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("n_nearest")
+                    .long("n_nearest")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("verbose")
+                    .long("verbose")
+                    .action(ArgAction::SetTrue),
+            )
+            .arg(Arg::new("alpha").long("alpha").action(ArgAction::Set))
+            .arg(Arg::new("beta").long("beta").action(ArgAction::Set))
+            .arg(
+                Arg::new("evaporation_rate")
+                    .long("evaporation-rate")
+                    .action(ArgAction::Set),
+            )
+            .arg(Arg::new("num_ants").long("num-ants").action(ArgAction::Set));
+        let args = cmd.get_matches_from([
+            "t",
+            "--alpha",
+            "2.0",
+            "--beta",
+            "4.0",
+            "--evaporation-rate",
+            "0.3",
+            "--num-ants",
+            "12",
+        ]);
+        let opts = AcoOptions::from_cli(&args).unwrap();
+        assert!((opts.alpha - 2.0).abs() < 1e-6);
+        assert!((opts.beta - 4.0).abs() < 1e-6);
+        assert!((opts.evaporation_rate - 0.3).abs() < 1e-6);
+        assert_eq!(opts.num_ants, 12);
     }
 
     fn fourier_cli_command() -> clap::Command {

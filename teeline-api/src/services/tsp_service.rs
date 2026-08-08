@@ -182,6 +182,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
         lk,
         fourier,
         som,
+        // ACO has no API-facing config yet (teeline-api wiring is a follow-up to GH #395,
+        // which shipped core solver + CLI only) — always defaults inside solve_with_context.
+        aco: None,
         heuristic,
     }
 }

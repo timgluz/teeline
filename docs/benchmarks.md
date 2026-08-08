@@ -49,6 +49,7 @@ representative, not as a guarantee.
 | **Christofides** | default (MST + greedy matching) | 8 707.66 | +15.4 % | < 0.01 s | 50 % | 6.5 MB |
 | **Greedy Edge** | default (Kruskal-style construction) | 9 954.06 | +31.9 % | < 0.01 s | 100 % | 6.9 MB |
 | **Greedy Edge + 2-opt** | `pipeline(greedy_edge,2opt)` | 8 415.55 | +11.5 % | < 0.01 s | 77 % | 7.0 MB |
+| **Ant Colony (ACO)** | default (`--epochs=150`, α=1, β=2, evaporation_rate=0.5, num_ants=25) | *to be measured* | *to be measured* | *to be measured* | *to be measured* | *to be measured* |
 | **Gravitational Search (GSA)** | default (`--epochs=10000 --n_nearest=25`, G0=20, α=1, W=0) | ~18 500 | ~+145 % | 1.2 s | 99 % | 7.6 MB |
 | **Fourier** | default (`k_max=4, m=200, epochs=400`) | 8 549.14 | +13.3 % | 2.5 s | 99 % | 6.6 MB |
 | **Fourier + 2-opt** | `pipeline(fourier,2opt)` | 7 948.88 | +5.4 % | 1.9 s | 99 % | 6.8 MB |

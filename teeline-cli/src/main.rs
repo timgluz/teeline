@@ -36,10 +36,13 @@ impl<'a> CliArgsProvider<'a> {
 impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         use teeline::tsp::{
-            CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, LKOptions,
-            SAOptions,
+            AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
+            LKOptions, SAOptions,
         };
         match self.solver {
+            Solvers::AntColony => {
+                base.aco = Some(AcoOptions::from_cli(self.args)?);
+            }
             Solvers::SimulatedAnnealing => {
                 base.sa = Some(SAOptions::from_cli(self.args)?);
             }
@@ -89,7 +92,7 @@ fn build_cli() -> Command {
     let solve_cmd = Command::new("solve")
         .about(
             "Solve a TSP instance. Deterministic solvers (2opt, 3opt, tabu, lk) auto-expand to \
-                pipeline(nn, solver); stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill) \
+                pipeline(nn, solver); stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill, aco) \
                 auto-expand to pipeline(shuffle, solver).",
         )
         .arg(
@@ -315,6 +318,30 @@ fn tuning_args() -> Vec<Arg> {
                  (without k_max) can worsen quality; k_max is the primary lever, see \
                  docs/algorithms/fourier.md",
             )
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("alpha")
+            .long("alpha")
+            .value_name("N")
+            .help("ACO: pheromone influence on transition probability (default 1.0)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("beta")
+            .long("beta")
+            .value_name("N")
+            .help("ACO: heuristic (1/distance) influence on transition probability (default 2.0, max 10.0)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("evaporation_rate")
+            .long("evaporation-rate")
+            .value_name("N")
+            .help("ACO: fraction of pheromone lost per epoch, in (0, 1) (default 0.5)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("num_ants")
+            .long("num-ants")
+            .value_name("N")
+            .help("ACO: colony size — number of ants constructing tours per epoch (default 25)")
             .action(ArgAction::Set)
             .required(false),
     ]
@@ -799,6 +826,31 @@ mod tests {
         let args = options_cmd().get_matches_from(["test", "fourier", "--k-max", "32"]);
         let opts = solver_options_from_args(&args, Solvers::Fourier);
         assert_eq!(opts.fourier.unwrap().k_max, 32);
+    }
+
+    #[test]
+    fn test_solver_options_aco_num_ants_parsed() {
+        // Exercises the CliArgsProvider::provide match arm for Solvers::AntColony —
+        // without it, base.aco is never populated regardless of flags (compiles fine,
+        // silently ignores the flag).
+        let args = options_cmd().get_matches_from([
+            "test",
+            "aco",
+            "--num-ants",
+            "12",
+            "--alpha",
+            "2.0",
+            "--beta",
+            "4.0",
+            "--evaporation-rate",
+            "0.3",
+        ]);
+        let opts = solver_options_from_args(&args, Solvers::AntColony);
+        let aco = opts.aco.unwrap();
+        assert_eq!(aco.num_ants, 12);
+        assert!((aco.alpha - 2.0).abs() < 1e-6);
+        assert!((aco.beta - 4.0).abs() < 1e-6);
+        assert!((aco.evaporation_rate - 0.3).abs() < 1e-6);
     }
 
     #[test]

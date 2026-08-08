@@ -76,6 +76,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | `gravitational_search.rs` | Gravitational Search Algorithm (Rashedi 2009): mass-weighted swap-velocity swarm (educational) | `gsa` |
 | `fourier.rs` | Fourier-basis constructive solver: closed-curve gradient descent + argsort decode | `fourier` |
 | `greedy_edge.rs` | Greedy edge construction: Kruskal-style, sorts all edges shortest-first and greedily accepts unless it creates degree 3+ or a premature sub-cycle (uses `graph.rs`'s union-find) | `gec` |
+| `ant_colony.rs` | Ant Colony Optimization (Ant System): pheromone- and heuristic-biased probabilistic tour construction; global evaporate + all-ants-deposit update per epoch | `aco` |
 
 **Tests:**
 

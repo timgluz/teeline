@@ -1,0 +1,6 @@
+[[stage]]
+solver = "aco"
+
+[stage.aco]
+epochs = 30
+num_ants = 10
