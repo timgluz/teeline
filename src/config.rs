@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::tsp::{
-    AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, LKOptions,
-    SAOptions, SOMOptions, Solvers,
+    AcoOptions, AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
+    LKOptions, SAOptions, SOMOptions, Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -13,8 +13,8 @@ pub trait AppOptionsProvider {
 }
 
 /// Applies recognised sub-tables from a `toml::Table` to the base `AppOptions`.
-/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `lk`, `som`, and `heuristic` are
-/// valid top-level keys.
+/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `lk`, `som`, `aco`, and `heuristic`
+/// are valid top-level keys.
 /// Returns `Err` on unknown keys or mis-typed sub-tables.
 pub struct TomlTableProvider<'a>(pub &'a toml::Table);
 
@@ -53,6 +53,10 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                     let t = value.as_table().ok_or("config: `som` must be a table")?;
                     base.som = Some(SOMOptions::from_toml(t)?);
                 }
+                "aco" => {
+                    let t = value.as_table().ok_or("config: `aco` must be a table")?;
+                    base.aco = Some(AcoOptions::from_toml(t)?);
+                }
                 "heuristic" => {
                     let t = value
                         .as_table()
@@ -61,7 +65,7 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, lk, som, heuristic"
+                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, lk, som, aco, heuristic"
                     ));
                 }
             }
@@ -119,6 +123,7 @@ pub fn load_pipeline_config(
             ("fourier", matches!(solver, Solvers::Fourier)),
             ("lk", matches!(solver, Solvers::LinKernighan)),
             ("som", matches!(solver, Solvers::KohonenSom)),
+            ("aco", matches!(solver, Solvers::AntColony)),
             (
                 "heuristic",
                 !matches!(
@@ -130,6 +135,7 @@ pub fn load_pipeline_config(
                         | Solvers::Fourier
                         | Solvers::LinKernighan
                         | Solvers::KohonenSom
+                        | Solvers::AntColony
                 ),
             ),
         ] {
@@ -485,6 +491,52 @@ mod tests {
         let stages = load_pipeline_config(toml, AppOptions::default()).unwrap();
         let sa = stages[0].1.sa.as_ref().unwrap();
         assert!((sa.max_temperature - 200.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_toml_provider_aco_sub_table_works() {
+        let table: toml::Table =
+            toml::from_str("solver = \"aco\"\n[aco]\nnum_ants = 10\nbeta = 3.0").unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        let aco = opts.aco.unwrap();
+        assert_eq!(aco.num_ants, 10);
+        assert!((aco.beta - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_load_pipeline_config_aco_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.aco]\nnum_ants = 10\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("aco"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_aco_errors() {
+        // ACO reads only opts.aco at solve time, never opts.heuristic —
+        // [stage.heuristic] on an aco stage is a silent no-op unless rejected here.
+        let toml = "[[stage]]\nsolver = \"aco\"\n\n[stage.aco]\nnum_ants = 10\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_aco_evaporation_rate_zero_errors() {
+        // Proves validate() actually fires through load_pipeline_config -> from_toml.
+        let toml = "[[stage]]\nsolver = \"aco\"\n\n[stage.aco]\nevaporation_rate = 0.0\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("evaporation_rate"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_aco_num_ants_in_sub_table() {
+        let toml = "[[stage]]\nsolver = \"aco\"\n\n[stage.aco]\nnum_ants = 15\nalpha = 2.0\n";
+        let stages = load_pipeline_config(toml, AppOptions::default()).unwrap();
+        assert_eq!(stages[0].0, Solvers::AntColony);
+        let aco = stages[0].1.aco.as_ref().unwrap();
+        assert_eq!(aco.num_ants, 15);
+        assert!((aco.alpha - 2.0).abs() < 1e-6);
     }
 
     #[test]
