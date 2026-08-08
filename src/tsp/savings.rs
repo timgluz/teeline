@@ -119,9 +119,14 @@ fn hub_position(cities: &[KDPoint]) -> usize {
 /// most by being linked directly (rather than both via the hub) sort first.
 ///
 /// Hub-involving pairs (`i == hub` or `j == hub`) have savings `0.0` (since
-/// `d(hub,hub)=0`), so they sink to the bottom of the descending sort and are
-/// accepted only when needed to fill the hub's two edges — guaranteeing the run
-/// terminates with exactly `n` edges covering every position including the hub.
+/// `d(hub,hub)=0`). Under EUC_2D the triangle inequality keeps every non-hub
+/// savings ≥ 0, so hub pairs sort last; under GEO (floored great-circle
+/// distances) flooring can break the triangle inequality and produce negative
+/// non-hub savings, so hub pairs may not be last. This is irrelevant to
+/// termination: `select_edges` always places exactly `n` edges forming one
+/// Hamiltonian cycle regardless of sort order (its spanning-forest argument is
+/// order-independent), so the hub always ends up with degree 2 like every other
+/// position.
 fn sorted_edges_by_savings(
     n: usize,
     hub: usize,
