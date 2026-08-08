@@ -24,6 +24,7 @@ pub mod probability;
 pub mod progress;
 pub mod random_shuffle;
 pub mod route;
+pub mod savings;
 pub mod simulated_annealing;
 pub mod som;
 pub mod stochastic_hill;
@@ -49,6 +50,7 @@ pub enum Solvers {
     BellmanKarp,
     BranchBound,
     Christofides,
+    Savings,
     CuckooSearch,
     FlowerPollination,
     Fourier,
@@ -79,6 +81,8 @@ impl Solvers {
             "branch_bound",
             "christofides",
             "chr",
+            "savings",
+            "sav",
             "cs",
             "cuckoo_search",
             "fpa",
@@ -235,6 +239,11 @@ impl Solvers {
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
+                name: "savings",
+                alias: Some("sav"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
                 name: "nearest_neighbor",
                 alias: Some("nn"),
                 kind: SolverKind::Heuristic,
@@ -337,7 +346,7 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 21] = [
+static SOLVER_LIST: [SolverInfo; 22] = [
     SolverInfo {
         name: "Ant Colony",
         alias: "aco",
@@ -398,6 +407,17 @@ static SOLVER_LIST: [SolverInfo; 21] = [
         category: "Constructive",
         desc: "Kruskal-style construction: sorts all edges shortest-first and greedily \
                accepts each unless it creates degree 3+ or a premature sub-cycle.",
+        complexity: "O(n\u{00b2} log n) time, O(n\u{00b2}) memory",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Savings",
+        alias: "sav",
+        category: "Constructive",
+        desc: "Savings construction: ranks edges by s(i,j)=d(hub,i)+d(hub,j)-d(i,j) relative to a \
+               centroid-nearest hub, then greedily accepts each (Kruskal-style degree/cycle guard). \
+               Inspired by Clarke-Wright but mechanically a savings-ordered greedy-edge builder.",
         complexity: "O(n\u{00b2} log n) time, O(n\u{00b2}) memory",
         has_options: false,
         exact: false,
@@ -543,6 +563,7 @@ impl FromStr for Solvers {
             "bhk" | "bellman_karp" => Ok(Solvers::BellmanKarp),
             "branch_bound" => Ok(Solvers::BranchBound),
             "christofides" | "chr" => Ok(Solvers::Christofides),
+            "sav" | "savings" => Ok(Solvers::Savings),
             "cs" | "cuckoo_search" => Ok(Solvers::CuckooSearch),
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
             "fourier" => Ok(Solvers::Fourier),
@@ -1637,6 +1658,7 @@ pub fn solve_with_context(
         Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour),
         Solvers::BranchBound => branch_bound::solve(problem, &h, tx, init_tour),
         Solvers::Christofides => christofides::solve(problem, &h, tx, init_tour),
+        Solvers::Savings => savings::solve(problem, &h, tx, init_tour),
         Solvers::CuckooSearch => {
             let cs = opts.cs.as_ref().cloned().unwrap_or_default();
             cuckoo_search::solve(problem, &cs, tx, init_tour)

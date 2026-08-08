@@ -112,6 +112,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "fourier"         => "Constructive Fourier-basis solver; best as warm-start: pipeline(fourier,2opt)",
         "som"             => "Topology-preserving constructive solver; best piped: pipeline(som,2opt) or pipeline(som,sa)",
         "gec"             => "Deterministic edge-by-edge construction; usually beats nn as a warm-start: pipeline(greedy_edge,2opt) or pipeline(greedy_edge,lk)",
+        "sav"             => "Savings-based construction; strong warm-start: pipeline(savings,2opt) or pipeline(savings,lk)",
         _                 => info.category,
     }
     .to_string()
@@ -122,6 +123,7 @@ fn kind_for(solver: Solvers) -> String {
         Solvers::BellmanKarp | Solvers::BranchBound => "exact",
         Solvers::NearestNeighbor
         | Solvers::Christofides
+        | Solvers::Savings
         | Solvers::Fourier
         | Solvers::KohonenSom
         | Solvers::GreedyEdge => "constructive",
