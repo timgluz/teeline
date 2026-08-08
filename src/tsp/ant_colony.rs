@@ -2,6 +2,7 @@ use std::sync::mpsc;
 
 use rand::RngExt;
 
+use super::probability::roulette_select;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{AcoOptions, Solution, TspProblem};
@@ -50,23 +51,6 @@ fn deposit_tour(pheromone: &mut [f32], n: usize, tour_pos: &[usize], cost: f32) 
     }
 }
 
-/// Roulette-wheel selection over `weights`, given `sum` (the caller-provided total, which
-/// may differ slightly from the true sum due to floating-point rounding over 50+ terms)
-/// and `r` drawn uniformly from `[0, 1)`. If the accumulation loop exhausts without
-/// crossing `r * sum` — a real, reachable path given f32 rounding, not a theoretical one —
-/// falls back to the last candidate rather than panicking.
-fn roulette_select(weights: &[(usize, f32)], sum: f32, r: f32) -> usize {
-    let target = r * sum;
-    let mut acc = 0.0f32;
-    for &(pos, w) in weights {
-        acc += w;
-        if acc >= target {
-            return pos;
-        }
-    }
-    weights.last().expect("weights must be non-empty").0
-}
-
 /// Selects the next city with graceful degradation for numerically degenerate weight sets.
 /// `primary` = (position, pheromone^alpha * eta^beta) pairs for the candidate set; `fallback`
 /// = (position, eta^beta) pairs for the same candidates. If `primary`'s sum is non-positive
@@ -90,6 +74,13 @@ fn select_next(primary: &[(usize, f32)], fallback: &[(usize, f32)], r1: f32, r2:
         .first()
         .map(|&(pos, _)| pos)
         .unwrap_or_else(|| primary.first().expect("candidate set must be non-empty").0)
+}
+
+/// A single ant's constructed tour (position-space) and its cost, grouped together rather
+/// than tracked as parallel `Vec<Vec<usize>>`/`Vec<f32>` arrays matched by index.
+struct Ant {
+    tour: Vec<usize>,
+    cost: f32,
 }
 
 /// Ant System (Dorigo 1996): a colony of stateless ants probabilistically construct tours
@@ -192,8 +183,7 @@ pub fn solve(
         // num_ants * n^2 / 2 evaluations vs n^2 here.
         let tau_alpha: Vec<f32> = pheromone.iter().map(|&t| t.powf(opts.alpha)).collect();
 
-        let mut ant_tours: Vec<Vec<usize>> = Vec::with_capacity(opts.num_ants);
-        let mut ant_costs: Vec<f32> = Vec::with_capacity(opts.num_ants);
+        let mut ants: Vec<Ant> = Vec::with_capacity(opts.num_ants);
 
         for _ in 0..opts.num_ants {
             let start = rng.random_range(0..n);
@@ -236,13 +226,12 @@ pub fn solve(
                     ));
                 }
             }
-            ant_tours.push(tour);
-            ant_costs.push(cost);
+            ants.push(Ant { tour, cost });
         }
 
         evaporate_and_floor(&mut pheromone, opts.evaporation_rate, tau_min);
-        for (tour, &cost) in ant_tours.iter().zip(ant_costs.iter()) {
-            deposit_tour(&mut pheromone, n, tour, cost);
+        for ant in &ants {
+            deposit_tour(&mut pheromone, n, &ant.tour, ant.cost);
         }
 
         if let Some(tx) = progress_tx {
@@ -328,25 +317,6 @@ mod tests {
         let mut pheromone = vec![0.0; n * n];
         deposit_tour(&mut pheromone, n, &[0, 1, 2], 0.0);
         assert!(pheromone.iter().all(|&t| t == 0.0));
-    }
-
-    #[test]
-    fn test_roulette_select_picks_correct_bucket() {
-        let weights = [(0usize, 1.0f32), (1usize, 3.0f32)];
-        // sum=4.0, r=0.5 -> target=2.0; acc after (0,1.0)=1.0 < 2.0; acc after (1,3.0)=4.0 >= 2.0.
-        assert_eq!(roulette_select(&weights, 4.0, 0.5), 1);
-        // r close to 0 should pick the first bucket.
-        assert_eq!(roulette_select(&weights, 4.0, 0.01), 0);
-    }
-
-    #[test]
-    fn test_roulette_select_exhaustion_falls_back_to_last() {
-        // Caller-provided sum (3.0) is inflated relative to the true weight total (2.0) —
-        // simulates f32 rounding drift. With r close to 1, target (2.9997) exceeds the max
-        // achievable accumulation (2.0), so the loop must exhaust and fall back to the last
-        // candidate rather than panicking.
-        let weights = [(0usize, 1.0f32), (1usize, 1.0f32)];
-        assert_eq!(roulette_select(&weights, 3.0, 0.9999), 1);
     }
 
     #[test]

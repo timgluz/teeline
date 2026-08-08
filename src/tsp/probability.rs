@@ -52,6 +52,23 @@ pub fn sample_without_replacement(rng: &mut impl RngExt, n: usize, excluded: &[u
     }
 }
 
+/// Roulette-wheel selection over `(id, weight)` pairs, given `sum` (the caller-provided
+/// total, which may differ slightly from the true sum due to floating-point rounding over
+/// many terms) and `r` drawn uniformly from `[0, 1)`. If the accumulation loop exhausts
+/// without crossing `r * sum` — a real, reachable path given f32 rounding, not a
+/// theoretical one — falls back to the last candidate rather than panicking.
+pub fn roulette_select(weights: &[(usize, f32)], sum: f32, r: f32) -> usize {
+    let target = r * sum;
+    let mut acc = 0.0f32;
+    for &(id, w) in weights {
+        acc += w;
+        if acc >= target {
+            return id;
+        }
+    }
+    weights.last().expect("weights must be non-empty").0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -121,5 +138,24 @@ mod tests {
         for _ in 0..100 {
             assert!(bernoulli(&mut rng, 1.1));
         }
+    }
+
+    #[test]
+    fn test_roulette_select_picks_correct_bucket() {
+        let weights = [(0usize, 1.0f32), (1usize, 3.0f32)];
+        // sum=4.0, r=0.5 -> target=2.0; acc after (0,1.0)=1.0 < 2.0; acc after (1,3.0)=4.0 >= 2.0.
+        assert_eq!(roulette_select(&weights, 4.0, 0.5), 1);
+        // r close to 0 should pick the first bucket.
+        assert_eq!(roulette_select(&weights, 4.0, 0.01), 0);
+    }
+
+    #[test]
+    fn test_roulette_select_exhaustion_falls_back_to_last() {
+        // Caller-provided sum (3.0) is inflated relative to the true weight total (2.0) —
+        // simulates f32 rounding drift. With r close to 1, target (2.9997) exceeds the max
+        // achievable accumulation (2.0), so the loop must exhaust and fall back to the last
+        // candidate rather than panicking.
+        let weights = [(0usize, 1.0f32), (1usize, 1.0f32)];
+        assert_eq!(roulette_select(&weights, 3.0, 0.9999), 1);
     }
 }
