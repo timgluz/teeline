@@ -60,6 +60,7 @@ impl Modify for SecurityAddon {
         request::GaConfig,
         request::CsConfig,
         request::FpaConfig,
+        request::AcoConfig,
         request::SomConfig,
         request::FourierConfig,
         request::SolverConfigs,
