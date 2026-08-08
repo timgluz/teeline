@@ -27,6 +27,7 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   fpa: { id: 'fpa', name: 'Flower Pollination' },
   gsa: { id: 'gsa', name: 'Gravitational Search' },
   som: { id: 'som', name: 'Kohonen SOM' },
+  aco: { id: 'aco', name: 'Ant Colony Optimization' },
 }
 
 export interface SolverGroup {
@@ -38,7 +39,7 @@ export const SOLVER_GROUPS: SolverGroup[] = [
   { label: 'Exact', ids: ['bhk', 'branch_bound'] },
   { label: 'Constructive', ids: ['nn', 'fourier', 'christofides', 'greedy_edge', 'som'] },
   { label: 'Local search', ids: ['2opt', '3opt', 'or_opt', 'stochastic_hill', 'lk'] },
-  { label: 'Metaheuristic', ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa'] },
+  { label: 'Metaheuristic', ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa', 'aco'] },
 ]
 
 // Every id in SOLVER_META has a generated doc page under /algorithms/<id>/.
