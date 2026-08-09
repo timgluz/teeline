@@ -1,0 +1,103 @@
+---
+type Kind = 'exact' | 'constructive' | 'local' | 'meta'
+const { kind } = Astro.props as { kind: Kind }
+---
+
+{
+  kind === 'exact' && (
+    <svg width="72" height="48" viewBox="0 0 72 48" class="shrink-0 text-accent" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-width="1.2" opacity="0.5">
+        <line x1="10" y1="40" x2="36" y2="8" />
+        <line x1="10" y1="40" x2="62" y2="40" />
+        <line x1="10" y1="40" x2="36" y2="40" />
+        <line x1="36" y1="8" x2="62" y2="40" />
+        <line x1="36" y1="8" x2="62" y2="12" />
+        <line x1="36" y1="40" x2="62" y2="12" />
+      </g>
+      <line x1="10" y1="40" x2="36" y2="8" stroke="currentColor" stroke-width="2" opacity="0.9" />
+      <g fill="currentColor">
+        <circle cx="10" cy="40" r="3" />
+        <circle cx="36" cy="8" r="3" />
+        <circle cx="62" cy="40" r="3" />
+        <circle cx="36" cy="40" r="3" />
+        <circle cx="62" cy="12" r="3" />
+      </g>
+    </svg>
+  )
+}
+
+{
+  kind === 'constructive' && (
+    <svg width="72" height="48" viewBox="0 0 72 48" class="shrink-0 text-accent" aria-hidden="true">
+      <polyline
+        points="8,36 20,14 34,28 48,10"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <line
+        x1="48"
+        y1="10"
+        x2="62"
+        y2="26"
+        stroke="currentColor"
+        stroke-width="1.2"
+        stroke-dasharray="4 3"
+        stroke-linecap="round"
+      />
+      <g fill="currentColor">
+        <circle cx="8" cy="36" r="3" />
+        <circle cx="20" cy="14" r="3" />
+        <circle cx="34" cy="28" r="3" />
+        <circle cx="48" cy="10" r="3" />
+        <circle cx="62" cy="26" r="3" />
+      </g>
+    </svg>
+  )
+}
+
+{
+  kind === 'local' && (
+    <svg width="72" height="48" viewBox="0 0 72 48" class="shrink-0 text-accent" aria-hidden="true">
+      <g opacity="0.35" stroke="currentColor" stroke-width="1.2">
+        <line x1="10" y1="10" x2="62" y2="38" />
+        <line x1="10" y1="38" x2="62" y2="10" />
+      </g>
+      <polyline
+        points="12,10 60,10 60,38 12,38"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+      <g fill="currentColor">
+        <circle cx="12" cy="10" r="3" />
+        <circle cx="60" cy="10" r="3" />
+        <circle cx="60" cy="38" r="3" />
+        <circle cx="12" cy="38" r="3" />
+      </g>
+    </svg>
+  )
+}
+
+{
+  kind === 'meta' && (
+    <svg width="72" height="48" viewBox="0 0 72 48" class="shrink-0 text-accent" aria-hidden="true">
+      <g fill="none" stroke="currentColor" stroke-linecap="round">
+        <line x1="10" y1="38" x2="36" y2="10" stroke-width="4" opacity="0.9" />
+        <line x1="10" y1="38" x2="62" y2="38" stroke-width="1.2" opacity="0.4" />
+        <line x1="36" y1="10" x2="62" y2="38" stroke-width="2.4" opacity="0.7" />
+        <line x1="36" y1="10" x2="48" y2="14" stroke-width="1.2" opacity="0.4" />
+      </g>
+      <g fill="currentColor">
+        <circle cx="10" cy="38" r="3" />
+        <circle cx="36" cy="10" r="3" />
+        <circle cx="62" cy="38" r="3" />
+        <circle cx="48" cy="14" r="3" />
+      </g>
+    </svg>
+  )
+}

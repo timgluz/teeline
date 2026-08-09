@@ -1,0 +1,98 @@
+---
+import { berlin52 } from '../lib/hero-cities'
+---
+
+<header class="relative overflow-hidden">
+  <!-- Faint route motif in the background -->
+  <div aria-hidden="true" class="pointer-events-none absolute inset-0 opacity-[0.06]">
+    <svg class="h-full w-full" viewBox="0 0 1800 1200" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="3">
+      {berlin52.map((c, i) => {
+        const next = berlin52[(i + 1) % berlin52.length]
+        return <line key={i} x1={c.x} y1={c.y} x2={next.x} y2={next.y} />
+      })}
+    </svg>
+  </div>
+
+  <div class="relative mx-auto grid max-w-content gap-12 px-6 py-16 lg:grid-cols-2 lg:py-24">
+    <!-- Left column: copy -->
+    <div class="flex flex-col justify-center">
+      <p class="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wider text-accent">
+        <span class="relative flex h-2 w-2">
+          <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75"></span>
+          <span class="relative inline-flex h-2 w-2 rounded-full bg-accent"></span>
+        </span>
+        live · 2-opt running
+      </p>
+      <h1 class="max-w-xl text-3xl font-semibold tracking-tight lg:text-5xl">
+        Solve the Traveling Salesman Problem, in your browser.
+      </h1>
+      <p class="mt-5 max-w-lg text-base text-text-dim">
+        20 algorithms from Held-Karp to Ant Colony, compiled to WebAssembly.
+        Nothing leaves your machine — drag the cities and watch the tour recompute.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-4">
+        <a href="/solve/" class="inline-flex items-center gap-2 rounded-md bg-accent px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent/90">
+          Open the solver
+          <span aria-hidden="true">→</span>
+        </a>
+        <a href="#algorithms" class="inline-flex items-center gap-2 rounded-md border border-border px-5 py-2.5 font-medium text-text transition-colors hover:border-border-hover hover:bg-surface">
+          Read the algorithm guide
+        </a>
+      </div>
+      <dl class="mt-10 grid max-w-md grid-cols-3 gap-6 border-t border-border pt-6">
+        <div>
+          <dt class="font-mono text-xs uppercase tracking-wider text-text-dim">Largest instance</dt>
+          <dd class="mt-1 font-mono text-sm text-text">pr1002 · 1002 cities</dd>
+        </div>
+        <div>
+          <dt class="font-mono text-xs uppercase tracking-wider text-text-dim">Algorithms</dt>
+          <dd class="mt-1 font-mono text-sm text-text">20</dd>
+        </div>
+        <div>
+          <dt class="font-mono text-xs uppercase tracking-wider text-text-dim">Runtime</dt>
+          <dd class="mt-1 font-mono text-sm text-text">WASM · no server</dd>
+        </div>
+      </dl>
+    </div>
+
+    <!-- Right column: live solver canvas -->
+    <div class="flex items-center justify-center">
+      <div class="w-full max-w-lg rounded-lg border border-border bg-surface p-4">
+        <div class="mb-3 flex items-center justify-between">
+          <div>
+            <p class="font-mono text-sm text-text">berlin52</p>
+            <p class="font-mono text-xs text-text-dim">2-opt · nearest-neighbour seed</p>
+          </div>
+          <span id="hero-solve-status" class="font-mono text-xs text-accent">solving</span>
+        </div>
+        <svg
+          id="hero-canvas"
+          viewBox="0 0 1800 1200"
+          class="h-auto w-full touch-none select-none"
+          role="img"
+          aria-label="Live TSP solver tour"
+        ></svg>
+        <p class="mt-2 font-mono text-xs text-text-dim">drag any city to edit</p>
+        <div class="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-3">
+          <div>
+            <p class="font-mono text-xs uppercase tracking-wider text-text-dim">tour length</p>
+            <p id="hero-tour-length" class="mt-0.5 font-mono text-lg text-text">—</p>
+          </div>
+          <div>
+            <p class="font-mono text-xs uppercase tracking-wider text-text-dim">iterations</p>
+            <p id="hero-iterations" class="mt-0.5 font-mono text-lg text-text">—</p>
+          </div>
+          <div>
+            <p class="font-mono text-xs uppercase tracking-wider text-text-dim">best</p>
+            <p id="hero-best" class="mt-0.5 font-mono text-lg text-positive">—</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<script>
+  import { initHeroCanvas } from '../lib/hero-canvas'
+  initHeroCanvas()
+</script>

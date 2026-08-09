@@ -1,0 +1,89 @@
+---
+interface Tile {
+  label: string
+  tag: string
+  code: string
+  blurb: string
+  href?: string
+}
+
+const TILES: Tile[] = [
+  {
+    label: 'HTTP API',
+    tag: 'cloud',
+    href: 'https://api.tspsolver.com/docs',
+    code: `# POST a .tsp instance, get a tour back
+curl -X POST https://api.tspsolver.com/solve \\
+  -H "Content-Type: application/json" \\
+  -d '{"instance":"berlin52","algo":"lin-kernighan"}'`,
+    blurb: 'Stateless, idempotent, rate-limited per key. The same WASM binary runs server-side.',
+  },
+  {
+    label: 'CLI',
+    tag: 'local',
+    href: 'https://github.com/timgluz/teeline',
+    code: `$ teeline solve berlin52.tsp --algo lk --time 5s
+tour: 7542  gap: 0.0%  time: 1.2s  iter: 8,412
+
+$ teeline batch ./instances/ --algo 2-opt`,
+    blurb: 'Pipes in and out. Drop it in a Makefile or a CI step.',
+  },
+  {
+    label: 'WebAssembly',
+    tag: 'embed',
+    href: '/solve/',
+    code: `import { solve } from 'teeline-wasm'
+
+const tour = solve(cities, {
+  algo: '2-opt',
+  epochs: 2000,
+})
+// → [0, 3, 7, 12, ...]`,
+    blurb: 'Runs in any browser, Node, Deno, or Bun. No server, nothing leaves your machine.',
+  },
+  {
+    label: 'WebMCP',
+    tag: 'agent',
+    href: '/webmcp/',
+    code: `{ "tool": "teeline.solve",
+  "params": {
+    "instance": "berlin52",
+    "algo": "auto"
+  }
+} → returns tour + metrics`,
+    blurb: 'Register the solver as an MCP tool. Your agent picks the algorithm.',
+  },
+]
+---
+
+<section id="access" class="mx-auto max-w-content px-6 py-16 lg:py-24">
+  <div class="mb-10 max-w-2xl">
+    <p class="mb-3 font-mono text-xs uppercase tracking-wider text-accent">access</p>
+    <h2 class="text-2xl font-semibold tracking-tight lg:text-4xl">Four ways to call the same solver.</h2>
+    <p class="mt-3 text-text-dim">One WASM core, four surfaces. The browser tool above is the same binary your CLI calls.</p>
+  </div>
+
+  <div class="grid gap-5 md:grid-cols-2">
+    {TILES.map((tile) => (
+      <article class="flex flex-col rounded-lg border border-border bg-surface p-6 transition-colors hover:border-border-hover">
+        <div class="mb-4 flex items-center justify-between">
+          <h3 class="text-lg font-semibold tracking-tight">{tile.label}</h3>
+          <span class="rounded-full border border-border px-2.5 py-0.5 font-mono text-xs text-text-dim">{tile.tag}</span>
+        </div>
+        <pre class="mb-4 flex-1 overflow-x-auto rounded-md border border-border bg-canvas p-4 font-mono text-xs leading-relaxed text-text"><code>{tile.code}</code></pre>
+        <p class="text-sm text-text-dim">{tile.blurb}</p>
+        {tile.href && (
+          <a
+            href={tile.href}
+            target={tile.href.startsWith('http') ? '_blank' : undefined}
+            rel={tile.href.startsWith('http') ? 'noopener noreferrer' : undefined}
+            class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-accent hover:underline"
+          >
+            {tile.label.toLowerCase()} docs
+            <span aria-hidden="true">→</span>
+          </a>
+        )}
+      </article>
+    ))}
+  </div>
+</section>

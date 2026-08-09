@@ -1,0 +1,35 @@
+---
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+import '@fontsource/jetbrains-mono/400.css'
+import '../styles/landing.css'
+import Topbar from '../components/Topbar.astro'
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const {
+  title = 'Teeline — Traveling Salesman Problem Solver',
+  description = 'Solve the Traveling Salesman Problem in your browser. 20 algorithms from Held-Karp to Ant Colony, compiled to WebAssembly. Nothing leaves your machine.',
+} = Astro.props
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/png" href="/favicon.svg" />
+    <link rel="canonical" href={`https://tspsolver.com${Astro.url.pathname}`} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <Topbar variant="landing" />
+    <slot />
+  </body>
+</html>

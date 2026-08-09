@@ -1,69 +1,30 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro'
-import AlgorithmCards from '../components/AlgorithmCards.astro'
-import FeatureCards from '../components/FeatureCards.astro'
-import '../main.css'
-
-const description =
-  "Browser-based Traveling Salesman Problem solver. Upload a TSPLIB .tsp file, pick an algorithm — Nearest Neighbor, 2-opt, Lin-Kernighan, Simulated Annealing and more — and download the optimised tour. Runs entirely in-browser via WebAssembly."
-const ogDescription =
-  "Browser-based Traveling Salesman Problem solver. Upload a TSPLIB .tsp file, pick an algorithm and download the optimised tour — runs entirely in-browser via WebAssembly."
-
-const jsonLd = {
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: 'teeline',
-  description: ogDescription,
-  url: 'https://tspsolver.com/',
-  applicationCategory: 'DeveloperApplication',
-  operatingSystem: 'Any (runs in-browser via WebAssembly)',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-}
+import LandingLayout from '../layouts/LandingLayout.astro'
+import LandingHero from '../components/LandingHero.astro'
+import LandingAlgorithms from '../components/LandingAlgorithms.astro'
+import LandingBenchmarks from '../components/LandingBenchmarks.astro'
+import LandingAccess from '../components/LandingAccess.astro'
 ---
-<BaseLayout title="Teeline TSP Solver" description={description} ogDescription={ogDescription} path="/">
-  <Fragment slot="head">
-    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
-  </Fragment>
 
-  <header class="container hero">
-    <img
-      src="/hero-logo.png"
-      width="130"
-      height="152"
-      alt="Teeline logo: a Big Dipper constellation forming a route, with the tagline Find your path"
-      class="hero-logo"
-    />
-    <div class="hero-text">
-      <h1>Teeline TSP Solver</h1>
-      <p class="tagline">
-        Find the shortest route through your cities — one of computing's oldest hard
-        problems, solved live in your browser with 20 algorithms, from exact search to
-        genetic algorithms and swarm intelligence.
-      </p>
-      <p class="tagline-link">
-        New to the problem? <a href="/tsp/">Read the TSP overview</a> — history, real-world
-        uses, and further reading.
-      </p>
-      <p>
-        <a href="/solve/" role="button">▶ Open Solver</a>
-      </p>
-    </div>
-  </header>
+<LandingLayout>
+  <LandingHero />
+  <LandingAlgorithms />
+  <LandingBenchmarks />
+  <LandingAccess />
 
-  <section class="container" aria-labelledby="features-heading">
-    <h2 id="features-heading">Features</h2>
-    <FeatureCards />
-  </section>
-
-  <section class="container" aria-labelledby="algorithms-index-heading">
-    <h2 id="algorithms-index-heading">Explore the algorithms</h2>
-    <p>Read how each solver works, with pseudocode and references:</p>
-    <AlgorithmCards />
-  </section>
-
-  <footer id="app-footer" class="container">
-    <div class="footer-links">
-      <a href="/solve/" role="button">Open Solver →</a>
+  <footer class="border-t border-border">
+    <div class="mx-auto flex max-w-content flex-wrap items-center justify-between gap-4 px-6 py-8">
+      <span class="font-mono text-sm text-text">teeline</span>
+      <nav class="flex items-center gap-6 font-mono text-xs">
+        <a href="/solve/" class="text-text-dim transition-colors hover:text-text">solver</a>
+        <a href="/algorithms/" class="text-text-dim transition-colors hover:text-text">algorithms</a>
+        <a href="/problems/" class="text-text-dim transition-colors hover:text-text">problems</a>
+        <a href="/blog/" class="text-text-dim transition-colors hover:text-text">blog</a>
+        <a href="https://github.com/timgluz/teeline" target="_blank" rel="noopener noreferrer" class="text-text-dim transition-colors hover:text-text">
+          github ↗
+        </a>
+      </nav>
+      <span class="font-mono text-xs text-text-dim">v0.2.1 · MIT</span>
     </div>
   </footer>
-</BaseLayout>
+</LandingLayout>
