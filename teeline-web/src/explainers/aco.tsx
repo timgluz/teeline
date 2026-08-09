@@ -24,11 +24,12 @@ function cityColor(i: number, onBest: boolean, onLast: boolean): string {
 interface CanvasProps {
   pheromone: number[][]
   maxP: number
+  tau0: number
   bestTour: number[]
   lastTour: number[] | null
   phase: string
 }
-function PheromoneCanvas({ pheromone, maxP, bestTour, lastTour, phase }: CanvasProps) {
+function PheromoneCanvas({ pheromone, maxP, tau0, bestTour, lastTour, phase }: CanvasProps) {
   const bestSet = useMemo(() => new Set(bestTour), [bestTour])
   const lastSet = useMemo(() => lastTour ? new Set(lastTour) : new Set<number>(), [lastTour])
 
@@ -49,21 +50,22 @@ function PheromoneCanvas({ pheromone, maxP, bestTour, lastTour, phase }: CanvasP
     <svg viewBox="0 0 300 300" className="aco-canvas" role="img" aria-label="ACO pheromone map">
       <rect x={0} y={0} width={300} height={300} className="aco-bg" />
 
-      {/* pheromone edges — dashed, width ∝ pheromone, subtle teal */}
+      {/* pheromone edges — only edges above baseline tau0 are visible;
+          untouched edges stay invisible so the colony's emergent trails are
+          the only thing on the canvas (no full-graph noise at the start) */}
       {edges.map(([i, j, p], k) => {
+        if (p <= tau0 * 1.0001) return null  // untouched, invisible
         const ratio = maxP > 0 ? p / maxP : 0
-        // power curve amplifies small pheromone differences:
-        // ratio 1.0→1.0, 0.9→0.76, 0.5→0.19 — edges that lag behind maxP fade fast
         const amp = Math.pow(ratio, 0.35)
         return (
           <line key={"p" + k}
             x1={CITIES[i][0]} y1={CITIES[i][1]}
             x2={CITIES[j][0]} y2={CITIES[j][1]}
             stroke="#0d9488"
-            strokeWidth={0.3 + amp * 4.5}
-            opacity={0.04 + amp * 0.72}
+            strokeWidth={0.3 + amp * 5.0}
+            opacity={0.05 + amp * 0.75}
             strokeLinecap="round"
-            strokeDasharray={amp > 0.35 ? "6 4" : "3 6"}
+            strokeDasharray={amp > 0.35 ? "5 3" : "3 5"}
           />
         )
       })}
@@ -180,6 +182,7 @@ export default function AcoExplainer() {
   const [lastTour, setLastTour] = useState<number[] | null>(null)
   const [lastEvent, setLastEvent] = useState<EventMode | null>(null)
   const [costHistory, setCostHistory] = useState<number[]>([])
+  const [tau0, setTau0] = useState(() => simRef.current.tau0)
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
 
@@ -189,6 +192,7 @@ export default function AcoExplainer() {
     setPhase('building'); setAntIdx(0)
     setBestTour(simRef.current.bestTour.slice()); setBestCost(simRef.current.bestCost)
     setLastTour(null); setLastEvent(null); setCostHistory([])
+    setTau0(simRef.current.tau0)
     setStep(0); setRunning(false)
   }, [])
 
@@ -243,7 +247,7 @@ export default function AcoExplainer() {
       <div className="aco-viz-row">
         <div className="aco-canvas-wrap">
           <PheromoneCanvas
-            pheromone={pheromone} maxP={maxP} bestTour={bestTour}
+            pheromone={pheromone} maxP={maxP} tau0={tau0} bestTour={bestTour}
             lastTour={lastTour} phase={phase}
           />
         </div>
