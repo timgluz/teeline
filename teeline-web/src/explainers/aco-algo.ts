@@ -5,11 +5,9 @@
 // (construct -> best-update -> evaporate -> deposit).
 
 export const CITIES: [number, number][] = [
-  [50, 55],
-  [250, 55],
-  [260, 245],
-  [40, 245],
-  [150, 110],
+  [45, 45], [155, 18], [265, 45], [285, 150],
+  [255, 265], [150, 285], [40, 260], [18, 150],
+  [110, 115], [200, 95], [220, 210], [95, 215],
 ]
 export const N_CITIES = CITIES.length
 
