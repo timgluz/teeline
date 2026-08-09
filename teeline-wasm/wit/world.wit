@@ -16,6 +16,11 @@ interface types {
         mutation-probability: f32,
         n-elite: u32,
         n-nearest: u32,
+        // ACO tunables (ignored by non-ACO solvers, same as n-elite/cooling-rate).
+        alpha: f32,
+        beta: f32,
+        evaporation-rate: f32,
+        num-ants: u32,
     }
 
     record solution {

@@ -12,6 +12,10 @@ describe('defaultSolveOptions', () => {
     expect(typeof opts.mutationProbability).toBe('number')
     expect(typeof opts.nElite).toBe('number')
     expect(typeof opts.nNearest).toBe('number')
+    expect(typeof opts.alpha).toBe('number')
+    expect(typeof opts.beta).toBe('number')
+    expect(typeof opts.evaporationRate).toBe('number')
+    expect(typeof opts.numAnts).toBe('number')
   })
 
   it('minTemperature is less than maxTemperature', () => {

@@ -8,8 +8,8 @@ use bindings::teeline::solver::types::{
 };
 use teeline::tsp::comparison;
 use teeline::tsp::{
-    AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions,
-    Solvers, TspProblem, distance_matrix::DistanceMatrix, kdtree::KDPoint,
+    AppOptions, AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
+    SAOptions, Solvers, TspProblem, distance_matrix::DistanceMatrix, kdtree::KDPoint,
 };
 
 struct Component;
@@ -67,6 +67,16 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::AntColony => AppOptions {
+            aco: Some(AcoOptions {
+                heuristic,
+                alpha: o.alpha,
+                beta: o.beta,
+                evaporation_rate: o.evaporation_rate,
+                num_ants: o.num_ants as usize,
+            }),
+            ..AppOptions::default()
+        },
         _ => AppOptions {
             heuristic: Some(heuristic),
             ..AppOptions::default()
@@ -113,6 +123,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "som"             => "Topology-preserving constructive solver; best piped: pipeline(som,2opt) or pipeline(som,sa)",
         "gec"             => "Deterministic edge-by-edge construction; usually beats nn as a warm-start: pipeline(greedy_edge,2opt) or pipeline(greedy_edge,lk)",
         "sav"             => "Savings-based construction; strong warm-start: pipeline(savings,2opt) or pipeline(savings,lk)",
+        "aco"             => "Pheromone-trail metaheuristic; tune beta (heuristic weight) and evaporation-rate. Slow per epoch — lower epochs on large datasets",
         _                 => info.category,
     }
     .to_string()
@@ -206,6 +217,20 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         Solvers::CuckooSearch | Solvers::FlowerPollination => {
             let mut v = shared_heuristic_params();
             v.push(mutation_param());
+            v
+        }
+        Solvers::AntColony => {
+            let mut v = shared_heuristic_params();
+            v.push(pf_min("alpha", "Pheromone influence (alpha)", 0.0, 0.1));
+            v.push(pf("beta", "Heuristic influence (beta)", 0.0, 6.0, 0.1));
+            v.push(pf(
+                "evaporationRate",
+                "Evaporation rate",
+                0.0001,
+                0.9999,
+                0.01,
+            ));
+            v.push(pi("numAnts", "Colony size (ants)", 1.0));
             v
         }
         Solvers::TwoOpt

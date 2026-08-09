@@ -239,11 +239,15 @@ const jsonLd = {
         toolautosubmit hidden>
     <textarea name="problem" toolparamdescription="TSPLIB-format problem data (NODE_COORD_SECTION etc.)"></textarea>
     <input name="algorithm" type="text"
-           toolparamdescription="Algorithm ID: nn, 2opt, lk, sa, ga, pso, cs, fpa, or_opt, christofides, gsa, fourier. Default: lk">
+           toolparamdescription="Algorithm ID: nn, 2opt, lk, sa, ga, pso, cs, fpa, or_opt, christofides, gsa, fourier, aco. Default: lk">
     <input name="epochs" type="number" toolparamdescription="Iteration count. Default: 500">
     <input name="max_temperature" type="number" toolparamdescription="Max temperature for SA. Default: 1000">
     <input name="mutation_probability" type="number" toolparamdescription="Mutation rate for GA (0–1). Default: 0.05">
     <input name="n_nearest" type="number" toolparamdescription="KD-tree candidate list size. Default: 5">
+    <input name="alpha" type="number" toolparamdescription="ACO pheromone influence. Default: 1.0">
+    <input name="beta" type="number" toolparamdescription="ACO heuristic (1/distance) influence, 0–6. Default: 2.0">
+    <input name="evaporation_rate" type="number" toolparamdescription="ACO pheromone evaporation per epoch (0–1). Default: 0.5">
+    <input name="num_ants" type="number" toolparamdescription="ACO colony size (tours per epoch). Default: 25">
   </form>
 
   <form id="webmcp-list-algorithms" toolname="listAlgorithms"
