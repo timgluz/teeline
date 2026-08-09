@@ -4,38 +4,72 @@
 // infer currentId from window.location.pathname because static HTML shells
 // didn't know their own route; Astro's getStaticPaths() params give us the
 // id directly at build time, so this whole client-side inference is gone.
-import { SOLVER_GROUPS, SOLVER_META, PAGED_SOLVERS } from '../nav-data'
+import { SOLVER_GROUPS, SOLVER_META, PAGED_SOLVERS, PROBLEM_GROUPS, PROBLEM_META } from '../nav-data'
 
 interface Props {
   currentId: string | null
+  currentType?: 'algorithm' | 'problem'
 }
 
-const { currentId } = Astro.props
+const { currentId, currentType = 'algorithm' } = Astro.props
 ---
 <ul>
-  {
-    SOLVER_GROUPS.map((g) => (
-      <li class="sidebar-group">
-        <span class="sidebar-group-label">{g.label}</span>
-        <ul>
-          {g.ids.map((id) => {
-            const meta = SOLVER_META[id]
-            if (!meta) return null
-            const isCurrent = id === currentId
-            return (
-              <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
-                {isCurrent ? (
-                  <span aria-current="page">{meta.name}</span>
-                ) : PAGED_SOLVERS.has(id) ? (
-                  <a href={`/algorithms/${id}/`}>{meta.name}</a>
-                ) : (
-                  <span>{meta.name}</span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      </li>
-    ))
-  }
+  {currentType === 'algorithm' && (
+    <>
+      <li class="sidebar-section-label">Algorithms</li>
+      {
+        SOLVER_GROUPS.map((g) => (
+          <li class="sidebar-group">
+            <span class="sidebar-group-label">{g.label}</span>
+            <ul>
+              {g.ids.map((id) => {
+                const meta = SOLVER_META[id]
+                if (!meta) return null
+                const isCurrent = id === currentId
+                return (
+                  <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
+                    {isCurrent ? (
+                      <span aria-current="page">{meta.name}</span>
+                    ) : PAGED_SOLVERS.has(id) ? (
+                      <a href={`/algorithms/${id}/`}>{meta.name}</a>
+                    ) : (
+                      <span>{meta.name}</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </li>
+        ))
+      }
+    </>
+  )}
+  {currentType === 'problem' && (
+    <>
+      <li class="sidebar-section-label">Problems</li>
+      {
+        PROBLEM_GROUPS.map((g) => (
+          <li class="sidebar-group">
+            <span class="sidebar-group-label">{g.label}</span>
+            <ul>
+              {g.ids.map((id) => {
+                const meta = PROBLEM_META[id]
+                if (!meta) return null
+                const isCurrent = id === currentId
+                return (
+                  <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
+                    {isCurrent ? (
+                      <span aria-current="page">{meta.name}</span>
+                    ) : (
+                      <a href={`/problems/${id}/`}>{meta.name}</a>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </li>
+        ))
+      }
+    </>
+  )}
 </ul>

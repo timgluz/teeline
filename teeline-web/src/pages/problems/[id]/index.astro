@@ -1,0 +1,93 @@
+---
+import { getCollection, render } from 'astro:content'
+import DocsLayout from '../../../layouts/DocsLayout.astro'
+
+export async function getStaticPaths() {
+  const problems = await getCollection('problems')
+  return problems.map((entry) => ({
+    params: { id: entry.data.id },
+    props: { entry },
+  }))
+}
+
+const { entry } = Astro.props
+const { data } = entry
+const { Content } = await render(entry)
+
+const pagePath = `/problems/${data.id}/`
+const canonicalUrl = `https://tspsolver.com${pagePath}`
+
+const sizeIcon = { small: '🟢', medium: '🟡', large: '🟠', xl: '🔴' }[data.sizeGroup] || ''
+const isCoordinateMetric = !['EXPLICIT', 'MATRIX', 'GEO'].some(t => data.edgeWeightType.toUpperCase().includes(t))
+const solverLink = data.optimalCost !== null && isCoordinateMetric
+  ? `/?dataset=${data.id}&opt=${data.optimalCost}`
+  : `/?dataset=${data.id}`
+
+const jsonLd = {
+  '@context': 'https://schema.org',
+  '@type': 'Dataset',
+  name: data.name,
+  description: `${data.description} — ${data.cities} cities, ${data.edgeWeightType}. TSPLIB95 TSP instance.`,
+  identifier: data.id,
+  url: canonicalUrl,
+  size: data.cities,
+  variableMeasured: data.edgeWeightType,
+  ...(data.optimalCost !== null ? { measurementTechnique: `Optimal tour length: ${data.optimalCost}` } : {}),
+  includedInDataCatalog: {
+    '@type': 'DataCatalog',
+    name: data.source,
+    url: data.sourceUrl,
+  },
+  distribution: {
+    '@type': 'DataDownload',
+    contentUrl: data.dataUrl,
+    encodingFormat: 'text/plain',
+  },
+}
+---
+
+<DocsLayout
+  title={`${data.name} — Teeline`}
+  description={data.description}
+  path={pagePath}
+  currentId={data.id}
+  name={data.name}
+  currentType="problem"
+>
+  <Fragment slot="head">
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </Fragment>
+
+  <div class="docs-type-badge">{sizeIcon} {data.sizeGroup} · {data.cities} cities</div>
+
+  <p style="margin-top: -0.5rem; margin-bottom: 1.5rem;">
+    <strong>{data.description}</strong>
+  </p>
+
+  <Content />
+
+  <table style="margin-top: 1.5rem;">
+    <thead>
+      <tr><th scope="col">Property</th><th scope="col">Value</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Name</td><td><code>{data.id}</code></td></tr>
+      <tr><td>Cities</td><td>{data.cities.toLocaleString()}</td></tr>
+      <tr><td>Type</td><td><code>{data.edgeWeightType}</code></td></tr>
+      {data.optimalCost !== null && (
+        <tr><td>Optimal tour</td><td><strong>{data.optimalCost.toLocaleString()}</strong></td></tr>
+      )}
+      <tr><td>Source</td><td><a href={data.sourceUrl} target="_blank" rel="noopener">{data.source}</a></td></tr>
+    </tbody>
+  </table>
+
+  <div class="grid" style="margin-top: 1.5rem; gap: 0.75rem;">
+    <a href={data.dataUrl} role="button" class="secondary" download>
+      ⬇ Download dataset
+    </a>
+    <a href={solverLink} role="button">
+      ▶ Open in Solver
+    </a>
+  </div>
+
+</DocsLayout>

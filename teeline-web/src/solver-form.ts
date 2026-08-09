@@ -106,6 +106,16 @@ export function initSolverConfig(
     checkProblem.classList.toggle('checklist-item--met', problemMet)
     checkSolver.classList.toggle('checklist-item--met', solverMet)
 
+    const checkOptimal = document.getElementById('check-optimal') as HTMLElement
+    const optCost = (window as any).__teelineOptCost as number | undefined
+    const optMet = optCost && optCost > 0
+    checkOptimal.classList.toggle('checklist-item--met', !!optMet)
+    if (optMet) {
+      checkOptimal.textContent = `optimal route · ${optCost!.toLocaleString()}`
+    } else {
+      checkOptimal.textContent = 'optimal route (optional)'
+    }
+
     btnRun.disabled = !(problemMet && solverMet)
   }
 

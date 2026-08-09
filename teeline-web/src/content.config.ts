@@ -12,6 +12,22 @@ const docs = defineCollection({
   }),
 })
 
+const problems = defineCollection({
+  loader: glob({ pattern: '*.md', base: '../docs/problems' }),
+  schema: z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    cities: z.number(),
+    sizeGroup: z.enum(['small', 'medium', 'large', 'xl']),
+    edgeWeightType: z.string(),
+    optimalCost: z.number().nullable(),
+    dataUrl: z.string(),
+    source: z.string(),
+    sourceUrl: z.string(),
+  }),
+})
+
 const blog = defineCollection({
   loader: glob({ pattern: '*.md', base: './src/content/blog' }),
   schema: z.object({
@@ -24,4 +40,4 @@ const blog = defineCollection({
   }),
 })
 
-export const collections = { docs, blog }
+export const collections = { docs, blog, problems }

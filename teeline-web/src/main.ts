@@ -7,7 +7,7 @@ import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionRes
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initWebMCP } from './webmcp'
-import { initResults, updateOptRoute, showRunning, showResult, patchComparison } from './results'
+import { initResults, updateOptRoute, showRunning, showResult, showGapFromOptCost, patchComparison } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
 window.addEventListener('load', () => import('./sentry'), { once: true })
@@ -143,6 +143,9 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
             showResult(record)
             showDownloadButtons(record, parsedProblem!)
             clearCompareError()
+
+            // Show gap from ?opt= query param if we have optimal cost but no route
+            showGapFromOptCost(record.total)
 
             if (optTourRoute) {
               const compareId = crypto.randomUUID()
