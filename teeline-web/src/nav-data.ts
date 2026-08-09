@@ -48,5 +48,5 @@ export const PAGED_SOLVERS = new Set(Object.keys(SOLVER_META))
 
 // The subset of ids with an interactive explainer under /algorithms/<id>/explainer/.
 export const EXPLAINER_SOLVERS = new Set([
-  'pso', 'gsa', 'tabu', 'ga', 'cs', 'fpa', 'lk', 'sa', 'som', 'fourier', 'greedy_edge',
+  'pso', 'gsa', 'tabu', 'ga', 'cs', 'fpa', 'lk', 'sa', 'som', 'fourier', 'greedy_edge', 'savings',
 ])
