@@ -84,6 +84,14 @@
   .prose-dark pre code {
     @apply bg-transparent p-0;
   }
+  /* Shiki (Astro markdown) wraps code in .astro-code with the theme's own
+     background — force it onto the dark surface so code blocks match the site. */
+  .astro-code {
+    @apply rounded-lg border border-border bg-surface !important;
+  }
+  .astro-code code {
+    background: transparent !important;
+  }
   .prose-dark table {
     @apply my-4 w-full border-collapse text-sm;
   }

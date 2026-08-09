@@ -18,12 +18,11 @@ export default defineConfig({
   build: {
     assets: 'assets',
   },
-  // Site is light-themed (data-theme="light", PicoCSS light) — match Shiki's
-  // theme to what the old @speed-highlight/core + github-light.css pipeline
-  // used. Astro's own default is github-dark, which would mismatch.
+  // Site is dark-themed (Tailwind dark canvas) — match Shiki's theme to the
+  // dark palette. (Was github-light when the docs used PicoCSS light.)
   markdown: {
     shikiConfig: {
-      theme: 'github-light',
+      theme: 'github-dark',
     },
   },
   vite: {
