@@ -28,6 +28,7 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   gsa: { id: 'gsa', name: 'Gravitational Search' },
   som: { id: 'som', name: 'Kohonen SOM' },
   aco: { id: 'aco', name: 'Ant Colony Optimization' },
+  savings: { id: 'savings', name: 'Savings' },
 }
 
 export interface SolverGroup {
@@ -37,7 +38,7 @@ export interface SolverGroup {
 
 export const SOLVER_GROUPS: SolverGroup[] = [
   { label: 'Exact', ids: ['bhk', 'branch_bound'] },
-  { label: 'Constructive', ids: ['nn', 'fourier', 'christofides', 'greedy_edge', 'som'] },
+  { label: 'Constructive', ids: ['nn', 'fourier', 'christofides', 'greedy_edge', 'savings', 'som'] },
   { label: 'Local search', ids: ['2opt', '3opt', 'or_opt', 'stochastic_hill', 'lk'] },
   { label: 'Metaheuristic', ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa', 'aco'] },
 ]
