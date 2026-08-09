@@ -204,7 +204,9 @@ export function initUpload(
   const datasetParam = params.get('dataset')
 
   if (datasetParam) {
-    const tspUrl = `https://static.tspsolver.com/tsplib/${datasetParam}.tsp`
+    const tspUrl = import.meta.env.DEV
+      ? `/tsplib/${datasetParam}.tsp`
+      : `https://static.tspsolver.com/tsplib/${datasetParam}.tsp`
     ;(async () => {
       try {
         const resp = await fetch(tspUrl)
@@ -214,7 +216,7 @@ export function initUpload(
 
         // Also try to load the .opt.tour if available
         try {
-          const optResp = await fetch(`https://static.tspsolver.com/tsplib/${datasetParam}.opt.tour`)
+          const optResp = await fetch(tspUrl.replace('.tsp', '.opt.tour')) 
           if (optResp.ok) {
             const optText = await optResp.text()
             const route = parseOptTour(optText)
