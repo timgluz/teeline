@@ -137,8 +137,11 @@ for (const file of TSP_FILES.sort()) {
 
   const icon = iconForSize(group)
 
-  const solverLink = optimalCost !== null
-    ? `/?dataset=${name}&opt=${optimalCost}`
+  const isExplicit = ['EXPLICIT', 'MATRIX'].some(t => ewt.toUpperCase().includes(t))
+  const solverOptimalCost = isExplicit ? null : optimalCost
+
+  const solverLink = solverOptimalCost !== null
+    ? `/?dataset=${name}&opt=${solverOptimalCost}`
     : `/?dataset=${name}`
 
   const content = `---
