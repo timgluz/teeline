@@ -1,6 +1,6 @@
 // Pure simulation logic for the 2-opt interactive explainer.
-// One `stepOnce` call scans all edge pairs (best-improvement), finds the best
-// improving swap, applies it, and records the event. No DOM, fully testable.
+// Two-click step: first click scans and highlights the best candidate swap
+// (tour stays as-is); second click applies the swap. No DOM, fully testable.
 
 export const CITIES: [number, number][] = [
   [150, 20],   // 0 — top
@@ -16,7 +16,7 @@ export const CITIES: [number, number][] = [
 ]
 export const N_CITIES = CITIES.length
 
-export type Phase = 'idle' | 'swap_found' | 'local_optimum'
+export type Phase = 'idle' | 'candidate' | 'swap_found' | 'local_optimum'
 
 export interface SwapEvent {
   i: number
@@ -137,24 +137,25 @@ export function applySwap(tour: number[], i: number, j: number): number[] {
   return next
 }
 
-// One complete scan pass: find best improvement, apply if found.
+// One step: if in candidate phase, apply the pending swap.
+// Otherwise scan for the best improving swap and show it as a candidate.
 export function stepOnce(state: SimState): SimState {
   if (state.phase === 'local_optimum')
     return { ...state, step: state.step + 1 }
 
-  const { bestDelta, bestI, bestJ } = scanOnePass(state)
-
-  if (bestDelta < 0) {
-    const ni = (bestI + 1) % N_CITIES
-    const nj = (bestJ + 1) % N_CITIES
-    const newTour = applySwap(state.tour, bestI, bestJ)
+  // Second click — apply the candidate swap
+  if (state.phase === 'candidate' && state.lastSwap) {
+    const { i, j, delta } = state.lastSwap
+    const ni = (i + 1) % N_CITIES
+    const nj = (j + 1) % N_CITIES
+    const newTour = applySwap(state.tour, i, j)
     const removed: [number, number][] = [
-      [state.tour[bestI], state.tour[ni]],
-      [state.tour[bestJ], state.tour[nj]],
+      [state.tour[i], state.tour[ni]],
+      [state.tour[j], state.tour[nj]],
     ]
     const added: [number, number][] = [
-      [newTour[bestI], newTour[ni]],
-      [newTour[bestJ], newTour[nj]],
+      [newTour[i], newTour[ni]],
+      [newTour[j], newTour[nj]],
     ]
     const cost = tourLength(newTour)
 
@@ -164,10 +165,35 @@ export function stepOnce(state: SimState): SimState {
       tour: newTour,
       pass: state.pass + 1,
       totalSwaps: state.totalSwaps + 1,
-      lastSwap: { i: bestI, j: bestJ, removed, added, delta: bestDelta },
+      lastSwap: { i, j, removed, added, delta },
       bestTour: cost < state.bestCost ? [...newTour] : state.bestTour,
       bestCost: Math.min(cost, state.bestCost),
       costHistory: [...state.costHistory, cost],
+      step: state.step + 1,
+    }
+  }
+
+  // First click — scan for best improvement
+  const { bestDelta, bestI, bestJ } = scanOnePass(state)
+
+  if (bestDelta < 0) {
+    const ni = (bestI + 1) % N_CITIES
+    const nj = (bestJ + 1) % N_CITIES
+    // Record candidate swap but DON'T modify the tour
+    const removed: [number, number][] = [
+      [state.tour[bestI], state.tour[ni]],
+      [state.tour[bestJ], state.tour[nj]],
+    ]
+    const newTour = applySwap(state.tour, bestI, bestJ)
+    const added: [number, number][] = [
+      [newTour[bestI], newTour[ni]],
+      [newTour[bestJ], newTour[nj]],
+    ]
+
+    return {
+      ...state,
+      phase: 'candidate',
+      lastSwap: { i: bestI, j: bestJ, removed, added, delta: bestDelta },
       step: state.step + 1,
     }
   }

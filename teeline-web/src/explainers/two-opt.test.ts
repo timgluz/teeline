@@ -114,9 +114,30 @@ describe('applySwap', () => {
 })
 
 describe('stepOnce', () => {
+  it('first click scans and shows candidate without changing tour', () => {
+    const s = makeInitState(SCENARIOS.bad_shuffle.tour)
+    const s1 = stepOnce(s)
+    expect(s1.phase).toBe('candidate')
+    expect(s1.lastSwap).not.toBeNull()
+    expect(s1.lastSwap!.delta).toBeLessThan(0)
+    expect(s1.tour).toEqual(s.tour) // tour unchanged
+    expect(s1.totalSwaps).toBe(0)   // not applied yet
+  })
+
+  it('second click applies the candidate swap', () => {
+    const s = makeInitState(SCENARIOS.bad_shuffle.tour)
+    const s1 = stepOnce(s)  // candidate
+    const s2 = stepOnce(s1) // apply
+    expect(s2.phase).toBe('swap_found')
+    expect(s2.totalSwaps).toBe(1)
+    expect(s2.pass).toBe(1)
+    // tour must have changed after apply
+    expect(s2.tour).not.toEqual(s.tour)
+  })
+
   it('eventually reaches local_optimum', () => {
     let s = makeInitState(SCENARIOS.bad_shuffle.tour)
-    let maxSteps = 200
+    let maxSteps = 400
     while (s.phase !== 'local_optimum' && maxSteps > 0) {
       s = stepOnce(s)
       maxSteps--
@@ -134,15 +155,15 @@ describe('stepOnce', () => {
     expect(s2.phase).toBe('local_optimum')
   })
 
-  it('produces a swap_found event with valid fields', () => {
+  it('produces valid swap event fields when applied', () => {
     const s = makeInitState(SCENARIOS.bad_shuffle.tour)
-    const s1 = stepOnce(s)
-    expect(s1.phase).toBe('swap_found')
-    expect(s1.lastSwap).not.toBeNull()
-    expect(s1.lastSwap!.i).toBeGreaterThanOrEqual(0)
-    expect(s1.lastSwap!.j).toBeGreaterThan(s1.lastSwap!.i + 1)
-    expect(s1.lastSwap!.delta).toBeLessThan(0)
-    expect(s1.lastSwap!.removed).toHaveLength(2)
-    expect(s1.lastSwap!.added).toHaveLength(2)
+    const s1 = stepOnce(s)  // candidate
+    const s2 = stepOnce(s1) // apply
+    expect(s2.lastSwap).not.toBeNull()
+    expect(s2.lastSwap!.i).toBeGreaterThanOrEqual(0)
+    expect(s2.lastSwap!.j).toBeGreaterThan(s2.lastSwap!.i + 1)
+    expect(s2.lastSwap!.delta).toBeLessThan(0)
+    expect(s2.lastSwap!.removed).toHaveLength(2)
+    expect(s2.lastSwap!.added).toHaveLength(2)
   })
 })

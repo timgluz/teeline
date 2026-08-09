@@ -33,14 +33,18 @@ function TourCanvas({ tour, lastSwap, phase }: {
     edges.push({ from: a, to: b, key: `${Math.min(a, b)}-${Math.max(a, b)}` })
   }
 
-  const showSwap = phase === 'swap_found' && lastSwap
+  const showCandidate = phase === 'candidate' && lastSwap
+  const showApplied = phase === 'swap_found' && lastSwap
 
   return (
     <svg viewBox="0 0 300 300" className="topt-canvas" role="img" aria-label="2-opt tour">
       <rect x={0} y={0} width={300} height={300} className="topt-bg" />
       {edges.map(({ from, to, key }) => {
         let cls = "topt-edge"
-        if (showSwap) {
+        if (showCandidate) {
+          if (removeSet.has(key)) cls += " topt-cand-removed"
+          else if (addSet.has(key)) cls += " topt-cand-added"
+        } else if (showApplied) {
           if (removeSet.has(key)) cls += " topt-removed"
           else if (addSet.has(key)) cls += " topt-added"
         }
@@ -136,10 +140,13 @@ export default function TwoOptExplainer() {
     return () => clearInterval(id)
   }, [running, speedIdx, step_fn])
 
-  let chipText = "Press Step or Run to start optimising"
+  let chipText = "Click Step to scan for improving swaps"
   let chipClass = "topt-chip topt-chip-idle"
-  if (phase === 'swap_found' && lastSwap) {
-    chipText = `Swap (${lastSwap.i + 1},${lastSwap.j + 1}) — Δ=${lastSwap.delta.toFixed(0)}`
+  if (phase === 'candidate' && lastSwap) {
+    chipText = `Candidate swap (${lastSwap.i + 1},${lastSwap.j + 1}) — Δ=${lastSwap.delta.toFixed(0)} — click Step to apply`
+    chipClass = "topt-chip topt-chip-candidate"
+  } else if (phase === 'swap_found' && lastSwap) {
+    chipText = `Swap (${lastSwap.i + 1},${lastSwap.j + 1}) applied — Δ=${lastSwap.delta.toFixed(0)}`
     chipClass = "topt-chip topt-chip-swap"
   } else if (phase === 'local_optimum') {
     chipText = `Local optimum reached — no improving swap exists (${totalSwaps} swaps, ${pass} passes)`
@@ -170,6 +177,8 @@ export default function TwoOptExplainer() {
 
       <div className="topt-legend">
         <span><span className="topt-swatch topt-swatch-normal" /> tour edge</span>
+        <span><span className="topt-swatch topt-swatch-cand-rm" /> candidate (remove)</span>
+        <span><span className="topt-swatch topt-swatch-cand-ad" /> candidate (add)</span>
         <span><span className="topt-swatch topt-swatch-removed" /> removed</span>
         <span><span className="topt-swatch topt-swatch-added" /> new edge</span>
       </div>
@@ -293,6 +302,8 @@ const CSS = `
 }
 .topt-bg { fill: var(--panel); }
 .topt-edge { stroke: #94a3b8; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.topt-cand-removed { stroke: #ea580c; stroke-width: 3.5; stroke-dasharray: 6 4; }
+.topt-cand-added { stroke: #16a34a; stroke-width: 3.5; stroke-dasharray: 4 6; }
 .topt-removed { stroke: #ef4444; stroke-width: 3.5; stroke-dasharray: 6 3; }
 .topt-added { stroke: #16a34a; stroke-width: 3.5; }
 .topt-city { fill: #1f2937; stroke: #fff; stroke-width: 1.5; }
@@ -314,6 +325,8 @@ const CSS = `
   margin-right: 4px; vertical-align: middle;
 }
 .topt-swatch-normal { background: #94a3b8; }
+.topt-swatch-cand-rm { background: #ea580c; }
+.topt-swatch-cand-ad { background: #16a34a; }
 .topt-swatch-removed { background: #ef4444; }
 .topt-swatch-added { background: #16a34a; }
 
@@ -322,6 +335,7 @@ const CSS = `
   font-weight: 500; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 .topt-chip-idle { background: #f1f5f9; color: var(--muted); }
+.topt-chip-candidate { background: #ffedd5; color: #9a3412; }
 .topt-chip-swap { background: #fef3c7; color: #92400e; }
 .topt-chip-done { background: #dcfce7; color: #166534; }
 
