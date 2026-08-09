@@ -830,7 +830,10 @@ impl Default for GAOptions {
 impl GAOptions {
     pub fn validate(&self) -> Result<(), String> {
         self.heuristic.validate()?;
-        if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
+        if !self.mutation_probability.is_finite()
+            || self.mutation_probability < 0.0
+            || self.mutation_probability > 1.0
+        {
             return Err(format!(
                 "mutation_probability must be in [0, 1] (got {})",
                 self.mutation_probability
@@ -922,7 +925,10 @@ impl Default for CSOptions {
 impl CSOptions {
     pub fn validate(&self) -> Result<(), String> {
         self.heuristic.validate()?;
-        if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
+        if !self.mutation_probability.is_finite()
+            || self.mutation_probability < 0.0
+            || self.mutation_probability > 1.0
+        {
             return Err(format!(
                 "mutation_probability must be in [0, 1] (got {})",
                 self.mutation_probability
@@ -1004,7 +1010,10 @@ impl Default for FPAOptions {
 impl FPAOptions {
     pub fn validate(&self) -> Result<(), String> {
         self.heuristic.validate()?;
-        if self.mutation_probability < 0.0 || self.mutation_probability > 1.0 {
+        if !self.mutation_probability.is_finite()
+            || self.mutation_probability < 0.0
+            || self.mutation_probability > 1.0
+        {
             return Err(format!(
                 "mutation_probability must be in [0, 1] (got {})",
                 self.mutation_probability
