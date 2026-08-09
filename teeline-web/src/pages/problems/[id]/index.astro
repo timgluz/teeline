@@ -18,8 +18,7 @@ const pagePath = `/problems/${data.id}/`
 const canonicalUrl = `https://tspsolver.com${pagePath}`
 
 const sizeIcon = { small: '🟢', medium: '🟡', large: '🟠', xl: '🔴' }[data.sizeGroup] || ''
-const isCoordinateMetric = !['EXPLICIT', 'MATRIX', 'GEO'].some(t => data.edgeWeightType.toUpperCase().includes(t))
-const solverLink = data.optimalCost !== null && isCoordinateMetric
+const solverLink = data.optimalCost !== null
   ? `/?dataset=${data.id}&opt=${data.optimalCost}`
   : `/?dataset=${data.id}`
 
