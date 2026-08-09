@@ -49,4 +49,16 @@ mod tests {
         assert!(nn.is_some());
         assert_eq!(nn.unwrap().name, "Nearest Neighbor");
     }
+
+    #[test]
+    fn list_contains_savings() {
+        let registry = SolverRegistry;
+        let solvers = registry.list();
+        let sav = solvers.iter().find(|s| s.alias == "sav");
+        assert!(
+            sav.is_some(),
+            "savings/sav must appear in the solver registry"
+        );
+        assert_eq!(sav.unwrap().name, "Savings");
+    }
 }
