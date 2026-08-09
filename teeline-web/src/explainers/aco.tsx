@@ -110,6 +110,15 @@ function PheromoneHeatmap({ pheromone, maxP }: { pheromone: number[][]; maxP: nu
   return (
     <svg viewBox={`0 0 ${totalW} ${totalW}`} className="aco-heatmap">
       <rect x={0} y={0} width={totalW} height={totalW} className="aco-heatmap-bg" rx={3} />
+      {/* separators every 4 cities — visually chunk the 12×12 matrix */}
+      {[4, 8].map(x => (
+        <line key={"v" + x} x1={pad + x * cell} y1={pad} x2={pad + x * cell} y2={pad + n * cell}
+          stroke="var(--line)" strokeWidth={1} />
+      ))}
+      {[4, 8].map(y => (
+        <line key={"h" + y} x1={pad} y1={pad + y * cell} x2={pad + n * cell} y2={pad + y * cell}
+          stroke="var(--line)" strokeWidth={1} />
+      ))}
       {Array.from({ length: n }, (_, i) =>
         Array.from({ length: n }, (_, j) => {
           if (i >= j) return null  // lower triangle + diagonal
