@@ -11,8 +11,6 @@ source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
-# 100-city problem B (Krolak/Felts/Nelson)
-
 <svg viewBox="0 0 340 200" width="100%" style="max-width:340px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
   <circle cx="259.2" cy="129.9" r="2" fill="#0d9488" opacity="0.7"/>
     <circle cx="62.2" cy="103.6" r="2" fill="#0d9488" opacity="0.7"/>
@@ -117,16 +115,3 @@ sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 </svg>
 
 100-city problem B (Krolak/Felts/Nelson)
-
-| Field | Value |
-| ----- | ----- |
-| Name | `kroB100` |
-| Cities | 100 |
-| Type | `EUC_2D` |
-| Size group | 🟢 small |
-| Optimal tour | 22,141 |
-| Source | [TSPLIB95](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) |
-
-[Download dataset](https://static.tspsolver.com/tsplib/kroB100.tsp){.btn-primary}
-
-[Open in Solver →](/?dataset=kroB100&opt=22141){.btn-accent}

@@ -11,8 +11,6 @@ source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
-# 52 locations in Berlin (Groetschel)
-
 <svg viewBox="0 0 340 200" width="100%" style="max-width:340px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
   <circle cx="126.6" cy="97.9" r="2" fill="#0d9488" opacity="0.7"/>
     <circle cx="52.7" cy="44.6" r="2" fill="#0d9488" opacity="0.7"/>
@@ -69,16 +67,3 @@ sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 </svg>
 
 52 locations in Berlin (Groetschel)
-
-| Field | Value |
-| ----- | ----- |
-| Name | `berlin52` |
-| Cities | 52 |
-| Type | `EUC_2D` |
-| Size group | 🟢 small |
-| Optimal tour | Unknown |
-| Source | [TSPLIB95](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) |
-
-[Download dataset](https://static.tspsolver.com/tsplib/berlin52.tsp){.btn-primary}
-
-[Open in Solver →](/?dataset=berlin52){.btn-accent}

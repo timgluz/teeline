@@ -11,8 +11,6 @@ source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
-# 200-city problem A (Krolak/Felts/Nelson)
-
 <svg viewBox="0 0 340 200" width="100%" style="max-width:340px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
   <circle cx="122.2" cy="169.8" r="2" fill="#0d9488" opacity="0.7"/>
     <circle cx="220.7" cy="85.9" r="2" fill="#0d9488" opacity="0.7"/>
@@ -217,16 +215,3 @@ sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 </svg>
 
 200-city problem A (Krolak/Felts/Nelson)
-
-| Field | Value |
-| ----- | ----- |
-| Name | `kroA200` |
-| Cities | 200 |
-| Type | `EUC_2D` |
-| Size group | 🟡 medium |
-| Optimal tour | 29,368 |
-| Source | [TSPLIB95](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) |
-
-[Download dataset](https://static.tspsolver.com/tsplib/kroA200.tsp){.btn-primary}
-
-[Open in Solver →](/?dataset=kroA200&opt=29368){.btn-accent}

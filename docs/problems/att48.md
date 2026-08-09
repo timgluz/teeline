@@ -11,8 +11,6 @@ source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
-# 48 capitals of the US (Padberg/Rinaldi)
-
 <svg viewBox="0 0 340 200" width="100%" style="max-width:340px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
   <circle cx="258.1" cy="64.6" r="2" fill="#0d9488" opacity="0.7"/>
     <circle cx="118.9" cy="20.0" r="2" fill="#0d9488" opacity="0.7"/>
@@ -65,16 +63,3 @@ sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 </svg>
 
 48 capitals of the US (Padberg/Rinaldi)
-
-| Field | Value |
-| ----- | ----- |
-| Name | `att48` |
-| Cities | 48 |
-| Type | `ATT` |
-| Size group | 🟢 small |
-| Optimal tour | Unknown |
-| Source | [TSPLIB95](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) |
-
-[Download dataset](https://static.tspsolver.com/tsplib/att48.tsp){.btn-primary}
-
-[Open in Solver →](/?dataset=att48){.btn-accent}

@@ -11,8 +11,6 @@ source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
-# Odyssey of Ulysses (Groetschel/Padberg)
-
 <svg viewBox="0 0 340 200" width="100%" style="max-width:340px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
   <circle cx="174.5" cy="150.8" r="2" fill="#0d9488" opacity="0.7"/>
     <circle cx="181.3" cy="180.0" r="2" fill="#0d9488" opacity="0.7"/>
@@ -39,16 +37,3 @@ sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 </svg>
 
 Odyssey of Ulysses (Groetschel/Padberg)
-
-| Field | Value |
-| ----- | ----- |
-| Name | `ulysses22` |
-| Cities | 22 |
-| Type | `GEO` |
-| Size group | 🟢 small |
-| Optimal tour | 7,013 |
-| Source | [TSPLIB95](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) |
-
-[Download dataset](https://static.tspsolver.com/tsplib/ulysses22.tsp){.btn-primary}
-
-[Open in Solver →](/?dataset=ulysses22&opt=7013){.btn-accent}

@@ -119,6 +119,7 @@ for (const file of TSP_FILES.sort()) {
 
   const id = name
   const title = header['COMMENT'] || header['NAME'] || name
+  const cleanTitle = title.replace(/[.,;:!?]+$/, '') // strip trailing punctuation from heading
   const cities = parseInt(header['DIMENSION']) || 0
   const ewt = header['EDGE_WEIGHT_TYPE'] || 'UNKNOWN'
   const group = sizeGroup(cities)
@@ -142,7 +143,7 @@ for (const file of TSP_FILES.sort()) {
 
   const content = `---
 id: "${id}"
-name: "${title}"
+name: "${cleanTitle}"
 description: "${title}"
 cities: ${cities}
 sizeGroup: "${group}"
@@ -153,22 +154,9 @@ source: "${SOURCE}"
 sourceUrl: "${SOURCE_URL}"
 ---
 
-# ${title}
+${minimap}
 
-${minimap ? `${minimap}\n\n` : ''}${title}
-
-| Field | Value |
-| ----- | ----- |
-| Name | \`${id}\` |
-| Cities | ${cities} |
-| Type | \`${ewt}\` |
-| Size group | ${icon} ${group} |
-${optLine}
-| Source | [${SOURCE}](${SOURCE_URL}) |
-
-[Download dataset](${dataUrl}){.btn-primary}
-
-[Open in Solver →](${solverLink}){.btn-accent}
+${title}
 `
 
   writeFileSync(join(DOCS_DIR, `${id}.md`), content)

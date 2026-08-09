@@ -11,8 +11,6 @@ source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
-# 127 Biergaerten in Augsburg (Juenger/Reinelt)
-
 <svg viewBox="0 0 340 200" width="100%" style="max-width:340px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
   <circle cx="178.7" cy="123.4" r="2" fill="#0d9488" opacity="0.7"/>
     <circle cx="174.4" cy="127.8" r="2" fill="#0d9488" opacity="0.7"/>
@@ -144,16 +142,3 @@ sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 </svg>
 
 127 Biergaerten in Augsburg (Juenger/Reinelt)
-
-| Field | Value |
-| ----- | ----- |
-| Name | `bier127` |
-| Cities | 127 |
-| Type | `EUC_2D` |
-| Size group | 🟡 medium |
-| Optimal tour | Unknown |
-| Source | [TSPLIB95](https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/) |
-
-[Download dataset](https://static.tspsolver.com/tsplib/bier127.tsp){.btn-primary}
-
-[Open in Solver →](/?dataset=bier127){.btn-accent}
