@@ -25,10 +25,6 @@ pub struct TspService;
 // Private helpers
 // ---------------------------------------------------------------------------
 
-fn map_heuristic(h: &HeuristicConfig) -> HeuristicOptions {
-    map_heuristic_onto(h, HeuristicOptions::default())
-}
-
 // Maps partial HeuristicConfig onto a caller-supplied base so that solver-specific
 // defaults (e.g. LKOptions has n_nearest=5 vs the global default of 3) are preserved
 // when the caller omits a field.
@@ -91,7 +87,7 @@ fn make_app_options(
         "gsa" | "gravitational_search" => cfg.gsa.as_ref().and_then(|c| c.heuristic.as_ref()),
         _ => None,
     }
-    .map(map_heuristic);
+    .map(|h| map_heuristic_onto(h, HeuristicOptions::default()));
     if let Some(ref h) = heuristic {
         h.validate()?;
     }
@@ -102,7 +98,7 @@ fn make_app_options(
             heuristic: c
                 .heuristic
                 .as_ref()
-                .map(map_heuristic)
+                .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
                 .unwrap_or(d.heuristic),
             cooling_rate: c.cooling_rate.unwrap_or(d.cooling_rate),
             min_temperature: c.min_temperature.unwrap_or(d.min_temperature),
@@ -119,7 +115,7 @@ fn make_app_options(
             heuristic: c
                 .heuristic
                 .as_ref()
-                .map(map_heuristic)
+                .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
                 .unwrap_or(d.heuristic),
             mutation_probability: c.mutation_probability.unwrap_or(d.mutation_probability),
             n_elite: c.n_elite.unwrap_or(d.n_elite),
@@ -135,7 +131,7 @@ fn make_app_options(
             heuristic: c
                 .heuristic
                 .as_ref()
-                .map(map_heuristic)
+                .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
                 .unwrap_or(d.heuristic),
             mutation_probability: c.mutation_probability.unwrap_or(d.mutation_probability),
         }
@@ -150,7 +146,7 @@ fn make_app_options(
             heuristic: c
                 .heuristic
                 .as_ref()
-                .map(map_heuristic)
+                .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
                 .unwrap_or(d.heuristic),
             mutation_probability: c.mutation_probability.unwrap_or(d.mutation_probability),
         }
@@ -625,6 +621,39 @@ EOF
         assert_eq!(aco.num_ants, 40);
         assert_eq!(aco.alpha, AcoOptions::default().alpha);
         assert_eq!(aco.evaporation_rate, AcoOptions::default().evaporation_rate);
+    }
+
+    // LKOptions::default() overrides n_nearest to 5 (vs the global HeuristicOptions
+    // default of 3) and epochs to 100 (vs 10_000). The lk mapping must preserve those
+    // overrides when the fields are omitted — i.e. map onto LKOptions's own default
+    // via map_heuristic_onto, not the global default.
+    #[test]
+    fn test_make_app_options_lk_preserves_default_overrides_when_omitted() {
+        use crate::models::request::LkConfig;
+
+        let configs = SolverConfigs {
+            lk: Some(LkConfig {
+                heuristic: None,
+                max_depth: Some(8),
+            }),
+            ..Default::default()
+        };
+
+        let opts = make_app_options("lk", Some(&configs)).unwrap();
+        let lk = opts.lk.expect("lk config should map through");
+        assert_eq!(
+            lk.heuristic.n_nearest, 5,
+            "omitting n_nearest must fall back to LK's 5 default, not the global 3"
+        );
+        assert_eq!(
+            lk.heuristic.epochs, 100,
+            "omitting epochs must fall back to LK's 100 default, not the global 10_000"
+        );
+        assert_eq!(lk.max_depth, 8);
+        assert_eq!(
+            lk.heuristic.platoo_epochs,
+            LKOptions::default().heuristic.platoo_epochs
+        );
     }
 
     #[test]
