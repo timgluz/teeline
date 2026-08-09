@@ -100,21 +100,42 @@ function PheromoneCanvas({ pheromone, maxP, tau0, bestTour, lastTour, phase }: C
 }
 
 // ---------------------------------------------------------------
-// Side panel — epoch, ant progress, pheromone stats
+// Side panel — epoch, ant progress, pheromone heatmap grid
 // ---------------------------------------------------------------
+function PheromoneHeatmap({ pheromone, maxP }: { pheromone: number[][]; maxP: number }) {
+  const n = pheromone.length
+  const w = 112, pad = 2, cell = Math.floor((w - pad * 2) / n)
+  const totalW = cell * n + pad * 2
+
+  return (
+    <svg viewBox={`0 0 ${totalW} ${totalW}`} className="aco-heatmap">
+      <rect x={0} y={0} width={totalW} height={totalW} className="aco-heatmap-bg" rx={3} />
+      {Array.from({ length: n }, (_, i) =>
+        Array.from({ length: n }, (_, j) => {
+          if (i >= j) return null  // lower triangle + diagonal
+          const ratio = maxP > 0 ? pheromone[i][j] / maxP : 0
+          const r = Math.round(240 - ratio * 200)
+          const g = Math.round(253 - ratio * 200)
+          const b = Math.round(244 - ratio * 220)
+          return (
+            <rect key={`${i}-${j}`}
+              x={pad + j * cell} y={pad + i * cell}
+              width={cell - 1.5} height={cell - 1.5}
+              fill={`rgb(${r},${g},${b})`}
+              rx={1.5}
+            />
+          )
+        })
+      )}
+    </svg>
+  )
+}
+
 function SidePanel(props: {
   epoch: number; phase: string; antIdx: number; numAnts: number;
-  pheromone: number[][]; bestCost: number; alpha: number; beta: number;
+  pheromone: number[][]; bestCost: number; maxP: number;
 }) {
-  const { epoch, phase, antIdx, numAnts, pheromone, bestCost, alpha, beta } = props
-  let pMin = Infinity, pMax = 0
-  for (let i = 0; i < N_CITIES; i++) {
-    for (let j = i + 1; j < N_CITIES; j++) {
-      const p = pheromone[i][j]
-      if (p < pMin) pMin = p
-      if (p > pMax) pMax = p
-    }
-  }
+  const { epoch, phase, antIdx, numAnts, pheromone, bestCost, maxP } = props
 
   return (
     <div className="aco-sidebar">
@@ -131,12 +152,8 @@ function SidePanel(props: {
         <div className="aco-mono">{bestCost.toFixed(0)}</div>
       </div>
       <div className="aco-side-section">
-        <div className="aco-side-label">pheromone range</div>
-        <div className="aco-mono">{(pMin === Infinity ? 0 : pMin).toFixed(4)} – {pMax.toFixed(4)}</div>
-      </div>
-      <div className="aco-side-section">
-        <div className="aco-side-label">α · β</div>
-        <div className="aco-mono">{alpha.toFixed(1)} · {beta.toFixed(1)}</div>
+        <div className="aco-side-label">pheromone</div>
+        <PheromoneHeatmap pheromone={pheromone} maxP={maxP} />
       </div>
     </div>
   )
@@ -253,7 +270,7 @@ export default function AcoExplainer() {
         </div>
         <SidePanel
           epoch={epoch} phase={phase} antIdx={antIdx} numAnts={numAnts}
-          pheromone={pheromone} bestCost={bestCost} alpha={alpha} beta={beta}
+          pheromone={pheromone} bestCost={bestCost} maxP={maxP}
         />
       </div>
 
@@ -485,6 +502,9 @@ const CSS = `
 .aco-btn:hover:not(:disabled) { border-color: var(--accent); }
 .aco-btn:disabled { opacity: 0.45; cursor: default; }
 .aco-btn-primary { color: var(--accent); border-color: var(--accent); }
+
+.aco-heatmap { width: 100%; display: block; margin-top: 4px; }
+.aco-heatmap-bg { fill: var(--panel); }
 
 .aco-scenarios { margin-top: 4px; }
 .aco-scenario-row { display: flex; gap: 6px; flex-wrap: wrap; }
