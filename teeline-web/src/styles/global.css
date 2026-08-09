@@ -57,6 +57,12 @@
   .prose-dark a {
     @apply text-accent no-underline hover:underline;
   }
+  /* CTA buttons inside prose (e.g. "Open interactive explainer") must keep
+     white text — .prose-dark a sets accent color which would otherwise
+     make the label invisible on the accent background. */
+  .prose-dark a.explainer-cta {
+    @apply text-white no-underline hover:opacity-90 hover:no-underline;
+  }
   .prose-dark :is(ul, ol) {
     @apply my-4 pl-6;
   }
