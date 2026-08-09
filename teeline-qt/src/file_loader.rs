@@ -1,6 +1,6 @@
+use qtbridge::qobject_impl;
 use std::path::Path;
 use teeline::tsp::{kdtree::KDPoint, opt_tour, tour_cost, tsplib};
-use qtbridge::qobject_impl;
 
 pub struct FileLoader {
     city_count: i32,
@@ -42,52 +42,157 @@ impl Default for FileLoader {
 
 #[qobject_impl(Singleton)]
 impl FileLoader {
-    qproperty!("cityCount",          Member = city_count,          Write = set_city_count,          Notify = "cityCountChanged");
-    qproperty!("problemName",        Member = problem_name,        Write = set_problem_name,        Notify = "problemNameChanged");
-    qproperty!("edgeWeightType",     Member = edge_weight_type,    Write = set_edge_weight_type,    Notify = "edgeWeightTypeChanged");
-    qproperty!("isLoaded",           Member = is_loaded,           Write = set_is_loaded,           Notify = "isLoadedChanged");
-    qproperty!("errorMessage",       Member = error_message,       Write = set_error_message,       Notify = "errorMessageChanged");
-    qproperty!("citiesJson",         Member = cities_json,         Write = set_cities_json,         Notify = "citiesJsonChanged");
-    qproperty!("recentFilesJson",    Member = recent_files_json,   Write = set_recent_files_json,   Notify = "recentFilesJsonChanged");
-    qproperty!("filePath",           Member = file_path,           Write = set_file_path,           Notify = "filePathChanged");
-    qproperty!("hasOptTour",         Member = has_opt_tour,        Write = set_has_opt_tour,        Notify = "hasOptTourChanged");
-    qproperty!("optTourRouteJson",   Member = opt_tour_route_json, Write = set_opt_tour_route_json, Notify = "optTourRouteJsonChanged");
-    qproperty!("optTourCost",        Member = opt_tour_cost,       Write = set_opt_tour_cost,       Notify = "optTourCostChanged");
-    qproperty!("optTourFilePath",    Member = opt_tour_file_path,  Write = set_opt_tour_file_path,  Notify = "optTourFilePathChanged");
+    qproperty!(
+        "cityCount",
+        Member = city_count,
+        Write = set_city_count,
+        Notify = "cityCountChanged"
+    );
+    qproperty!(
+        "problemName",
+        Member = problem_name,
+        Write = set_problem_name,
+        Notify = "problemNameChanged"
+    );
+    qproperty!(
+        "edgeWeightType",
+        Member = edge_weight_type,
+        Write = set_edge_weight_type,
+        Notify = "edgeWeightTypeChanged"
+    );
+    qproperty!(
+        "isLoaded",
+        Member = is_loaded,
+        Write = set_is_loaded,
+        Notify = "isLoadedChanged"
+    );
+    qproperty!(
+        "errorMessage",
+        Member = error_message,
+        Write = set_error_message,
+        Notify = "errorMessageChanged"
+    );
+    qproperty!(
+        "citiesJson",
+        Member = cities_json,
+        Write = set_cities_json,
+        Notify = "citiesJsonChanged"
+    );
+    qproperty!(
+        "recentFilesJson",
+        Member = recent_files_json,
+        Write = set_recent_files_json,
+        Notify = "recentFilesJsonChanged"
+    );
+    qproperty!(
+        "filePath",
+        Member = file_path,
+        Write = set_file_path,
+        Notify = "filePathChanged"
+    );
+    qproperty!(
+        "hasOptTour",
+        Member = has_opt_tour,
+        Write = set_has_opt_tour,
+        Notify = "hasOptTourChanged"
+    );
+    qproperty!(
+        "optTourRouteJson",
+        Member = opt_tour_route_json,
+        Write = set_opt_tour_route_json,
+        Notify = "optTourRouteJsonChanged"
+    );
+    qproperty!(
+        "optTourCost",
+        Member = opt_tour_cost,
+        Write = set_opt_tour_cost,
+        Notify = "optTourCostChanged"
+    );
+    qproperty!(
+        "optTourFilePath",
+        Member = opt_tour_file_path,
+        Write = set_opt_tour_file_path,
+        Notify = "optTourFilePathChanged"
+    );
 
-    fn set_city_count(&mut self, v: i32)          { self.city_count = v;          self.city_count_changed(); }
-    fn set_problem_name(&mut self, v: String)      { self.problem_name = v;        self.problem_name_changed(); }
-    fn set_edge_weight_type(&mut self, v: String)  { self.edge_weight_type = v;    self.edge_weight_type_changed(); }
-    fn set_is_loaded(&mut self, v: bool)           { self.is_loaded = v;           self.is_loaded_changed(); }
-    fn set_error_message(&mut self, v: String)     { self.error_message = v;       self.error_message_changed(); }
-    fn set_cities_json(&mut self, v: String)       { self.cities_json = v;         self.cities_json_changed(); }
-    fn set_recent_files_json(&mut self, v: String) { self.recent_files_json = v;   self.recent_files_json_changed(); }
-    fn set_file_path(&mut self, v: String)         { self.file_path = v;           self.file_path_changed(); }
-    fn set_has_opt_tour(&mut self, v: bool)        { self.has_opt_tour = v;        self.has_opt_tour_changed(); }
-    fn set_opt_tour_route_json(&mut self, v: String) { self.opt_tour_route_json = v; self.opt_tour_route_json_changed(); }
-    fn set_opt_tour_cost(&mut self, v: f32)        { self.opt_tour_cost = v;       self.opt_tour_cost_changed(); }
-    fn set_opt_tour_file_path(&mut self, v: String){ self.opt_tour_file_path = v;  self.opt_tour_file_path_changed(); }
+    fn set_city_count(&mut self, v: i32) {
+        self.city_count = v;
+        self.city_count_changed();
+    }
+    fn set_problem_name(&mut self, v: String) {
+        self.problem_name = v;
+        self.problem_name_changed();
+    }
+    fn set_edge_weight_type(&mut self, v: String) {
+        self.edge_weight_type = v;
+        self.edge_weight_type_changed();
+    }
+    fn set_is_loaded(&mut self, v: bool) {
+        self.is_loaded = v;
+        self.is_loaded_changed();
+    }
+    fn set_error_message(&mut self, v: String) {
+        self.error_message = v;
+        self.error_message_changed();
+    }
+    fn set_cities_json(&mut self, v: String) {
+        self.cities_json = v;
+        self.cities_json_changed();
+    }
+    fn set_recent_files_json(&mut self, v: String) {
+        self.recent_files_json = v;
+        self.recent_files_json_changed();
+    }
+    fn set_file_path(&mut self, v: String) {
+        self.file_path = v;
+        self.file_path_changed();
+    }
+    fn set_has_opt_tour(&mut self, v: bool) {
+        self.has_opt_tour = v;
+        self.has_opt_tour_changed();
+    }
+    fn set_opt_tour_route_json(&mut self, v: String) {
+        self.opt_tour_route_json = v;
+        self.opt_tour_route_json_changed();
+    }
+    fn set_opt_tour_cost(&mut self, v: f32) {
+        self.opt_tour_cost = v;
+        self.opt_tour_cost_changed();
+    }
+    fn set_opt_tour_file_path(&mut self, v: String) {
+        self.opt_tour_file_path = v;
+        self.opt_tour_file_path_changed();
+    }
 
-    #[qsignal] fn city_count_changed(&self);
-    #[qsignal] fn problem_name_changed(&self);
-    #[qsignal] fn edge_weight_type_changed(&self);
-    #[qsignal] fn is_loaded_changed(&self);
-    #[qsignal] fn error_message_changed(&self);
-    #[qsignal] fn cities_json_changed(&self);
-    #[qsignal] fn recent_files_json_changed(&self);
-    #[qsignal] fn file_path_changed(&self);
-    #[qsignal] fn has_opt_tour_changed(&self);
-    #[qsignal] fn opt_tour_route_json_changed(&self);
-    #[qsignal] fn opt_tour_cost_changed(&self);
-    #[qsignal] fn opt_tour_file_path_changed(&self);
+    #[qsignal]
+    fn city_count_changed(&self);
+    #[qsignal]
+    fn problem_name_changed(&self);
+    #[qsignal]
+    fn edge_weight_type_changed(&self);
+    #[qsignal]
+    fn is_loaded_changed(&self);
+    #[qsignal]
+    fn error_message_changed(&self);
+    #[qsignal]
+    fn cities_json_changed(&self);
+    #[qsignal]
+    fn recent_files_json_changed(&self);
+    #[qsignal]
+    fn file_path_changed(&self);
+    #[qsignal]
+    fn has_opt_tour_changed(&self);
+    #[qsignal]
+    fn opt_tour_route_json_changed(&self);
+    #[qsignal]
+    fn opt_tour_cost_changed(&self);
+    #[qsignal]
+    fn opt_tour_file_path_changed(&self);
 
     /// Load a TSPLIB file. `path` may be a filesystem path or a file:// URL.
     #[qslot]
     fn load_file(&mut self, path: String) {
-        let clean = path
-            .strip_prefix("file://")
-            .unwrap_or(&path)
-            .to_string();
+        let clean = path.strip_prefix("file://").unwrap_or(&path).to_string();
 
         // Reset opt-tour state whenever a new problem is loaded
         self.cached_cities = Vec::new();
@@ -99,7 +204,11 @@ impl FileLoader {
         eprintln!("[FileLoader] loading: {clean}");
         match tsplib::read_from_file(Path::new(&clean)) {
             Ok(data) => {
-                let ew_type = if data.has_explicit_weights() { "EXPLICIT" } else { "EUC_2D" };
+                let ew_type = if data.has_explicit_weights() {
+                    "EXPLICIT"
+                } else {
+                    "EUC_2D"
+                };
                 self.cached_cities = data.cities().to_vec();
                 self.set_problem_name(data.name.clone());
                 self.set_city_count(data.len() as i32);
@@ -114,10 +223,9 @@ impl FileLoader {
                 self.set_recent_files_json(updated);
 
                 // Auto-pair: load sibling .opt.tour if it exists
-                if let (Some(parent), Some(stem)) = (
-                    Path::new(&clean).parent(),
-                    Path::new(&clean).file_stem(),
-                ) {
+                if let (Some(parent), Some(stem)) =
+                    (Path::new(&clean).parent(), Path::new(&clean).file_stem())
+                {
                     let opt_path = parent.join(format!("{}.opt.tour", stem.to_string_lossy()));
                     if opt_path.exists() {
                         self.load_opt_tour(opt_path.to_string_lossy().into_owned());
@@ -134,10 +242,7 @@ impl FileLoader {
     /// Load a known-optimal .opt.tour file and compute its cost against the loaded problem.
     #[qslot]
     fn load_opt_tour(&mut self, path: String) {
-        let clean = path
-            .strip_prefix("file://")
-            .unwrap_or(&path)
-            .to_string();
+        let clean = path.strip_prefix("file://").unwrap_or(&path).to_string();
 
         if self.cached_cities.is_empty() {
             self.set_error_message("Load a .tsp file before loading an optimal tour".to_string());
@@ -150,14 +255,17 @@ impl FileLoader {
                 if opt.route.len() != self.cached_cities.len() {
                     self.set_error_message(format!(
                         "opt.tour has {} cities but problem has {}",
-                        opt.route.len(), self.cached_cities.len()
+                        opt.route.len(),
+                        self.cached_cities.len()
                     ));
                     return;
                 }
                 let valid_ids: std::collections::HashSet<usize> =
                     self.cached_cities.iter().map(|c| c.id).collect();
                 if opt.route.iter().any(|id| !valid_ids.contains(id)) {
-                    self.set_error_message("opt.tour contains city IDs not in the loaded problem".to_string());
+                    self.set_error_message(
+                        "opt.tour contains city IDs not in the loaded problem".to_string(),
+                    );
                     return;
                 }
 
@@ -220,9 +328,15 @@ fn cities_to_json(cities: &[KDPoint]) -> String {
         return "[]".to_string();
     }
     let min_x = cities.iter().map(|c| c.x()).fold(f32::INFINITY, f32::min);
-    let max_x = cities.iter().map(|c| c.x()).fold(f32::NEG_INFINITY, f32::max);
+    let max_x = cities
+        .iter()
+        .map(|c| c.x())
+        .fold(f32::NEG_INFINITY, f32::max);
     let min_y = cities.iter().map(|c| c.y()).fold(f32::INFINITY, f32::min);
-    let max_y = cities.iter().map(|c| c.y()).fold(f32::NEG_INFINITY, f32::max);
+    let max_y = cities
+        .iter()
+        .map(|c| c.y())
+        .fold(f32::NEG_INFINITY, f32::max);
     let rx = (max_x - min_x).max(1.0);
     let ry = (max_y - min_y).max(1.0);
 

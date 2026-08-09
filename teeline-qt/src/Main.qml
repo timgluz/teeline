@@ -277,6 +277,7 @@ ApplicationWindow {
         readonly property var psoDefaults: ({ epochs: 10000, n_nearest: 30 })
         readonly property var csDefaults:  ({ epochs: 10000, mutation_probability: 0.001 })
         readonly property var fpaDefaults: ({ epochs: 10000, mutation_probability: 0.001 })
+        readonly property var acoDefaults: ({ epochs: 150, alpha: 1.0, beta: 2.0, evaporation_rate: 0.5, num_ants: 25 })
 
         property string selectedAlias: selectedSolver ? selectedSolver.alias : ""
         property bool isSA:  selectedAlias === "sa"  || selectedAlias === "simulated_annealing"
@@ -284,6 +285,7 @@ ApplicationWindow {
         property bool isPSO: selectedAlias === "pso" || selectedAlias === "particle_swarm"
         property bool isCS:  selectedAlias === "cs"  || selectedAlias === "cuckoo_search"
         property bool isFPA: selectedAlias === "fpa" || selectedAlias === "flower_pollination"
+        property bool isACO: selectedAlias === "aco" || selectedAlias === "ant_colony"
 
         // Reset fields to defaults whenever the selected solver changes
         onSelectedSolverChanged: {
@@ -292,6 +294,7 @@ ApplicationWindow {
             else if (isPSO) { epochsField.text = psoDefaults.epochs.toString(); swarmField.text = psoDefaults.n_nearest.toString() }
             else if (isCS)  { epochsField.text = csDefaults.epochs.toString();  mpField2.text = csDefaults.mutation_probability.toString() }
             else if (isFPA) { epochsField.text = fpaDefaults.epochs.toString(); mpField2.text = fpaDefaults.mutation_probability.toString() }
+            else if (isACO) { epochsField.text = acoDefaults.epochs.toString(); alphaField.text = acoDefaults.alpha.toString(); betaField.text = acoDefaults.beta.toString(); evapField.text = acoDefaults.evaporation_rate.toString(); antsField.text = acoDefaults.num_ants.toString() }
         }
 
         function collectOpts() {
@@ -308,6 +311,11 @@ ApplicationWindow {
                 obj.n_nearest = parseInt(swarmField.text) || 30
             } else if (isCS || isFPA) {
                 obj.mutation_probability = parseFloat(mpField2.text) || 0.001
+            } else if (isACO) {
+                obj.alpha = parseFloat(alphaField.text) || 1.0
+                obj.beta = parseFloat(betaField.text) || 2.0
+                obj.evaporation_rate = parseFloat(evapField.text) || 0.5
+                obj.num_ants = parseInt(antsField.text) || 25
             }
             return JSON.stringify(obj)
         }
@@ -332,6 +340,15 @@ ApplicationWindow {
             if (isCS || isFPA) {
                 var mp2 = parseFloat(mpField2.text)
                 if (isNaN(mp2) || mp2 < 0 || mp2 > 1) return true
+            }
+            if (isACO) {
+                var alpha = parseFloat(alphaField.text)
+                var beta = parseFloat(betaField.text)
+                if (isNaN(alpha) || alpha < 0) return true
+                if (isNaN(beta) || beta < 0) return true
+                var evap = parseFloat(evapField.text)
+                if (isNaN(evap) || evap < 0 || evap > 1) return true
+                if (isNaN(parseInt(antsField.text)) || parseInt(antsField.text) < 1) return true
             }
             if (isPSO) {
                 if (isNaN(parseInt(swarmField.text)) || parseInt(swarmField.text) < 1) return true
@@ -622,6 +639,72 @@ ApplicationWindow {
                                 Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
                             }
 
+                            // ── ACO: alpha, beta, evaporation rate, num_ants ─
+                            ColumnLayout {
+                                visible: isACO
+                                spacing: 8; Layout.fillWidth: true
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Text { text: "Alpha (pheromone weight)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                    TextField {
+                                        id: alphaField
+                                        Layout.preferredWidth: 140; font.pixelSize: 14
+                                        text: acoDefaults.alpha.toString(); placeholderText: "1.0"
+                                        color: acceptableInput ? theme.textDark : theme.inputError
+                                        placeholderTextColor: theme.fieldPlaceholder
+                                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                    Text { text: "Higher values favour pheromone over distance"; color: theme.textHint; font.pixelSize: 11 }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Text { text: "Beta (heuristic weight)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                    TextField {
+                                        id: betaField
+                                        Layout.preferredWidth: 140; font.pixelSize: 14
+                                        text: acoDefaults.beta.toString(); placeholderText: "2.0"
+                                        color: acceptableInput ? theme.textDark : theme.inputError
+                                        placeholderTextColor: theme.fieldPlaceholder
+                                        validator: DoubleValidator { bottom: 0; top: 100; notation: DoubleValidator.StandardNotation }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                    Text { text: "Higher values favour distance over pheromone"; color: theme.textHint; font.pixelSize: 11 }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Text { text: "Evaporation rate"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                    TextField {
+                                        id: evapField
+                                        Layout.preferredWidth: 140; font.pixelSize: 14
+                                        text: acoDefaults.evaporation_rate.toString(); placeholderText: "0.5"
+                                        color: acceptableInput ? theme.textDark : theme.inputError
+                                        placeholderTextColor: theme.fieldPlaceholder
+                                        validator: DoubleValidator { bottom: 0; top: 1; notation: DoubleValidator.StandardNotation }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                    Text { text: "Range [0, 1]. Higher values evaporate faster"; color: theme.textHint; font.pixelSize: 11 }
+                                }
+
+                                ColumnLayout {
+                                    spacing: 6
+                                    Text { text: "Number of ants"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                    TextField {
+                                        id: antsField
+                                        Layout.preferredWidth: 140; font.pixelSize: 14
+                                        text: acoDefaults.num_ants.toString(); placeholderText: "25"
+                                        color: acceptableInput ? theme.textDark : theme.inputError
+                                        placeholderTextColor: theme.fieldPlaceholder
+                                        validator: IntValidator { bottom: 1; top: 10000 }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                    Text { text: "Ants per iteration (higher = smoother, slower)"; color: theme.textHint; font.pixelSize: 11 }
+                                }
+                            }
+
                             // ── PSO: swarm size ────────────────────────────────
                             ColumnLayout {
                                 visible: isPSO
@@ -791,10 +874,11 @@ ApplicationWindow {
                             property bool hasPSO: modelData.solver === "pso" || modelData.solver === "particle_swarm"
                             property bool hasCS:  modelData.solver === "cs"  || modelData.solver === "cuckoo_search"
                             property bool hasFPA: modelData.solver === "fpa" || modelData.solver === "flower_pollination"
-                            property bool hasAnyOpts: hasSA || hasGA || hasPSO || hasCS || hasFPA
+                            property bool hasACO: modelData.solver === "aco" || modelData.solver === "ant_colony"
+                            property bool hasAnyOpts: hasSA || hasGA || hasPSO || hasCS || hasFPA || hasACO
 
                             // Height: 64 base + accordion when open
-                            property int accordionExpandedH: hasSA ? 240 : (hasGA ? 180 : 130)
+                            property int accordionExpandedH: hasSA ? 240 : (hasGA ? 180 : (hasACO ? 300 : 130))
                             height: 64 + (configOpen ? accordionExpandedH : 0)
                             Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.InOutQuad } }
 
@@ -812,6 +896,11 @@ ApplicationWindow {
                                     opts.n_nearest = parseInt(swarmField.text) || 30
                                 } else if (hasCS || hasFPA) {
                                     opts.mutation_probability = parseFloat(mpField.text) || 0.001
+                                } else if (hasACO) {
+                                    opts.alpha = parseFloat(alphaField.text) || 1.0
+                                    opts.beta = parseFloat(betaField.text) || 2.0
+                                    opts.evaporation_rate = parseFloat(evapField.text) || 0.5
+                                    opts.num_ants = parseInt(antsField.text) || 25
                                 }
                                 return opts
                             }
@@ -1000,6 +1089,55 @@ ApplicationWindow {
                                         Layout.preferredWidth: 180
                                         text: "3"; color: theme.textDark; font.pixelSize: 13
                                         validator: IntValidator { bottom: 1; top: 1000 }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // ACO: alpha
+                                RowLayout {
+                                    visible: hasACO; spacing: 12
+                                    Text { text: "Alpha"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: alphaField
+                                        Layout.preferredWidth: 180
+                                        text: "1.0"; color: theme.textDark; font.pixelSize: 13
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // ACO: beta
+                                RowLayout {
+                                    visible: hasACO; spacing: 12
+                                    Text { text: "Beta"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: betaField
+                                        Layout.preferredWidth: 180
+                                        text: "2.0"; color: theme.textDark; font.pixelSize: 13
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // ACO: evaporation rate
+                                RowLayout {
+                                    visible: hasACO; spacing: 12
+                                    Text { text: "Evaporation rate"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: evapField
+                                        Layout.preferredWidth: 180
+                                        text: "0.5"; color: theme.textDark; font.pixelSize: 13
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // ACO: number of ants
+                                RowLayout {
+                                    visible: hasACO; spacing: 12
+                                    Text { text: "Number of ants"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: antsField
+                                        Layout.preferredWidth: 180
+                                        text: "25"; color: theme.textDark; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 10000 }
                                         background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                                     }
                                 }

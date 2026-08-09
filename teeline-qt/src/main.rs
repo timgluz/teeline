@@ -2,8 +2,8 @@ mod file_loader;
 mod solver_engine;
 
 use file_loader::FileLoader;
+use qtbridge::{QApp, qobject_impl};
 use solver_engine::SolverEngine;
-use qtbridge::{qobject_impl, QApp};
 
 #[derive(Default)]
 pub struct AppBackend {}
