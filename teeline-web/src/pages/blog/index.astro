@@ -32,21 +32,21 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main class="container">
-    <p style="margin-bottom: 1rem;">
-      <a href="/">← Back to Teeline</a>
+  <main class="mx-auto max-w-content px-6 py-8">
+    <p class="mb-4 font-mono text-xs text-text-dim">
+      <a href="/" class="text-accent no-underline hover:underline">← Back to Teeline</a>
     </p>
 
-    <h1>Blog</h1>
+    <h1 class="text-2xl font-semibold tracking-tight lg:text-3xl">Blog</h1>
 
-    {posts.length === 0 && <p class="muted">No posts yet — check back soon.</p>}
+    {posts.length === 0 && <p class="text-text-dim">No posts yet — check back soon.</p>}
 
-    <ul class="blog-list">
+    <ul class="mt-6 list-none space-y-6 p-0">
       {
         posts.map((post) => (
-          <li>
-            <a href={`/blog/${post.id}/`}>{post.data.title}</a>
-            <p>{post.data.description}</p>
+          <li class="border-b border-border pb-6">
+            <a href={`/blog/${post.id}/`} class="text-lg font-medium text-accent no-underline hover:underline">{post.data.title}</a>
+            <p class="mt-1 text-text-dim">{post.data.description}</p>
           </li>
         ))
       }

@@ -23,9 +23,9 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
-    <p style="margin-bottom: 1rem;">
-      <a href="/">← Back to Teeline</a>
+  <main class="prose-dark mx-auto max-w-content px-6 py-8">
+    <p class="mb-4 font-mono text-xs text-text-dim">
+      <a href="/" class="text-accent no-underline hover:underline">← Back to Teeline</a>
     </p>
 
     <h1>AI agent access</h1>
@@ -67,7 +67,7 @@ const jsonLd = {
       </li>
     </ol>
     <p>
-      Once connected, open the <a href="/">solver page</a> — that's where the tool forms
+      Once connected, open the <a href="/solve/">solver page</a> — that's where the tool forms
       actually live, so an agent needs to be pointed there to call them.
     </p>
 

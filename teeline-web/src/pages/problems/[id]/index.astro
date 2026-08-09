@@ -57,15 +57,15 @@ const jsonLd = {
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
 
-  <div class="docs-type-badge">{sizeIcon} {data.sizeGroup} · {data.cities} cities</div>
+  <div class="mb-2 font-sans text-xs uppercase tracking-wider text-accent">{sizeIcon} {data.sizeGroup} · {data.cities} cities</div>
 
-  <p style="margin-top: -0.5rem; margin-bottom: 1.5rem;">
+  <p class="-mt-2 mb-6">
     <strong>{data.description}</strong>
   </p>
 
   <Content />
 
-  <table style="margin-top: 1.5rem;">
+  <table class="mt-6">
     <thead>
       <tr><th scope="col">Property</th><th scope="col">Value</th></tr>
     </thead>
@@ -80,11 +80,11 @@ const jsonLd = {
     </tbody>
   </table>
 
-  <div class="grid" style="margin-top: 1.5rem; gap: 0.75rem;">
-    <a href={data.dataUrl} role="button" class="secondary" download>
+  <div class="mt-6 flex flex-wrap gap-3">
+    <a href={data.dataUrl} download class="inline-flex items-center gap-2 rounded-md border border-border px-5 py-2.5 font-medium text-text no-underline transition-colors hover:border-border-hover hover:bg-surface">
       ⬇ Download dataset
     </a>
-    <a href={solverLink} role="button">
+    <a href={solverLink} class="inline-flex items-center gap-2 rounded-md bg-accent px-5 py-2.5 font-medium text-white no-underline transition-colors hover:bg-accent/90">
       ▶ Open in Solver
     </a>
   </div>

@@ -1,6 +1,5 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import '../../main.css'
 
 const description =
   "Traveling Salesman Problem solver — upload a TSPLIB .tsp file, pick an algorithm, and get an optimized tour. Runs entirely in-browser via WebAssembly."
@@ -22,7 +21,7 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main class="container">
+  <main class="mx-auto max-w-content px-6 py-8">
     <nav aria-label="Solver steps">
       <ol class="stepper" role="list">
         <li class="stepper-step stepper-step--active" aria-current="step">
@@ -165,7 +164,7 @@ const jsonLd = {
               </tbody>
             </table>
 
-            <p id="comparison-error" class="comparison-error pico-color-red-500" hidden aria-live="polite"></p>
+            <p id="comparison-error" class="comparison-error" hidden aria-live="polite"></p>
 
             <section aria-labelledby="run-history-heading">
               <h3 id="run-history-heading">Run history</h3>
@@ -190,7 +189,7 @@ const jsonLd = {
     <!-- /#step-content -->
   </main>
 
-  <footer id="app-footer" class="container">
+  <footer id="app-footer">
     <span id="wasm-status" class="status-dot status-dot--loading"></span>
     <span id="wasm-version">Connecting…</span>
   </footer>

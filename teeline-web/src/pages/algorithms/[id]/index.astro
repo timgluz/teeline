@@ -34,9 +34,9 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  {entry.data.typeBadge && <p class="docs-type-badge">{entry.data.typeBadge}</p>}
+  {entry.data.typeBadge && <p class="mb-2 font-sans text-xs uppercase tracking-wider text-accent">{entry.data.typeBadge}</p>}
   {entry.data.hasExplainer && (
-    <a class="docs-explainer-cta" href={`/algorithms/${entry.data.id}/explainer/`}>▶ Open interactive explainer →</a>
+    <a class="mb-8 mt-4 inline-block rounded-md bg-accent px-5 py-2.5 font-medium text-white no-underline hover:opacity-90" href={`/algorithms/${entry.data.id}/explainer/`}>▶ Open interactive explainer →</a>
   )}
   <Content />
 </DocsLayout>

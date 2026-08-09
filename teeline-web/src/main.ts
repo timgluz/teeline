@@ -1,6 +1,3 @@
-import '@picocss/pico/css/pico.min.css'
-import './main.css'
-import './docs.css'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage, CompareToursResult } from './worker'

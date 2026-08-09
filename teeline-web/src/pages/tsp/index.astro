@@ -23,9 +23,9 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main style="padding: 1.5rem 2rem; max-width: 800px; margin: 0 auto;">
-    <p style="margin-bottom: 1rem;">
-      <a href="/">← Back to Teeline</a>
+  <main class="prose-dark mx-auto max-w-content px-6 py-8">
+    <p class="mb-4 font-mono text-xs text-text-dim">
+      <a href="/" class="text-accent no-underline hover:underline">← Back to Teeline</a>
     </p>
 
     <h1>The Traveling Salesman Problem</h1>
@@ -88,7 +88,7 @@ const jsonLd = {
     </ul>
 
     <p>
-      Ready to see it solved? <a href="/">Load a dataset</a> and try a few algorithms
+      Ready to see it solved? <a href="/solve/">Open the solver</a> and try a few algorithms
       against each other.
     </p>
   </main>
