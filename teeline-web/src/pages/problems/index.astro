@@ -1,0 +1,50 @@
+---
+import { getCollection } from 'astro:content'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+
+const problems = await getCollection('problems')
+const groups = { small: [] as typeof problems, medium: [] as typeof problems, large: [] as typeof problems, xl: [] as typeof problems }
+for (const p of problems) groups[p.data.sizeGroup].push(p)
+const groupLabels = { small: 'Small (≤100)', medium: 'Medium (101–500)', large: 'Large (501–2000)', xl: 'XL (>2000)' }
+const groupIcons = { small: '🟢', medium: '🟡', large: '🟠', xl: '🔴' }
+
+const title = 'Problems — Teeline'
+const description = 'Browse TSP problem instances from TSPLIB95. Each instance includes city count, edge weight type, known optimal tour cost, and a download link.'
+---
+
+<BaseLayout title={title} description={description} path="/problems/">
+  <main class="container" style="padding-top: 2rem; padding-bottom: 3rem;">
+    <h1>TSP Problem Instances</h1>
+    <p>{description}</p>
+
+    {
+      (Object.entries(groups) as [keyof typeof groups, typeof problems][]).map(([key, items]) => (
+        items.length > 0 && (
+          <section style="margin-top: 1.5rem;">
+            <h2>{groupIcons[key]} {groupLabels[key]} ({items.length})</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Cities</th>
+                  <th>Type</th>
+                  <th>Optimal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((p) => (
+                  <tr>
+                    <td><a href={`/problems/${p.data.id}/`}>{p.data.name}</a></td>
+                    <td>{p.data.cities.toLocaleString()}</td>
+                    <td><code>{p.data.edgeWeightType}</code></td>
+                    <td>{p.data.optimalCost !== null ? p.data.optimalCost.toLocaleString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )
+      ))
+    }
+  </main>
+</BaseLayout>

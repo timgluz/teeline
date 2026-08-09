@@ -198,6 +198,40 @@ export function initUpload(
       }
     })
   })
+
+  // ---- Auto-load dataset from ?dataset= query param ----
+  const params = new URLSearchParams(window.location.search)
+  const datasetParam = params.get('dataset')
+
+  if (datasetParam) {
+    const tspUrl = `https://static.tspsolver.com/tsplib/${datasetParam}.tsp`
+    ;(async () => {
+      try {
+        const resp = await fetch(tspUrl)
+        if (!resp.ok) return
+        const text = await resp.text()
+        await loadTspText(`${datasetParam}.tsp`, text)
+
+        // Also try to load the .opt.tour if available
+        try {
+          const optResp = await fetch(`https://static.tspsolver.com/tsplib/${datasetParam}.opt.tour`)
+          if (optResp.ok) {
+            const optText = await optResp.text()
+            const route = parseOptTour(optText)
+            onOptTourLoaded?.(route)
+          }
+        } catch { /* opt tour not available, ignore */ }
+
+        // Auto-navigate to step 2 (configure solver)
+        setTimeout(() => {
+          const btnContinue = document.getElementById('btn-continue') as HTMLButtonElement | null
+          btnContinue?.click()
+        }, 100)
+      } catch (err) {
+        showError(err instanceof Error ? err.message : String(err))
+      }
+    })()
+  }
 }
 
 // ---- Stepper helpers (module-private) ----
