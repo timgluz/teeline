@@ -132,7 +132,9 @@ function PheromoneHeatmap({ pheromone, maxP }: { pheromone: number[][]; maxP: nu
               width={cell - 1.5} height={cell - 1.5}
               fill={`rgb(${r},${g},${b})`}
               rx={1.5}
-            />
+            >
+              <title>{i}–{j}  {(ratio * 100).toFixed(0)}%</title>
+            </rect>
           )
         })
       )}
