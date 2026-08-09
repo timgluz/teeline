@@ -6,7 +6,7 @@ use std::time::Instant;
 use serde_json::json;
 use qtbridge::{QObjectHolder, invoke_method, qobject_impl};
 use teeline::tsp::{
-    self, AppOptions, GAOptions, CSOptions, FPAOptions, HeuristicOptions, SAOptions,
+    self, AcoOptions, AppOptions, GAOptions, CSOptions, FPAOptions, HeuristicOptions, SAOptions,
     Solvers, TspProblem,
     kdtree::KDPoint,
     pipeline::{PipelineStage, run_pipeline},
@@ -384,6 +384,19 @@ fn build_app_options(alias: &str, json: &str) -> AppOptions {
                 fpa: Some(FPAOptions {
                     heuristic: h,
                     mutation_probability: get_f32(&v, "mutation_probability", def.mutation_probability),
+                }),
+                ..AppOptions::default()
+            }
+        }
+        "aco" | "ant_colony" => {
+            let def = AcoOptions::default();
+            AppOptions {
+                aco: Some(AcoOptions {
+                    heuristic: h,
+                    alpha: get_f32(&v, "alpha", def.alpha),
+                    beta: get_f32(&v, "beta", def.beta),
+                    evaporation_rate: get_f32(&v, "evaporation_rate", def.evaporation_rate),
+                    num_ants: get_usize(&v, "num_ants", def.num_ants),
                 }),
                 ..AppOptions::default()
             }
