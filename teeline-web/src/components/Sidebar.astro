@@ -14,56 +14,62 @@ interface Props {
 const { currentId, currentType = 'algorithm' } = Astro.props
 ---
 <ul>
-  <!-- Algorithms -->
-  <li class="sidebar-section-label">Algorithms</li>
-  {
-    SOLVER_GROUPS.map((g) => (
-      <li class="sidebar-group">
-        <span class="sidebar-group-label">{g.label}</span>
-        <ul>
-          {g.ids.map((id) => {
-            const meta = SOLVER_META[id]
-            if (!meta) return null
-            const isCurrent = currentType === 'algorithm' && id === currentId
-            return (
-              <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
-                {isCurrent ? (
-                  <span aria-current="page">{meta.name}</span>
-                ) : PAGED_SOLVERS.has(id) ? (
-                  <a href={`/algorithms/${id}/`}>{meta.name}</a>
-                ) : (
-                  <span>{meta.name}</span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      </li>
-    ))
-  }
-  <!-- Problems -->
-  <li class="sidebar-section-label" style="margin-top:1.5rem;">Problems</li>
-  {
-    PROBLEM_GROUPS.map((g) => (
-      <li class="sidebar-group">
-        <span class="sidebar-group-label">{g.label}</span>
-        <ul>
-          {g.ids.map((id) => {
-            const meta = PROBLEM_META[id]
-            if (!meta) return null
-            const isCurrent = currentType === 'problem' && id === currentId
-            return (
-              <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
-                {isCurrent ? (
-                  <span aria-current="page">{meta.name}</span>
-                ) : (
-                  <a href={`/problems/${id}/`}>{meta.name}</a>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      </li>
-    ))
-  }
+  {currentType === 'algorithm' && (
+    <>
+      <li class="sidebar-section-label">Algorithms</li>
+      {
+        SOLVER_GROUPS.map((g) => (
+          <li class="sidebar-group">
+            <span class="sidebar-group-label">{g.label}</span>
+            <ul>
+              {g.ids.map((id) => {
+                const meta = SOLVER_META[id]
+                if (!meta) return null
+                const isCurrent = id === currentId
+                return (
+                  <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
+                    {isCurrent ? (
+                      <span aria-current="page">{meta.name}</span>
+                    ) : PAGED_SOLVERS.has(id) ? (
+                      <a href={`/algorithms/${id}/`}>{meta.name}</a>
+                    ) : (
+                      <span>{meta.name}</span>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </li>
+        ))
+      }
+    </>
+  )}
+  {currentType === 'problem' && (
+    <>
+      <li class="sidebar-section-label">Problems</li>
+      {
+        PROBLEM_GROUPS.map((g) => (
+          <li class="sidebar-group">
+            <span class="sidebar-group-label">{g.label}</span>
+            <ul>
+              {g.ids.map((id) => {
+                const meta = PROBLEM_META[id]
+                if (!meta) return null
+                const isCurrent = id === currentId
+                return (
+                  <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
+                    {isCurrent ? (
+                      <span aria-current="page">{meta.name}</span>
+                    ) : (
+                      <a href={`/problems/${id}/`}>{meta.name}</a>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </li>
+        ))
+      }
+    </>
+  )}
 </ul>
