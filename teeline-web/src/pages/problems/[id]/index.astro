@@ -19,8 +19,8 @@ const canonicalUrl = `https://tspsolver.com${pagePath}`
 
 const sizeIcon = { small: '🟢', medium: '🟡', large: '🟠', xl: '🔴' }[data.sizeGroup] || ''
 const solverLink = data.optimalCost !== null
-  ? `/?dataset=${data.id}&opt=${data.optimalCost}`
-  : `/?dataset=${data.id}`
+  ? `/solve/?dataset=${data.id}&opt=${data.optimalCost}`
+  : `/solve/?dataset=${data.id}`
 
 const jsonLd = {
   '@context': 'https://schema.org',
