@@ -33,6 +33,7 @@ function PheromoneCanvas({ pheromone, maxP, bestTour, lastTour, phase }: CanvasP
   const lastSet = useMemo(() => lastTour ? new Set(lastTour) : new Set<number>(), [lastTour])
 
   const bestPts = bestTour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
+  const bestPtsClosed = bestPts + ` ${CITIES[bestTour[0]][0]},${CITIES[bestTour[0]][1]}`
   const lastPts = lastTour
     ? lastTour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ") + ` ${CITIES[lastTour[0]][0]},${CITIES[lastTour[0]][1]}`
     : ""
@@ -67,8 +68,8 @@ function PheromoneCanvas({ pheromone, maxP, bestTour, lastTour, phase }: CanvasP
       {/* best tour underlay (faded fill) */}
       <polygon points={bestPts} className="aco-best-area" />
 
-      {/* best tour — thick solid line */}
-      <polyline points={bestPts} className="aco-best-tour" />
+      {/* best tour — thick solid closed line */}
+      <polyline points={bestPtsClosed} className="aco-best-tour" />
 
       {/* last tour (dashed, highlighted) */}
       {lastTour && phase === 'building' && (
