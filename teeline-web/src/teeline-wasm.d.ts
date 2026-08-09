@@ -13,6 +13,10 @@ declare module 'teeline-wasm' {
     mutationProbability: number
     nElite: number
     nNearest: number
+    alpha: number
+    beta: number
+    evaporationRate: number
+    numAnts: number
   }
   export interface Solution {
     total: number

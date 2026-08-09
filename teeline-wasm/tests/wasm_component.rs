@@ -123,6 +123,10 @@ fn default_options() -> crate::teeline::solver::types::SolveOptions {
         mutation_probability: 0.001,
         n_elite: 3,
         n_nearest: 3,
+        alpha: 1.0,
+        beta: 2.0,
+        evaporation_rate: 0.5,
+        num_ants: 25,
     }
 }
 
@@ -795,6 +799,10 @@ const VALID_SOLVE_OPTIONS_KEYS: &[&str] = &[
     "mutationProbability",
     "nElite",
     "nNearest",
+    "alpha",
+    "beta",
+    "evaporationRate",
+    "numAnts",
 ];
 
 #[test]

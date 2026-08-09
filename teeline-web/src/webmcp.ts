@@ -44,6 +44,14 @@ function wireSolveTSP(worker: Worker): void {
       if (mutProb !== null && mutProb !== '') options.mutationProbability = parseFloat(mutProb as string)
       const nNearest = data.get('n_nearest')
       if (nNearest !== null && nNearest !== '') options.nNearest = parseInt(nNearest as string, 10)
+      const alpha = data.get('alpha')
+      if (alpha !== null && alpha !== '') options.alpha = parseFloat(alpha as string)
+      const beta = data.get('beta')
+      if (beta !== null && beta !== '') options.beta = parseFloat(beta as string)
+      const evaporationRate = data.get('evaporation_rate')
+      if (evaporationRate !== null && evaporationRate !== '') options.evaporationRate = parseFloat(evaporationRate as string)
+      const numAnts = data.get('num_ants')
+      if (numAnts !== null && numAnts !== '') options.numAnts = parseInt(numAnts as string, 10)
 
       const handler = (msg: MessageEvent) => {
         const res = msg.data as WebMCPSolveResult
