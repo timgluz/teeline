@@ -92,12 +92,19 @@ fn kd_to_city(c: &KDPoint) -> City {
     }
 }
 
-fn parse_input_to_kd(input: &str) -> Result<Vec<KDPoint>, String> {
+fn parse_to_tsp_problem(input: &str) -> Result<TspProblem, String> {
     if input.trim_start().starts_with('[') {
-        teeline::tsp::tsplib::parse_json_cities(input)
+        let kd_cities = teeline::tsp::tsplib::parse_json_cities(input)?;
+        let distances = DistanceMatrix::from_cities(&kd_cities)
+            .map_err(|e| format!("distance matrix: {e}"))?;
+        Ok(TspProblem::new(kd_cities, distances))
     } else {
         let data = teeline::tsp::tsplib::read_from_str(input)?;
-        Ok(data.cities().to_vec())
+        let kd_cities = data.cities().to_vec();
+        let distances = data
+            .distance_matrix()
+            .map_err(|e| format!("distance matrix: {e}"))?;
+        Ok(TspProblem::new(kd_cities, distances))
     }
 }
 
@@ -316,6 +323,7 @@ impl Guest for Component {
             let data = teeline::tsp::tsplib::read_from_str(&input)?;
             let dt = match data.distance_type {
                 teeline::tsp::DistanceType::Euc2D => "EUC_2D",
+                teeline::tsp::DistanceType::Explicit => "EXPLICIT",
                 teeline::tsp::DistanceType::Geo => "GEO",
             };
             Ok(ParsedProblem {
@@ -332,8 +340,19 @@ impl Guest for Component {
         input: String,
         options: SolveOptions,
     ) -> Result<Solution, String> {
-        let kd_cities = parse_input_to_kd(&input)?;
-        solve_with_cities(&solver, kd_cities, &options)
+        let problem = parse_to_tsp_problem(&input)?;
+        let solver_id = teeline::tsp::find_solver(&solver)?;
+        let opts = build_opts(solver_id, &options);
+        let start = std::time::Instant::now();
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            teeline::tsp::solve_problem(solver_id, &problem, &opts)
+        }))
+        .map_err(|_| format!("solver '{}' panicked", solver))?
+        .map(|s| Solution {
+            total: s.total,
+            route: s.route().iter().map(|&id| id as u32).collect(),
+            duration_ms: start.elapsed().as_millis() as u32,
+        })
     }
 
     fn compare(
@@ -341,8 +360,8 @@ impl Guest for Component {
         input: String,
         options: SolveOptions,
     ) -> Vec<CompareResult> {
-        let kd_cities = match parse_input_to_kd(&input) {
-            Ok(c) => c,
+        let problem = match parse_to_tsp_problem(&input) {
+            Ok(p) => p,
             Err(e) => {
                 return algorithms
                     .into_iter()
@@ -357,7 +376,27 @@ impl Guest for Component {
         algorithms
             .into_iter()
             .map(|algo| {
-                let sol = solve_with_cities(&algo, kd_cities.clone(), &options);
+                let solver_id = match teeline::tsp::find_solver(&algo) {
+                    Ok(id) => id,
+                    Err(e) => {
+                        return CompareResult {
+                            algorithm: algo,
+                            solution: Err(e),
+                        };
+                    }
+                };
+                let opts = build_opts(solver_id, &options);
+                let start = std::time::Instant::now();
+                let sol = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    teeline::tsp::solve_problem(solver_id, &problem, &opts)
+                }))
+                .map_err(|_| format!("solver '{}' panicked", algo))
+                .and_then(|r| r)
+                .map(|s| Solution {
+                    total: s.total,
+                    route: s.route().iter().map(|&id| id as u32).collect(),
+                    duration_ms: start.elapsed().as_millis() as u32,
+                });
                 CompareResult {
                     algorithm: algo,
                     solution: sol,
@@ -446,6 +485,38 @@ impl Guest for Component {
 
         let route: Vec<usize> = route.iter().map(|&x| x as usize).collect();
         Ok(comparison::tour_cost(&route, &kd_cities))
+    }
+
+    fn compare_tours_from_input(
+        solver_route: Vec<u32>,
+        opt_route: Vec<u32>,
+        input: String,
+    ) -> Result<ComparisonStats, String> {
+        let data = teeline::tsp::tsplib::read_from_str(&input)?;
+        let dm = data.distance_matrix()?;
+
+        let solver: Vec<usize> = solver_route.iter().map(|&x| x as usize).collect();
+        let opt: Vec<usize> = opt_route.iter().map(|&x| x as usize).collect();
+
+        let stats = comparison::compare_tours_from_matrix(&solver, &opt, &dm);
+        Ok(ComparisonStats {
+            optimal_cost: stats.optimal_cost,
+            solver_cost: stats.solver_cost,
+            gap_pct: stats.gap_pct,
+            shared_edges: stats.shared_edges as u32,
+            solver_only_edges: stats.solver_only_edges as u32,
+            optimal_only_edges: stats.optimal_only_edges as u32,
+        })
+    }
+
+    fn tour_distance_from_input(route: Vec<u32>, input: String) -> Result<f32, String> {
+        if route.len() < 2 {
+            return Err("route must contain at least 2 city ids".to_string());
+        }
+        let data = teeline::tsp::tsplib::read_from_str(&input)?;
+        let dm = data.distance_matrix()?;
+        let route: Vec<usize> = route.iter().map(|&x| x as usize).collect();
+        Ok(dm.tour_length(&route))
     }
 }
 

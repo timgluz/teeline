@@ -68,6 +68,7 @@ window.parseFile = parseFile
 // ---- App state ----
 
 let parsedProblem: ParsedProblem | null = null
+let rawInput: string | null = null
 let optTourRoute: number[] | null = null
 let solverConfig: ReturnType<typeof initSolverConfig> | null = null
 
@@ -160,13 +161,23 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
                 }
               }
               worker.addEventListener('message', compareHandler)
-              worker.postMessage({
-                type: 'compare-tours',
-                id: compareId,
-                solverRoute: result.route,
-                optRoute: optTourRoute,
-                cities: parsedProblem!.cities,
-              })
+              if (rawInput) {
+                worker.postMessage({
+                  type: 'compare-tours-from-input',
+                  id: compareId,
+                  solverRoute: result.route,
+                  optRoute: optTourRoute,
+                  input: rawInput,
+                })
+              } else {
+                worker.postMessage({
+                  type: 'compare-tours',
+                  id: compareId,
+                  solverRoute: result.route,
+                  optRoute: optTourRoute,
+                  cities: parsedProblem!.cities,
+                })
+              }
             }
           })
           .catch((err: Error) => {
@@ -180,7 +191,7 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
     // Upload depends on solverConfig.refresh — must be wired after solverConfig exists
     initUpload(
       parseFile,
-      (p) => { parsedProblem = p; solverConfig!.refresh() },
+      (p, input) => { parsedProblem = p; rawInput = input; solverConfig!.refresh() },
       (route) => {
         optTourRoute = route.length > 0 ? route : null
         updateOptRoute(optTourRoute)
@@ -221,6 +232,7 @@ function clearCompareError(): void {
 
 function resetToStep01(): void {
   parsedProblem = null
+  rawInput = null
   optTourRoute = null
   resetUpload()
   ;(document.getElementById('step-01') as HTMLElement).hidden = false

@@ -7,11 +7,12 @@ vi.mock('teeline-wasm', () => ({
   listAlgorithms: vi.fn(),
   getVersion: vi.fn(),
   compareTours: vi.fn(),
+  compareToursFromInput: vi.fn(),
 }))
 
 
 
-import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours } from 'teeline-wasm'
+import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours, compareToursFromInput } from 'teeline-wasm'
 import {
   handleMessage,
   type ParseAndSolveRequest,
@@ -20,6 +21,7 @@ import {
   type ListAlgorithmsRequest,
   type GetVersionRequest,
   type CompareToursRequest,
+  type CompareToursFromInputRequest,
   type ComparisonStats,
   type WebMCPSolveRequest,
   type WebMCPListAlgorithmsRequest,
@@ -355,6 +357,59 @@ describe('handleMessage — webmcp-parse', () => {
       expect(res.id).toBe('parse-id-err')
       expect(res.error).toContain('invalid tsplib')
       expect(res.problem).toBeUndefined()
+    }
+  })
+})
+
+describe('handleMessage — compare-tours-from-input', () => {
+  const mockStats: ComparisonStats = {
+    optimalCost: 2085.0,
+    solverCost: 2200.0,
+    gapPct: 5.5,
+    sharedEdges: 10,
+    solverOnlyEdges: 3,
+    optimalOnlyEdges: 4,
+  }
+  const solverRoute = [1, 2, 3]
+  const optRoute    = [1, 3, 2]
+  const tspInput = 'NAME: test\nDIMENSION: 3\nEDGE_WEIGHT_TYPE: EXPLICIT\nNODE_COORD_SECTION\n1 0.0 0.0\n2 1.0 0.0\n3 0.0 1.0\nEOF\n'
+
+  it('returns compare-tours-result with stats when using raw input', () => {
+    vi.mocked(compareToursFromInput).mockReturnValue(mockStats)
+    const req: CompareToursFromInputRequest = {
+      type: 'compare-tours-from-input',
+      id: 'from-input-1',
+      solverRoute,
+      optRoute,
+      input: tspInput,
+    }
+    const res = handleMessage(req)
+    expect(res.type).toBe('compare-tours-result')
+    if (res.type === 'compare-tours-result') {
+      expect(res.id).toBe('from-input-1')
+      expect(res.stats?.gapPct).toBe(5.5)
+      expect(res.stats?.sharedEdges).toBe(10)
+      expect(res.error).toBeUndefined()
+    }
+  })
+
+  it('returns error when compareToursFromInput throws', () => {
+    vi.mocked(compareToursFromInput).mockImplementation(() => {
+      throw new Error('bad TSPLIB input')
+    })
+    const req: CompareToursFromInputRequest = {
+      type: 'compare-tours-from-input',
+      id: 'from-input-err',
+      solverRoute,
+      optRoute,
+      input: 'garbage',
+    }
+    const res = handleMessage(req)
+    expect(res.type).toBe('compare-tours-result')
+    if (res.type === 'compare-tours-result') {
+      expect(res.id).toBe('from-input-err')
+      expect(res.error).toContain('bad TSPLIB input')
+      expect(res.stats).toBeUndefined()
     }
   })
 })

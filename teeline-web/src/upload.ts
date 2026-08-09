@@ -33,7 +33,7 @@ export function resetUpload(): void {
 
 export function initUpload(
   parseFile: (input: string) => Promise<ParsedProblem>,
-  onProblemLoaded?: (problem: ParsedProblem) => void,
+  onProblemLoaded?: (problem: ParsedProblem, rawInput: string) => void,
   onOptTourLoaded?: (route: number[]) => void,
 ): void {
   // DOM elements — all pre-built in index.html
@@ -104,7 +104,7 @@ export function initUpload(
     try {
       const parsed = await parseFile(text)
       showTspLoaded(filename, parsed)
-      onProblemLoaded?.(parsed)
+      onProblemLoaded?.(parsed, text)
     } catch (err) {
       showError(err instanceof Error ? err.message : String(err))
     }

@@ -137,6 +137,11 @@ impl DistanceMatrix {
                 let d = match distance_type {
                     DistanceType::Euc2D => pt1.distance(pt2),
                     DistanceType::Geo => geo_distance(pt1, pt2),
+                    DistanceType::Explicit => {
+                        return Err(
+                            "cannot build distance matrix from coordinates for EXPLICIT type — use DistanceMatrix::new() with precomputed distances",
+                        );
+                    }
                 };
                 distances.push(d);
             }

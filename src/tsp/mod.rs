@@ -165,6 +165,7 @@ impl Solvers {
 pub enum DistanceType {
     #[default]
     Euc2D,
+    Explicit,
     Geo,
 }
 
@@ -173,6 +174,7 @@ impl FromStr for DistanceType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_uppercase().as_str() {
             "EUC_2D" | "EUC2D" => Ok(DistanceType::Euc2D),
+            "EXPLICIT" => Ok(DistanceType::Explicit),
             "GEO" => Ok(DistanceType::Geo),
             other => Err(format!("unsupported distance type: {other}")),
         }
@@ -2472,5 +2474,13 @@ mod tests {
         let args = cmd.get_matches_from(["t", "--epochs", "0"]);
         let err = FourierOptions::from_cli(&args).unwrap_err();
         assert!(err.contains("epochs"), "got: {err}");
+    }
+
+    #[test]
+    fn distance_type_from_str_explicit() {
+        assert_eq!(
+            "EXPLICIT".parse::<DistanceType>().unwrap(),
+            DistanceType::Explicit
+        );
     }
 }

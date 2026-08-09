@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours, type ParsedProblem } from 'teeline-wasm'
+import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours, compareToursFromInput, type ParsedProblem } from 'teeline-wasm'
 import type { AlgorithmInfo } from 'teeline-wasm'
 import { defaultSolveOptions, type SolveOptions } from './solver-options'
 
@@ -77,6 +77,14 @@ export interface CompareToursRequest {
   cities: Array<{ id: number; x: number; y: number }>
 }
 
+export interface CompareToursFromInputRequest {
+  type: 'compare-tours-from-input'
+  id: string
+  solverRoute: number[]
+  optRoute: number[]
+  input: string
+}
+
 export interface CompareToursResult {
   type: 'compare-tours-result'
   id: string
@@ -121,7 +129,7 @@ export interface WebMCPParseResult {
   error?: string
 }
 
-type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest | CompareToursRequest | WebMCPSolveRequest | WebMCPListAlgorithmsRequest | WebMCPParseRequest
+type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest | CompareToursRequest | CompareToursFromInputRequest | WebMCPSolveRequest | WebMCPListAlgorithmsRequest | WebMCPParseRequest
 type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError | WorkerReadyMessage | CompareToursResult | WebMCPSolveResult | WebMCPAlgorithmsResult | WebMCPParseResult
 
 export function handleMessage(data: WorkerRequest): WorkerResponse {
@@ -141,6 +149,30 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
       try {
         // compareTours returns ComparisonStats directly (jco throws on WIT Err)
         const s = compareTours(new Uint32Array(req.solverRoute), new Uint32Array(req.optRoute), req.cities)
+        return {
+          type: 'compare-tours-result',
+          id: req.id,
+          stats: {
+            optimalCost: s.optimalCost,
+            solverCost: s.solverCost,
+            gapPct: s.gapPct,
+            sharedEdges: s.sharedEdges,
+            solverOnlyEdges: s.solverOnlyEdges,
+            optimalOnlyEdges: s.optimalOnlyEdges,
+          },
+        }
+      } catch (err) {
+        return {
+          type: 'compare-tours-result',
+          id: req.id,
+          error: err instanceof Error ? err.message : String(err),
+        }
+      }
+    }
+    if (data.type === 'compare-tours-from-input') {
+      const req = data as CompareToursFromInputRequest
+      try {
+        const s = compareToursFromInput(new Uint32Array(req.solverRoute), new Uint32Array(req.optRoute), req.input)
         return {
           type: 'compare-tours-result',
           id: req.id,
