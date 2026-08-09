@@ -78,6 +78,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of Greedy Edge Construction: watch every pairwise edge scan shortest-first, accepted unless it would create degree 3+ or a premature sub-cycle, with union-find components merging until one Hamiltonian cycle remains.',
     backLabel: 'Greedy Edge',
   },
+  savings: {
+    title: 'Savings Construction — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of Savings Construction: watch every pairwise edge scan highest-savings-first, ranked by the Clarke-Wright savings formula s(i,j) = d(hub,i) + d(hub,j) − d(i,j), with a centroid-nearest hub city bias and the same Kruskal-style accept/reject guards as Greedy Edge.',
+    backLabel: 'Savings',
+  },
 }
 
 export const EXPLAINER_IDS = Object.keys(EXPLAINER_META)
