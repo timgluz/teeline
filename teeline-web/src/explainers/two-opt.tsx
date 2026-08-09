@@ -143,10 +143,14 @@ export default function TwoOptExplainer() {
   let chipText = "Click Step to scan for improving swaps"
   let chipClass = "topt-chip topt-chip-idle"
   if (phase === 'candidate' && lastSwap) {
-    chipText = `Candidate swap (${lastSwap.i + 1},${lastSwap.j + 1}) — Δ=${lastSwap.delta.toFixed(0)} — click Step to apply`
+    const [r0a, r0b] = lastSwap.removed[0]
+    const [r1a, r1b] = lastSwap.removed[1]
+    chipText = `Candidate — edges to remove: ${r0a}→${r0b} and ${r1a}→${r1b}  (Δ=${lastSwap.delta.toFixed(0)})`
     chipClass = "topt-chip topt-chip-candidate"
   } else if (phase === 'swap_found' && lastSwap) {
-    chipText = `Swap (${lastSwap.i + 1},${lastSwap.j + 1}) applied — Δ=${lastSwap.delta.toFixed(0)}`
+    const [r0a, r0b] = lastSwap.removed[0]
+    const [a0a, a0b] = lastSwap.added[0]
+    chipText = `Swapped — removed ${r0a}→${r0b}, added ${a0a}→${a0b}  (Δ=${lastSwap.delta.toFixed(0)})`
     chipClass = "topt-chip topt-chip-swap"
   } else if (phase === 'local_optimum') {
     chipText = `Local optimum reached — no improving swap exists (${totalSwaps} swaps, ${pass} passes)`
