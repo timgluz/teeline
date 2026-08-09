@@ -43,7 +43,9 @@ impl Default for SolverEngine {
 }
 
 fn build_solvers_json() -> String {
-    let arr: Vec<serde_json::Value> = teeline::tsp::list_solvers()
+    let mut list: Vec<_> = teeline::tsp::list_solvers().iter().collect();
+    list.sort_by_key(|s| s.category);
+    let arr: Vec<serde_json::Value> = list
         .iter()
         .map(|s| {
             json!({
