@@ -101,7 +101,7 @@ describe('maxPheromone', () => {
 
 describe('tourLength', () => {
   it('computes a closed-loop distance', () => {
-    const tour = [0, 1, 2, 3, 4, 5, 6]
+    const tour = [0, 1, 2, 3, 4]
     expect(tourLength(tour)).toBeGreaterThan(0)
   })
 })
