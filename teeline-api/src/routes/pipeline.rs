@@ -74,7 +74,7 @@ use crate::{
     ),
     responses(
         (status = 200, description = "Pipeline result", body = PipelineResponse),
-        (status = 400, description = "Invalid input, unknown solver, or stage count outside [2, 20]"),
+        (status = 400, description = "Invalid input, unknown solver, stage count outside [2, 20], or invalid solver parameters"),
         (status = 401, description = "Missing or invalid API key"),
         (status = 500, description = "Solver failure")
     )

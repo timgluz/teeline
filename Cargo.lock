@@ -1938,7 +1938,7 @@ dependencies = [
 
 [[package]]
 name = "teeline"
-version = "1.0.11"
+version = "1.0.12"
 dependencies = [
  "clap",
  "criterion",
@@ -1954,7 +1954,7 @@ dependencies = [
 
 [[package]]
 name = "teeline-api"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "teeline-cli"
-version = "1.0.11"
+version = "1.0.12"
 dependencies = [
  "clap",
  "serde_json",

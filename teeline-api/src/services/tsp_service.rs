@@ -66,9 +66,12 @@ fn input_to_problem(input: &TspInput) -> Result<TspProblem, String> {
     }
 }
 
-fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOptions {
+fn make_app_options(
+    solver_name: &str,
+    configs: Option<&SolverConfigs>,
+) -> Result<AppOptions, String> {
     let Some(cfg) = configs else {
-        return AppOptions::default();
+        return Ok(AppOptions::default());
     };
 
     // Top-level HeuristicOptions is used by solvers that don't embed their own:
@@ -89,6 +92,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
         _ => None,
     }
     .map(map_heuristic);
+    if let Some(ref h) = heuristic {
+        h.validate()?;
+    }
 
     let sa = cfg.sa.as_ref().map(|c| {
         let d = SAOptions::default();
@@ -103,6 +109,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             max_temperature: c.max_temperature.unwrap_or(d.max_temperature),
         }
     });
+    if let Some(ref s) = sa {
+        s.validate()?;
+    }
 
     let ga = cfg.ga.as_ref().map(|c| {
         let d = GAOptions::default();
@@ -116,6 +125,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             n_elite: c.n_elite.unwrap_or(d.n_elite),
         }
     });
+    if let Some(ref g) = ga {
+        g.validate()?;
+    }
 
     let cs = cfg.cs.as_ref().map(|c| {
         let d = CSOptions::default();
@@ -128,6 +140,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             mutation_probability: c.mutation_probability.unwrap_or(d.mutation_probability),
         }
     });
+    if let Some(ref c) = cs {
+        c.validate()?;
+    }
 
     let fpa = cfg.fpa.as_ref().map(|c| {
         let d = FPAOptions::default();
@@ -140,6 +155,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             mutation_probability: c.mutation_probability.unwrap_or(d.mutation_probability),
         }
     });
+    if let Some(ref f) = fpa {
+        f.validate()?;
+    }
 
     // ACO embeds its own HeuristicOptions, but AcoOptions::default() overrides epochs to 150
     // (the global HeuristicOptions default of 10_000 would take minutes per run at ACO's
@@ -160,6 +178,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             num_ants: c.num_ants.unwrap_or(d.num_ants),
         }
     });
+    if let Some(ref a) = aco {
+        a.validate()?;
+    }
 
     let lk = cfg.lk.as_ref().map(|c| {
         let d = LKOptions::default();
@@ -172,6 +193,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             max_depth: c.max_depth.unwrap_or(d.max_depth),
         }
     });
+    if let Some(ref l) = lk {
+        l.validate()?;
+    }
 
     let fourier = cfg.fourier.as_ref().map(|c| {
         let d = FourierOptions::default();
@@ -184,6 +208,9 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             epochs: c.epochs.unwrap_or(d.epochs),
         }
     });
+    if let Some(ref fr) = fourier {
+        fr.validate()?;
+    }
 
     let som = cfg.som.as_ref().map(|c| {
         let d = SOMOptions::default();
@@ -194,8 +221,11 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
             neuron_multiplier: c.neuron_multiplier.unwrap_or(d.neuron_multiplier),
         }
     });
+    if let Some(ref sm) = som {
+        sm.validate()?;
+    }
 
-    AppOptions {
+    Ok(AppOptions {
         sa,
         ga,
         cs,
@@ -205,7 +235,7 @@ fn make_app_options(solver_name: &str, configs: Option<&SolverConfigs>) -> AppOp
         som,
         aco,
         heuristic,
-    }
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +292,7 @@ impl TspSolverService for TspService {
         req.validate()?;
         let solver: Solvers = find_solver(&req.solver)?;
         let problem = input_to_problem(&req.input)?;
-        let opts = make_app_options(&req.solver, req.configs.as_ref());
+        let opts = make_app_options(&req.solver, req.configs.as_ref())?;
 
         let start = Instant::now();
         let solution = tokio::task::spawn_blocking(move || solve_problem(solver, &problem, &opts))
@@ -293,10 +323,10 @@ impl TspSolverService for TspService {
             .iter()
             .zip(&solvers)
             .map(|(s, &solver)| {
-                let opts = make_app_options(&s.solver, s.configs.as_ref());
-                PipelineStage::new(solver, opts, problem.clone(), None)
+                let opts = make_app_options(&s.solver, s.configs.as_ref())?;
+                Ok(PipelineStage::new(solver, opts, problem.clone(), None))
             })
-            .collect();
+            .collect::<Result<Vec<_>, String>>()?;
 
         let outcomes = tokio::task::spawn_blocking(move || run_pipeline_stages(&stages))
             .await
@@ -559,8 +589,8 @@ EOF
             ..Default::default()
         };
 
-        let via_alias = make_app_options("tabu", Some(&configs));
-        let via_full_name = make_app_options("tabu_search", Some(&configs));
+        let via_alias = make_app_options("tabu", Some(&configs)).unwrap();
+        let via_full_name = make_app_options("tabu_search", Some(&configs)).unwrap();
 
         assert_eq!(via_alias.heuristic.as_ref().unwrap().n_nearest, 7);
         assert_eq!(via_alias.heuristic, via_full_name.heuristic);
@@ -585,7 +615,7 @@ EOF
             ..Default::default()
         };
 
-        let opts = make_app_options("aco", Some(&configs));
+        let opts = make_app_options("aco", Some(&configs)).unwrap();
         let aco = opts.aco.expect("aco config should map through");
         assert_eq!(
             aco.heuristic.epochs, 150,
@@ -595,5 +625,78 @@ EOF
         assert_eq!(aco.num_ants, 40);
         assert_eq!(aco.alpha, AcoOptions::default().alpha);
         assert_eq!(aco.evaporation_rate, AcoOptions::default().evaporation_rate);
+    }
+
+    #[test]
+    fn test_make_app_options_rejects_zero_n_nearest() {
+        let configs = SolverConfigs {
+            sa: Some(crate::models::request::SaConfig {
+                heuristic: Some(HeuristicConfig {
+                    n_nearest: Some(0),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("sa", Some(&configs)).unwrap_err();
+        assert!(
+            err.contains("n_nearest"),
+            "expected n_nearest error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_make_app_options_rejects_aco_zero_ants() {
+        let configs = SolverConfigs {
+            aco: Some(crate::models::request::AcoConfig {
+                num_ants: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("aco", Some(&configs)).unwrap_err();
+        assert!(
+            err.contains("num_ants"),
+            "expected num_ants error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_make_app_options_rejects_aco_beta_out_of_range() {
+        let configs = SolverConfigs {
+            aco: Some(crate::models::request::AcoConfig {
+                beta: Some(8.0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("aco", Some(&configs)).unwrap_err();
+        assert!(err.contains("beta"), "expected beta error, got: {err}");
+    }
+
+    #[test]
+    fn test_make_app_options_rejects_ga_negative_mutation() {
+        let configs = SolverConfigs {
+            ga: Some(crate::models::request::GaConfig {
+                mutation_probability: Some(-0.1),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("ga", Some(&configs)).unwrap_err();
+        assert!(
+            err.contains("mutation_probability"),
+            "expected mutation error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_make_app_options_accepts_valid_defaults() {
+        let configs = SolverConfigs {
+            aco: Some(crate::models::request::AcoConfig::default()),
+            ..Default::default()
+        };
+        assert!(make_app_options("aco", Some(&configs)).is_ok());
     }
 }

@@ -1650,9 +1650,11 @@ pub fn solve_with_context(
 ) -> Result<Solution, String> {
     let tx = progress_tx.as_ref();
     let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
+    h.validate()?;
     let solution = match solver {
         Solvers::AntColony => {
             let aco = opts.aco.as_ref().cloned().unwrap_or_default();
+            aco.validate()?;
             ant_colony::solve(problem, &aco, tx, init_tour)
         }
         Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour),
@@ -1661,23 +1663,28 @@ pub fn solve_with_context(
         Solvers::Savings => savings::solve(problem, &h, tx, init_tour),
         Solvers::CuckooSearch => {
             let cs = opts.cs.as_ref().cloned().unwrap_or_default();
+            cs.validate()?;
             cuckoo_search::solve(problem, &cs, tx, init_tour)
         }
         Solvers::FlowerPollination => {
             let fpa = opts.fpa.as_ref().cloned().unwrap_or_default();
+            fpa.validate()?;
             flower_pollination::solve(problem, &fpa, tx, init_tour)
         }
         Solvers::Fourier => {
             let f = opts.fourier.as_ref().cloned().unwrap_or_default();
+            f.validate()?;
             fourier::solve(problem, &f, tx, init_tour)
         }
         Solvers::LinKernighan => {
             let lk = opts.lk.as_ref().cloned().unwrap_or_default();
+            lk.validate()?;
             lin_kernighan::solve(problem, &lk, tx, init_tour)
         }
         Solvers::NearestNeighbor => nearest_neighbor::solve(problem, &h, tx, init_tour),
         Solvers::GeneticAlgorithm => {
             let ga = opts.ga.as_ref().cloned().unwrap_or_default();
+            ga.validate()?;
             genetic_algorithm::solve(problem, &ga, tx, init_tour)
         }
         Solvers::GravitationalSearch => gravitational_search::solve(problem, &h, tx, init_tour),
@@ -1686,10 +1693,12 @@ pub fn solve_with_context(
         Solvers::RandomShuffle => random_shuffle::solve(problem, &h, tx, init_tour),
         Solvers::KohonenSom => {
             let s = opts.som.as_ref().cloned().unwrap_or_default();
+            s.validate()?;
             som::solve(problem, &s, tx, init_tour)
         }
         Solvers::SimulatedAnnealing => {
             let sa = opts.sa.as_ref().cloned().unwrap_or_default();
+            sa.validate()?;
             simulated_annealing::solve(problem, &sa, tx, init_tour)
         }
         Solvers::StochasticHill => stochastic_hill::solve(problem, &h, tx, init_tour),
