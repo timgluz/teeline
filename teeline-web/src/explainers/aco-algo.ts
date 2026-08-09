@@ -9,7 +9,7 @@ export const CITIES: [number, number][] = [
   [250, 55],
   [260, 245],
   [40, 245],
-  [150, 150],
+  [150, 110],
 ]
 export const N_CITIES = CITIES.length
 
@@ -73,15 +73,6 @@ export function tourLength(tour: number[]): number {
   return d
 }
 
-function shuffle(n: number): number[] {
-  const t = Array.from({ length: n }, (_, i) => i)
-  for (let i = n - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[t[i], t[j]] = [t[j], t[i]]
-  }
-  return t
-}
-
 // Roulette-wheel construction: starting from a random city, each next city is
 // chosen probabilistically weighted by pheromone^alpha * eta^beta among unvisited
 // cities. Falls back to first-unvisited if all weights are zero (matching the
@@ -135,8 +126,9 @@ export function makeInitState(
   for (let i = 0; i < N_CITIES; i++) pheromone[i][i] = 0
   const eta = computeEta(beta)
 
-  // seed with one random tour to get a non-trivial best
-  const initTour = shuffle(N_CITIES)
+  // seed with identity tour — a clean clockwise perimeter order that
+  // the ACO colony will refine from (random can produce crossings)
+  const initTour = Array.from({ length: N_CITIES }, (_, i) => i)
   const initCost = tourLength(initTour)
 
   return {
