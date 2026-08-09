@@ -169,9 +169,9 @@ export default function TwoOptExplainer() {
       </div>
 
       <div className="topt-legend">
-        <span><span class="topt-swatch topt-swatch-normal" /> tour edge</span>
-        <span><span class="topt-swatch topt-swatch-removed" /> removed</span>
-        <span><span class="topt-swatch topt-swatch-added" /> new edge</span>
+        <span><span className="topt-swatch topt-swatch-normal" /> tour edge</span>
+        <span><span className="topt-swatch topt-swatch-removed" /> removed</span>
+        <span><span className="topt-swatch topt-swatch-added" /> new edge</span>
       </div>
 
       <div className={chipClass}>{chipText}</div>

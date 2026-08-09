@@ -90,7 +90,7 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of Ant Colony Optimization: watch a colony of ants construct tours probabilistically, biased by a shared pheromone matrix that strengthens on short edges and decays over epochs. Adjust α (pheromone influence), β (heuristic weight), evaporation rate, and colony size.',
     backLabel: 'ACO',
   },
-  two_opt: {
+  '2opt': {
     title: '2-opt — Interactive Explainer — Teeline',
     description:
       'Interactive walkthrough of the 2-opt local-search algorithm: watch edge swaps eliminate crossings one pass at a time, with removed edges highlighted red and new edges green. Step through best-improvement scans until the tour reaches a local optimum.',
