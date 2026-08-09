@@ -325,14 +325,32 @@ export default function AcoExplainer() {
         </div>
       </div>
 
-      <div className="aco-controls">
-        <button className="aco-btn" onClick={step_fn} disabled={running}>◀ Step</button>
-        <button className={`aco-btn ${!running ? "aco-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)}>
-          {running ? "⏸ Pause" : "▶ Run"}
-        </button>
-        <button className="aco-btn" onClick={() => reinit(alpha, beta, evapRate, numAnts)}>↺ Reset</button>
-      </div>
+       <div className="aco-controls">
+         <button className="aco-btn" onClick={step_fn} disabled={running}>◀ Step</button>
+         <button className={`aco-btn ${!running ? "aco-btn-primary" : ""}`}
+           onClick={() => setRunning(r => !r)}>
+           {running ? "⏸ Pause" : "▶ Run"}
+         </button>
+         <button className="aco-btn" onClick={() => reinit(alpha, beta, evapRate, numAnts)}>↺ Reset</button>
+       </div>
+
+       <div className="aco-scenarios">
+         <div className="aco-section-label">Scenarios</div>
+         <div className="aco-scenario-row">
+           {([
+             { label: 'Default', desc: 'balanced α=1.0 β=2.0 ρ=0.50 ants=10', a: 1.0, b: 2.0, e: 0.50, n: 10 },
+             { label: 'Pheromone-heavy', desc: 'high α=3.0 β=1.0 — ants follow existing trails', a: 3.0, b: 1.0, e: 0.30, n: 10 },
+             { label: 'Distance-driven', desc: 'high β=5.0 — ants prioritise short edges', a: 0.5, b: 5.0, e: 0.50, n: 10 },
+             { label: 'Fast evaporation', desc: 'ρ=0.85 — trails fade quickly, more exploration', a: 1.0, b: 2.0, e: 0.85, n: 10 },
+             { label: 'Large colony', desc: 'ants=25 — more deposits per epoch', a: 1.0, b: 2.0, e: 0.50, n: 25 },
+           ] as const).map(s => (
+             <button key={s.label} className="aco-scenario-btn" title={s.desc}
+               onClick={() => { setAlpha(s.a); setBeta(s.b); setEvapRate(s.e); setNumAnts(s.n); reinit(s.a, s.b, s.e, s.n) }}>
+               {s.label}
+             </button>
+           ))}
+         </div>
+       </div>
 
       <footer className="aco-footer">
         <span className="aco-mono">cities: {N_CITIES}</span>
@@ -467,6 +485,21 @@ const CSS = `
 .aco-btn:hover:not(:disabled) { border-color: var(--accent); }
 .aco-btn:disabled { opacity: 0.45; cursor: default; }
 .aco-btn-primary { color: var(--accent); border-color: var(--accent); }
+
+.aco-scenarios { margin-top: 4px; }
+.aco-scenario-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.aco-scenario-btn {
+  background: var(--panel);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.aco-scenario-btn:hover { border-color: var(--accent); color: var(--text); }
 
 .aco-footer {
   display: flex; flex-wrap: wrap; gap: 14px;
