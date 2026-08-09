@@ -105,9 +105,11 @@ export default function TwoOptExplainer() {
   const [speedIdx, setSpeedIdx] = useState(0) // 1x = 600ms — slow enough to observe swaps
 
   const simRef = useRef(makeInitState(DEFAULT_TOUR))
+  const historyRef = useRef<Array<typeof simRef.current>>([])
 
   const reinit = useCallback((t: number[]) => {
     simRef.current = makeInitState(t)
+    historyRef.current = []
     setTour([...t])
     setPhase('idle')
     setBestCost(simRef.current.bestCost)
@@ -120,6 +122,7 @@ export default function TwoOptExplainer() {
   }, [])
 
   const step_fn = useCallback(() => {
+    historyRef.current.push(structuredClone(simRef.current))
     const next = stepOnce(simRef.current)
     simRef.current = next
     setTour([...next.tour])
@@ -132,6 +135,21 @@ export default function TwoOptExplainer() {
     setStep(next.step)
     if (next.phase === 'local_optimum') setRunning(false)
   }, [])
+
+  const stepBack = useCallback(() => {
+    const h = historyRef.current
+    if (h.length === 0 || running) return
+    const prev = h.pop()!
+    simRef.current = prev
+    setTour([...prev.tour])
+    setPhase(prev.phase)
+    setBestCost(prev.bestCost)
+    setPass(prev.pass)
+    setTotalSwaps(prev.totalSwaps)
+    setLastSwap(prev.lastSwap)
+    setCostHistory([...prev.costHistory])
+    setStep(prev.step)
+  }, [running])
 
   useEffect(() => {
     if (!running) return
@@ -235,6 +253,9 @@ export default function TwoOptExplainer() {
       </div>
 
       <div className="topt-controls">
+        <button className="topt-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>
+          ⏴ Back
+        </button>
         <button className="topt-btn" onClick={step_fn} disabled={running || phase === 'local_optimum'}>
           ⏵ Step
         </button>
