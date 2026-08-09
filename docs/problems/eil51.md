@@ -1,6 +1,6 @@
 ---
 id: "eil51"
-name: "51-city problem (Christofides/Eilon)"
+name: "Eil 51"
 description: "51-city problem (Christofides/Eilon)"
 cities: 51
 sizeGroup: "small"

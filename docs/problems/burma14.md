@@ -1,6 +1,6 @@
 ---
 id: "burma14"
-name: "14-Staedte in Burma (Zaw Win)"
+name: "Burma 14"
 description: "14-Staedte in Burma (Zaw Win)"
 cities: 14
 sizeGroup: "small"

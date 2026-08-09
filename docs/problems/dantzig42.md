@@ -1,6 +1,6 @@
 ---
 id: "dantzig42"
-name: "42 cities (Dantzig)"
+name: "Dantzig 42"
 description: "42 cities (Dantzig)"
 cities: 42
 sizeGroup: "small"

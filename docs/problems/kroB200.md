@@ -1,6 +1,6 @@
 ---
 id: "kroB200"
-name: "200-city problem B (Krolak/Felts/Nelson)"
+name: "KroB 200"
 description: "200-city problem B (Krolak/Felts/Nelson)"
 cities: 200
 sizeGroup: "medium"

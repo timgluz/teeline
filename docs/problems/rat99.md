@@ -1,6 +1,6 @@
 ---
 id: "rat99"
-name: "Rattled grid (Pulleyblank)"
+name: "Rat 99"
 description: "Rattled grid (Pulleyblank)"
 cities: 99
 sizeGroup: "small"

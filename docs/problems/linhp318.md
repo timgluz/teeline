@@ -1,6 +1,6 @@
 ---
 id: "linhp318"
-name: "Original 318-city problem (Lin/Kernighan)"
+name: "Linhp 318"
 description: "Original 318-city problem (Lin/Kernighan)"
 cities: 318
 sizeGroup: "medium"

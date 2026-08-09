@@ -1,6 +1,6 @@
 ---
 id: "ulysses22"
-name: "Odyssey of Ulysses (Groetschel/Padberg)"
+name: "Ulysses 22"
 description: "Odyssey of Ulysses (Groetschel/Padberg)"
 cities: 22
 sizeGroup: "small"

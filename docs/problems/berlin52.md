@@ -1,6 +1,6 @@
 ---
 id: "berlin52"
-name: "52 locations in Berlin (Groetschel)"
+name: "Berlin 52"
 description: "52 locations in Berlin (Groetschel)"
 cities: 52
 sizeGroup: "small"

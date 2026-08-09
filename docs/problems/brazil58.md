@@ -1,6 +1,6 @@
 ---
 id: "brazil58"
-name: "58 cities in Brazil (Ferreira)"
+name: "Brazil 58"
 description: "58 cities in Brazil (Ferreira)"
 cities: 58
 sizeGroup: "small"

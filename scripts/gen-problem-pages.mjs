@@ -118,8 +118,12 @@ for (const file of TSP_FILES.sort()) {
   const header = parseHeader(txt)
 
   const id = name
-  const title = header['COMMENT'] || header['NAME'] || name
-  const cleanTitle = title.replace(/[.,;:!?]+$/, '') // strip trailing punctuation from heading
+  const comment = header['COMMENT'] || ''
+  const title = comment || header['NAME'] || name
+  const cleanTitle = title.replace(/[.,;:!?]+$/, '')
+  // Derive a short display name from the TSPLIB NAME (e.g. "bayg29" → "Bayg 29")
+  const shortName = name.replace(/([a-z])(\d)/gi, '$1 $2').replace(/([A-Z])([A-Z][a-z])/g, '$1 $2')
+    .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
   const cities = parseInt(header['DIMENSION']) || 0
   const ewt = header['EDGE_WEIGHT_TYPE'] || 'UNKNOWN'
   const group = sizeGroup(cities)
@@ -137,7 +141,7 @@ for (const file of TSP_FILES.sort()) {
 
   const icon = iconForSize(group)
 
-  const isExplicit = ['EXPLICIT', 'MATRIX'].some(t => ewt.toUpperCase().includes(t))
+  const isExplicit = ['EXPLICIT', 'MATRIX', 'GEO'].some(t => ewt.toUpperCase().includes(t))
   const solverOptimalCost = isExplicit ? null : optimalCost
 
   const solverLink = solverOptimalCost !== null
@@ -146,7 +150,7 @@ for (const file of TSP_FILES.sort()) {
 
   const content = `---
 id: "${id}"
-name: "${cleanTitle}"
+name: "${shortName}"
 description: "${title}"
 cities: ${cities}
 sizeGroup: "${group}"

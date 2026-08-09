@@ -1,6 +1,6 @@
 ---
 id: "att48"
-name: "48 capitals of the US (Padberg/Rinaldi)"
+name: "Att 48"
 description: "48 capitals of the US (Padberg/Rinaldi)"
 cities: 48
 sizeGroup: "small"

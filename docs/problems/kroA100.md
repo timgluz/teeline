@@ -1,6 +1,6 @@
 ---
 id: "kroA100"
-name: "100-city problem A (Krolak/Felts/Nelson)"
+name: "KroA 100"
 description: "100-city problem A (Krolak/Felts/Nelson)"
 cities: 100
 sizeGroup: "small"

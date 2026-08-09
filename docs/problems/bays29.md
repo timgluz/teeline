@@ -1,6 +1,6 @@
 ---
 id: "bays29"
-name: "29 cities in Bavaria, street distances (Groetschel,Juenger,Reinelt)"
+name: "Bays 29"
 description: "29 cities in Bavaria, street distances (Groetschel,Juenger,Reinelt)"
 cities: 29
 sizeGroup: "small"

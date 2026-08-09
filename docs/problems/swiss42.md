@@ -1,6 +1,6 @@
 ---
 id: "swiss42"
-name: "42 Staedte Schweiz (Fricker)"
+name: "Swiss 42"
 description: "42 Staedte Schweiz (Fricker)"
 cities: 42
 sizeGroup: "small"

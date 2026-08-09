@@ -1,6 +1,6 @@
 ---
 id: "bayg29"
-name: "29 Cities in Bavaria, geographical distances (Groetschel,Juenger,Reinelt)"
+name: "Bayg 29"
 description: "29 Cities in Bavaria, geographical distances (Groetschel,Juenger,Reinelt)"
 cities: 29
 sizeGroup: "small"

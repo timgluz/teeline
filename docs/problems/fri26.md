@@ -1,6 +1,6 @@
 ---
 id: "fri26"
-name: "26 Staedte (Fricker)"
+name: "Fri 26"
 description: "26 Staedte (Fricker)"
 cities: 26
 sizeGroup: "small"

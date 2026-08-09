@@ -1,6 +1,6 @@
 ---
 id: "bier127"
-name: "127 Biergaerten in Augsburg (Juenger/Reinelt)"
+name: "Bier 127"
 description: "127 Biergaerten in Augsburg (Juenger/Reinelt)"
 cities: 127
 sizeGroup: "medium"

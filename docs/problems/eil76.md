@@ -1,6 +1,6 @@
 ---
 id: "eil76"
-name: "76-city problem (Christofides/Eilon)"
+name: "Eil 76"
 description: "76-city problem (Christofides/Eilon)"
 cities: 76
 sizeGroup: "small"
