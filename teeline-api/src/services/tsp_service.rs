@@ -656,6 +656,109 @@ EOF
         );
     }
 
+    // SA/GA/CS/FPA use map_heuristic_onto(h, d.heuristic.clone()) so that a future
+    // solver-side Default override can't be silently discarded. These tests assert the
+    // mapping is wired correctly — custom fields flow through, solver defaults survive.
+    #[test]
+    fn test_make_app_options_sa_maps_heuristic_onto_own_default() {
+        use crate::models::request::SaConfig;
+
+        let configs = SolverConfigs {
+            sa: Some(SaConfig {
+                heuristic: Some(HeuristicConfig {
+                    n_nearest: Some(7),
+                    ..Default::default()
+                }),
+                cooling_rate: Some(0.005),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let opts = make_app_options("sa", Some(&configs)).unwrap();
+        let sa = opts.sa.expect("sa config should map through");
+        assert_eq!(sa.heuristic.n_nearest, 7);
+        assert_eq!(sa.cooling_rate, 0.005);
+        assert_eq!(sa.heuristic.epochs, SAOptions::default().heuristic.epochs);
+        assert_eq!(sa.min_temperature, SAOptions::default().min_temperature);
+    }
+
+    #[test]
+    fn test_make_app_options_ga_maps_heuristic_onto_own_default() {
+        use crate::models::request::GaConfig;
+
+        let configs = SolverConfigs {
+            ga: Some(GaConfig {
+                heuristic: Some(HeuristicConfig {
+                    epochs: Some(500),
+                    ..Default::default()
+                }),
+                mutation_probability: Some(0.05),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let opts = make_app_options("ga", Some(&configs)).unwrap();
+        let ga = opts.ga.expect("ga config should map through");
+        assert_eq!(ga.heuristic.epochs, 500);
+        assert_eq!(ga.mutation_probability, 0.05);
+        assert_eq!(
+            ga.heuristic.n_nearest,
+            GAOptions::default().heuristic.n_nearest
+        );
+        assert_eq!(ga.n_elite, GAOptions::default().n_elite);
+    }
+
+    #[test]
+    fn test_make_app_options_cs_maps_heuristic_onto_own_default() {
+        use crate::models::request::CsConfig;
+
+        let configs = SolverConfigs {
+            cs: Some(CsConfig {
+                heuristic: Some(HeuristicConfig {
+                    platoo_epochs: Some(200),
+                    ..Default::default()
+                }),
+                mutation_probability: Some(0.1),
+            }),
+            ..Default::default()
+        };
+
+        let opts = make_app_options("cs", Some(&configs)).unwrap();
+        let cs = opts.cs.expect("cs config should map through");
+        assert_eq!(cs.heuristic.platoo_epochs, 200);
+        assert_eq!(cs.mutation_probability, 0.1);
+        assert_eq!(cs.heuristic.epochs, CSOptions::default().heuristic.epochs);
+    }
+
+    #[test]
+    fn test_make_app_options_fpa_maps_heuristic_onto_own_default() {
+        use crate::models::request::FpaConfig;
+
+        let configs = SolverConfigs {
+            fpa: Some(FpaConfig {
+                heuristic: Some(HeuristicConfig {
+                    epochs: Some(800),
+                    n_nearest: Some(7),
+                    ..Default::default()
+                }),
+                mutation_probability: Some(0.02),
+            }),
+            ..Default::default()
+        };
+
+        let opts = make_app_options("fpa", Some(&configs)).unwrap();
+        let fpa = opts.fpa.expect("fpa config should map through");
+        assert_eq!(fpa.heuristic.epochs, 800);
+        assert_eq!(fpa.heuristic.n_nearest, 7);
+        assert_eq!(fpa.mutation_probability, 0.02);
+        assert_eq!(
+            fpa.heuristic.platoo_epochs,
+            FPAOptions::default().heuristic.platoo_epochs
+        );
+    }
+
     #[test]
     fn test_make_app_options_rejects_zero_n_nearest() {
         let configs = SolverConfigs {
