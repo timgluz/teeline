@@ -204,9 +204,7 @@ export function initUpload(
   const datasetParam = params.get('dataset')
 
   if (datasetParam) {
-    const tspUrl = import.meta.env.DEV
-      ? `/tsplib/${datasetParam}.tsp`
-      : `https://static.tspsolver.com/tsplib/${datasetParam}.tsp`
+    const tspUrl = `https://static.tspsolver.com/tsplib/${datasetParam}.tsp`
     ;(async () => {
       try {
         const resp = await fetch(tspUrl)

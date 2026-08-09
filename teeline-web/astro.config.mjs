@@ -54,13 +54,5 @@ export default defineConfig({
       },
       sentryVitePlugin({ org: 'timo-sulg', project: 'javascript' }),
     ],
-    server: {
-      proxy: {
-        '/tsplib': {
-          target: 'https://static.tspsolver.com',
-          changeOrigin: true,
-        },
-      },
-    },
   },
 })
