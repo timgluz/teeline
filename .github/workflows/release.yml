@@ -338,8 +338,7 @@ jobs:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' }}
-    outputs:
-      artifact-ready: ${{ steps.signal.outputs.ready }}
+    continue-on-error: true
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -406,22 +405,17 @@ jobs:
           ./linuxdeploy-x86_64.AppImage --appdir=AppDir --plugin qt --output appimage
           # linuxdeploy names the file using the desktop entry Name + arch
           mv Teeline_Qt-x86_64.AppImage "teeline-qt-${{ needs.plan.outputs.tag }}-linux-x86_64.AppImage"
-      - id: upload
-        uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
           name: qt-linux
           path: teeline-qt-*-linux-x86_64.AppImage
           if-no-files-found: error
-      - id: signal
-        if: always()
-        run: echo "ready=${{ steps.upload.outcome == 'success' }}" >> "$GITHUB_OUTPUT"
 
   build-qt-windows:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' }}
-    outputs:
-      artifact-ready: ${{ steps.signal.outputs.ready }}
+    continue-on-error: true
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -443,41 +437,31 @@ jobs:
           cache: true
           extra: '--base https://download.qt.io/'
       - name: Build teeline-qt
-        id: build
-        continue-on-error: true
         run: cargo build --release --manifest-path teeline-qt/Cargo.toml
       - name: Deploy Qt dependencies
-        if: steps.build.outcome == 'success'
         shell: pwsh
         run: |
           $windeployqt = "${{ env.QT_ROOT_DIR }}\bin\windeployqt.exe"
           & $windeployqt --release --compiler-runtime --qmldir teeline-qt\src --dir deploy teeline-qt\target\release\teeline-qt.exe
           Copy-Item teeline-qt\target\release\teeline-qt.exe deploy\
       - name: Package zip
-        if: steps.build.outcome == 'success'
         shell: pwsh
         run: |
           $tag = "${{ needs.plan.outputs.tag }}"
           $name = "teeline-qt-${tag}-windows-x64"
           Rename-Item deploy $name
           Compress-Archive -Path $name -DestinationPath "${name}.zip"
-      - id: upload
-        if: steps.build.outcome == 'success'
-        uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
           name: qt-windows
           path: teeline-qt-*-windows-x64.zip
           if-no-files-found: error
-      - id: signal
-        if: always()
-        run: echo "ready=${{ steps.upload.outcome == 'success' }}" >> "$GITHUB_OUTPUT"
 
   build-qt-macos:
     needs:
       - plan
     if: ${{ needs.plan.outputs.publishing == 'true' }}
-    outputs:
-      artifact-ready: ${{ steps.signal.outputs.ready }}
+    continue-on-error: true
     runs-on: macos-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -497,11 +481,8 @@ jobs:
           cache: true
           extra: '--base https://download.qt.io/'
       - name: Build teeline-qt
-        id: build
-        continue-on-error: true
         run: cargo build --release --manifest-path teeline-qt/Cargo.toml
       - name: Create .app bundle
-        if: steps.build.outcome == 'success'
         run: |
           mkdir -p TeelineQt.app/Contents/MacOS
           mkdir -p TeelineQt.app/Contents/Resources
@@ -529,7 +510,6 @@ jobs:
           </plist>
           EOF
       - name: Deploy Qt frameworks and create DMG
-        if: steps.build.outcome == 'success'
         run: |
           macdeployqt TeelineQt.app -always-overwrite -qmldir=teeline-qt/src
           codesign --force --deep -s - TeelineQt.app
@@ -538,16 +518,11 @@ jobs:
             -srcfolder TeelineQt.app \
             -ov -format UDZO \
             "teeline-qt-${{ needs.plan.outputs.tag }}-macos-arm64.dmg"
-      - id: upload
-        if: steps.build.outcome == 'success'
-        uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7
         with:
           name: qt-macos
           path: teeline-qt-*-macos-arm64.dmg
           if-no-files-found: error
-      - id: signal
-        if: always()
-        run: echo "ready=${{ steps.upload.outcome == 'success' }}" >> "$GITHUB_OUTPUT"
 
   upload-qt-artifacts:
     needs:
@@ -556,28 +531,27 @@ jobs:
       - build-qt-linux
       - build-qt-windows
       - build-qt-macos
-    if: ${{ always() && needs.host.result == 'success' }}
+    if: ${{ always() && needs.host.result == 'success' && (needs.build-qt-linux.result == 'success' || needs.build-qt-windows.result == 'success' || needs.build-qt-macos.result == 'success') }}
     runs-on: ubuntu-22.04
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/download-artifact@v8
-        if: ${{ needs.build-qt-linux.outputs.artifact-ready == 'true' }}
+        if: ${{ needs.build-qt-linux.result == 'success' }}
         with:
           name: qt-linux
           path: artifacts/
       - uses: actions/download-artifact@v8
-        if: ${{ needs.build-qt-windows.outputs.artifact-ready == 'true' }}
+        if: ${{ needs.build-qt-windows.result == 'success' }}
         with:
           name: qt-windows
           path: artifacts/
       - uses: actions/download-artifact@v8
-        if: ${{ needs.build-qt-macos.outputs.artifact-ready == 'true' }}
+        if: ${{ needs.build-qt-macos.result == 'success' }}
         with:
           name: qt-macos
           path: artifacts/
       - name: Attach Qt artifacts to GitHub Release
-        if: ${{ hashFiles('artifacts/*') != '' }}
         run: gh release upload "${{ needs.plan.outputs.tag }}" artifacts/* --repo "${{ github.repository }}"
 
   publish-wassette:
