@@ -52,15 +52,18 @@ function PheromoneCanvas({ pheromone, maxP, bestTour, lastTour, phase }: CanvasP
       {/* pheromone edges — dashed, width ∝ pheromone, subtle teal */}
       {edges.map(([i, j, p], k) => {
         const ratio = maxP > 0 ? p / maxP : 0
+        // power curve amplifies small pheromone differences:
+        // ratio 1.0→1.0, 0.9→0.76, 0.5→0.19 — edges that lag behind maxP fade fast
+        const amp = Math.pow(ratio, 0.35)
         return (
           <line key={"p" + k}
             x1={CITIES[i][0]} y1={CITIES[i][1]}
             x2={CITIES[j][0]} y2={CITIES[j][1]}
             stroke="#0d9488"
-            strokeWidth={0.6 + ratio * 3.5}
-            opacity={0.08 + ratio * 0.55}
+            strokeWidth={0.3 + amp * 4.5}
+            opacity={0.04 + amp * 0.72}
             strokeLinecap="round"
-            strokeDasharray={ratio > 0.3 ? "6 4" : "3 5"}
+            strokeDasharray={amp > 0.35 ? "6 4" : "3 6"}
           />
         )
       })}
