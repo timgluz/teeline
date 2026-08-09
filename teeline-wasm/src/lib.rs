@@ -492,6 +492,13 @@ impl Guest for Component {
         opt_route: Vec<u32>,
         input: String,
     ) -> Result<ComparisonStats, String> {
+        if solver_route.len() != opt_route.len() {
+            return Err(format!(
+                "dimension mismatch: solver={} opt={}",
+                solver_route.len(),
+                opt_route.len()
+            ));
+        }
         let data = teeline::tsp::tsplib::read_from_str(&input)?;
         let dm = data.distance_matrix()?;
 

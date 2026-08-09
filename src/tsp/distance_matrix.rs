@@ -56,7 +56,7 @@ use std::collections::HashMap;
 use super::kdtree::KDPoint;
 use super::{CityTable, DistanceType, NearestResult};
 
-fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     use std::f64::consts::PI;
     fn to_rad(x: f32) -> f64 {
         let deg = x.trunc() as f64;

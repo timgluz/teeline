@@ -1,4 +1,5 @@
 use crate::tsp::DistanceType;
+use crate::tsp::distance_matrix;
 use crate::tsp::distance_matrix::DistanceMatrix;
 use crate::tsp::kdtree::KDPoint;
 use std::collections::{HashMap, HashSet};
@@ -32,11 +33,9 @@ pub fn tour_cost_with_type(route: &[usize], cities: &[KDPoint], dt: DistanceType
                     let dy = a.y() - b.y();
                     (dx * dx + dy * dy).sqrt()
                 }
-                DistanceType::Geo => geo_distance(a, b),
+                DistanceType::Geo => distance_matrix::geo_distance(a, b),
                 DistanceType::Explicit => {
-                    let dx = a.x() - b.x();
-                    let dy = a.y() - b.y();
-                    (dx * dx + dy * dy).sqrt()
+                    panic!("tour_cost_with_type requires DistanceMatrix for EXPLICIT; use tour_cost_from_matrix instead")
                 }
             }
         })
@@ -100,25 +99,6 @@ fn build_stats(
         solver_only_edges,
         optimal_only_edges,
     }
-}
-
-/// GEO distance formula from TSPLIB spec.
-fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
-    use std::f64::consts::PI;
-    fn to_rad(x: f32) -> f64 {
-        let deg = x.trunc() as f64;
-        let min = (x - x.trunc()) as f64;
-        PI * (deg + 5.0 * min / 3.0) / 180.0
-    }
-    let lat1 = to_rad(p1.coords[0]);
-    let lon1 = to_rad(p1.coords[1]);
-    let lat2 = to_rad(p2.coords[0]);
-    let lon2 = to_rad(p2.coords[1]);
-    let q1 = (lon1 - lon2).cos();
-    let q2 = (lat1 - lat2).cos();
-    let q3 = (lat1 + lat2).cos();
-    const RRR: f64 = 6378.388;
-    (RRR * (0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)).acos() + 1.0).floor() as f32
 }
 
 /// Build a set of undirected edges: each edge stored as (min_id, max_id).
