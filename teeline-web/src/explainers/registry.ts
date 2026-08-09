@@ -1,4 +1,4 @@
-// Metadata registry for the 10 interactive explainer pages. Only metadata
+// Metadata registry for the 14 interactive explainer pages. Only metadata
 // lives here — the components themselves must be statically imported
 // directly in [id]/explainer/index.astro, because Astro's client:* hydration
 // directives require the compiler to see a literal top-level `import`
@@ -89,6 +89,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
     description:
       'Interactive walkthrough of Ant Colony Optimization: watch a colony of ants construct tours probabilistically, biased by a shared pheromone matrix that strengthens on short edges and decays over epochs. Adjust α (pheromone influence), β (heuristic weight), evaporation rate, and colony size.',
     backLabel: 'ACO',
+  },
+  '2opt': {
+    title: '2-opt — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the 2-opt local-search algorithm: watch edge swaps eliminate crossings one pass at a time, with removed edges highlighted red and new edges green. Step through best-improvement scans until the tour reaches a local optimum.',
+    backLabel: '2-opt',
   },
 }
 

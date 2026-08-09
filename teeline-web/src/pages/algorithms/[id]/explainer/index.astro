@@ -1,5 +1,5 @@
 ---
-// Replaces the 10 hand-authored algorithms/<id>/explainer/index.html shells +
+// Replaces the 14 hand-authored algorithms/<id>/explainer/index.html shells +
 // their *-page.ts mount scripts (manual preact.render() calls). One dynamic
 // route over a fixed id->component map; client:visible defers hydration
 // until the explainer scrolls into view (below-the-fold interactive demo,
@@ -28,6 +28,7 @@ import FourierExplainer from '../../../../explainers/fourier'
 import GreedyEdgeExplainer from '../../../../explainers/greedy-edge'
 import SavingsExplainer from '../../../../explainers/savings'
 import AcoExplainer from '../../../../explainers/aco'
+import TwoOptExplainer from '../../../../explainers/two-opt'
 
 export function getStaticPaths() {
   return EXPLAINER_IDS.map((id) => ({ params: { id } }))
@@ -67,5 +68,6 @@ const jsonLd = {
     {id === 'greedy_edge' && <GreedyEdgeExplainer client:visible />}
     {id === 'savings' && <SavingsExplainer client:visible />}
     {id === 'aco' && <AcoExplainer client:visible />}
+    {id === '2opt' && <TwoOptExplainer client:visible />}
   </main>
 </BaseLayout>
