@@ -111,4 +111,21 @@ world solver {
         route:  list<u32>,
         cities: list<city>,
     ) -> result<f32, string>;
+
+    // ── distance-type-aware variants — parse input internally ─────────────────
+
+    /// Like `compare-tours`, but parses `input` as TSPLIB to use the problem's
+    /// actual distance type (EXPLICIT matrix, GEO, or EUC_2D).
+    export compare-tours-from-input: func(
+        solver-route: list<u32>,
+        opt-route:    list<u32>,
+        input:        string,
+    ) -> result<comparison-stats, string>;
+
+    /// Like `tour-distance`, but parses `input` as TSPLIB to use the problem's
+    /// actual distance type (EXPLICIT matrix, GEO, or EUC_2D).
+    export tour-distance-from-input: func(
+        route: list<u32>,
+        input: string,
+    ) -> result<f32, string>;
 }

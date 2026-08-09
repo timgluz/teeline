@@ -56,7 +56,7 @@ use std::collections::HashMap;
 use super::kdtree::KDPoint;
 use super::{CityTable, DistanceType, NearestResult};
 
-fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     use std::f64::consts::PI;
     fn to_rad(x: f32) -> f64 {
         let deg = x.trunc() as f64;
@@ -137,6 +137,11 @@ impl DistanceMatrix {
                 let d = match distance_type {
                     DistanceType::Euc2D => pt1.distance(pt2),
                     DistanceType::Geo => geo_distance(pt1, pt2),
+                    DistanceType::Explicit => {
+                        return Err(
+                            "cannot build distance matrix from coordinates for EXPLICIT type — use DistanceMatrix::new() with precomputed distances",
+                        );
+                    }
                 };
                 distances.push(d);
             }

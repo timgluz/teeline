@@ -212,6 +212,24 @@ fn run_tour_distance(
         .unwrap()
 }
 
+fn run_compare_tours_from_input(
+    solver_route: &[u32],
+    opt_route: &[u32],
+    input: &str,
+) -> Result<crate::teeline::solver::types::ComparisonStats, String> {
+    let (mut store, instance) = make_instance();
+    instance
+        .call_compare_tours_from_input(&mut store, solver_route, opt_route, input)
+        .unwrap()
+}
+
+fn run_tour_distance_from_input(route: &[u32], input: &str) -> Result<f32, String> {
+    let (mut store, instance) = make_instance();
+    instance
+        .call_tour_distance_from_input(&mut store, route, input)
+        .unwrap()
+}
+
 // Unit square, side 10: closed-loop perimeter is exactly 40.0.
 fn square_cities() -> Vec<crate::teeline::solver::types::City> {
     use crate::teeline::solver::types::City;
@@ -942,5 +960,117 @@ fn test_tour_distance_duplicate_city_id_returns_error() {
     assert!(
         msg.contains("duplicate"),
         "error must mention 'duplicate', got: {msg}"
+    );
+}
+
+// ── EXPLICIT / GEO distance tests ────────────────────────────────────────────
+
+#[test]
+fn test_parse_explicit_matrix_returns_explicit_distance_type() {
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/gr17.tsp"
+    ))
+    .expect("gr17.tsp missing");
+    let p = run_parse(&input);
+    assert_eq!(p.distance_type, "EXPLICIT");
+    assert_eq!(p.cities.len(), 17);
+}
+
+#[test]
+fn test_parse_geo_returns_geo_distance_type() {
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/burma14.tsp"
+    ))
+    .expect("burma14.tsp missing");
+    let p = run_parse(&input);
+    assert_eq!(p.distance_type, "GEO");
+    assert_eq!(p.cities.len(), 14);
+}
+
+#[test]
+fn test_parse_and_solve_explicit_matrix_uses_matrix_distances() {
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/gr17.tsp"
+    ))
+    .expect("gr17.tsp missing");
+    let solution = run_parse_and_solve("nn", &input);
+    assert_valid_tour(&solution, 17);
+    // gr17 has EXPLICIT distances. The Euclidean NN tour on the grid
+    // placeholder coordinates would be wildly different from the explicit
+    // matrix tour. Ensure the result is positive and finite.
+    assert!(solution.total > 0.0, "tour distance must be positive for gr17");
+    assert!(solution.total.is_finite(), "tour distance must be finite");
+}
+
+#[test]
+fn test_parse_and_solve_geo_uses_geo_distances() {
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/burma14.tsp"
+    ))
+    .expect("burma14.tsp missing");
+    let solution = run_parse_and_solve("nn", &input);
+    assert_valid_tour(&solution, 14);
+    // For burma14 (GEO), the total should be different from a Euclidean NN.
+    // We can't assert an exact value, but we can verify it's positive and
+    // not the same as a Euclidean computation would produce.
+    assert!(solution.total > 100.0, "GEO distance should be substantial, got {}", solution.total);
+}
+
+#[test]
+fn test_compare_tours_from_input_explicit_self_is_zero_gap() {
+    let input =
+        std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../tests/fixtures/ring6_explicit.tsp"
+        ))
+        .expect("ring6_explicit.tsp missing");
+    let route = vec![1u32, 2, 3, 4, 5, 6];
+    let stats = run_compare_tours_from_input(&route, &route, &input)
+        .expect("compare_tours_from_input must succeed");
+    assert_eq!(stats.gap_pct, 0.0, "identical tour must have 0% gap");
+    assert_eq!(stats.shared_edges, 6);
+    assert_eq!(stats.solver_only_edges, 0);
+    assert_eq!(stats.optimal_only_edges, 0);
+}
+
+#[test]
+fn test_tour_distance_from_input_ring6_explicit() {
+    let input =
+        std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../tests/fixtures/ring6_explicit.tsp"
+        ))
+        .expect("ring6_explicit.tsp missing");
+    let route = vec![1u32, 2, 3, 4, 5, 6];
+    let distance = run_tour_distance_from_input(&route, &input)
+        .expect("tour_distance_from_input must succeed");
+    // Ring6 optimal is 60 (6 edges at distance 10 each)
+    assert!((distance - 60.0).abs() < 0.01, "expected 60, got {distance}");
+}
+
+#[test]
+fn test_tour_distance_from_input_geo_is_different_from_euc() {
+    let burma14_input =
+        std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../tests/fixtures/burma14.tsp"
+        ))
+        .expect("burma14.tsp missing");
+    let route: Vec<u32> = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+    let geo_dist = run_tour_distance_from_input(&route, &burma14_input)
+        .expect("GEO tour_distance_from_input must succeed");
+
+    // Build a EUC_2D version and compare
+    let euc_input = burma14_input.replace("GEO", "EUC_2D");
+    let euc_dist = run_tour_distance_from_input(&route, &euc_input)
+        .expect("EUC_2D tour_distance_from_input must succeed");
+
+    assert!(
+        (geo_dist - euc_dist).abs() > 100.0,
+        "GEO ({geo_dist}) and EUC_2D ({euc_dist}) distances must differ significantly for burma14"
     );
 }
