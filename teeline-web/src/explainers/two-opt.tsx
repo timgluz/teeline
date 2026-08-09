@@ -6,7 +6,7 @@ import {
 import type { Phase } from "./two-opt-algo"
 
 const DEFAULT_TOUR = SCENARIOS.bad_shuffle.tour
-const SPEEDS = [30, 60, 100, 160, 250, 380, 600]
+const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
 const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
 
 // ---------------------------------------------------------------
@@ -98,7 +98,7 @@ export default function TwoOptExplainer() {
   const [costHistory, setCostHistory] = useState<number[]>(() => [tourLength(DEFAULT_TOUR)])
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
-  const [speedIdx, setSpeedIdx] = useState(2) // 3x = 100ms
+  const [speedIdx, setSpeedIdx] = useState(0) // 1x = 600ms — slow enough to observe swaps
 
   const simRef = useRef(makeInitState(DEFAULT_TOUR))
 
@@ -223,7 +223,7 @@ export default function TwoOptExplainer() {
 
       <div className="topt-controls">
         <button className="topt-btn" onClick={step_fn} disabled={running || phase === 'local_optimum'}>
-          ◀ Step
+          ⏵ Step
         </button>
         <button className="topt-btn" onClick={() => setRunning(!running)} disabled={phase === 'local_optimum'}>
           {running ? "⏸ Pause" : "▶ Run"}
