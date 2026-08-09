@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config'
 import preact from '@astrojs/preact'
 import sitemap from '@astrojs/sitemap'
+import tailwind from '@astrojs/tailwind'
 import { resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
@@ -10,7 +11,7 @@ const configDir = fileURLToPath(new URL('.', import.meta.url))
 export default defineConfig({
   site: 'https://tspsolver.com',
   output: 'static',
-  integrations: [preact(), sitemap()],
+  integrations: [preact(), sitemap(), tailwind({ applyBaseStyles: false })],
   // Astro's default output asset directory is dist/_astro/, not Vite's
   // dist/assets/. Pin it to 'assets' so scripts/copy-wasm.mjs and
   // public/_headers' Content-Type rule for *.wasm (both hardcode "assets/")
