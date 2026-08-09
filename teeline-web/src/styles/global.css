@@ -63,6 +63,19 @@
   .prose-dark a.explainer-cta {
     @apply text-white no-underline hover:opacity-90 hover:no-underline;
   }
+  /* Action-row buttons on doc pages (e.g. "Open in Solver" / "Download") —
+     same fix: keep the explicit text color instead of prose's accent.
+     Selector avoids the .text-white/.text-text utility class names so
+     Tailwind's @apply doesn't mistake them for composition. */
+  .prose-dark .doc-actions a.btn-solid {
+    text-decoration: none;
+  }
+  .prose-dark .doc-actions a.btn-solid.btn--primary {
+    color: #fff;
+  }
+  .prose-dark .doc-actions a.btn-solid.btn--secondary {
+    color: var(--color-text);
+  }
   .prose-dark :is(ul, ol) {
     @apply my-4 pl-6;
   }
