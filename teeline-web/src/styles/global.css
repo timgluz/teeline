@@ -205,15 +205,24 @@
     @apply text-xs text-text-dim;
   }
 
-  /* ---- Tour figure + SVG ---- */
+  /* ---- Step 04 (results) ---- */
+  .step-04-body {
+    @apply flex flex-col items-center;
+  }
   .tour-figure {
-    @apply relative mb-4 overflow-hidden rounded-lg border border-border bg-surface;
+    @apply relative mb-6 w-full max-w-3xl overflow-hidden rounded-lg border border-border bg-surface;
   }
   .tour-figure__header {
     @apply flex items-center justify-between gap-4 border-b border-border px-4 py-2;
   }
   .tour-figure__metrics {
     @apply grid grid-cols-3 gap-4 border-t border-border px-4 py-3;
+  }
+  .step-04-details {
+    @apply w-full max-w-3xl;
+  }
+  .step-04-actions {
+    @apply mx-auto w-full max-w-3xl;
   }
   .tour-svg { @apply block h-auto w-full; }
   .tour-svg polyline.tour-solver {
@@ -267,13 +276,6 @@
   /* ---- Download actions ---- */
   .download-actions { @apply mb-4 flex flex-wrap gap-2; }
 
-  /* ---- Step 04 2-col ---- */
-  @media (min-width: 1024px) {
-    .step-04-body {
-      @apply grid grid-cols-2 items-start gap-4;
-    }
-  }
-
   /* ---- WASM status footer ---- */
   #app-footer {
     @apply mx-auto flex max-w-content items-center gap-2 border-t border-border px-6 py-3 font-mono text-xs text-text-dim;
@@ -295,7 +297,6 @@
 
   /* ---- Generic helper components (PicoCSS replacement aliases) ---- */
   .step-panel { @apply my-4; }
-  .step-04-sidebar { @apply mt-4 lg:mt-0; }
   .muted { @apply text-text-dim; }
   .comparison-error { @apply my-3 text-sm text-negative; }
   .outline {
