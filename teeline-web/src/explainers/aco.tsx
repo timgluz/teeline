@@ -12,11 +12,6 @@ const AXIS_COLORS = [
 
 const DEFAULTS = { alpha: 1.0, beta: 2.0, evaporationRate: 0.5, numAnts: 10 }
 
-function edgeAlpha(phero: number, maxP: number): number {
-  if (maxP <= 0) return 0.04
-  return 0.04 + (phero / maxP) * 0.75
-}
-
 function cityColor(i: number, onBest: boolean, onLast: boolean): string {
   if (onBest) return "#16a34a"
   if (onLast) return "#ea580c"
@@ -53,28 +48,32 @@ function PheromoneCanvas({ pheromone, maxP, bestTour, lastTour, phase }: CanvasP
     <svg viewBox="0 0 300 300" className="aco-canvas" role="img" aria-label="ACO pheromone map">
       <rect x={0} y={0} width={300} height={300} className="aco-bg" />
 
-      {/* pheromone edges — opacity ∝ pheromone */}
-      {edges.map(([i, j, p], k) => (
-        <line key={"p" + k}
-          x1={CITIES[i][0]} y1={CITIES[i][1]}
-          x2={CITIES[j][0]} y2={CITIES[j][1]}
-          stroke="#0d9488"
-          strokeWidth={1.2 + (p / Math.max(maxP, 1e-9)) * 3.5}
-          opacity={edgeAlpha(p, maxP)}
-          strokeLinecap="round"
-        />
-      ))}
+      {/* pheromone edges — dashed, width ∝ pheromone, subtle teal */}
+      {edges.map(([i, j, p], k) => {
+        const ratio = maxP > 0 ? p / maxP : 0
+        return (
+          <line key={"p" + k}
+            x1={CITIES[i][0]} y1={CITIES[i][1]}
+            x2={CITIES[j][0]} y2={CITIES[j][1]}
+            stroke="#0d9488"
+            strokeWidth={0.6 + ratio * 3.5}
+            opacity={0.08 + ratio * 0.55}
+            strokeLinecap="round"
+            strokeDasharray={ratio > 0.3 ? "6 4" : "3 5"}
+          />
+        )
+      })}
 
-      {/* best tour underlay (faded polygon) */}
+      {/* best tour underlay (faded fill) */}
       <polygon points={bestPts} className="aco-best-area" />
+
+      {/* best tour — thick solid line */}
+      <polyline points={bestPts} className="aco-best-tour" />
 
       {/* last tour (dashed, highlighted) */}
       {lastTour && phase === 'building' && (
         <polyline points={lastPts} className="aco-last-tour" />
       )}
-
-      {/* best tour edges (solid) */}
-      <polyline points={bestPts} className="aco-best-tour" />
 
       {/* cities */}
       {CITIES.map(([x, y], i) => {
@@ -386,8 +385,8 @@ const CSS = `
   border: 1px solid var(--line);
 }
 .aco-bg { fill: var(--panel); }
-.aco-best-area { fill: #dcfce7; stroke: none; opacity: 0.6; }
-.aco-best-tour { fill: none; stroke: var(--improve); stroke-width: 2.8; stroke-linejoin: round; }
+.aco-best-area { fill: #bbf7d0; stroke: none; opacity: 0.5; }
+.aco-best-tour { fill: none; stroke: #16a34a; stroke-width: 3.2; stroke-linejoin: round; }
 .aco-last-tour { fill: none; stroke: var(--last); stroke-width: 1.8; stroke-linejoin: round; stroke-dasharray: 4 3; }
 .aco-city { stroke: #fff; stroke-width: 1.2; }
 .aco-city-label {
