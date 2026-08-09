@@ -51,14 +51,45 @@ export function updateOptRoute(route: number[] | null): void {
   optRouteRef = route ?? undefined
 }
 
+export function setTourProblemName(name: string): void {
+  const el = document.getElementById('tour-problem-name')
+  if (el) el.textContent = name
+}
+
+export function setTourSolverName(name: string): void {
+  const el = document.getElementById('tour-solver-name')
+  if (el) el.textContent = name
+}
+
+function setTourStatus(status: string, state: 'accent' | 'positive' = 'accent'): void {
+  const el = document.getElementById('tour-status')
+  if (!el) return
+  el.textContent = status
+  el.className = `font-mono text-xs ${state === 'positive' ? 'text-positive' : 'text-accent'}`
+}
+
 export function showRunning(): void {
   const overlay = document.getElementById('solving-overlay') as HTMLElement
   overlay.hidden = false
+  setTourStatus('solving')
 }
 
 export function showResult(record: RunRecord): void {
   const overlay = document.getElementById('solving-overlay') as HTMLElement
   overlay.hidden = true
+
+  setTourSolverName(record.solver)
+  setTourStatus('done', 'positive')
+
+  const lengthMetric = document.getElementById('result-tour-length')
+  if (lengthMetric) lengthMetric.textContent = record.total.toFixed(1)
+  const runtimeMetric = document.getElementById('result-runtime-metric')
+  if (runtimeMetric) runtimeMetric.textContent = formatRuntime(record.runtime)
+  const gapMetric = document.getElementById('result-gap-metric')
+  if (gapMetric) {
+    gapMetric.textContent = formatGapPct(record.comparison)
+    gapMetric.className = `mt-0.5 font-mono text-lg ${record.comparison !== undefined && record.comparison.gapPct > 0 ? 'text-negative' : 'text-positive'}`
+  }
 
   const svgEl = document.getElementById('tour-svg') as unknown as SVGSVGElement
   renderTour(svgEl, citiesRef, record.route, record.comparison !== undefined ? optRouteRef : undefined)
@@ -78,6 +109,11 @@ export function showGapFromOptCost(solverCost: number): void {
   if (optCost && optCost > 0) {
     const gap = ((solverCost - optCost) / optCost * 100)
     document.getElementById('result-gap')!.textContent = `${gap.toFixed(1)}%`
+    const gapMetric = document.getElementById('result-gap-metric')
+    if (gapMetric) {
+      gapMetric.textContent = `${gap.toFixed(1)}%`
+      gapMetric.className = `mt-0.5 font-mono text-lg ${gap > 0 ? 'text-negative' : 'text-positive'}`
+    }
   }
 }
 
@@ -85,6 +121,11 @@ export function patchComparison(record: RunRecord, stats: ComparisonStats): void
   record.comparison = stats
   document.getElementById('result-gap')!.textContent = formatGapPct(stats)
   applyComparisonCells(stats)
+  const gapMetric = document.getElementById('result-gap-metric')
+  if (gapMetric) {
+    gapMetric.textContent = formatGapPct(stats)
+    gapMetric.className = `mt-0.5 font-mono text-lg ${stats.gapPct > 0 ? 'text-negative' : 'text-positive'}`
+  }
   const svgEl = document.getElementById('tour-svg') as unknown as SVGSVGElement
   renderTour(svgEl, citiesRef, record.route, optRouteRef)
 }

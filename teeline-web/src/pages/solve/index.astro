@@ -134,10 +134,31 @@ const jsonLd = {
 
         <div class="step-04-body">
           <figure class="tour-figure">
+            <div class="tour-figure__header">
+              <div>
+                <p id="tour-problem-name" class="font-mono text-sm text-text">—</p>
+                <p id="tour-solver-name" class="font-mono text-xs text-text-dim">—</p>
+              </div>
+              <span id="tour-status" class="font-mono text-xs text-accent">idle</span>
+            </div>
             <div id="solving-overlay" class="solving-overlay" hidden>
               <p>Solving…</p>
             </div>
             <svg id="tour-svg" class="tour-svg" viewBox="0 0 600 400" role="img" aria-label="TSP tour map"></svg>
+            <div class="tour-figure__metrics">
+              <div>
+                <p class="font-mono text-xs uppercase tracking-wider text-text-dim">tour length</p>
+                <p id="result-tour-length" class="mt-0.5 font-mono text-lg text-text">—</p>
+              </div>
+              <div>
+                <p class="font-mono text-xs uppercase tracking-wider text-text-dim">runtime</p>
+                <p id="result-runtime-metric" class="mt-0.5 font-mono text-lg text-text">—</p>
+              </div>
+              <div>
+                <p class="font-mono text-xs uppercase tracking-wider text-text-dim">gap vs optimal</p>
+                <p id="result-gap-metric" class="mt-0.5 font-mono text-lg text-positive">—</p>
+              </div>
+            </div>
           </figure>
 
           <div class="step-04-sidebar">

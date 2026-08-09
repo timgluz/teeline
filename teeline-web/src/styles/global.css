@@ -209,6 +209,12 @@
   .tour-figure {
     @apply relative mb-4 overflow-hidden rounded-lg border border-border bg-surface;
   }
+  .tour-figure__header {
+    @apply flex items-center justify-between gap-4 border-b border-border px-4 py-2;
+  }
+  .tour-figure__metrics {
+    @apply grid grid-cols-3 gap-4 border-t border-border px-4 py-3;
+  }
   .tour-svg { @apply block h-auto w-full; }
   .tour-svg polyline.tour-solver {
     fill: none;
