@@ -202,6 +202,10 @@ export function initUpload(
   // ---- Auto-load dataset from ?dataset= query param ----
   const params = new URLSearchParams(window.location.search)
   const datasetParam = params.get('dataset')
+  const optParam = params.get('opt')
+  if (optParam) {
+    ;(window as any).__teelineOptCost = Number(optParam)
+  }
 
   if (datasetParam) {
     // In dev, Vite proxies /tsplib/ → static.tspsolver.com/tsplib/ to avoid CORS

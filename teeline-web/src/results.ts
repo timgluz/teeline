@@ -72,6 +72,15 @@ export function showResult(record: RunRecord): void {
   renderHistoryRow(record)
 }
 
+// Show gap % from a known optimal cost (used when opt.tour route is unavailable)
+export function showGapFromOptCost(solverCost: number): void {
+  const optCost = (window as any).__teelineOptCost as number | undefined
+  if (optCost && optCost > 0) {
+    const gap = ((solverCost - optCost) / optCost * 100)
+    document.getElementById('result-gap')!.textContent = `${gap.toFixed(1)}%`
+  }
+}
+
 export function patchComparison(record: RunRecord, stats: ComparisonStats): void {
   record.comparison = stats
   document.getElementById('result-gap')!.textContent = formatGapPct(stats)
