@@ -699,4 +699,33 @@ EOF
         };
         assert!(make_app_options("aco", Some(&configs)).is_ok());
     }
+
+    // NaN is not representable in JSON, so Hurl e2e can't test this path.
+    // These tests guard the core-side is_finite() defense-in-depth.
+    #[test]
+    fn test_ga_validate_rejects_nan_mutation() {
+        let ga = GAOptions {
+            mutation_probability: f32::NAN,
+            ..Default::default()
+        };
+        assert!(ga.validate().is_err());
+    }
+
+    #[test]
+    fn test_cs_validate_rejects_nan_mutation() {
+        let cs = CSOptions {
+            mutation_probability: f32::NAN,
+            ..Default::default()
+        };
+        assert!(cs.validate().is_err());
+    }
+
+    #[test]
+    fn test_fpa_validate_rejects_nan_mutation() {
+        let fpa = FPAOptions {
+            mutation_probability: f32::NAN,
+            ..Default::default()
+        };
+        assert!(fpa.validate().is_err());
+    }
 }
