@@ -639,23 +639,6 @@ ApplicationWindow {
                                 Text { text: "Range [0, 1]"; color: theme.textHint; font.pixelSize: 11 }
                             }
 
-                            // ── PSO: swarm size ────────────────────────────────
-                            ColumnLayout {
-                                visible: isPSO
-                                spacing: 6
-                                Text { text: "Swarm size (n_nearest)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
-                                TextField {
-                                    id: swarmField
-                                    Layout.preferredWidth: 140; font.pixelSize: 14
-                                    text: psoDefaults.n_nearest.toString(); placeholderText: "30"
-                                    color: acceptableInput ? theme.textDark : theme.inputError
-                                    placeholderTextColor: theme.fieldPlaceholder
-                                    validator: IntValidator { bottom: 1; top: 10000 }
-                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
-                                }
-                                Text { text: "Minimum particle count (floor is 30)"; color: theme.textHint; font.pixelSize: 11 }
-                            }
-
                             // ── ACO: alpha, beta, evaporation rate, num_ants ─
                             ColumnLayout {
                                 visible: isACO
@@ -720,6 +703,23 @@ ApplicationWindow {
                                     }
                                     Text { text: "Ants per iteration (higher = smoother, slower)"; color: theme.textHint; font.pixelSize: 11 }
                                 }
+                            }
+
+                            // ── PSO: swarm size ────────────────────────────────
+                            ColumnLayout {
+                                visible: isPSO
+                                spacing: 6
+                                Text { text: "Swarm size (n_nearest)"; color: theme.textLabel; font.pixelSize: 13; font.bold: true }
+                                TextField {
+                                    id: swarmField
+                                    Layout.preferredWidth: 140; font.pixelSize: 14
+                                    text: psoDefaults.n_nearest.toString(); placeholderText: "30"
+                                    color: acceptableInput ? theme.textDark : theme.inputError
+                                    placeholderTextColor: theme.fieldPlaceholder
+                                    validator: IntValidator { bottom: 1; top: 10000 }
+                                    background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                }
+                                Text { text: "Minimum particle count (floor is 30)"; color: theme.textHint; font.pixelSize: 11 }
                             }
 
                             Item { Layout.preferredHeight: 16 }
@@ -1093,19 +1093,6 @@ ApplicationWindow {
                                     }
                                 }
 
-                                // PSO: swarm size (n_nearest)
-                                RowLayout {
-                                    visible: hasPSO; spacing: 12
-                                    Text { text: "Swarm size (n_nearest)"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
-                                    TextField {
-                                        id: swarmField
-                                        Layout.preferredWidth: 180
-                                        text: "30"; color: theme.textDark; font.pixelSize: 13
-                                        validator: IntValidator { bottom: 1; top: 10000 }
-                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
-                                    }
-                                }
-
                                 // ACO: alpha
                                 RowLayout {
                                     visible: hasACO; spacing: 12
@@ -1150,6 +1137,19 @@ ApplicationWindow {
                                         id: antsField
                                         Layout.preferredWidth: 180
                                         text: "25"; color: theme.textDark; font.pixelSize: 13
+                                        validator: IntValidator { bottom: 1; top: 10000 }
+                                        background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
+                                    }
+                                }
+
+                                // PSO: swarm size (n_nearest)
+                                RowLayout {
+                                    visible: hasPSO; spacing: 12
+                                    Text { text: "Swarm size (n_nearest)"; color: theme.textMuted; font.pixelSize: 12; Layout.preferredWidth: 148 }
+                                    TextField {
+                                        id: swarmField
+                                        Layout.preferredWidth: 180
+                                        text: "30"; color: theme.textDark; font.pixelSize: 13
                                         validator: IntValidator { bottom: 1; top: 10000 }
                                         background: Rectangle { color: theme.fieldBg; radius: 4; border.color: parent.activeFocus ? theme.accent : theme.fieldBorder; border.width: 1 }
                                     }
