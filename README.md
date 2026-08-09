@@ -245,18 +245,25 @@ done
 | Bellman–Held–Karp | `bhk` | exact | [→](docs/algorithms/bellman-held-karp.md) |
 | Branch and Bound | `branch_bound` | exact | [→](docs/algorithms/branch-bound.md) |
 | Nearest Neighbor | `nn` | heuristic — constructive | [→](docs/algorithms/nearest-neighbor.md) |
+| Christofides | `christofides`, `chr` | heuristic — constructive | [→](docs/algorithms/christofides.md) |
+| Greedy Edge | `greedy_edge`, `gec` | heuristic — constructive | [→](docs/algorithms/greedy-edge.md) |
+| Fourier | `fourier` | heuristic — constructive | [→](docs/algorithms/fourier.md) |
+| Kohonen SOM | `som` | heuristic — constructive | [→](docs/algorithms/som.md) |
 | 2-opt | `2opt` | heuristic — local search | [→](docs/algorithms/two-opt.md) |
 | 3-opt | `3opt` | heuristic — local search | [→](docs/algorithms/three-opt.md) |
+| Or-opt | `or_opt`, `or-opt` | heuristic — local search | [→](docs/algorithms/or-opt.md) |
 | Stochastic Hill Climbing | `stochastic_hill` | heuristic — local search | [→](docs/algorithms/stochastic-hill.md) |
+| Lin-Kernighan | `lin_kernighan`, `lk` | heuristic — local search | [→](docs/algorithms/lin-kernighan.md) |
 | Simulated Annealing | `sa` | heuristic — local search | [→](docs/algorithms/simulated-annealing.md) |
-| Tabu Search | `tabu_search` | heuristic — local search | [→](docs/algorithms/tabu-search.md) |
+| Tabu Search | `tabu_search`, `tabu` | heuristic — local search | [→](docs/algorithms/tabu-search.md) |
 | Genetic Algorithm | `ga` | heuristic — evolutionary | [→](docs/algorithms/genetic-algorithm.md) |
 | Particle Swarm | `pso` | heuristic — swarm | [→](docs/algorithms/particle-swarm.md) |
+| Gravitational Search | `gsa` | heuristic — swarm / physics | [→](docs/algorithms/gravitational-search.md) |
 | Cuckoo Search | `cs` | heuristic — nature-inspired | [→](docs/algorithms/cuckoo-search.md) |
 | Flower Pollination | `fpa` | heuristic — nature-inspired | [→](docs/algorithms/flower-pollination.md) |
-| Gravitational Search | `gsa` | heuristic — swarm / physics | [→](docs/algorithms/gravitational-search.md) |
+| Ant Colony Optimization | `ant_colony`, `aco` | heuristic — nature-inspired | [→](docs/algorithms/ant-colony.md) |
 
-Exact algorithms find the provably optimal tour but have exponential complexity — do not use on more than ~20 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics.
+Exact algorithms find the provably optimal tour but have exponential complexity — do not use on more than ~20 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics. (`savings`/`sav` is implemented but not yet documented.)
 
 ## Pipeline
 
@@ -270,9 +277,9 @@ Auto-expansion strategy depends on the solver type:
 
 | Solver type | Auto-expands to | Why |
 | --- | --- | --- |
-| **Deterministic local search** (2opt, 3opt, tabu) | `pipeline(nn, solver)` | Monotone hill-climbers: better start = better end |
-| **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
-| **Constructive** (nn, bhk, branch_bound) | no expansion | They build a tour from scratch |
+| **Deterministic local search** (2opt, 3opt, tabu, or_opt, lk, branch_bound) | `pipeline(nn, solver)` | Monotone hill-climbers (and B&B's upper bound) benefit from a good start |
+| **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa, gsa, fourier, aco) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
+| **Constructive** (nn, christofides, greedy_edge, bhk) | no expansion | They build a tour from scratch |
 
 ```bash
 # sa auto-expands to pipeline(shuffle, sa)
@@ -385,7 +392,7 @@ Quick summary (pipeline presets first, then standalone `--no-seed` baselines):
 | Flower Pollination (default) | +17.5 % | 0.53 s |
 | Nearest Neighbour | +19.0 % | 0.01 s |
 
-> **Note:** Stochastic solvers (sa, ga, pso, cs, fpa, stochastic_hill) auto-expand to `pipeline(shuffle, solver)`. Use `--no-seed` to skip the shuffle and run from input city order. Use `teeline solve classic` for the best SA result via `nn → 2opt → sa`.
+> **Note:** Stochastic solvers (sa, stochastic_hill, ga, pso, cs, fpa, gsa, fourier, aco) auto-expand to `pipeline(shuffle, solver)`. Use `--no-seed` to skip the shuffle and run from input city order. Use `teeline solve classic` for the best SA result via `nn → 2opt → sa`.
 
 ---
 
