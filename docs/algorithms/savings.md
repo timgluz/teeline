@@ -3,7 +3,7 @@ id: "savings"
 name: "Savings"
 typeBadge: "Heuristic — constructive"
 description: "A savings-ordered greedy-edge construction inspired by Clarke-Wright: ranks pairwise edges by the saving of linking two cities directly instead of through a centroid-nearest hub, then greedily accepts each on the same Kruskal-style scaffolding as greedy_edge (degree ≤ 2, no premature sub-cycle)."
-hasExplainer: false
+hasExplainer: true
 ---
 
 # Savings

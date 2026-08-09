@@ -53,9 +53,9 @@ describe('PAGED_SOLVERS', () => {
 })
 
 describe('EXPLAINER_SOLVERS', () => {
-  it('contains exactly the 11 ids with an interactive explainer', () => {
+  it('contains exactly the 12 ids with an interactive explainer', () => {
     expect(EXPLAINER_SOLVERS).toEqual(
-      new Set(['pso', 'gsa', 'tabu', 'ga', 'cs', 'fpa', 'lk', 'sa', 'som', 'fourier', 'greedy_edge']),
+      new Set(['pso', 'gsa', 'tabu', 'ga', 'cs', 'fpa', 'lk', 'sa', 'som', 'fourier', 'greedy_edge', 'savings']),
     )
   })
 
