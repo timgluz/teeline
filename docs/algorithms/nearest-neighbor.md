@@ -3,7 +3,7 @@ id: "nn"
 name: "Nearest Neighbor"
 typeBadge: "Heuristic — constructive"
 description: "Greedy construction heuristic: start from an arbitrary city and repeatedly move to the closest unvisited city until all cities have been visited. Uses a KD-tree for efficient nearest-neighbor queries."
-hasExplainer: false
+hasExplainer: true
 ---
 
 # Nearest Neighbor

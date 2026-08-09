@@ -1,4 +1,4 @@
-// Metadata registry for the 14 interactive explainer pages. Only metadata
+// Metadata registry for the 15 interactive explainer pages. Only metadata
 // lives here — the components themselves must be statically imported
 // directly in [id]/explainer/index.astro, because Astro's client:* hydration
 // directives require the compiler to see a literal top-level `import`
@@ -95,6 +95,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
     description:
       'Interactive walkthrough of the 2-opt local-search algorithm: watch edge swaps eliminate crossings one pass at a time, with removed edges highlighted red and new edges green. Step through best-improvement scans until the tour reaches a local optimum.',
     backLabel: '2-opt',
+  },
+  nn: {
+    title: 'Nearest Neighbor — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the Nearest Neighbor constructive TSP heuristic: watch the tour grow one city at a time as the algorithm greedily picks the closest unvisited city. Step through each decision and see how early choices shape the final tour.',
+    backLabel: 'NN',
   },
 }
 
