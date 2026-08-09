@@ -3,6 +3,22 @@
 @tailwind utilities;
 
 @layer base {
+  /* Design tokens as CSS variables — Tailwind v3 generates utility classes
+     (bg-accent, text-canvas, …) but NOT var(--color-*) like v4 does, so the
+     raw var() references in component rules (e.g. SVG strokes) need them here. */
+  :root {
+    --color-canvas: #0A0A0B;
+    --color-surface: #141416;
+    --color-surface-2: #1C1C20;
+    --color-border: #232327;
+    --color-border-hover: #3A3A40;
+    --color-text: #F5F5F6;
+    --color-text-dim: #8A8A92;
+    --color-accent: #6366F1;
+    --color-accent-dim: rgba(99, 102, 241, 0.12);
+    --color-positive: #22D3A5;
+    --color-negative: #F87171;
+  }
   html {
     color-scheme: dark;
   }
@@ -13,6 +29,11 @@
   ::selection {
     background-color: var(--color-accent);
     color: var(--color-text);
+  }
+  /* Respect the hidden attribute even when a component class sets display
+     (PicoCSS did this with !important; Tailwind's preflight doesn't). */
+  [hidden] {
+    display: none !important;
   }
   /* Prose styling for markdown content (algorithm/problem/blog pages). */
   .prose-dark {
@@ -213,7 +234,18 @@
   }
 
   /* ---- Results table ---- */
-  .results-table { @apply mb-4 w-full; }
+  .results-table {
+    @apply mb-4 w-full border-collapse text-sm;
+  }
+  .results-table :is(th, td) {
+    @apply border-b border-border px-3 py-2 text-left;
+  }
+  .results-table thead th {
+    @apply font-semibold text-text-dim;
+  }
+  .results-table td {
+    @apply font-mono tabular-nums text-text;
+  }
 
   /* ---- Run history ---- */
   .run-history-list { @apply mb-4 list-none p-0; }
