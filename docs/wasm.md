@@ -28,23 +28,34 @@ world solver {
 ### Solver names
 
 | Name(s) | Algorithm |
-|---|---|
-| `sa`, `simulated_annealing` | Simulated Annealing |
-| `2opt`, `two_opt` | 2-opt local search |
-| `nn`, `nearest_neighbor` | Nearest Neighbor |
-| `ga`, `genetic_algorithm` | Genetic Algorithm |
-| `pso`, `particle_swarm` | Particle Swarm Optimisation |
-| `cs`, `cuckoo_search` | Cuckoo Search |
-| `fpa`, `flower_pollination` | Flower Pollination Algorithm |
-| `tabu_search` | Tabu Search |
-| `stochastic_hill` | Stochastic Hill Climbing |
+| --- | --- |
 | `bhk`, `bellman_karp` | Bellman–Held–Karp (**exact — ≤ 20 cities**) |
 | `branch_bound` | Branch and Bound (**exact — ≤ 20 cities**) |
+| `nn`, `nearest_neighbor` | Nearest Neighbor |
+| `christofides`, `chr` | Christofides (≤1.5× approximation) |
+| `savings`, `sav` | Savings (Clarke-Wright-inspired constructive) |
+| `greedy_edge`, `gec` | Greedy Edge Construction |
+| `fourier` | Fourier-basis constructive |
+| `som`, `kohonen_som` | Kohonen Self-Organizing Map |
+| `2opt`, `two_opt` | 2-opt local search |
+| `3opt`, `three_opt` | 3-opt local search |
+| `or_opt`, `or-opt` | Or-opt local search |
+| `stochastic_hill` | Stochastic Hill Climbing |
+| `lk`, `lin_kernighan` | Lin-Kernighan |
+| `sa`, `simulated_annealing` | Simulated Annealing |
+| `tabu_search`, `tabu` | Tabu Search |
+| `ga`, `genetic_algorithm` | Genetic Algorithm |
+| `pso`, `particle_swarm` | Particle Swarm Optimisation |
+| `gsa`, `gravitational_search` | Gravitational Search |
+| `cs`, `cuckoo_search` | Cuckoo Search |
+| `fpa`, `flower_pollination` | Flower Pollination Algorithm |
+| `aco`, `ant_colony` | Ant Colony Optimization |
+| `shuffle`, `random_shuffle` | Random shuffle (utility — baseline seed only) |
 
 ### Default solve-options
 
 | Field | Default | Notes |
-|---|---|---|
+| --- | --- | --- |
 | `epochs` | 10 000 | Maximum iterations |
 | `platoo-epochs` | 500 | Iterations without improvement before restart |
 | `cooling-rate` | 0.0001 | SA temperature decay per step |
@@ -74,6 +85,7 @@ cargo component build --manifest-path teeline-wasm/Cargo.toml --release
 ```
 
 Artifacts:
+
 - Debug: `target/wasm32-wasip1/debug/teeline_wasm.wasm`
 - Release: `target/wasm32-wasip1/release/teeline_wasm.wasm`
 
