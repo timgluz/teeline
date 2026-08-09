@@ -66,7 +66,10 @@ export function initUpload(
     tspIdle.hidden = true
     tspChip.hidden = false
     zoneTsp.classList.add('drop-zone--loaded')
-    metaLine.textContent = formatMetadata(parsed)
+    let meta = formatMetadata(parsed)
+    const optCost = (window as any).__teelineOptCost as number | undefined
+    if (optCost && optCost > 0) meta += ` · optimal: ${optCost.toLocaleString()}`
+    metaLine.textContent = meta
     metaLine.hidden = false
     errorLine.hidden = true
     btnContinue.hidden = false
