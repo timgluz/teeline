@@ -84,6 +84,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of Savings Construction: watch every pairwise edge scan highest-savings-first, ranked by the Clarke-Wright savings formula s(i,j) = d(hub,i) + d(hub,j) − d(i,j), with a centroid-nearest hub city bias and the same Kruskal-style accept/reject guards as Greedy Edge.',
     backLabel: 'Savings',
   },
+  aco: {
+    title: 'Ant Colony Optimization — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of Ant Colony Optimization: watch a colony of ants construct tours probabilistically, biased by a shared pheromone matrix that strengthens on short edges and decays over epochs. Adjust α (pheromone influence), β (heuristic weight), evaporation rate, and colony size.',
+    backLabel: 'ACO',
+  },
 }
 
 export const EXPLAINER_IDS = Object.keys(EXPLAINER_META)

@@ -3,7 +3,7 @@ id: "aco"
 name: "Ant Colony Optimization"
 typeBadge: "Heuristic — nature-inspired metaheuristic"
 description: "Nature-inspired metaheuristic (Ant System, Dorigo 1996) that models pheromone-trail foraging in ant colonies. Maintains a shared pheromone matrix across a colony of ants. Each epoch:"
-hasExplainer: false
+hasExplainer: true
 ---
 
 # Ant Colony Optimization
