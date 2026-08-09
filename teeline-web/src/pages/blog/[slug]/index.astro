@@ -37,13 +37,13 @@ const jsonLd = {
     )}
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main class="container">
-    <p style="margin-bottom: 1rem;">
-      <a href="/blog/">← Back to Blog</a>
+  <main class="prose-dark mx-auto max-w-content px-6 py-8">
+    <p class="mb-4 font-mono text-xs text-text-dim">
+      <a href="/blog/" class="text-accent no-underline hover:underline">← Back to Blog</a>
     </p>
     <article>
       <h1>{post.data.title}</h1>
-      <p class="muted">{dateLabel}</p>
+      <p class="text-sm text-text-dim">{dateLabel}</p>
       <Content />
     </article>
   </main>

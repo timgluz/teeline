@@ -1,9 +1,6 @@
 ---
-// Server-rendered replacement for nav-html.mjs's renderSidebarHtml() +
-// algorithms-sidebar.ts's initSidebar(). The old client-side version had to
-// infer currentId from window.location.pathname because static HTML shells
-// didn't know their own route; Astro's getStaticPaths() params give us the
-// id directly at build time, so this whole client-side inference is gone.
+// Server-rendered docs sidebar. Tailwind-styled dark theme to match the
+// site-wide design tokens.
 import { SOLVER_GROUPS, SOLVER_META, PAGED_SOLVERS, PROBLEM_GROUPS, PROBLEM_META } from '../nav-data'
 
 interface Props {
@@ -13,27 +10,27 @@ interface Props {
 
 const { currentId, currentType = 'algorithm' } = Astro.props
 ---
-<ul>
+<ul class="m-0 list-none p-0">
   {currentType === 'algorithm' && (
-    <>
-      <li class="sidebar-section-label">Algorithms</li>
+    <Fragment>
+      <li class="px-4 pb-1 pt-2 font-sans text-xs font-semibold tracking-wide text-text">Algorithms</li>
       {
         SOLVER_GROUPS.map((g) => (
-          <li class="sidebar-group">
-            <span class="sidebar-group-label">{g.label}</span>
-            <ul>
+          <li class="mb-1">
+            <span class="block px-4 pb-1 pt-2 font-sans text-[0.7rem] font-bold uppercase tracking-wider text-text-dim">{g.label}</span>
+            <ul class="m-0 list-none p-0">
               {g.ids.map((id) => {
                 const meta = SOLVER_META[id]
                 if (!meta) return null
                 const isCurrent = id === currentId
                 return (
-                  <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
+                  <li class={isCurrent ? 'border-l-2 border-accent bg-accent-dim' : ''}>
                     {isCurrent ? (
-                      <span aria-current="page">{meta.name}</span>
+                      <span aria-current="page" class="block px-4 py-1 text-sm font-semibold text-accent">{meta.name}</span>
                     ) : PAGED_SOLVERS.has(id) ? (
-                      <a href={`/algorithms/${id}/`}>{meta.name}</a>
+                      <a href={`/algorithms/${id}/`} class="block px-4 py-1 text-sm text-text no-underline hover:bg-surface-2 hover:text-accent">{meta.name}</a>
                     ) : (
-                      <span>{meta.name}</span>
+                      <span class="block px-4 py-1 text-sm text-text">{meta.name}</span>
                     )}
                   </li>
                 )
@@ -42,26 +39,26 @@ const { currentId, currentType = 'algorithm' } = Astro.props
           </li>
         ))
       }
-    </>
+    </Fragment>
   )}
   {currentType === 'problem' && (
-    <>
-      <li class="sidebar-section-label">Problems</li>
+    <Fragment>
+      <li class="px-4 pb-1 pt-2 font-sans text-xs font-semibold tracking-wide text-text">Problems</li>
       {
         PROBLEM_GROUPS.map((g) => (
-          <li class="sidebar-group">
-            <span class="sidebar-group-label">{g.label}</span>
-            <ul>
+          <li class="mb-1">
+            <span class="block px-4 pb-1 pt-2 font-sans text-[0.7rem] font-bold uppercase tracking-wider text-text-dim">{g.label}</span>
+            <ul class="m-0 list-none p-0">
               {g.ids.map((id) => {
                 const meta = PROBLEM_META[id]
                 if (!meta) return null
                 const isCurrent = id === currentId
                 return (
-                  <li class={`sidebar-item${isCurrent ? ' sidebar-item--current' : ''}`}>
+                  <li class={isCurrent ? 'border-l-2 border-accent bg-accent-dim' : ''}>
                     {isCurrent ? (
-                      <span aria-current="page">{meta.name}</span>
+                      <span aria-current="page" class="block px-4 py-1 text-sm font-semibold text-accent">{meta.name}</span>
                     ) : (
-                      <a href={`/problems/${id}/`}>{meta.name}</a>
+                      <a href={`/problems/${id}/`} class="block px-4 py-1 text-sm text-text no-underline hover:bg-surface-2 hover:text-accent">{meta.name}</a>
                     )}
                   </li>
                 )
@@ -70,6 +67,6 @@ const { currentId, currentType = 'algorithm' } = Astro.props
           </li>
         ))
       }
-    </>
+    </Fragment>
   )}
 </ul>

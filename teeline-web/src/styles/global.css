@@ -1,0 +1,343 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Design tokens as CSS variables — Tailwind v3 generates utility classes
+     (bg-accent, text-canvas, …) but NOT var(--color-*) like v4 does, so the
+     raw var() references in component rules (e.g. SVG strokes) need them here. */
+  :root {
+    --color-canvas: #0A0A0B;
+    --color-surface: #141416;
+    --color-surface-2: #1C1C20;
+    --color-border: #232327;
+    --color-border-hover: #3A3A40;
+    --color-text: #F5F5F6;
+    --color-text-dim: #8A8A92;
+    --color-accent: #6366F1;
+    --color-accent-dim: rgba(99, 102, 241, 0.12);
+    --color-positive: #22D3A5;
+    --color-negative: #F87171;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-canvas text-text font-sans antialiased;
+    line-height: 1.55;
+  }
+  ::selection {
+    background-color: var(--color-accent);
+    color: var(--color-text);
+  }
+  /* Respect the hidden attribute even when a component class sets display
+     (PicoCSS did this with !important; Tailwind's preflight doesn't). */
+  [hidden] {
+    display: none !important;
+  }
+  /* Prose styling for markdown content (algorithm/problem/blog pages). */
+  .prose-dark {
+    @apply text-text;
+  }
+  .prose-dark :is(h1, h2, h3, h4, h5, h6) {
+    @apply font-semibold tracking-tight text-text;
+  }
+  .prose-dark h1 {
+    @apply text-2xl lg:text-3xl;
+  }
+  .prose-dark h2 {
+    @apply mt-8 text-xl lg:text-2xl;
+  }
+  .prose-dark h3 {
+    @apply mt-6 text-lg;
+  }
+  .prose-dark p {
+    @apply my-4 text-base leading-relaxed;
+  }
+  .prose-dark a {
+    @apply text-accent no-underline hover:underline;
+  }
+  /* CTA buttons inside prose (e.g. "Open interactive explainer") must keep
+     white text — .prose-dark a sets accent color which would otherwise
+     make the label invisible on the accent background. */
+  .prose-dark a.explainer-cta {
+    @apply text-white no-underline hover:opacity-90 hover:no-underline;
+  }
+  /* Action-row buttons on doc pages (e.g. "Open in Solver" / "Download") —
+     same fix: keep the explicit text color instead of prose's accent.
+     Selector avoids the .text-white/.text-text utility class names so
+     Tailwind's @apply doesn't mistake them for composition. */
+  .prose-dark .doc-actions a.btn-solid {
+    text-decoration: none;
+  }
+  .prose-dark .doc-actions a.btn-solid.btn--primary {
+    color: #fff;
+  }
+  .prose-dark .doc-actions a.btn-solid.btn--secondary {
+    color: var(--color-text);
+  }
+  .prose-dark :is(ul, ol) {
+    @apply my-4 pl-6;
+  }
+  .prose-dark ul {
+    @apply list-disc;
+  }
+  .prose-dark ol {
+    @apply list-decimal;
+  }
+  .prose-dark li {
+    @apply my-1 leading-relaxed;
+  }
+  .prose-dark strong {
+    @apply font-semibold text-text;
+  }
+  .prose-dark blockquote {
+    @apply my-4 border-l-2 border-border pl-4 text-text-dim;
+  }
+  .prose-dark :is(code) {
+    @apply rounded bg-surface-2 px-1.5 py-0.5 font-mono text-sm text-text;
+  }
+  .prose-dark pre {
+    @apply my-4 overflow-x-auto rounded-lg border border-border bg-surface p-4 font-mono text-sm leading-relaxed;
+  }
+  .prose-dark pre code {
+    @apply bg-transparent p-0;
+  }
+  /* Shiki (Astro markdown) wraps code in .astro-code with the theme's own
+     background — force it onto the dark surface so code blocks match the site. */
+  .astro-code {
+    @apply rounded-lg border border-border bg-surface !important;
+  }
+  .astro-code code {
+    background: transparent !important;
+  }
+  .prose-dark table {
+    @apply my-4 w-full border-collapse text-sm;
+  }
+  .prose-dark :is(th, td) {
+    @apply border-b border-border px-3 py-2 text-left align-top;
+  }
+  .prose-dark th {
+    @apply font-semibold text-text-dim;
+  }
+  .prose-dark hr {
+    @apply my-8 border-border;
+  }
+}
+
+@layer components {
+  /* Solve-page component classes — the interactive TS (upload/solver-form/results)
+     toggles these by name, so they're defined here with @apply (Tailwind). */
+
+  /* ---- Stepper ---- */
+  .stepper {
+    @apply mb-4 flex list-none gap-6 p-0;
+  }
+  .stepper-step {
+    @apply flex items-center gap-2 text-sm text-text-dim;
+  }
+  .stepper-step--active {
+    @apply font-semibold text-accent;
+  }
+  .stepper-step--done {
+    @apply text-positive;
+  }
+  .stepper-number {
+    @apply inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-current;
+  }
+  .stepper-step--done .stepper-number {
+    @apply border-positive bg-positive text-canvas;
+  }
+
+  /* ---- Drop zones ---- */
+  .drop-zones {
+    @apply mb-4 grid grid-cols-1 gap-4 md:grid-cols-2;
+  }
+  .drop-zone {
+    @apply flex min-h-36 flex-col items-center justify-center rounded-lg border-2 border-border p-4 text-center transition-colors;
+  }
+  .drop-zone--required { @apply border-solid; }
+  .drop-zone--optional { @apply border-dashed; }
+  .drop-zone--dragover {
+    @apply border-accent bg-accent-dim;
+  }
+  .drop-zone--loaded {
+    @apply border-positive;
+  }
+  .drop-zone__idle {
+    @apply flex flex-col items-center gap-1;
+  }
+  .drop-zone__hint { @apply m-0; }
+  .drop-zone__or { @apply m-0 text-text-dim; }
+  .drop-zone__hint-secondary { @apply mt-1 text-text-dim; }
+
+  /* ---- File chip ---- */
+  .drop-zone__chip {
+    @apply flex flex-wrap items-center justify-center gap-2;
+  }
+  .chip-icon { @apply text-lg text-positive; }
+  .chip-name { @apply break-all font-semibold; }
+  .chip-replace { @apply m-0 px-2 py-0.5 text-xs; }
+
+  /* ---- Metadata / error ---- */
+  .metadata-line { @apply mb-0 mt-1 text-sm text-text-dim; }
+  .upload-error { @apply mb-0 mt-1 text-sm text-negative; }
+
+  /* ---- Example buttons ---- */
+  .example-buttons { @apply mt-2 flex flex-wrap gap-2; }
+  .example-buttons button { @apply m-0; }
+
+  /* ---- Step actions ---- */
+  .step-actions { @apply mt-4 flex justify-end; }
+  .step-actions--spread { @apply justify-between; }
+
+  /* ---- Solver pills ---- */
+  .solver-pills {
+    @apply mb-4 flex flex-wrap items-center gap-2;
+  }
+  .pill { @apply m-0 px-3 py-1 text-sm; }
+  .pill--active {
+    @apply border-accent bg-accent text-white;
+  }
+  #solver-select { @apply m-0 h-auto px-2 py-1 text-sm; }
+
+  /* ---- Config panel ---- */
+  .config-panel {
+    @apply mb-4 min-h-20 rounded-lg border border-border p-4;
+  }
+  .solver-kind-badge { @apply mb-4 text-xs text-text-dim; }
+  .config-no-params { @apply m-0; }
+  .config-grid {
+    @apply grid grid-cols-1 items-center gap-x-4 gap-y-2 sm:grid-cols-[max-content_1fr];
+  }
+  .config-grid label { @apply m-0 whitespace-nowrap text-sm; }
+  .config-grid input[type='number'] { @apply m-0 h-auto px-2 py-1 text-sm; }
+
+  /* ---- Checklist ---- */
+  .checklist {
+    @apply mb-4 flex list-none flex-col gap-2 p-0;
+  }
+  .checklist-item {
+    @apply flex items-center gap-2 text-[0.95rem] text-text-dim;
+  }
+  .checklist-item::before {
+    content: '○';
+    @apply shrink-0 text-base;
+  }
+  .checklist-item--met { @apply text-positive; }
+  .checklist-item--met::before { content: '✓'; }
+  .checklist-item--optional { font-style: italic; }
+  .checklist-item--optional::after {
+    content: ' (optional)';
+    @apply text-xs text-text-dim;
+  }
+
+  /* ---- Step 04 (results) ---- */
+  .step-04-body {
+    @apply flex flex-col items-center;
+  }
+  .tour-figure {
+    @apply relative mb-6 w-full max-w-3xl overflow-hidden rounded-lg border border-border bg-surface;
+  }
+  .tour-figure__header {
+    @apply flex items-center justify-between gap-4 border-b border-border px-4 py-2;
+  }
+  .tour-figure__metrics {
+    @apply grid grid-cols-3 gap-4 border-t border-border px-4 py-3;
+  }
+  .step-04-details {
+    @apply w-full max-w-3xl;
+  }
+  .step-04-actions {
+    @apply mx-auto w-full max-w-3xl;
+  }
+  .tour-svg { @apply block h-auto w-full; }
+  .tour-svg polyline.tour-solver {
+    fill: none;
+    stroke: var(--color-accent);
+    stroke-width: 1.5;
+  }
+  .tour-svg polyline.tour-optimal {
+    fill: none;
+    stroke: #555;
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+  }
+  .tour-svg circle.city-dot { fill: var(--color-accent); }
+  .tour-svg .legend-solver { font-size: 11px; fill: var(--color-accent); }
+  .tour-svg .legend-optimal { font-size: 11px; fill: #555; }
+
+  /* ---- Solving overlay ---- */
+  .solving-overlay {
+    @apply absolute inset-0 flex items-center justify-center bg-canvas/85;
+  }
+  .solving-overlay p {
+    @apply m-0 text-xl font-bold text-accent;
+  }
+
+  /* ---- Results table ---- */
+  .results-table {
+    @apply mb-4 w-full border-collapse text-sm;
+  }
+  .results-table :is(th, td) {
+    @apply border-b border-border px-3 py-2 text-left;
+  }
+  .results-table thead th {
+    @apply font-semibold text-text-dim;
+  }
+  .results-table td {
+    @apply font-mono tabular-nums text-text;
+  }
+
+  /* ---- Run history ---- */
+  .run-history-list { @apply mb-4 list-none p-0; }
+  .run-history-item {
+    @apply cursor-pointer rounded px-2 py-1 font-mono text-sm tabular-nums;
+  }
+  .run-history-item:hover { @apply bg-accent-dim; }
+  .run-history-item:empty::before {
+    content: 'No runs yet.';
+    @apply text-text-dim;
+  }
+
+  /* ---- Download actions ---- */
+  .download-actions { @apply mb-4 flex flex-wrap gap-2; }
+
+  /* ---- WASM status footer ---- */
+  #app-footer {
+    @apply mx-auto flex max-w-content items-center gap-2 border-t border-border px-6 py-3 font-mono text-xs text-text-dim;
+  }
+  .status-dot {
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
+  }
+  .status-dot--loading { background: #888; }
+  .status-dot--ready { background: #2da44e; }
+  .status-dot--error { background: #cf222e; }
+
+  /* ---- Phone overrides ---- */
+  @media (max-width: 576px) {
+    .stepper-label { display: none; }
+    #btn-run { width: 100%; }
+    .download-actions { flex-direction: column; }
+    .results-table { font-size: 0.85rem; }
+  }
+
+  /* ---- Generic helper components (PicoCSS replacement aliases) ---- */
+  .step-panel { @apply my-4; }
+  .muted { @apply text-text-dim; }
+  .comparison-error { @apply my-3 text-sm text-negative; }
+  .outline {
+    @apply inline-flex items-center justify-center rounded-md border border-border bg-transparent px-4 py-2 font-medium text-text transition-colors hover:border-border-hover hover:bg-surface;
+  }
+  .outline.secondary,
+  .secondary {
+    @apply border-border text-text-dim hover:text-text;
+  }
+  #btn-run,
+  #btn-continue {
+    @apply inline-flex items-center justify-center rounded-md bg-accent px-5 py-2 font-medium text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .pill {
+    @apply rounded-full border border-border bg-transparent px-3 py-1 text-sm text-text-dim transition-colors hover:border-accent hover:text-accent;
+  }
+}

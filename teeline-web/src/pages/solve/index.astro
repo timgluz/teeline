@@ -1,6 +1,5 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
-import '../../main.css'
 
 const description =
   "Traveling Salesman Problem solver — upload a TSPLIB .tsp file, pick an algorithm, and get an optimized tour. Runs entirely in-browser via WebAssembly."
@@ -22,7 +21,7 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main class="container">
+  <main class="mx-auto max-w-content px-6 py-8">
     <nav aria-label="Solver steps">
       <ol class="stepper" role="list">
         <li class="stepper-step stepper-step--active" aria-current="step">
@@ -135,13 +134,34 @@ const jsonLd = {
 
         <div class="step-04-body">
           <figure class="tour-figure">
+            <div class="tour-figure__header">
+              <div>
+                <p id="tour-problem-name" class="font-mono text-sm text-text">—</p>
+                <p id="tour-solver-name" class="font-mono text-xs text-text-dim">—</p>
+              </div>
+              <span id="tour-status" class="font-mono text-xs text-accent">idle</span>
+            </div>
             <div id="solving-overlay" class="solving-overlay" hidden>
               <p>Solving…</p>
             </div>
             <svg id="tour-svg" class="tour-svg" viewBox="0 0 600 400" role="img" aria-label="TSP tour map"></svg>
+            <div class="tour-figure__metrics">
+              <div>
+                <p class="font-mono text-xs uppercase tracking-wider text-text-dim">tour length</p>
+                <p id="result-tour-length" class="mt-0.5 font-mono text-lg text-text">—</p>
+              </div>
+              <div>
+                <p class="font-mono text-xs uppercase tracking-wider text-text-dim">runtime</p>
+                <p id="result-runtime-metric" class="mt-0.5 font-mono text-lg text-text">—</p>
+              </div>
+              <div>
+                <p class="font-mono text-xs uppercase tracking-wider text-text-dim">gap vs optimal</p>
+                <p id="result-gap-metric" class="mt-0.5 font-mono text-lg text-positive">—</p>
+              </div>
+            </div>
           </figure>
 
-          <div class="step-04-sidebar">
+          <div class="step-04-details">
             <table class="results-table">
               <thead>
                 <tr>
@@ -165,7 +185,7 @@ const jsonLd = {
               </tbody>
             </table>
 
-            <p id="comparison-error" class="comparison-error pico-color-red-500" hidden aria-live="polite"></p>
+            <p id="comparison-error" class="comparison-error" hidden aria-live="polite"></p>
 
             <section aria-labelledby="run-history-heading">
               <h3 id="run-history-heading">Run history</h3>
@@ -174,14 +194,14 @@ const jsonLd = {
           </div>
         </div>
 
-        <div id="download-actions" class="download-actions" hidden>
+        <div id="download-actions" class="download-actions step-04-actions" hidden>
           <button type="button" id="btn-download-tour" class="outline secondary">⬇ .tour</button>
           <button type="button" id="btn-download-csv" class="outline secondary">⬇ .csv</button>
           <button type="button" id="btn-download-json" class="outline secondary">⬇ .json</button>
           <button type="button" id="btn-download-svg" class="outline secondary">⬇ .svg</button>
         </div>
 
-        <div class="step-actions step-actions--spread">
+        <div class="step-actions step-actions--spread step-04-actions">
           <button type="button" id="btn-new-dataset" class="outline secondary">← New dataset</button>
           <button type="button" id="btn-try-again" class="outline secondary">↻ try another solver</button>
         </div>
@@ -190,7 +210,7 @@ const jsonLd = {
     <!-- /#step-content -->
   </main>
 
-  <footer id="app-footer" class="container">
+  <footer id="app-footer">
     <span id="wasm-status" class="status-dot status-dot--loading"></span>
     <span id="wasm-version">Connecting…</span>
   </footer>

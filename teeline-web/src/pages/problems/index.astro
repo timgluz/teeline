@@ -13,35 +13,37 @@ const description = 'Browse TSP problem instances from TSPLIB95. Each instance i
 ---
 
 <BaseLayout title={title} description={description} path="/problems/">
-  <main class="container" style="padding-top: 2rem; padding-bottom: 3rem;">
-    <h1>TSP Problem Instances</h1>
-    <p>{description}</p>
+  <main class="mx-auto max-w-content px-6 py-8">
+    <h1 class="text-2xl font-semibold tracking-tight lg:text-3xl">TSP Problem Instances</h1>
+    <p class="mt-3 text-text-dim">{description}</p>
 
     {
       (Object.entries(groups) as [keyof typeof groups, typeof problems][]).map(([key, items]) => (
         items.length > 0 && (
-          <section style="margin-top: 1.5rem;">
-            <h2>{groupIcons[key]} {groupLabels[key]} ({items.length})</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Cities</th>
-                  <th>Type</th>
-                  <th>Optimal</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((p) => (
-                  <tr>
-                    <td><a href={`/problems/${p.data.id}/`}>{p.data.name}</a></td>
-                    <td>{p.data.cities.toLocaleString()}</td>
-                    <td><code>{p.data.edgeWeightType}</code></td>
-                    <td>{p.data.optimalCost !== null ? p.data.optimalCost.toLocaleString() : '—'}</td>
+          <section class="mt-6">
+            <h2 class="text-xl font-semibold tracking-tight">{groupIcons[key]} {groupLabels[key]} ({items.length})</h2>
+            <div class="mt-3 overflow-x-auto rounded-lg border border-border bg-surface">
+              <table class="w-full border-collapse text-sm">
+                <thead>
+                  <tr class="border-b border-border">
+                    <th class="px-4 py-2 text-left font-semibold text-text-dim">Name</th>
+                    <th class="px-4 py-2 text-left font-semibold text-text-dim">Cities</th>
+                    <th class="px-4 py-2 text-left font-semibold text-text-dim">Type</th>
+                    <th class="px-4 py-2 text-left font-semibold text-text-dim">Optimal</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {items.map((p) => (
+                    <tr class="border-b border-border last:border-b-0">
+                      <td class="px-4 py-2"><a href={`/problems/${p.data.id}/`} class="text-accent no-underline hover:underline">{p.data.name}</a></td>
+                      <td class="px-4 py-2">{p.data.cities.toLocaleString()}</td>
+                      <td class="px-4 py-2"><code>{p.data.edgeWeightType}</code></td>
+                      <td class="px-4 py-2">{p.data.optimalCost !== null ? p.data.optimalCost.toLocaleString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         )
       ))

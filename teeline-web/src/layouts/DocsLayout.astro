@@ -15,25 +15,29 @@ const { title, description, path, currentId, name, currentType = 'algorithm' } =
 ---
 <BaseLayout title={title} description={description} path={path} ogType="article">
   <Fragment slot="head"><slot name="head" /></Fragment>
-  <div class="docs-layout">
-    <aside class="docs-sidebar">
-      <nav aria-label="Documentation">
+  <div class="mx-auto grid w-full max-w-content grid-cols-1 md:grid-cols-[220px_1fr]">
+    <aside class="hidden border-r border-border md:block">
+      <nav aria-label="Documentation" class="sticky top-14 max-h-[calc(100vh-56px)] overflow-y-auto py-4">
         <Sidebar currentId={currentId} currentType={currentType} />
       </nav>
     </aside>
-    <main class="docs-main">
+    <main class="docs-main min-w-0 px-6 py-8 md:px-10">
       <nav aria-label="breadcrumb">
-        <ul>
-          <li><a href="/">teeline</a></li>
+        <ul class="mb-6 flex list-none gap-2 p-0 font-mono text-xs text-text-dim">
+          <li><a href="/" class="no-underline hover:text-accent">teeline</a></li>
+          <li aria-hidden="true">/</li>
           {currentType === 'problem' ? (
-            <li><a href="/problems/">Problems</a></li>
+            <li><a href="/problems/" class="no-underline hover:text-accent">Problems</a></li>
           ) : (
             <li>Algorithms</li>
           )}
-          <li>{name}</li>
+          <li aria-hidden="true">/</li>
+          <li class="text-text">{name}</li>
         </ul>
       </nav>
-      <slot />
+      <div class="prose-dark">
+        <slot />
+      </div>
     </main>
   </div>
 </BaseLayout>

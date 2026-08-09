@@ -52,9 +52,9 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main style="padding: 1.5rem 2rem; max-width: 900px; margin: 0 auto;">
-    <p style="margin-bottom: 1rem;">
-      <a href={`/algorithms/${id}/`}>← Back to {meta.backLabel} docs</a>
+  <main class="mx-auto max-w-content px-6 py-8">
+    <p class="mb-4 font-mono text-xs text-text-dim">
+      <a href={`/algorithms/${id}/`} class="text-accent no-underline hover:underline">← Back to {meta.backLabel} docs</a>
     </p>
     {id === 'pso' && <PsoExplainer client:visible />}
     {id === 'gsa' && <GsaExplainer client:visible />}

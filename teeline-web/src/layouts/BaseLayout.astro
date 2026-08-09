@@ -1,6 +1,9 @@
 ---
-import '@picocss/pico/css/pico.min.css'
-import '../docs.css'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+import '@fontsource/jetbrains-mono/400.css'
+import '../styles/global.css'
 import Topbar from '../components/Topbar.astro'
 
 interface Props {
@@ -14,7 +17,7 @@ interface Props {
 const { title, description, path, ogType = 'website', ogDescription } = Astro.props
 const canonicalUrl = `https://tspsolver.com${path}`
 ---
-<html lang="en" data-theme="light">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -36,20 +39,6 @@ const canonicalUrl = `https://tspsolver.com${path}`
     <link rel="canonical" href={canonicalUrl} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <slot name="head" />
-    <style is:global>
-      /* Typical webpage blue for links, site-wide, overriding Pico's default primary. */
-      :root[data-theme='light'] {
-        --pico-primary: #0969da;
-        --pico-primary-background: #0969da;
-        --pico-primary-border: var(--pico-primary-background);
-        --pico-primary-underline: rgba(9, 105, 218, 0.5);
-        --pico-primary-hover: #0550ae;
-        --pico-primary-hover-background: #0550ae;
-        --pico-primary-hover-border: var(--pico-primary-hover-background);
-        --pico-primary-hover-underline: var(--pico-primary-hover);
-        --pico-primary-focus: rgba(9, 105, 218, 0.375);
-      }
-    </style>
   </head>
   <body>
     <Topbar />

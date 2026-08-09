@@ -1,13 +1,10 @@
-import '@picocss/pico/css/pico.min.css'
-import './main.css'
-import './docs.css'
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
 import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage, CompareToursResult } from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initWebMCP } from './webmcp'
-import { initResults, updateOptRoute, showRunning, showResult, showGapFromOptCost, patchComparison } from './results'
+import { initResults, updateOptRoute, showRunning, showResult, showGapFromOptCost, patchComparison, setTourProblemName, setTourSolverName } from './results'
 import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
 
 window.addEventListener('load', () => import('./sentry'), { once: true })
@@ -134,6 +131,7 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
           },
         )
 
+        setTourSolverName(solver)
         showRunning()
 
         const start = Date.now()
@@ -191,7 +189,7 @@ worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMe
     // Upload depends on solverConfig.refresh — must be wired after solverConfig exists
     initUpload(
       parseFile,
-      (p, input) => { parsedProblem = p; rawInput = input; solverConfig!.refresh() },
+      (p, input) => { parsedProblem = p; rawInput = input; solverConfig!.refresh(); setTourProblemName(p.name || 'unnamed') },
       (route) => {
         optTourRoute = route.length > 0 ? route : null
         updateOptRoute(optTourRoute)
@@ -235,6 +233,14 @@ function resetToStep01(): void {
   rawInput = null
   optTourRoute = null
   resetUpload()
+  setTourProblemName('—')
+  setTourSolverName('—')
+  const lenM = document.getElementById('result-tour-length')
+  const rtM = document.getElementById('result-runtime-metric')
+  const gapM = document.getElementById('result-gap-metric')
+  if (lenM) lenM.textContent = '—'
+  if (rtM) rtM.textContent = '—'
+  if (gapM) { gapM.textContent = '—'; gapM.className = 'mt-0.5 font-mono text-lg text-positive' }
   ;(document.getElementById('step-01') as HTMLElement).hidden = false
   ;(document.getElementById('step-02') as HTMLElement).hidden = true
   ;(document.getElementById('step-04') as HTMLElement).hidden = true
