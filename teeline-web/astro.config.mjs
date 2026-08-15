@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config'
 import preact from '@astrojs/preact'
 import sitemap from '@astrojs/sitemap'
+import tailwindcss from '@tailwindcss/vite'
 import { resolve as resolvePath } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
@@ -38,6 +39,8 @@ export default defineConfig({
     optimizeDeps: { exclude: ['teeline-wasm'] },
     worker: { format: 'es' },
     plugins: [
+      // Tailwind v4 (CSS-first config via @theme in src/styles/global.css).
+      tailwindcss(),
       // preview2-shim ships separate node/ and browser/ variants.
       // With preserveSymlinks:true, Vite finds the copy nested inside
       // teeline-wasm/js-bindings/node_modules/ and picks the 'node' condition.
