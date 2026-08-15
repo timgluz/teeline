@@ -58,6 +58,13 @@ export default defineConfig({
     ],
     server: {
       proxy: {
+        // Auth service (WebAuthn + API keys) runs as Pages Functions — proxy
+        // them from astro dev to `wrangler pages dev` (port 8788) so the UI
+        // works locally. Production serves functions on the same origin.
+        '/api/auth': {
+          target: 'http://localhost:8788',
+          changeOrigin: true,
+        },
         '/tsplib': {
           target: 'https://static.tspsolver.com',
           changeOrigin: true,
