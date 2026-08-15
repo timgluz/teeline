@@ -3,7 +3,7 @@ title: "The passkey is the account: replacing our auth provider with self-hosted
 description: "How teeline swapped a hosted sign-in page and OAuth buttons for one-tap passkeys, self-hosted sessions, and API keys you can actually manage — and the honest trade-offs of doing it at zero users."
 pubDate: 2026-08-15
 tags: ["auth", "webauthn", "passkeys", "cloudflare"]
-draft: true
+draft: false
 ---
 
 [teeline](/) is a browser-based Traveling Salesman Problem solver. Upload a `.tsp` file, pick from
