@@ -4,6 +4,7 @@
 // verifier so the full import graph is exercised by the bundler.
 // Replaced by real WebAuthn routes in Phase 2.
 import { generateRegistrationOptions, verifyRegistrationResponse } from '@simplewebauthn/server'
+import type { Env } from '../../lib/env'
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
   try {
@@ -23,13 +24,4 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   } catch (err) {
     return Response.json({ ok: false, error: String(err) }, { status: 500 })
   }
-}
-
-// Env shape for this worker — D1 binding + secrets (moved to a shared .d.ts
-// in Phase 1; inline here so the scaffold type-checks standalone).
-interface Env {
-  DB?: D1Database & { name?: string }
-  AUTH_SERVICE_SECRET?: string
-  SESSION_SECRET?: string
-  ALLOWED_ORIGINS?: string
 }
