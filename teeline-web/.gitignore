@@ -27,3 +27,6 @@ dist-ssr
 # Sentry Config File
 .env.sentry-build-plugin
 test-results/
+
+# Wrangler local state (Pages Functions dev)
+.wrangler

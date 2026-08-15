@@ -1,3 +1,19 @@
 name = "teeline-web"
 pages_build_output_dir = "dist"
 compatibility_date = "2026-05-29"
+
+# ---- WebAuthn auth (Phase 0 scaffold) ----
+# D1 binding for the auth service (users / credentials / api_keys / challenges).
+# database_id is created under your Cloudflare account with:
+#   wrangler d1 create teeline-auth
+# then paste the returned id below (the placeholder breaks remote deploys).
+[[d1_databases]]
+binding = "DB"
+database_name = "teeline-auth"
+database_id = "REPLACE_WITH_REAL_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# Secrets (set via Cloudflare dashboard / `wrangler pages secret put`):
+#   AUTH_SERVICE_SECRET — shared secret between teeline-api and the verify endpoint
+#   SESSION_SECRET      — HMAC key for the session cookie
+#   ALLOWED_ORIGINS     — comma-separated origins allowed for WebAuthn (dev override)
