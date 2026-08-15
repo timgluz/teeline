@@ -17,19 +17,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const rpID = rpIdFor(new URL(request.url).hostname)
   const nonce = crypto.randomUUID()
 
-  const options = await generateAuthenticationOptions({
-    rpID,
-    allowCredentials: [], // discoverable credentials only
-    userVerification: 'preferred',
-    timeout: CHALLENGE_TTL_MS,
-  })
+  let options
+  try {
+    options = await generateAuthenticationOptions({
+      rpID,
+      allowCredentials: [], // discoverable credentials only
+      userVerification: 'preferred',
+      timeout: CHALLENGE_TTL_MS,
+    })
 
-  await insertChallenge(env.DB, {
-    id: nonce,
-    type: 'login',
-    challenge: options.challenge,
-    expiresAt: Date.now() + CHALLENGE_TTL_MS,
-  })
+    await insertChallenge(env.DB, {
+      id: nonce,
+      type: 'login',
+      challenge: options.challenge,
+      expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    })
+  } catch (err) {
+    console.error('Failed to start login:', err)
+    return serverError('Failed to start login — please try again')
+  }
 
   return json({ options, nonce }, 201)
 }

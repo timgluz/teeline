@@ -13,12 +13,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!isAllowedOrigin(origin, env)) return forbidden()
   if (!env.SESSION_SECRET) return serverError('Auth service not configured')
 
-  // Optional friendly name; defaults to a generic label.
+  // Optional friendly name; defaults to a generic label. A null/primitive
+  // body is valid JSON but not an object — guard before property access.
   let displayName = 'Teeline user'
   try {
-    const body = (await request.json()) as { displayName?: unknown }
-    if (typeof body.displayName === 'string' && body.displayName.trim()) {
-      displayName = body.displayName.trim().slice(0, 64)
+    const body = (await request.json()) as { displayName?: unknown } | null
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      typeof body.displayName === 'string' &&
+      body.displayName.trim()
+    ) {
+      // Truncate by code points, not UTF-16 units (avoid splitting surrogates).
+      displayName = Array.from(body.displayName.trim()).slice(0, 64).join('')
     }
   } catch {
     /* body optional */

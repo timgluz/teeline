@@ -59,6 +59,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // transports type derived from the verifier's expectation (avoids a direct
   // dep on @simplewebauthn/typescript-types for one cast)
   type Transport = NonNullable<Parameters<typeof verifyAuthenticationResponse>[0]['credential']['transports']>[number]
+  function safeParseTransports(raw: string): Transport[] | undefined {
+    try {
+      return JSON.parse(raw) as Transport[]
+    } catch {
+      return undefined // corrupt stored value — treat as absent
+    }
+  }
   let verification
   try {
     verification = await verifyAuthenticationResponse({
@@ -70,7 +77,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
         id: credential.id,
         publicKey: isoBase64URL.toBuffer(credential.public_key),
         counter: credential.counter,
-        transports: credential.transports ? (JSON.parse(credential.transports) as Transport[]) : undefined,
+        transports: credential.transports ? safeParseTransports(credential.transports) : undefined,
       },
     })
   } catch (err) {
@@ -79,17 +86,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
   if (!verification.verified) return badRequest('Authentication not verified')
 
-  // Counter rollback is the clone-detection signal; SimpleWebAuthn already
-  // rejected a lower counter, so persisting the new one is safe and atomic.
-  await updateCredentialCounter(env.DB, credential.id, verification.authenticationInfo.newCounter)
+  // Resolve the user FIRST, then persist the new counter: updating the
+  // counter for a credential whose user was deleted would permanently brick
+  // it (stored counter > authenticator counter on the next attempt).
+  try {
+    const user = await getUser(env.DB, credential.user_id)
+    if (!user) return serverError('User not found for verified credential')
 
-  const user = await getUser(env.DB, credential.user_id)
-  if (!user) return serverError('User not found for verified credential')
+    // Counter rollback is the clone-detection signal; SimpleWebAuthn already
+    // rejected a lower counter, so persisting the new one is safe and atomic.
+    await updateCredentialCounter(env.DB, credential.id, verification.authenticationInfo.newCounter)
 
-  const token = await createSessionToken(env.SESSION_SECRET, user.id)
-  return json(
-    { user: { id: user.id, displayName: user.display_name, createdAt: user.created_at } },
-    200,
-    { 'Set-Cookie': sessionCookieHeader(token) },
-  )
+    const token = await createSessionToken(env.SESSION_SECRET, user.id)
+    return json(
+      { user: { id: user.id, displayName: user.display_name, createdAt: user.created_at } },
+      200,
+      { 'Set-Cookie': sessionCookieHeader(token) },
+    )
+  } catch (err) {
+    console.error('Login post-verification failed:', err)
+    return serverError('Login failed — please try again')
+  }
 }

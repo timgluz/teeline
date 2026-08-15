@@ -35,12 +35,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return badRequest('nonce and credential are required')
   }
 
-  const row = await getChallenge(env.DB, body.nonce)
+  let row
+  try {
+    row = await getChallenge(env.DB, body.nonce)
+  } catch (err) {
+    console.error('Failed to fetch challenge:', err)
+    return serverError('Failed to complete registration — please try again')
+  }
   if (!row || row.type !== 'register' || row.expires_at < Date.now()) {
     return badRequest('Unknown or expired challenge — start again')
   }
   if (!row.user_handle) return serverError('Challenge missing user handle')
-  if (!(await consumeChallenge(env.DB, row.id))) {
+  let consumed
+  try {
+    consumed = await consumeChallenge(env.DB, row.id)
+  } catch (err) {
+    console.error('Failed to consume challenge:', err)
+    return serverError('Failed to complete registration — please try again')
+  }
+  if (!consumed) {
     return badRequest('Challenge already used — start again')
   }
 
@@ -85,7 +98,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return serverError('Failed to complete registration — please try again')
   }
 
-  const token = await createSessionToken(env.SESSION_SECRET, userId, now)
+  let token
+  try {
+    token = await createSessionToken(env.SESSION_SECRET, userId, now)
+  } catch (err) {
+    // User + credential are persisted; only session minting failed. Tell the
+    // client to log in rather than returning 500 (which would trigger a
+    // duplicate registration attempt).
+    console.error('Failed to create session token after registration:', err)
+    return json(
+      { error: 'Registration succeeded but the session could not be established — please log in.', user: { id: userId } },
+      201,
+    )
+  }
   return json(
     { user: { id: userId, displayName: null, createdAt: now } },
     201,

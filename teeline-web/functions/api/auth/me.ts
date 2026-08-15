@@ -14,7 +14,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
 
   const headers: Record<string, string> = {}
   if (shouldRefreshSession(session) && env.SESSION_SECRET) {
-    headers['Set-Cookie'] = sessionCookieHeader(await createSessionToken(env.SESSION_SECRET, user.id))
+    try {
+      headers['Set-Cookie'] = sessionCookieHeader(await createSessionToken(env.SESSION_SECRET, user.id))
+    } catch (err) {
+      // Sliding refresh is best-effort: the existing token stays valid until
+      // exp, so a mint failure must not break the response.
+      console.error('Session refresh failed:', err)
+    }
   }
   return json({ user: { id: user.id, displayName: user.display_name, createdAt: user.created_at } }, 200, headers)
 }
