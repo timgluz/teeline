@@ -22,7 +22,9 @@ Relevant environment variables:
 | --- | --- | --- |
 | `PORT` | Listen port | `8080` |
 | `API_KEY` | Static break-glass bearer token. Unset or empty disables it. | unset |
-| `CLERK_SECRET_KEY` | Enables self-serve per-user API keys via Clerk. Unset disables it. | unset |
+| `TEELINE_AUTH_MODE` | `breakglass` (static key only), `service` (verify via the auth service) or `disabled`. Unset: inferred from the credentials below. | inferred |
+| `AUTH_SERVICE_URL` | Base URL of the WebAuthn auth service (e.g. `https://tspsolver.com`). Used in `service` mode. | unset |
+| `AUTH_SERVICE_SECRET` | Shared secret for the auth service's internal verify endpoint. Used in `service` mode. | unset |
 | `RATE_LIMIT_RPM` | Requests per minute per client. `0` disables rate limiting. | `100` |
 
 ## Testing
@@ -50,7 +52,35 @@ Set via `fly secrets set <NAME>=<value> --app teeline-api`:
 | Secret | Purpose |
 | --- | --- |
 | `API_KEY` | Static break-glass bearer token |
-| `CLERK_SECRET_KEY` | Enables self-serve API keys (see Authentication above) |
+| `TEELINE_AUTH_MODE` | `service` in production (see Authentication above) |
+| `AUTH_SERVICE_URL` | Base URL of the WebAuthn auth service |
+| `AUTH_SERVICE_SECRET` | Shared secret for the auth service's verify endpoint |
+
+> **`AUTH_SERVICE_SECRET` must match the Cloudflare Pages project's `AUTH_SERVICE_SECRET`** —
+> the auth service only answers the internal verify endpoint to callers presenting this header.
+> Set the Pages side with `echo "<value>" | npx wrangler pages secret put AUTH_SERVICE_SECRET
+> --project-name teeline-web` (see `teeline-web/README.md` → *Cloudflare Pages Secrets*).
+
+### End-to-end setup checklist (fresh environment)
+
+```bash
+# 1. Cloudflare: create the auth D1 + schema + secrets (from teeline-web/)
+npx wrangler d1 create teeline-auth                                   # → database_id into wrangler.toml
+npx wrangler d1 migrations apply teeline-auth --remote
+echo "<AUTH_SERVICE_SECRET>" | npx wrangler pages secret put AUTH_SERVICE_SECRET --project-name teeline-web
+echo "<SESSION_SECRET>"      | npx wrangler pages secret put SESSION_SECRET      --project-name teeline-web
+
+# 2. Fly: point the API at the auth service (same AUTH_SERVICE_SECRET)
+fly secrets set TEELINE_AUTH_MODE=service AUTH_SERVICE_URL=https://tspsolver.com \
+  AUTH_SERVICE_SECRET=<same-value> --app teeline-api
+fly secrets unset CLERK_SECRET_KEY --app teeline-api                    # remove the old IdP
+
+# 3. Deploy both (CI on master, or manually):
+#    task web:deploy:release   # wrangler pages deploy (migrations run first in deploy-web.yml)
+#    task api:release          # flyctl deploy
+```
+
+Local-dev / CI keep `TEELINE_AUTH_MODE=breakglass` + `API_KEY` only (no auth-service round-trip).
 
 ### Manual Deploy
 
@@ -65,8 +95,8 @@ teeline-api/
 ├── src/
 │   ├── main.rs       # entrypoint — reads env, wires up auth/rate-limiting/routes
 │   ├── lib.rs        # build_api_router() / build_router() — route wiring
-│   ├── middleware.rs # require_auth (static key + Clerk verifier), metrics
-│   ├── clerk.rs      # ApiKeyVerifier trait + ClerkVerifier
+│   ├── middleware.rs # require_auth (static key + service verifier), metrics
+│   ├── auth.rs       # ApiKeyVerifier trait + ServiceVerifier
 │   ├── openapi.rs    # utoipa OpenAPI spec + Scalar docs UI
 │   ├── error.rs      # ApiError → HTTP response mapping
 │   ├── metrics.rs    # Prometheus/OpenMetrics state

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use axum::Router;
 use teeline_api::{
     AppState,
-    clerk::{ApiKeyVerifier, ClerkVerifier, NullVerifier},
+    auth::{ApiKeyVerifier, NullVerifier, ServiceVerifier},
     metrics::MetricsState,
     middleware,
     services::{SolverRegistry, TspService},
@@ -34,12 +34,68 @@ fn api_key() -> Option<String> {
         .filter(|token| !token.is_empty())
 }
 
-/// Returns the configured Clerk backend secret key, if any. Same
-/// empty-string-safety as `api_key()`.
-fn clerk_secret_key() -> Option<String> {
-    std::env::var("CLERK_SECRET_KEY")
-        .ok()
-        .filter(|token| !token.is_empty())
+/// Returns the configured auth service URL (WebAuthn auth service, e.g.
+/// `https://tspsolver.com`), if any. Same empty-string-safety as `api_key()`.
+fn auth_service_url() -> Option<String> {
+    auth_service_url_from(std::env::var("AUTH_SERVICE_URL").ok())
+}
+
+/// Pure for testing; trims and returns the trimmed value — a URL with stray
+/// whitespace (common when copy-pasting secrets) must not reach the HTTP
+/// client.
+fn auth_service_url_from(raw: Option<String>) -> Option<String> {
+    raw.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
+}
+
+/// Returns the configured shared secret for the auth service's internal
+/// verify endpoint, if any. Same empty-string-safety as `api_key()`.
+fn auth_service_secret() -> Option<String> {
+    auth_service_secret_from(std::env::var("AUTH_SERVICE_SECRET").ok())
+}
+
+/// Pure for testing. A whitespace-only secret would infer Service mode with a
+/// useless key — treat it as unset (same empty-string-safety as `api_key()`).
+fn auth_service_secret_from(raw: Option<String>) -> Option<String> {
+    raw.filter(|token| !token.trim().is_empty())
+}
+
+/// How the API authenticates requests.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AuthMode {
+    /// No auth middleware at all (original no-auth MVP behavior).
+    Disabled,
+    /// Only the static break-glass `API_KEY` — used by local-dev & CI.
+    Breakglass,
+    /// The auth service verifier (optionally alongside the break-glass key).
+    Service,
+}
+
+/// Pure decision so it is unit-testable without touching process env.
+fn auth_mode_with(env_mode: Option<&str>, has_service: bool, has_breakglass: bool) -> AuthMode {
+    match env_mode {
+        Some("breakglass") => AuthMode::Breakglass,
+        Some("service") => AuthMode::Service,
+        Some("disabled") => AuthMode::Disabled,
+        Some(other) => {
+            tracing::warn!("unknown TEELINE_AUTH_MODE '{other}', treating as disabled");
+            AuthMode::Disabled
+        }
+        // Back-compat inference when TEELINE_AUTH_MODE is unset: service wins
+        // if fully configured, else break-glass if a static key exists.
+        None => match (has_service, has_breakglass) {
+            (true, _) => AuthMode::Service,
+            (false, true) => AuthMode::Breakglass,
+            (false, false) => AuthMode::Disabled,
+        },
+    }
+}
+
+fn auth_mode() -> AuthMode {
+    auth_mode_with(
+        std::env::var("TEELINE_AUTH_MODE").ok().as_deref(),
+        auth_service_url().is_some() && auth_service_secret().is_some(),
+        api_key().is_some(),
+    )
 }
 
 #[tokio::main]
@@ -84,29 +140,40 @@ async fn main() -> anyhow::Result<()> {
     // Applied after GovernorLayer, so auth wraps outermost for matched
     // routes (each subsequent .layer()/.route_layer() call wraps the
     // previous stack) — unauthenticated requests are rejected before
-    // consuming rate-limit budget for the static-key path (the Clerk path is
-    // itself a network call and isn't cheap, but that's an accepted v1
+    // consuming rate-limit budget for the static-key path (the service path
+    // is itself a network call and isn't cheap, but that's an accepted v1
     // tradeoff, not something layering order can fix). require_auth uses
     // route_layer internally (not layer) so it only runs for requests that
     // actually match a route.
     let static_key = api_key();
-    let clerk_secret = clerk_secret_key();
-    let verifier: Arc<dyn ApiKeyVerifier> = match &clerk_secret {
-        Some(secret) => Arc::new(ClerkVerifier::new(secret.clone())),
-        None => Arc::new(NullVerifier),
-    };
-    if static_key.is_some() || clerk_secret.is_some() {
-        tracing::info!(
-            static_key = static_key.is_some(),
-            clerk = clerk_secret.is_some(),
-            "API auth enabled"
-        );
-        // An absent static key becomes "" here, which `token_matches` always
-        // rejects (defense in depth against an empty configured token) — so
-        // Clerk-only setups (no API_KEY) work correctly too.
-        api = middleware::require_auth(api, static_key.unwrap_or_default(), verifier);
-    } else {
-        tracing::info!("API auth disabled (neither API_KEY nor CLERK_SECRET_KEY set)");
+    match auth_mode() {
+        AuthMode::Disabled => {
+            tracing::info!("API auth disabled (TEELINE_AUTH_MODE=disabled or no credentials)");
+        }
+        AuthMode::Breakglass => {
+            tracing::info!("API auth: break-glass key only (TEELINE_AUTH_MODE=breakglass)");
+            // An absent static key becomes "" here, which `token_matches`
+            // always rejects (defense in depth against an empty token).
+            api = middleware::require_auth(
+                api,
+                static_key.unwrap_or_default(),
+                Arc::new(NullVerifier),
+            );
+        }
+        AuthMode::Service => {
+            let url = auth_service_url().ok_or_else(|| {
+                anyhow::anyhow!("AUTH_SERVICE_URL is required when TEELINE_AUTH_MODE=service")
+            })?;
+            let secret = auth_service_secret().ok_or_else(|| {
+                anyhow::anyhow!("AUTH_SERVICE_SECRET is required when TEELINE_AUTH_MODE=service")
+            })?;
+            tracing::info!(
+                static_key = static_key.is_some(),
+                "API auth: verifying keys via auth service"
+            );
+            let verifier: Arc<dyn ApiKeyVerifier> = Arc::new(ServiceVerifier::new(url, secret));
+            api = middleware::require_auth(api, static_key.unwrap_or_default(), verifier);
+        }
     }
 
     let app = teeline_api::build_router(state, api);
@@ -119,4 +186,67 @@ async fn main() -> anyhow::Result<()> {
     )
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn explicit_mode_wins_over_inference() {
+        assert_eq!(
+            auth_mode_with(Some("breakglass"), true, true),
+            AuthMode::Breakglass
+        );
+        assert_eq!(
+            auth_mode_with(Some("service"), false, false),
+            AuthMode::Service
+        );
+        assert_eq!(
+            auth_mode_with(Some("disabled"), true, true),
+            AuthMode::Disabled
+        );
+    }
+
+    #[test]
+    fn unknown_mode_treated_as_disabled() {
+        assert_eq!(
+            auth_mode_with(Some("banana"), true, true),
+            AuthMode::Disabled
+        );
+    }
+
+    #[test]
+    fn unset_mode_infers_from_credentials() {
+        // service configured → Service (even with a static key present)
+        assert_eq!(auth_mode_with(None, true, true), AuthMode::Service);
+        // only a static key → Breakglass
+        assert_eq!(auth_mode_with(None, false, true), AuthMode::Breakglass);
+        // nothing → Disabled (back-compat no-auth MVP). Note: "service URL
+        // without secret" also lands here because has_service already encodes
+        // "URL AND secret both present".
+        assert_eq!(auth_mode_with(None, false, false), AuthMode::Disabled);
+    }
+
+    #[test]
+    fn auth_service_url_is_trimmed() {
+        assert_eq!(
+            auth_service_url_from(Some("  https://tspsolver.com  ".into())),
+            Some("https://tspsolver.com".into())
+        );
+        assert_eq!(auth_service_url_from(Some("   ".into())), None);
+        assert_eq!(auth_service_url_from(Some("".into())), None);
+        assert_eq!(auth_service_url_from(None), None);
+    }
+
+    #[test]
+    fn auth_service_secret_ignores_whitespace_only() {
+        assert_eq!(
+            auth_service_secret_from(Some("s3cr3t".into())),
+            Some("s3cr3t".into())
+        );
+        assert_eq!(auth_service_secret_from(Some("   ".into())), None);
+        assert_eq!(auth_service_secret_from(Some("".into())), None);
+        assert_eq!(auth_service_secret_from(None), None);
+    }
 }

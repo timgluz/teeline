@@ -6,7 +6,7 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use teeline_api::{
     AppState,
-    clerk::{ApiKeyVerifier, NullVerifier, VerifiedKey},
+    auth::{ApiKeyVerifier, NullVerifier, VerifiedKey},
     metrics::MetricsState,
     middleware,
     models::{
@@ -461,12 +461,13 @@ async fn unmatched_path_returns_404_not_401_when_auth_enabled() {
 }
 
 // ---------------------------------------------------------------------------
-// Auth — Clerk verifier path (StaticVerifier stands in for a real Clerk call)
+// Auth — service-verifier path (StaticVerifier stands in for the real
+// auth-service call; the verifier trait keeps these tests mode-agnostic)
 // ---------------------------------------------------------------------------
 
-const CLERK_TEST_KEY: &str = "ak_validkeyforintegrationtests";
+const SERVICE_TEST_KEY: &str = "ak_validkeyforintegrationtests";
 
-fn clerk_verifier_with(key: &str, subject: &str) -> Arc<dyn ApiKeyVerifier> {
+fn service_verifier_with(key: &str, subject: &str) -> Arc<dyn ApiKeyVerifier> {
     let mut keys = HashMap::new();
     keys.insert(
         key.to_string(),
@@ -478,13 +479,14 @@ fn clerk_verifier_with(key: &str, subject: &str) -> Arc<dyn ApiKeyVerifier> {
 }
 
 #[tokio::test]
-async fn solvers_with_valid_clerk_key_returns_200() {
-    let app = make_authed_app_with_verifier(clerk_verifier_with(CLERK_TEST_KEY, "user_test123"));
+async fn solvers_with_valid_service_key_returns_200() {
+    let app =
+        make_authed_app_with_verifier(service_verifier_with(SERVICE_TEST_KEY, "user_test123"));
     let resp = app
         .oneshot(get_with_header(
             "/api/v1/solvers",
             "Authorization",
-            &format!("Bearer {CLERK_TEST_KEY}"),
+            &format!("Bearer {SERVICE_TEST_KEY}"),
         ))
         .await
         .unwrap();
@@ -492,7 +494,7 @@ async fn solvers_with_valid_clerk_key_returns_200() {
 }
 
 #[tokio::test]
-async fn solvers_with_unknown_clerk_shaped_key_returns_401() {
+async fn solvers_with_unknown_service_shaped_key_returns_401() {
     // A key the verifier doesn't recognize (not revoked — simply never
     // issued) must still 401, not be treated as valid by default.
     let app = make_authed_app_with_verifier(Arc::new(StaticVerifier(HashMap::new())));
@@ -508,8 +510,8 @@ async fn solvers_with_unknown_clerk_shaped_key_returns_401() {
 }
 
 #[tokio::test]
-async fn solvers_with_static_break_glass_key_still_works_alongside_clerk_verifier() {
-    // Even with a Clerk verifier configured, the static break-glass key
+async fn solvers_with_static_break_glass_key_still_works_alongside_service_verifier() {
+    // Even with a service verifier configured, the static break-glass key
     // must still authorize independently — the two credentials are OR'd,
     // not one replacing the other.
     let app = make_authed_app_with_verifier(Arc::new(StaticVerifier(HashMap::new())));
@@ -525,8 +527,9 @@ async fn solvers_with_static_break_glass_key_still_works_alongside_clerk_verifie
 }
 
 #[tokio::test]
-async fn solvers_with_neither_static_nor_clerk_credential_returns_401() {
-    let app = make_authed_app_with_verifier(clerk_verifier_with(CLERK_TEST_KEY, "user_test123"));
+async fn solvers_with_neither_static_nor_service_credential_returns_401() {
+    let app =
+        make_authed_app_with_verifier(service_verifier_with(SERVICE_TEST_KEY, "user_test123"));
     let resp = app.oneshot(get("/api/v1/solvers")).await.unwrap();
     assert_eq!(resp.status(), StatusCode::UNAUTHORIZED);
 }
