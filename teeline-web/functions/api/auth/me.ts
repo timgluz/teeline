@@ -2,7 +2,7 @@
 // session cookie forward when it's past the halfway point of its lifetime.
 import type { Env } from '../../lib/env'
 import { getUser } from '../../lib/db'
-import { json, serverError, unauthorized } from '../../lib/http'
+import { json, forbidden, serverError, unauthorized } from '../../lib/http'
 import { createSessionToken, getSessionUser, sessionCookieHeader, shouldRefreshSession } from '../../lib/session'
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
@@ -17,6 +17,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
     return serverError('Failed to load user — please try again')
   }
   if (!user) return unauthorized() // account deleted → session is void
+  if (user.banned) return forbidden('Account is banned') // banned account → deny, no session slide
 
   const headers: Record<string, string> = {}
   if (shouldRefreshSession(session) && env.SESSION_SECRET) {

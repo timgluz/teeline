@@ -1,9 +1,9 @@
 // API-key lifecycle tests: mint (show-once), list (metadata only), revoke
 // (immediate), and the internal verify contract (the shape teeline-api
 // expects — a drop-in for the old Clerk verify call).
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { makeD1, SCHEMA, type D1Like } from '../../lib/test/sqlite-d1'
-import { createUser } from '../../lib/db'
+import { createUser, setUserBanned } from '../../lib/db'
 import { createSessionToken } from '../../lib/session'
 import Database from 'better-sqlite3'
 
@@ -40,13 +40,11 @@ async function seedUser(id = 'u1'): Promise<void> {
   await createUser(shim, { id, displayName: 'Tim', createdAt: Date.now() })
 }
 
-beforeAll(() => {
-  shim = makeD1(new Database(':memory:'))
-})
-
 beforeEach(() => {
+  // Fresh in-memory DB per test — migrations are not idempotent (0003 is a
+  // plain ALTER TABLE ADD COLUMN).
+  shim = makeD1(new Database(':memory:'))
   shim.exec(SCHEMA)
-  shim.exec('DELETE FROM api_keys; DELETE FROM credentials; DELETE FROM challenges; DELETE FROM users;')
 })
 
 describe('key creation (show-once)', () => {
@@ -142,6 +140,22 @@ describe('internal verify endpoint', () => {
     const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ subject: 'u1', revoked: false, expired: false })
+  })
+
+  it('404s for a key owned by a banned user (ban kills existing keys)', async () => {
+    await seedUser()
+    const cookie = await sessionCookie('u1')
+    const minted = (await createKey(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))).json() as unknown as Promise<{ secret: string }>
+    const { secret } = await minted
+    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(200)
+
+    // operator bans the account → the key stops verifying immediately
+    await setUserBanned(shim, 'u1', true)
+    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(404)
+
+    // unban restores it (flag is a toggle, not a deletion)
+    await setUserBanned(shim, 'u1', false)
+    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(200)
   })
 
   it('404s for an unknown key', async () => {

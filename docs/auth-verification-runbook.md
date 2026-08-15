@@ -109,3 +109,33 @@ npx wrangler pages deployment tail --project-name teeline-web <deployment-id>
 - Curl tests to the auth service need the **`Origin` header** (CSRF), and the session cookie is
   `__Host-`/SameSite=Strict — a full sign-in only works from a real browser.
 - Test keys inserted via §2 are **real, working keys** — always clean them up.
+
+## 7. Banning an abusive account
+
+The `banned` flag (migration `0003_add_banned.sql`, column `users.banned`, default 0) is the
+operator tool for abusive users. It does **not** delete the account — it denies access:
+
+- **Login** (`/api/auth/login/complete`) → 403, no session cookie.
+- **Session APIs** (`/api/auth/me`, `/api/auth/keys` create/list/revoke) → 403.
+- **Existing API keys** (`/api/auth/keys/verify`) → 404, so the teeline-api middleware stops
+  authorizing them immediately — no key rotation needed.
+
+Find the user id (WebAuthn userHandle — ask them for it, or look it up in D1), then set the flag:
+
+```bash
+# From teeline-web/ — list users to find the id
+npx wrangler d1 execute teeline-auth --remote --command "SELECT id, display_name, banned, created_at FROM users"
+
+# Ban
+npx wrangler d1 execute teeline-auth --remote --command "UPDATE users SET banned = 1 WHERE id = '<user-id>'"
+
+# Unban (rare; restores access without re-registration)
+npx wrangler d1 execute teeline-auth --remote --command "UPDATE users SET banned = 0 WHERE id = '<user-id>'"
+```
+
+Caveats:
+
+- The flag is **per account**: with open registration a banned user can create a brand-new account
+  with a new passkey. A durable ban would additionally deny-list credential IDs (follow-up).
+- Banning is immediate and idempotent; setting it again (or on a nonexistent id) is a no-op.
+- Banned users keep their rows — deleting the account (`deleteUser`) remains the "GDPR-style" nuke.

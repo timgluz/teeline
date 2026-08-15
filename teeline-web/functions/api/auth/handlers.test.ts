@@ -2,10 +2,10 @@
 // mocked at the verification boundary and the real SQL against the D1 shim.
 // Exercises: challenge lifecycle, atomic user+credential creation, session
 // cookie issuance/validation, counter updates, origin policy.
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
 import { makeD1, SCHEMA, type D1Like } from '../../lib/test/sqlite-d1'
-import { addCredential, createUser, getChallenge, getCredentialById, getUser } from '../../lib/db'
+import { addCredential, createUser, getChallenge, getCredentialById, getUser, setUserBanned } from '../../lib/db'
 import { createSessionToken } from '../../lib/session'
 import Database from 'better-sqlite3'
 
@@ -23,6 +23,7 @@ import { onRequestPost as loginBegin } from './login/begin'
 import { onRequestPost as loginComplete } from './login/complete'
 import { onRequestGet as me } from './me'
 import { onRequestPost as logout } from './logout'
+import { onRequestGet as listKeys, onRequestPost as createKey } from './keys'
 
 let shim: D1Like
 const env = { SESSION_SECRET: 'test-session-secret', ALLOWED_ORIGINS: 'http://localhost:8788' } as never // DB injected below
@@ -41,13 +42,11 @@ function req(path: string, init: RequestInit = {}): Request {
 
 const NOW = Date.now()
 
-beforeAll(() => {
-  shim = makeD1(new Database(':memory:'))
-})
-
 beforeEach(() => {
+  // Fresh in-memory DB per test — migrations are not idempotent (0003 is a
+  // plain ALTER TABLE ADD COLUMN).
+  shim = makeD1(new Database(':memory:'))
   shim.exec(SCHEMA)
-  shim.exec('DELETE FROM api_keys; DELETE FROM credentials; DELETE FROM challenges; DELETE FROM users;')
   vi.clearAllMocks()
   mocks.generateRegistrationOptions.mockResolvedValue({ challenge: 'reg-challenge' })
   mocks.generateAuthenticationOptions.mockResolvedValue({ challenge: 'login-challenge', rpId: 'localhost', allowCredentials: [], userVerification: 'preferred' })
@@ -143,6 +142,21 @@ describe('login', () => {
     )
     expect(res.status).toBe(400)
   })
+
+  it('denies a banned user (403) but still advances the credential counter', async () => {
+    await seedUser()
+    await setUserBanned(shim, 'u1', true)
+    const beginRes = await loginBegin(ctx(req('/api/auth/login/begin', { body: '{}' })))
+    const { nonce } = (await beginRes.json()) as { nonce: string }
+
+    const res = await loginComplete(
+      ctx(req('/api/auth/login/complete', { body: JSON.stringify({ nonce, credential: { id: 'cred-1', response: { clientDataJSON: 'client', authenticatorData: 'auth', signature: 'sig' } } }) })),
+    )
+    expect(res.status).toBe(403)
+    expect(res.headers.get('Set-Cookie')).toBeNull() // no session for a banned user
+    // counter advanced anyway so an eventual unban doesn't hit a stale counter
+    expect((await getCredentialById(shim, 'cred-1'))?.counter).toBe(9)
+  })
 })
 
 describe('session endpoints', () => {
@@ -158,6 +172,28 @@ describe('session endpoints', () => {
   it('me rejects a missing or tampered cookie', async () => {
     expect((await me(ctx(new Request('http://localhost:8788/api/auth/me')))).status).toBe(401)
     expect((await me(ctx(new Request('http://localhost:8788/api/auth/me', { headers: { Cookie: '__Host-teeline-session=tampered' } })))).status).toBe(401)
+  })
+
+  it('me rejects a banned user (403) despite a valid cookie', async () => {
+    await createUser(shim, { id: 'u1', displayName: 'Tim', createdAt: NOW })
+    const token = await createSessionToken(env.SESSION_SECRET as string, 'u1', NOW)
+    const cookie = `__Host-teeline-session=${token}`
+    expect((await me(ctx(new Request('http://localhost:8788/api/auth/me', { headers: { Cookie: cookie } })))).status).toBe(200)
+
+    await setUserBanned(shim, 'u1', true)
+    const res = await me(ctx(new Request('http://localhost:8788/api/auth/me', { headers: { Cookie: cookie } })))
+    expect(res.status).toBe(403)
+    expect(res.headers.get('Set-Cookie')).toBeNull() // no session slide for a banned user
+  })
+
+  it('banned users cannot mint or list API keys (requireSession 403)', async () => {
+    await createUser(shim, { id: 'u1', displayName: 'Tim', createdAt: NOW })
+    const token = await createSessionToken(env.SESSION_SECRET as string, 'u1', NOW)
+    const cookie = `__Host-teeline-session=${token}`
+    await setUserBanned(shim, 'u1', true)
+
+    expect((await createKey(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))).status).toBe(403)
+    expect((await listKeys(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))).status).toBe(403)
   })
 
   it('logout clears the cookie', async () => {
