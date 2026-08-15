@@ -18,7 +18,8 @@ export const onRequestDelete: PagesFunction<Env> = async ({ request, env, params
   try {
     const revoked = await revokeKey(env.DB, id, auth.userId)
     if (!revoked) return badRequest('Key not found')
-    console.log('[audit] api_key_revoked', JSON.stringify({ keyId: id, userId: auth.userId, at: Date.now() }))
+    const clientIp = request.headers.get('CF-Connecting-IP') ?? null
+    console.log('[audit] api_key_revoked', JSON.stringify({ keyId: id, userId: auth.userId, ip: clientIp, at: Date.now() }))
     return json({ ok: true })
   } catch (err) {
     console.error('Failed to revoke API key:', err)
