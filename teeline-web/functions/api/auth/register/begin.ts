@@ -1,0 +1,54 @@
+// POST /api/auth/register/begin — start a WebAuthn registration ceremony.
+// Creates a challenge row (TTL, single-use) and returns the options the
+// browser passes to navigator.credentials.create(). Registration is open:
+// the first passkey on this origin becomes an account.
+import { generateRegistrationOptions } from '@simplewebauthn/server'
+import type { Env } from '../../../lib/env'
+import { insertChallenge } from '../../../lib/db'
+import { CHALLENGE_TTL_MS, RP_NAME, isAllowedOrigin, requestOrigin, rpIdFor } from '../../../lib/webauthn'
+import { forbidden, json, serverError } from '../../../lib/http'
+
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  const origin = requestOrigin(request)
+  if (!isAllowedOrigin(origin, env)) return forbidden()
+  if (!env.SESSION_SECRET) return serverError('Auth service not configured (SESSION_SECRET missing)')
+
+  // Optional friendly name; defaults to a generic label.
+  let displayName = 'Teeline user'
+  try {
+    const body = (await request.json()) as { displayName?: unknown }
+    if (typeof body.displayName === 'string' && body.displayName.trim()) {
+      displayName = body.displayName.trim().slice(0, 64)
+    }
+  } catch {
+    /* body optional */
+  }
+
+  const rpID = rpIdFor(new URL(request.url).hostname)
+  const userHandle = crypto.randomUUID()
+  const nonce = crypto.randomUUID()
+
+  const options = await generateRegistrationOptions({
+    rpName: RP_NAME,
+    rpID,
+    userName: userHandle, // stable unique id; the authenticator shows displayName
+    userDisplayName: displayName,
+    userID: new Uint8Array(new TextEncoder().encode(userHandle)),
+    attestationType: 'none',
+    authenticatorSelection: {
+      residentKey: 'required',
+      userVerification: 'preferred',
+    },
+    timeout: CHALLENGE_TTL_MS,
+  })
+
+  await insertChallenge(env.DB, {
+    id: nonce,
+    type: 'register',
+    challenge: options.challenge,
+    userHandle,
+    expiresAt: Date.now() + CHALLENGE_TTL_MS,
+  })
+
+  return json({ options, nonce }, 201)
+}

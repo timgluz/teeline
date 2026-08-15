@@ -15,5 +15,5 @@
     "erasableSyntaxOnly": true
   },
   "include": ["**/*.ts"],
-  "exclude": ["**/*.test.ts"]
+  "exclude": ["**/*.test.ts", "**/test/**"]
 }

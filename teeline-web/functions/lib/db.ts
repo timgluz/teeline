@@ -96,6 +96,23 @@ export async function addCredential(
     .run()
 }
 
+// Registration: create the user and its first credential in one transaction
+// (D1 batch is atomic) so a failure can't leave a half-created account.
+export async function createUserWithCredential(
+  db: D1Database,
+  user: { id: string; displayName?: string; createdAt: number },
+  credential: { id: string; publicKey: string; counter: number; transports?: string[]; createdAt: number },
+): Promise<void> {
+  await db.batch([
+    db
+      .prepare(`INSERT INTO users (${USER_COLS}) VALUES (?1, ?2, ?3)`)
+      .bind(user.id, user.displayName ?? null, user.createdAt),
+    db
+      .prepare(`INSERT INTO credentials (${CRED_COLS}) VALUES (?1, ?2, ?3, ?4, ?5, ?6)`)
+      .bind(credential.id, user.id, credential.publicKey, credential.counter, credential.transports ? JSON.stringify(credential.transports) : null, credential.createdAt),
+  ])
+}
+
 export async function listCredentialsByUser(db: D1Database, userId: string): Promise<CredentialRow[]> {
   return (
     await db

@@ -1,8 +1,13 @@
 version: '3'
 
 tasks:
+  db:migrate:local:
+    desc: Apply D1 migrations to the local dev database (wrangler pages dev uses local D1; migrations are only applied to the remote DB on deploy)
+    cmds:
+      - npx wrangler d1 migrations apply teeline-auth --local
+
   dev:
-    desc: Start Astro dev server at http://localhost:4321
+    desc: Start Astro dev server at http://localhost:4321 (auth Functions need SESSION_SECRET via .dev.vars and a migrated local D1 — run db:migrate:local once)
     cmds:
       - npm run dev
 
