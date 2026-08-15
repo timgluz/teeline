@@ -41,6 +41,10 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          # Same as teeline-web.yml: astro 7.2+ builds OOM past the default
+          # ~4 GB Node heap on the runner.
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Deploy to Cloudflare Pages
         run: npx wrangler pages deploy dist/
