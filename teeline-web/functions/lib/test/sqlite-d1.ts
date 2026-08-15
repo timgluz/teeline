@@ -29,7 +29,7 @@ export type D1Like = {
       run(): { meta: { changes: number; last_row_id: number } }
     }
   }
-  batch(stmts: { run(): { meta: { changes: number; last_row_id: number } } }[]): { meta: { changes: number; last_row_id: number } }[]
+  batch(stmts: { _isSelect?: boolean; all?<T>(): { results: T[] }; run?(): { meta: { changes: number } } }[]): unknown[]
 }
 
 export function makeD1(db: Database.Database): D1Like {
@@ -46,9 +46,14 @@ export function makeD1(db: Database.Database): D1Like {
         throw new Error(`sqlite-d1 shim: reused numbered param in SQL: ${sql}`)
       }
       const stmt = db.prepare(sql.replace(/\?(\d+)/g, '?'))
+      // Real D1 batch executes each statement and returns per-statement
+      // results; better-sqlite3 needs .all() for SELECTs and .run() for
+      // writes, so the bound object carries the hint for batch().
+      const isSelect = /^\s*SELECT/i.test(sql)
       return {
         bind(...params) {
           return {
+            _isSelect: isSelect,
             first<T>(col?: string): T | null {
               const row = stmt.get(...params) as Record<string, unknown> | undefined
               if (row === undefined) return null
@@ -67,7 +72,7 @@ export function makeD1(db: Database.Database): D1Like {
       }
     },
     batch(stmts) {
-      return db.transaction(() => stmts.map((s) => s.run()))()
+      return db.transaction(() => stmts.map((s) => (s._isSelect ? s.all() : s.run())))()
     },
   }
 }

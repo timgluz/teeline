@@ -7,6 +7,7 @@ import type { Env } from '../../../lib/env'
 import { consumeChallenge, createUserWithCredential, getChallenge } from '../../../lib/db'
 import { isClientOriginAllowed, rpIdFor, serverOrigin } from '../../../lib/webauthn'
 import { badRequest, forbidden, json, serverError } from '../../../lib/http'
+import { rateLimit } from '../../../lib/ratelimit'
 import { createSessionToken, sessionCookieHeader } from '../../../lib/session'
 
 type RegistrationResponse = Parameters<typeof verifyRegistrationResponse>[0]['response']
@@ -30,6 +31,8 @@ function isRegistrationCredential(v: unknown): v is RegistrationResponse {
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!isClientOriginAllowed(request, env)) return forbidden() // CSRF: client origin must be on the allowlist
+  const limited = await rateLimit(request, env, 'register-complete', 10)
+  if (limited) return limited
   if (!env.SESSION_SECRET) return serverError('Auth service not configured')
 
   let body: { nonce?: unknown; credential?: unknown }

@@ -6,10 +6,13 @@ import { createApiKey, listApiKeysByUser } from '../../lib/db'
 import { json, serverError } from '../../lib/http'
 import { generateKeySecret, hashSecret, newKeyId } from '../../lib/keys'
 import { requireSession } from '../../lib/auth'
+import { rateLimit } from '../../lib/ratelimit'
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const auth = await requireSession(request, env)
   if (auth instanceof Response) return auth
+  const limited = await rateLimit(request, env, 'keys-create', 30)
+  if (limited) return limited
 
   // Optional human-readable label.
   let name: string | undefined
@@ -33,6 +36,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       secretHash: await hashSecret(secret),
       createdAt: now,
     })
+    const clientIp = request.headers.get('CF-Connecting-IP') ?? null
+    console.log('[audit] api_key_created', JSON.stringify({ keyId: id, userId: auth.userId, ip: clientIp, at: now }))
     // `secret` is the only time the plaintext exists — the client must save
     // it now (the UI shows it once until the page is refreshed).
     return json({ id, name: name ?? null, secret, createdAt: now }, 201)

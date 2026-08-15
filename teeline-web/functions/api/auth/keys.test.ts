@@ -26,7 +26,7 @@ function req(path: string, init: RequestInit = {}): Request {
   const { headers, ...rest } = init
   return new Request(`http://localhost:8788${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8788', ...(headers as Record<string, string>) },
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8788', 'CF-Connecting-IP': '1.2.3.4', ...(headers as Record<string, string>) },
     ...rest,
   })
 }

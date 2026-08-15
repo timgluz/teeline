@@ -34,7 +34,7 @@ function ctx(request: Request) {
 function req(path: string, init: RequestInit = {}): Request {
   return new Request(`http://localhost:8788${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8788' },
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8788', 'CF-Connecting-IP': '1.2.3.4' },
     ...init,
   })
 }
