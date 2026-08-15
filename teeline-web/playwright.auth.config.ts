@@ -19,7 +19,7 @@ export default defineConfig({
   ],
   webServer: {
     command:
-      'bash -c "mkdir -p .e2e-state && printf \'SESSION_SECRET=e2e-session-secret\\nAUTH_SERVICE_SECRET=e2e-shared-secret\\nALLOWED_ORIGINS=http://localhost:8788\\n\' > .dev.vars && NODE_OPTIONS=--max-old-space-size=8192 npm run build && npx wrangler d1 migrations apply teeline-auth --local && npx wrangler pages dev --port 8788"',
+      'bash -c "mkdir -p .e2e-state && printf \'SESSION_SECRET=e2e-session-secret\\nAUTH_SERVICE_SECRET=e2e-shared-secret\\nALLOWED_ORIGINS=http://localhost:8788\\n\' > .dev.vars && NODE_OPTIONS=--max-old-space-size=8192 npm run build:check && npx wrangler d1 migrations apply teeline-auth --local && npx wrangler pages dev --port 8788"',
     url: 'http://localhost:8788/api-key/',
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,
