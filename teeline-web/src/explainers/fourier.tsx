@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "preact/hooks";
-import type { ComponentChildren } from "preact";
+import type { ComponentChildren, CSSProperties } from "preact";
 
 /**
  * FourierExplainer
@@ -377,7 +377,7 @@ function TrainTab() {
             <div
               key={stage}
               className={"fx-stage" + (stage < kActive || done ? " fx-stage-done" : stage === kActive ? " fx-stage-active" : "")}
-              style={stage === kActive && !done ? { "--p": `${stageProgress}%` } as preact.JSX.CSSProperties : undefined}
+              style={stage === kActive && !done ? { "--p": `${stageProgress}%` } as CSSProperties : undefined}
             >
               <span>k≤{stage}</span>
             </div>
