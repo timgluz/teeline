@@ -48,6 +48,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build gate (Pages Functions bundle)
+        # Compiles teeline-web/functions/* (WebAuthn auth) to catch bundler /
+        # SimpleWebAuthn edge-runtime issues early. Local build only — no
+        # Cloudflare auth required.
+        run: npx wrangler pages functions build --outdir /tmp/teeline-fn-build
+
       - name: Lint (tsc)
         run: npx tsc --noEmit
 
