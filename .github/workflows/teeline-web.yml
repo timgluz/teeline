@@ -56,3 +56,7 @@ jobs:
 
       - name: Build
         run: npm run build:check
+        env:
+          # astro 7.2+ static builds exceed the runner's default Node heap
+          # (~4 GB) and abort with "JavaScript heap out of memory" (exit 134).
+          NODE_OPTIONS: --max-old-space-size=6144
