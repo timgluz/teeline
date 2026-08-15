@@ -50,9 +50,11 @@ jobs:
 
       - name: Build gate (Pages Functions bundle)
         # Compiles teeline-web/functions/* (WebAuthn auth) to catch bundler /
-        # SimpleWebAuthn edge-runtime issues early. Local build only — no
-        # Cloudflare auth required.
-        run: npx wrangler pages functions build --outdir /tmp/teeline-fn-build
+        # SimpleWebAuthn edge-runtime issues early, and type-checks them with
+        # the Workers types. Local build only — no Cloudflare auth required.
+        run: |
+          npx tsc -p functions/tsconfig.json --noEmit
+          npx wrangler pages functions build --outdir /tmp/teeline-fn-build
 
       - name: Lint (tsc)
         run: npx tsc --noEmit
