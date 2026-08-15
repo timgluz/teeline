@@ -8,7 +8,7 @@ use axum::response::IntoResponse;
 use subtle::ConstantTimeEq;
 use tower::{Layer, Service};
 
-use crate::clerk::ApiKeyVerifier;
+use crate::auth::ApiKeyVerifier;
 use crate::error::ApiError;
 use crate::metrics::{HttpDurationLabels, HttpLabels, MetricsState};
 

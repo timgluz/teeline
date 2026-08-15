@@ -1,4 +1,4 @@
-pub mod clerk;
+pub mod auth;
 pub mod error;
 pub mod metrics;
 pub mod middleware;

@@ -30,3 +30,6 @@ node_modules/
 # benchmark output (raw TSV); baseline snapshots are force-added as needed
 bench/solvers-*.tsv
 teeline-wasm/target/
+
+# Local cargo cache (sandbox CARGO_HOME)
+.cargo-home
