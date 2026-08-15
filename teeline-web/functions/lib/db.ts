@@ -14,6 +14,9 @@ export interface UserRow {
   id: string
   display_name: string | null
   created_at: number
+  // Operator-set ban flag: banned users cannot log in and their API keys
+  // stop verifying (findActiveKeyByHash joins users and filters banned).
+  banned: number
 }
 
 export interface CredentialRow {
@@ -45,8 +48,12 @@ export interface ChallengeRow {
 }
 
 const USER_COLS = 'id, display_name, created_at'
+// SELECT list includes the ban flag (INSERTs omit it — the column defaults to 0).
+const USER_SELECT_COLS = 'id, display_name, created_at, banned'
 const CRED_COLS = 'id, user_id, public_key, counter, transports, created_at'
 const KEY_COLS = 'id, user_id, name, secret_hash, created_at, last_used_at, revoked'
+// Same columns, qualified for the api_keys↔users JOIN in findActiveKeyByHash.
+const KEY_COLS_ALIASED = 'k.id, k.user_id, k.name, k.secret_hash, k.created_at, k.last_used_at, k.revoked'
 
 // ---- Users ---------------------------------------------------------------
 
@@ -62,9 +69,16 @@ export async function createUser(
 
 export async function getUser(db: D1Database, id: string): Promise<UserRow | null> {
   return (
-    (await db.prepare(`SELECT ${USER_COLS} FROM users WHERE id = ?1`).bind(id).first<UserRow>()) ??
+    (await db.prepare(`SELECT ${USER_SELECT_COLS} FROM users WHERE id = ?1`).bind(id).first<UserRow>()) ??
     null
   )
+}
+
+// Operator hook: set or clear the ban flag. Returns false when the user
+// doesn't exist. Banned users can't log in and their keys stop verifying.
+export async function setUserBanned(db: D1Database, id: string, banned: boolean): Promise<boolean> {
+  const res = await db.prepare('UPDATE users SET banned = ?1 WHERE id = ?2').bind(banned ? 1 : 0, id).run()
+  return res.meta.changes > 0
 }
 
 // Operator reset: passkey loss = account loss. Wipes user + credentials + keys
@@ -160,11 +174,17 @@ export async function listApiKeysByUser(db: D1Database, userId: string): Promise
 }
 
 // Verify path: hash lookup, revoked keys are invisible (revocation is a soft
-// flag, effective immediately — no cache to invalidate).
+// flag, effective immediately — no cache to invalidate). Also invisible: keys
+// owned by a banned user — banning an account kills its existing keys in the
+// same query, no per-key bookkeeping.
 export async function findActiveKeyByHash(db: D1Database, secretHash: string): Promise<ApiKeyRow | null> {
   return (
     (await db
-      .prepare(`SELECT ${KEY_COLS} FROM api_keys WHERE secret_hash = ?1 AND revoked = 0`)
+      .prepare(
+        `SELECT ${KEY_COLS_ALIASED}
+         FROM api_keys k JOIN users u ON u.id = k.user_id
+         WHERE k.secret_hash = ?1 AND k.revoked = 0 AND u.banned = 0`,
+      )
       .bind(secretHash)
       .first<ApiKeyRow>()) ?? null
   )

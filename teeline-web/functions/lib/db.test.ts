@@ -8,7 +8,7 @@
 // pages dev`'s local D1 *does* work — this only affects the library path.
 // better-sqlite3 is deterministic, fast and CI-friendly; the real D1 path is
 // exercised by the deploy-time migrations and the Phase 3 verify e2e.
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   addCredential,
   consumeChallenge,
@@ -24,6 +24,7 @@ import {
   listApiKeysByUser,
   listCredentialsByUser,
   revokeKey,
+  setUserBanned,
   timingSafeEqual,
   touchKeyLastUsed,
   updateCredentialCounter,
@@ -34,15 +35,11 @@ import Database from 'better-sqlite3'
 
 let db: D1Like
 
-beforeAll(() => {
-  db = makeD1(new Database(':memory:'))
-})
-
 beforeEach(() => {
-  // Fresh schema per test; the SQL is idempotent (IF NOT EXISTS), which also
-  // proves re-applying migrations is safe.
+  // Fresh in-memory DB per test. Migrations are applied once per DB — they
+  // are NOT idempotent (0003 is a plain ALTER TABLE ADD COLUMN).
+  db = makeD1(new Database(':memory:'))
   db.exec(SCHEMA)
-  db.exec('DELETE FROM api_keys; DELETE FROM credentials; DELETE FROM challenges; DELETE FROM users;')
 })
 
 const NOW = 1_752_000_000_000
@@ -66,6 +63,17 @@ describe('users', () => {
     expect(await getUser(db as never, 'u1')).toBeNull()
     expect(await getCredentialById(db as never, 'c1')).toBeNull()
     expect(await listApiKeysByUser(db as never, 'u1')).toEqual([])
+  })
+
+  it('new users default to not banned; setUserBanned flips the flag', async () => {
+    await createUser(db as never, { id: 'u1', createdAt: NOW })
+    expect((await getUser(db as never, 'u1'))?.banned).toBe(0)
+    expect(await setUserBanned(db as never, 'u1', true)).toBe(true)
+    expect((await getUser(db as never, 'u1'))?.banned).toBe(1)
+    expect(await setUserBanned(db as never, 'u1', false)).toBe(true)
+    expect((await getUser(db as never, 'u1'))?.banned).toBe(0)
+    // unknown user → no-op
+    expect(await setUserBanned(db as never, 'ghost', true)).toBe(false)
   })
 })
 

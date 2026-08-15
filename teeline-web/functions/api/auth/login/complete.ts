@@ -99,6 +99,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     // rejected a lower counter, so persisting the new one is safe and atomic.
     await updateCredentialCounter(env.DB, credential.id, verification.authenticationInfo.newCounter)
 
+    // Banned account: the ceremony succeeded but access is denied. The counter
+    // is updated above so an eventual unban leaves the credential usable.
+    if (user.banned) return forbidden('Account is banned')
+
     const token = await createSessionToken(env.SESSION_SECRET, user.id)
     return json(
       { user: { id: user.id, displayName: user.display_name, createdAt: user.created_at } },

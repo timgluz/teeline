@@ -1,18 +1,16 @@
 // Rate limiter tests against the D1 shim (real SQLite).
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { makeD1, SCHEMA, type D1Like } from './test/sqlite-d1'
 import Database from 'better-sqlite3'
 import { checkRateLimit, cleanupRateLimits } from './ratelimit'
 
 let db: D1Like
 
-beforeAll(() => {
-  db = makeD1(new Database(':memory:'))
-})
-
 beforeEach(() => {
+  // Fresh in-memory DB per test — migrations are not idempotent (0003 is a
+  // plain ALTER TABLE ADD COLUMN).
+  db = makeD1(new Database(':memory:'))
   db.exec(SCHEMA)
-  db.exec('DELETE FROM rate_limits;')
 })
 
 const NOW = 1_752_000_000_000

@@ -1,5 +1,5 @@
 // Handler-level rate limiting: a single IP flooding an auth endpoint gets 429.
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { makeD1, SCHEMA, type D1Like } from '../../lib/test/sqlite-d1'
 import Database from 'better-sqlite3'
 import { onRequestPost as registerBegin } from './register/begin'
@@ -11,13 +11,11 @@ function ctx(request: Request) {
   return { request, env: { ...env, DB: shim } } as never
 }
 
-beforeAll(() => {
-  shim = makeD1(new Database(':memory:'))
-})
-
 beforeEach(() => {
+  // Fresh in-memory DB per test — migrations are not idempotent (0003 is a
+  // plain ALTER TABLE ADD COLUMN).
+  shim = makeD1(new Database(':memory:'))
   shim.exec(SCHEMA)
-  shim.exec('DELETE FROM rate_limits; DELETE FROM challenges;')
 })
 
 describe('register/begin rate limit', () => {
