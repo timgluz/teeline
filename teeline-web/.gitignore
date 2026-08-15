@@ -30,3 +30,5 @@ test-results/
 
 # Wrangler local state (Pages Functions dev)
 .wrangler
+.dev.vars
+.e2e-state

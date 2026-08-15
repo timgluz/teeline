@@ -22,13 +22,13 @@ function stubAuthFetch() {
       return new Response(JSON.stringify({ options: { challenge: 'reg-challenge' }, nonce: 'n1' }), { status: 201 })
     }
     if (path.endsWith('/register/complete')) {
-      return new Response(JSON.stringify({ id: 'u1', displayName: null, createdAt: 1 }), { status: 201 })
+      return new Response(JSON.stringify({ user: { id: 'u1', displayName: null, createdAt: 1 } }), { status: 201 })
     }
     if (path.endsWith('/login/begin')) {
       return new Response(JSON.stringify({ options: { challenge: 'login-challenge' }, nonce: 'n2' }), { status: 201 })
     }
     if (path.endsWith('/login/complete')) {
-      return new Response(JSON.stringify({ id: 'u1', displayName: 'Tim', createdAt: 1 }), { status: 200 })
+      return new Response(JSON.stringify({ user: { id: 'u1', displayName: 'Tim', createdAt: 1 } }), { status: 200 })
     }
     if (path.endsWith('/me')) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })

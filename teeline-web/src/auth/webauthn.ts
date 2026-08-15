@@ -43,10 +43,11 @@ export async function registerPasskey(displayName?: string): Promise<User> {
     'Passkey creation was cancelled',
   )
 
-  return apiFetch<User>('/api/auth/register/complete', {
+  const { user } = await apiFetch<{ user: User }>('/api/auth/register/complete', {
     method: 'POST',
     body: JSON.stringify({ nonce, credential: response }),
   })
+  return user
 }
 
 /** Sign in with an existing passkey (discoverable credentials — no username). */
@@ -64,16 +65,18 @@ export async function loginWithPasskey(): Promise<User> {
     'Passkey sign-in was cancelled',
   )
 
-  return apiFetch<User>('/api/auth/login/complete', {
+  const { user } = await apiFetch<{ user: User }>('/api/auth/login/complete', {
     method: 'POST',
     body: JSON.stringify({ nonce, credential: response }),
   })
+  return user
 }
 
 /** Current user, or null when not signed in. */
 export async function me(): Promise<User | null> {
   try {
-    return await apiFetch<User>('/api/auth/me')
+    const { user } = await apiFetch<{ user: User }>('/api/auth/me')
+    return user
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) return null
     throw err

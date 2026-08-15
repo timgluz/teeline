@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
+  // tests/auth runs under playwright.auth.config.ts (wrangler pages dev +
+  // WebAuthn virtual authenticator) — not the astro dev server here.
+  testIgnore: '**/auth/**',
   timeout: 30_000,
   use: {
     baseURL: 'http://localhost:4321',
