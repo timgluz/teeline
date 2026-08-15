@@ -31,8 +31,16 @@ pub struct ServiceVerifier {
 
 impl ServiceVerifier {
     pub fn new(service_url: impl Into<Arc<str>>, shared_secret: impl Into<Arc<str>>) -> Self {
+        let service_url: Arc<str> = service_url.into();
+        let trimmed = service_url.trim_end_matches('/');
+        if !trimmed.starts_with("https://") {
+            tracing::warn!(
+                url = %trimmed,
+                "AUTH_SERVICE_URL is not HTTPS — API keys and the shared secret would be sent in cleartext"
+            );
+        }
         Self {
-            service_url: service_url.into(),
+            service_url: trimmed.into(),
             shared_secret: shared_secret.into(),
             client: reqwest::Client::builder()
                 // A slow/hung auth-service response must not tie up our
@@ -84,13 +92,28 @@ impl ApiKeyVerifier for ServiceVerifier {
             .json(&serde_json::json!({ "secret": key }))
             .send()
             .await
+            .map_err(|e| {
+                // An auth-service outage must not be indistinguishable from a
+                // bad key: fail closed (None → 401), but log loudly.
+                tracing::warn!(error = %e, "auth service verify request failed");
+                e
+            })
             .ok()?;
 
         if !resp.status().is_success() {
-            return None; // secret unknown/revoked at the auth service (404)
+            // Expected rejection: unknown/revoked key at the auth service (404).
+            tracing::debug!(status = %resp.status(), "auth service rejected key");
+            return None;
         }
 
-        let body: VerifyResponse = resp.json().await.ok()?;
+        let body: VerifyResponse = resp
+            .json()
+            .await
+            .map_err(|e| {
+                tracing::warn!(error = %e, "failed to parse auth service response");
+                e
+            })
+            .ok()?;
         decide(body)
     }
 }
@@ -169,11 +192,21 @@ mod tests {
 
     // ---- ServiceVerifier against a stub auth service ---------------------
 
+    /// Aborts the stub server on drop so a panicking test can't leak the task.
+    struct ServerGuard(tokio::task::JoinHandle<()>);
+    impl Drop for ServerGuard {
+        fn drop(&mut self) {
+            self.0.abort();
+        }
+    }
+
     /// Minimal stub of the auth service's verify endpoint so the verifier is
-    /// exercised over a real HTTP round-trip (no mocks).
+    /// exercised over a real HTTP round-trip (no mocks). The stub enforces the
+    /// X-Auth-Secret header, so a verifier that stops sending it fails tests.
     async fn stub_service(
+        expected_secret: &'static str,
         respond: impl Fn(&str) -> (u16, serde_json::Value) + Send + Sync + 'static,
-    ) -> (String, tokio::task::JoinHandle<()>) {
+    ) -> (String, ServerGuard) {
         use axum::{
             Json, Router,
             extract::State,
@@ -185,9 +218,14 @@ mod tests {
         type Responder = Arc<dyn Fn(&str) -> (u16, serde_json::Value) + Send + Sync>;
 
         async fn handler(
-            State(respond): State<Responder>,
+            State((respond, expected_secret)): State<(Responder, &'static str)>,
+            headers: axum::http::HeaderMap,
             Json(body): Json<serde_json::Value>,
         ) -> Response {
+            let presented = headers.get("X-Auth-Secret").and_then(|v| v.to_str().ok());
+            if presented != Some(expected_secret) {
+                return StatusCode::UNAUTHORIZED.into_response();
+            }
             let key = body.get("secret").and_then(|v| v.as_str()).unwrap_or("");
             let (status, payload) = respond(key);
             let mut resp = Json(payload).into_response();
@@ -198,18 +236,18 @@ mod tests {
 
         let router = Router::new()
             .route("/api/auth/keys/verify", post(handler))
-            .with_state(Arc::new(respond) as Responder);
+            .with_state((Arc::new(respond) as Responder, expected_secret));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let handle = tokio::spawn(async move {
             axum::serve(listener, router).await.unwrap();
         });
-        (format!("http://{}", addr), handle)
+        (format!("http://{}", addr), ServerGuard(handle))
     }
 
     #[tokio::test]
     async fn service_verifier_accepts_valid_key() {
-        let (base, server) = stub_service(|key| {
+        let (base, _server) = stub_service("shared-secret",|key| {
             if key == "ak_validkey123" {
                 (200, serde_json::json!({ "subject": "user_abc", "revoked": false, "expired": false }))
             } else {
@@ -224,12 +262,11 @@ mod tests {
                 subject: "user_abc".to_string()
             })
         );
-        server.abort();
     }
 
     #[tokio::test]
     async fn service_verifier_rejects_unknown_key() {
-        let (base, server) = stub_service(|_| {
+        let (base, _server) = stub_service("shared-secret", |_| {
             (
                 404,
                 serde_json::json!({ "error": "Unknown or revoked key" }),
@@ -238,13 +275,12 @@ mod tests {
         .await;
         let verifier = ServiceVerifier::new(base, "shared-secret");
         assert_eq!(verifier.verify("ak_unknownkey123").await, None);
-        server.abort();
     }
 
     #[tokio::test]
     async fn service_verifier_rejects_revoked_via_body_despite_200() {
         // The service returns 200 but flags revoked — decide() must reject.
-        let (base, server) = stub_service(|_| {
+        let (base, _server) = stub_service("shared-secret", |_| {
             (
                 200,
                 serde_json::json!({ "subject": "user_abc", "revoked": true, "expired": false }),
@@ -253,12 +289,26 @@ mod tests {
         .await;
         let verifier = ServiceVerifier::new(base, "shared-secret");
         assert_eq!(verifier.verify("ak_revoked12345").await, None);
-        server.abort();
+    }
+
+    #[tokio::test]
+    async fn service_verifier_wrong_shared_secret_is_rejected() {
+        // The stub 401s when the X-Auth-Secret header doesn't match, proving
+        // the verifier actually sends it.
+        let (base, _server) = stub_service("expected-secret", |_| {
+            (
+                200,
+                serde_json::json!({ "subject": "x", "revoked": false, "expired": false }),
+            )
+        })
+        .await;
+        let verifier = ServiceVerifier::new(base, "wrong-secret");
+        assert_eq!(verifier.verify("ak_anything123456").await, None);
     }
 
     #[tokio::test]
     async fn service_verifier_shape_check_skips_network() {
-        let (base, server) = stub_service(|_| {
+        let (base, _server) = stub_service("shared-secret", |_| {
             (
                 200,
                 serde_json::json!({ "subject": "x", "revoked": false, "expired": false }),
@@ -267,6 +317,5 @@ mod tests {
         .await;
         let verifier = ServiceVerifier::new(base, "shared-secret");
         assert_eq!(verifier.verify("not-a-key").await, None);
-        server.abort();
     }
 }

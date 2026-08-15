@@ -104,9 +104,9 @@ const AUTH_EXEMPT_PATH: &str = "/api/v1/health";
 
 /// Wraps `router` so every request must present a valid credential, except
 /// `AUTH_EXEMPT_PATH`. A request is authorized if it presents either the
-/// static break-glass `token` (operator credential, works even if Clerk is
-/// unreachable) or a key that `verifier` confirms is a live, non-revoked,
-/// non-expired Clerk-issued API key. Uses `route_layer` (not `layer`) so
+/// static break-glass `token` (operator credential, works even if the auth
+/// service is unreachable) or a key that `verifier` confirms is a live,
+/// non-revoked, non-expired API key. Uses `route_layer` (not `layer`) so
 /// requests that don't match any route on `router` fall through to axum's
 /// normal 404 instead of getting a 401 — `.layer()` would also wrap the
 /// router's fallback, turning every unmatched path into a 401 (axum's
@@ -139,7 +139,7 @@ pub fn require_auth(
                 if let Some(presented) = extract_token(&headers)
                     && let Some(verified) = verifier.verify(presented).await
                 {
-                    tracing::info!(subject = %verified.subject, "request authorized via Clerk API key");
+                    tracing::info!(subject = %verified.subject, "request authorized via service API key");
                     return next.run(request).await;
                 }
                 ApiError::Unauthorized.into_response()

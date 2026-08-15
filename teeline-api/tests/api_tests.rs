@@ -527,7 +527,7 @@ async fn solvers_with_static_break_glass_key_still_works_alongside_service_verif
 }
 
 #[tokio::test]
-async fn solvers_with_neither_static_nor_clerk_credential_returns_401() {
+async fn solvers_with_neither_static_nor_service_credential_returns_401() {
     let app =
         make_authed_app_with_verifier(service_verifier_with(SERVICE_TEST_KEY, "user_test123"));
     let resp = app.oneshot(get("/api/v1/solvers")).await.unwrap();

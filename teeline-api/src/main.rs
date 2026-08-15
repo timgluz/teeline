@@ -39,7 +39,10 @@ fn api_key() -> Option<String> {
 fn auth_service_url() -> Option<String> {
     std::env::var("AUTH_SERVICE_URL")
         .ok()
-        .filter(|v| !v.trim().is_empty())
+        // Trim and return the trimmed value — a URL with stray whitespace
+        // (common when copy-pasting secrets) must not reach the HTTP client.
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 /// Returns the configured shared secret for the auth service's internal
@@ -47,7 +50,9 @@ fn auth_service_url() -> Option<String> {
 fn auth_service_secret() -> Option<String> {
     std::env::var("AUTH_SERVICE_SECRET")
         .ok()
-        .filter(|token| !token.is_empty())
+        // Whitespace-only secret would infer Service mode with a useless key —
+        // treat it as unset (same empty-string-safety as `api_key()`).
+        .filter(|token| !token.trim().is_empty())
 }
 
 /// How the API authenticates requests.
@@ -152,10 +157,12 @@ async fn main() -> anyhow::Result<()> {
             );
         }
         AuthMode::Service => {
-            let url = auth_service_url()
-                .expect("AUTH_SERVICE_URL is required when TEELINE_AUTH_MODE=service");
-            let secret = auth_service_secret()
-                .expect("AUTH_SERVICE_SECRET is required when TEELINE_AUTH_MODE=service");
+            let url = auth_service_url().ok_or_else(|| {
+                anyhow::anyhow!("AUTH_SERVICE_URL is required when TEELINE_AUTH_MODE=service")
+            })?;
+            let secret = auth_service_secret().ok_or_else(|| {
+                anyhow::anyhow!("AUTH_SERVICE_SECRET is required when TEELINE_AUTH_MODE=service")
+            })?;
             tracing::info!(
                 static_key = static_key.is_some(),
                 "API auth: verifying keys via auth service"
@@ -211,9 +218,9 @@ mod tests {
         assert_eq!(auth_mode_with(None, true, true), AuthMode::Service);
         // only a static key → Breakglass
         assert_eq!(auth_mode_with(None, false, true), AuthMode::Breakglass);
-        // nothing → Disabled (back-compat no-auth MVP)
-        assert_eq!(auth_mode_with(None, false, false), AuthMode::Disabled);
-        // service URL without secret → not "service", so falls through
+        // nothing → Disabled (back-compat no-auth MVP). Note: "service URL
+        // without secret" also lands here because has_service already encodes
+        // "URL AND secret both present".
         assert_eq!(auth_mode_with(None, false, false), AuthMode::Disabled);
     }
 }
