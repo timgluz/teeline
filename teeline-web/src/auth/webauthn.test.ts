@@ -3,8 +3,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { loginWithPasskey, me, registerPasskey } from './webauthn'
 
+const mocks = vi.hoisted(() => ({
+  startRegistration: vi.fn(),
+  startAuthentication: vi.fn(),
+}))
+vi.mock('@simplewebauthn/browser', () => mocks)
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.clearAllMocks()
 })
 
 // fetch stub: route begin/complete based on the URL
@@ -30,52 +37,49 @@ function stubAuthFetch() {
   }))
 }
 
-function stubCredentials() {
-  const credential = {
-    id: 'cred-1',
-    type: 'public-key',
-    rawId: 'raw',
-    response: { clientDataJSON: 'c', attestationObject: 'a' },
-    getClientExtensionResults: () => ({}),
-  } as unknown as PublicKeyCredential
-  const get = vi.fn(async (_opts: CredentialRequestOptions) => credential)
-  const create = vi.fn(async (_opts: CredentialCreationOptions) => credential)
-  vi.stubGlobal('navigator', { credentials: { get, create } })
-  return { get, create }
-}
-
 describe('registerPasskey', () => {
-  it('runs begin → credentials.create → complete and returns the user', async () => {
+  it('runs begin → startRegistration → complete and returns the user', async () => {
     stubAuthFetch()
-    const { create } = stubCredentials()
+    mocks.startRegistration.mockResolvedValue({ id: 'cred-1', rawId: 'raw', type: 'public-key', response: { clientDataJSON: 'c', attestationObject: 'a' }, clientExtensionResults: {} })
     const user = await registerPasskey('Tim')
     expect(user).toMatchObject({ id: 'u1' })
-    expect(create).toHaveBeenCalledTimes(1)
-    const opts = create.mock.calls[0][0] as CredentialCreationOptions
-    expect(opts.publicKey).toBeDefined()
+    expect(mocks.startRegistration).toHaveBeenCalledTimes(1)
+    expect(mocks.startRegistration.mock.calls[0][0].optionsJSON.challenge).toBe('reg-challenge')
   })
 
-  it('throws when the user cancels the ceremony', async () => {
+  it('maps user cancellation to a friendly error', async () => {
     stubAuthFetch()
-    vi.stubGlobal('navigator', { credentials: { get: vi.fn(), create: vi.fn(async () => null) } })
-    await expect(registerPasskey()).rejects.toThrow('cancelled')
+    mocks.startRegistration.mockRejectedValue(new DOMException('The operation either timed out or was not allowed.', 'NotAllowedError'))
+    await expect(registerPasskey()).rejects.toThrow('Passkey creation was cancelled')
+  })
+
+  it('maps unexpected failures to a generic error', async () => {
+    stubAuthFetch()
+    mocks.startRegistration.mockRejectedValue(new Error('boom'))
+    await expect(registerPasskey()).rejects.toThrow('please try again')
   })
 })
 
 describe('loginWithPasskey', () => {
-  it('runs begin → credentials.get → complete and returns the user', async () => {
+  it('runs begin → startAuthentication → complete and returns the user', async () => {
     stubAuthFetch()
-    const { get } = stubCredentials()
+    mocks.startAuthentication.mockResolvedValue({ id: 'cred-1', rawId: 'raw', type: 'public-key', response: { clientDataJSON: 'c', authenticatorData: 'a', signature: 's' }, clientExtensionResults: {} })
     const user = await loginWithPasskey()
     expect(user).toMatchObject({ id: 'u1', displayName: 'Tim' })
-    expect(get).toHaveBeenCalledTimes(1)
+    expect(mocks.startAuthentication).toHaveBeenCalledTimes(1)
+    expect(mocks.startAuthentication.mock.calls[0][0].optionsJSON.challenge).toBe('login-challenge')
+  })
+
+  it('maps user cancellation to a friendly error', async () => {
+    stubAuthFetch()
+    mocks.startAuthentication.mockRejectedValue(new DOMException('aborted', 'AbortError'))
+    await expect(loginWithPasskey()).rejects.toThrow('Passkey sign-in was cancelled')
   })
 })
 
 describe('me', () => {
   it('returns null on 401 (not signed in)', async () => {
     stubAuthFetch()
-    stubCredentials()
     await expect(me()).resolves.toBeNull()
   })
 })

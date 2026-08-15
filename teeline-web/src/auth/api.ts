@@ -13,10 +13,15 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const { headers, ...rest } = init
+  // Destructure `credentials` out so callers cannot override the same-origin
+  // policy enforced below (see header comment).
+  const { headers, credentials: _enforced, ...rest } = init
   const res = await fetch(path, {
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...(headers as Record<string, string>) },
+    headers: {
+      'Content-Type': 'application/json',
+      ...Object.fromEntries(new Headers(headers)),
+    },
     ...rest,
   })
 

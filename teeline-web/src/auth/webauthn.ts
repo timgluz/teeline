@@ -1,6 +1,12 @@
-// Client-side WebAuthn ceremony helpers — native navigator.credentials, no
-// library needed. The server (Cloudflare Pages Functions) stores the
-// challenge and verifies the attestation/assertion.
+// Client-side WebAuthn ceremony helpers.
+//
+// Uses @simplewebauthn/browser — the client half of the same library as the
+// server (Pages Functions). It handles the two fiddly conversions that
+// native navigator.credentials does NOT: decoding the server's base64url
+// JSON options into WebAuthn-native BufferSources (challenge, user.id,
+// allowCredentials ids), and serializing the returned credential back to
+// the base64url JSON the server's verify*Response() expects.
+import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 import { ApiError, apiFetch } from './api'
 
 export interface User {
@@ -9,48 +15,58 @@ export interface User {
   createdAt: number
 }
 
-/** Serialize a PublicKeyCredential to the JSON shape SimpleWebAuthn expects. */
-function credentialToJSON(cred: PublicKeyCredential): unknown {
-  return JSON.parse(JSON.stringify(cred))
+/** Map common WebAuthn failures to user-friendly messages. */
+async function withCancellation<T>(fn: () => Promise<T>, cancelledMessage: string): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    // User dismissed the prompt or timed out — treat as a graceful cancel.
+    if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+      throw new Error(cancelledMessage)
+    }
+    throw new Error('Passkey operation failed — please try again')
+  }
 }
 
 /** First-time registration: create a passkey on this origin → session. */
 export async function registerPasskey(displayName?: string): Promise<User> {
   const { options, nonce } = await apiFetch<{
-    options: PublicKeyCredentialCreationOptions
+    options: Parameters<typeof startRegistration>[0]['optionsJSON']
     nonce: string
   }>('/api/auth/register/begin', {
     method: 'POST',
     body: JSON.stringify({ displayName }),
   })
 
-  const credential = await navigator.credentials.create({ publicKey: options })
-  if (!credential) throw new Error('Passkey creation was cancelled')
-  const publicKeyCredential = credential as PublicKeyCredential // WebAuthn create/get with publicKey options returns a PublicKeyCredential
+  const response = await withCancellation(
+    () => startRegistration({ optionsJSON: options }),
+    'Passkey creation was cancelled',
+  )
 
   return apiFetch<User>('/api/auth/register/complete', {
     method: 'POST',
-    body: JSON.stringify({ nonce, credential: credentialToJSON(publicKeyCredential) }),
+    body: JSON.stringify({ nonce, credential: response }),
   })
 }
 
 /** Sign in with an existing passkey (discoverable credentials — no username). */
 export async function loginWithPasskey(): Promise<User> {
   const { options, nonce } = await apiFetch<{
-    options: PublicKeyCredentialRequestOptions
+    options: Parameters<typeof startAuthentication>[0]['optionsJSON']
     nonce: string
   }>('/api/auth/login/begin', {
     method: 'POST',
-    body: '{}',
+    body: JSON.stringify({}),
   })
 
-  const credential = await navigator.credentials.get({ publicKey: options })
-  if (!credential) throw new Error('Passkey sign-in was cancelled')
-  const publicKeyCredential = credential as PublicKeyCredential
+  const response = await withCancellation(
+    () => startAuthentication({ optionsJSON: options }),
+    'Passkey sign-in was cancelled',
+  )
 
   return apiFetch<User>('/api/auth/login/complete', {
     method: 'POST',
-    body: JSON.stringify({ nonce, credential: credentialToJSON(publicKeyCredential) }),
+    body: JSON.stringify({ nonce, credential: response }),
   })
 }
 

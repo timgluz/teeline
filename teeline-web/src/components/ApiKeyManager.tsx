@@ -57,8 +57,13 @@ export default function ApiKeyManager() {
         return
       }
       setUser(u)
-      await refreshKeys()
       setView('signedin')
+      try {
+        await refreshKeys()
+      } catch (err) {
+        // Keys list is non-critical; the user is still authenticated.
+        setError(messageOf(err))
+      }
     } catch (err) {
       setError(messageOf(err))
       setView('anonymous')
@@ -102,11 +107,16 @@ export default function ApiKeyManager() {
       const key = await apiFetch<FreshSecret>('/api/auth/keys', { method: 'POST', body: '{}' })
       setFresh(key)
       setCopied(false)
-      await refreshKeys()
+      try {
+        await refreshKeys()
+      } catch {
+        // Key was created and shown; the list refresh is non-critical.
+      }
     })
 
   const onRevoke = (id: string) =>
     run(async () => {
+      if (!window.confirm('Revoke this API key? This cannot be undone.')) return
       await apiFetch(`/api/auth/keys/${id}`, { method: 'DELETE' })
       await refreshKeys()
     })
@@ -193,6 +203,7 @@ export default function ApiKeyManager() {
                 <button class={`${btnBase} bg-accent px-4 py-1 text-sm text-white hover:bg-accent/90`} onClick={onCopySecret}>
                   {copied ? 'Copied!' : 'Copy to clipboard'}
                 </button>
+                {copied && <span class="sr-only" role="status">API key copied to clipboard</span>}
                 <button class={`${btnBase} border border-border px-4 py-1 text-sm text-text hover:border-accent hover:text-accent`} onClick={() => setFresh(null)}>
                   I've saved it
                 </button>
@@ -230,6 +241,7 @@ export default function ApiKeyManager() {
                           class="rounded px-2 py-1 text-xs text-negative hover:bg-negative/10 disabled:opacity-50"
                           onClick={() => onRevoke(k.id)}
                           disabled={busy}
+                          aria-label={`Revoke key ${k.name ?? k.id.slice(0, 10)}`}
                         >
                           Revoke
                         </button>

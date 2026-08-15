@@ -38,16 +38,6 @@ const jsonLd = {
 
     <ApiKeyManager client:visible />
 
-    <h2>Using your key</h2>
-    <p>Send it as a bearer token on every request:</p>
-    <pre><code>curl -H "Authorization: Bearer ak_your_key_here" \
-  https://api.tspsolver.com/api/v1/solvers</code></pre>
-    <p>
-      An <code>X-Api-Key</code> header works the same way, if that fits your tooling better:
-    </p>
-    <pre><code>curl -H "X-Api-Key: ak_your_key_here" \
-  https://api.tspsolver.com/api/v1/solvers</code></pre>
-
     <h2>Save it now — it's shown once</h2>
     <p>
       Your new key (it looks like <code>ak_&hellip;</code>) is revealed exactly once, right after
@@ -58,6 +48,16 @@ const jsonLd = {
       before you refresh or leave the page. If you lose it, there's no way to recover it — revoke it
       on this page and create a new one.
     </p>
+
+    <h2>Using your key</h2>
+    <p>Send it as a bearer token on every request:</p>
+    <pre><code>curl -H "Authorization: Bearer ak_your_key_here" \
+  https://api.tspsolver.com/api/v1/solvers</code></pre>
+    <p>
+      An <code>X-Api-Key</code> header works the same way, if that fits your tooling better:
+    </p>
+    <pre><code>curl -H "X-Api-Key: ak_your_key_here" \
+  https://api.tspsolver.com/api/v1/solvers</code></pre>
 
     <h2>Managing or revoking a key</h2>
     <p>
