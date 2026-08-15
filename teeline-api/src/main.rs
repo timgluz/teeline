@@ -37,22 +37,26 @@ fn api_key() -> Option<String> {
 /// Returns the configured auth service URL (WebAuthn auth service, e.g.
 /// `https://tspsolver.com`), if any. Same empty-string-safety as `api_key()`.
 fn auth_service_url() -> Option<String> {
-    std::env::var("AUTH_SERVICE_URL")
-        .ok()
-        // Trim and return the trimmed value — a URL with stray whitespace
-        // (common when copy-pasting secrets) must not reach the HTTP client.
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
+    auth_service_url_from(std::env::var("AUTH_SERVICE_URL").ok())
+}
+
+/// Pure for testing; trims and returns the trimmed value — a URL with stray
+/// whitespace (common when copy-pasting secrets) must not reach the HTTP
+/// client.
+fn auth_service_url_from(raw: Option<String>) -> Option<String> {
+    raw.map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
 }
 
 /// Returns the configured shared secret for the auth service's internal
 /// verify endpoint, if any. Same empty-string-safety as `api_key()`.
 fn auth_service_secret() -> Option<String> {
-    std::env::var("AUTH_SERVICE_SECRET")
-        .ok()
-        // Whitespace-only secret would infer Service mode with a useless key —
-        // treat it as unset (same empty-string-safety as `api_key()`).
-        .filter(|token| !token.trim().is_empty())
+    auth_service_secret_from(std::env::var("AUTH_SERVICE_SECRET").ok())
+}
+
+/// Pure for testing. A whitespace-only secret would infer Service mode with a
+/// useless key — treat it as unset (same empty-string-safety as `api_key()`).
+fn auth_service_secret_from(raw: Option<String>) -> Option<String> {
+    raw.filter(|token| !token.trim().is_empty())
 }
 
 /// How the API authenticates requests.
@@ -222,5 +226,27 @@ mod tests {
         // without secret" also lands here because has_service already encodes
         // "URL AND secret both present".
         assert_eq!(auth_mode_with(None, false, false), AuthMode::Disabled);
+    }
+
+    #[test]
+    fn auth_service_url_is_trimmed() {
+        assert_eq!(
+            auth_service_url_from(Some("  https://tspsolver.com  ".into())),
+            Some("https://tspsolver.com".into())
+        );
+        assert_eq!(auth_service_url_from(Some("   ".into())), None);
+        assert_eq!(auth_service_url_from(Some("".into())), None);
+        assert_eq!(auth_service_url_from(None), None);
+    }
+
+    #[test]
+    fn auth_service_secret_ignores_whitespace_only() {
+        assert_eq!(
+            auth_service_secret_from(Some("s3cr3t".into())),
+            Some("s3cr3t".into())
+        );
+        assert_eq!(auth_service_secret_from(Some("   ".into())), None);
+        assert_eq!(auth_service_secret_from(Some("".into())), None);
+        assert_eq!(auth_service_secret_from(None), None);
     }
 }

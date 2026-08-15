@@ -307,6 +307,19 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn service_verifier_handles_service_unreachable() {
+        // Bind a listener and drop it so the port is closed — the verify
+        // request fails at the network layer (the warn! path), and verify()
+        // must return None (fail closed).
+        let addr = {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            listener.local_addr().unwrap()
+        };
+        let verifier = ServiceVerifier::new(format!("http://{addr}"), "shared-secret");
+        assert_eq!(verifier.verify("ak_whatever123456").await, None);
+    }
+
+    #[tokio::test]
     async fn service_verifier_shape_check_skips_network() {
         let (base, _server) = stub_service("shared-secret", |_| {
             (
