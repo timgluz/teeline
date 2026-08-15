@@ -2,15 +2,13 @@
 // D1-compatible shim. D1 *is* SQLite, so the SQL in db.ts runs unchanged
 // (numbered ?NNN params are normalized to anonymous ? — same bind order).
 //
-// Why not miniflare's D1 emulation: the workerd build shipped with
-// wrangler 4.119 fails to start with `cloudflare-internal:d1-api` wrapped
-// bindings (workers-sdk#4077 / #10114). better-sqlite3 is deterministic,
-// fast and CI-friendly; the real D1 path is exercised by the deploy-time
-// migrations and the Phase 3 verify e2e.
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+// Why not miniflare's standalone D1 emulation: the miniflare library build
+// shipped with wrangler 4.119 fails to start D1 wrapped bindings
+// (cloudflare-internal:d1-api; workers-sdk#4077 / #10114). Note `wrangler
+// pages dev`'s local D1 *does* work — this only affects the library path.
+// better-sqlite3 is deterministic, fast and CI-friendly; the real D1 path is
+// exercised by the deploy-time migrations and the Phase 3 verify e2e.
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import Database from 'better-sqlite3'
 import {
   addCredential,
   consumeChallenge,
@@ -31,53 +29,8 @@ import {
   updateCredentialCounter,
 } from './db'
 
-const SCHEMA = readFileSync(join(import.meta.dirname, '../../migrations/0001_init.sql'), 'utf8')
-
-// ---- Minimal D1-compatible shim over better-sqlite3 ---------------------
-
-type D1Like = {
-  exec(sql: string): void
-  prepare(sql: string): {
-    bind(...params: unknown[]): {
-      first<T>(col?: string): T | null
-      all<T>(): { results: T[] }
-      run(): { meta: { changes: number } }
-    }
-  }
-  batch(stmts: { run(): { meta: { changes: number } } }[]): { meta: { changes: number } }[]
-}
-
-function makeD1(db: Database.Database): D1Like {
-  return {
-    exec(sql) {
-      db.exec(sql)
-    },
-    prepare(sql) {
-      // D1's ?NNN numbering → SQLite anonymous ? (identical bind order;
-      // db.ts never reuses a numbered param, so this is lossless).
-      const stmt = db.prepare(sql.replace(/\?(\d+)/g, '?'))
-      return {
-        bind(...params) {
-          return {
-            first<T>(): T | null {
-              return (stmt.get(...params) as T | undefined) ?? null
-            },
-            all<T>(): { results: T[] } {
-              return { results: stmt.all(...params) as T[] }
-            },
-            run() {
-              const info = stmt.run(...params)
-              return { meta: { changes: info.changes } }
-            },
-          }
-        },
-      }
-    },
-    batch(stmts) {
-      return db.transaction(() => stmts.map((s) => s.run()))()
-    },
-  }
-}
+import { makeD1, SCHEMA, type D1Like } from './test/sqlite-d1'
+import Database from 'better-sqlite3'
 
 let db: D1Like
 
@@ -209,5 +162,15 @@ describe('crypto helpers', () => {
     expect(timingSafeEqual('abc', 'abd')).toBe(false)
     expect(timingSafeEqual('abc', 'abcd')).toBe(false) // length mismatch short-circuits
     expect(timingSafeEqual('', '')).toBe(true)
+  })
+})
+
+describe('d1 shim', () => {
+  it('first(col) returns a single column value like real D1', async () => {
+    await createUser(db as never, { id: 'u1', displayName: 'Tim', createdAt: NOW })
+    const name = await db.prepare('SELECT id, display_name FROM users WHERE id = ?1').bind('u1').first<{ display_name: string }>('display_name')
+    expect(name).toBe('Tim')
+    const missing = await db.prepare('SELECT id, display_name FROM users WHERE id = ?1').bind('nope').first('display_name')
+    expect(missing).toBeNull()
   })
 })
