@@ -247,8 +247,20 @@ export default function SomExplainer() {
 
 const CSS = `
 .som-root {
-  font-family: system-ui, sans-serif;
-  max-width: 860px;
+  --accent: #7c3aed;
+  --bg: #ffffff;
+  --panel: #f6f8fa;
+  --line: #d0d7de;
+  --text: #1f2328;
+  --muted: #6b7280;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  max-width: 760px;
+  box-sizing: border-box;
 }
 
 .som-header {
@@ -259,7 +271,7 @@ const CSS = `
 }
 .som-emoji { font-size: 2rem; line-height: 1; }
 .som-title { margin: 0; font-size: 1.25rem; }
-.som-subtitle { margin: 0; color: #6b7280; font-size: 0.875rem; }
+.som-subtitle { margin: 0; color: var(--muted); font-size: 0.875rem; }
 
 .som-viz-row {
   display: flex;
@@ -405,7 +417,7 @@ const CSS = `
 .som-footer {
   margin-top: 0.75rem;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--muted);
 }
 
 @media (max-width: 600px) {
