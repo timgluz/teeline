@@ -24,8 +24,8 @@ Add these in **GitHub → repo Settings → Secrets and variables → Actions**:
 
 | Secret | How to obtain |
 | --- | --- |
-| `CLOUDFLARE_API_TOKEN` | [CF Dashboard](https://dash.cloudflare.com) → My Profile → API Tokens → **Create Token** → use the **Edit Cloudflare Pages** template (or custom token with *Cloudflare Pages: Edit* permission) |
-| `CLOUDFLARE_ACCOUNT_ID` | [CF Dashboard](https://dash.cloudflare.com) → select your account → the Account ID appears in the right sidebar |
+| `CLOUDFLARE_API_TOKEN` | [CF Dashboard](https://dash.cloudflare.com) → My Profile → API Tokens → **Create Token** — needs **both** *Cloudflare Pages: Edit* **and** *D1: Edit* permissions (deploy runs `wrangler d1 migrations apply` before the Pages deploy) |
+| `CLOUDFLARE_ACCOUNT_ID` | [CF Dashboard](https://dash.cloudflare.com) → select your account → the Account ID appears in the right sidebar. **Must be the account that owns the `teeline-auth` D1 database** (check with `npx wrangler d1 list`; a mismatch fails the deploy with CF error 7403). |
 
 `SENTRY_AUTH_TOKEN` is optional — the build succeeds without it; Sentry source map uploads are simply skipped.
 
