@@ -24,6 +24,18 @@ tasks:
     cmds:
       - cargo component build --manifest-path teeline-wasm/Cargo.toml --target wasm32-wasip2
 
+  wasm:bindings:
+    desc: Regenerate jco JS bindings into teeline-wasm/js-bindings after WIT export changes
+    # The committed teeline-wasm/js-bindings/teeline_wasm.js must stay in sync with
+    # the WIT exports, otherwise task web:build fails with
+    # "[MISSING_EXPORT] ... is not exported by node_modules/teeline-wasm/teeline_wasm.js".
+    # Run this after editing teeline-wasm/wit/world.wit and commit the regenerated
+    # teeline_wasm.js (CI regenerates it in deploy-web.yml from the release WASM).
+    cmds:
+      - cargo component build --manifest-path teeline-wasm/Cargo.toml --target wasm32-wasip1
+      - npx --yes @bytecodealliance/jco@1.20.0 transpile teeline-wasm/target/wasm32-wasip1/debug/teeline_wasm.wasm --name teeline_wasm -o teeline-wasm/js-bindings
+      - echo "js-bindings regenerated — commit teeline-wasm/js-bindings/teeline_wasm.js if changed"
+
   test:
     desc: Run all unit and integration tests
     cmds:
