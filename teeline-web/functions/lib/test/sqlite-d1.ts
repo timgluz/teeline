@@ -38,6 +38,13 @@ export function makeD1(db: Database.Database): D1Like {
       db.exec(sql)
     },
     prepare(sql) {
+      // Fail loudly if a future query reuses a numbered param (?1 twice) or
+      // embeds ?NNN in a string literal — the normalization would silently
+      // change bind semantics and mask real bugs.
+      const numbered = sql.match(/\?(\d+)/g)
+      if (numbered && new Set(numbered).size !== numbered.length) {
+        throw new Error(`sqlite-d1 shim: reused numbered param in SQL: ${sql}`)
+      }
       const stmt = db.prepare(sql.replace(/\?(\d+)/g, '?'))
       return {
         bind(...params) {

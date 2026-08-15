@@ -2,14 +2,20 @@
 // session cookie forward when it's past the halfway point of its lifetime.
 import type { Env } from '../../lib/env'
 import { getUser } from '../../lib/db'
-import { json, unauthorized } from '../../lib/http'
+import { json, serverError, unauthorized } from '../../lib/http'
 import { createSessionToken, getSessionUser, sessionCookieHeader, shouldRefreshSession } from '../../lib/session'
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const session = await getSessionUser(env, request.headers)
   if (!session) return unauthorized()
 
-  const user = await getUser(env.DB, session.sub)
+  let user
+  try {
+    user = await getUser(env.DB, session.sub)
+  } catch (err) {
+    console.error('Failed to fetch user:', err)
+    return serverError('Failed to load user — please try again')
+  }
   if (!user) return unauthorized() // account deleted → session is void
 
   const headers: Record<string, string> = {}

@@ -2,9 +2,17 @@
 //
 // rpID rules (WebAuthn): rpID must be a suffix of the caller's effective
 // domain. Production is tspsolver.com; local dev runs on localhost, which is
-// its own valid rpID. The expectedOrigin for verification is the request's
-// own origin — but only after it passes the allowlist, which doubles as the
-// CSRF Origin check on mutating endpoints.
+// its own valid rpID.
+//
+// Two distinct origins matter:
+// - serverOrigin(request) — the request's destination origin. This is what
+//   WebAuthn's expectedOrigin must be (the browser records it in
+//   clientDataJSON), so it is used by the *complete* handlers for
+//   verification.
+// - clientOrigin(request) — the Origin/Referer header, i.e. where the
+//   request actually came from. This is the CSRF check on mutating
+//   endpoints: a cross-site POST carries the attacker's origin (or none),
+//   which the allowlist rejects.
 import type { Env } from './env'
 
 export const RP_NAME = 'Teeline'
@@ -25,6 +33,32 @@ export function isAllowedOrigin(origin: string, env: Env): boolean {
   return extra.includes(origin)
 }
 
-export function requestOrigin(request: Request): string {
+/** Destination origin of the request — used for WebAuthn expectedOrigin. */
+export function serverOrigin(request: Request): string {
   return new URL(request.url).origin
+}
+
+/**
+ * Origin the request claims to come from (Origin header, falling back to
+ * Referer). Used as the CSRF check: returns null when neither header is
+ * present, which mutating endpoints must reject.
+ */
+export function clientOrigin(request: Request): string | null {
+  const origin = request.headers.get('Origin')
+  if (origin) return origin
+  const referer = request.headers.get('Referer')
+  if (referer) {
+    try {
+      return new URL(referer).origin
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+/** True when the request's client origin is present and on the allowlist. */
+export function isClientOriginAllowed(request: Request, env: Env): boolean {
+  const origin = clientOrigin(request)
+  return origin !== null && isAllowedOrigin(origin, env)
 }

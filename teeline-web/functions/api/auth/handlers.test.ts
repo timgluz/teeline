@@ -34,7 +34,7 @@ function ctx(request: Request) {
 function req(path: string, init: RequestInit = {}): Request {
   return new Request(`http://localhost:8788${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8788' },
     ...init,
   })
 }
@@ -168,9 +168,18 @@ describe('session endpoints', () => {
 })
 
 describe('origin policy', () => {
-  it('rejects ceremonies from disallowed origins', async () => {
-    const evil = new Request('https://evil.com/api/auth/register/begin', { method: 'POST' })
-    const res = await registerBegin(ctx(evil))
-    expect(res.status).toBe(403)
+  it('rejects ceremonies whose Origin header is not allowed (CSRF)', async () => {
+    const evil = new Request('https://evil.com/api/auth/register/begin', {
+      method: 'POST',
+      headers: { Origin: 'https://evil.com' },
+    })
+    expect((await registerBegin(ctx(evil))).status).toBe(403)
+  })
+
+  it('rejects mutating requests with no Origin header (e.g. cross-site POSTs)', async () => {
+    const noOrigin = new Request('http://localhost:8788/api/auth/logout', { method: 'POST' })
+    expect((await logout(ctx(noOrigin))).status).toBe(403)
+    // same-origin requests with the Origin header pass
+    expect((await logout(ctx(req('/api/auth/logout')))).status).toBe(200)
   })
 })

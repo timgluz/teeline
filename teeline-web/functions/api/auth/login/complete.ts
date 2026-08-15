@@ -6,7 +6,7 @@ import { verifyAuthenticationResponse } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
 import type { Env } from '../../../lib/env'
 import { consumeChallenge, getChallenge, getCredentialById, getUser, updateCredentialCounter } from '../../../lib/db'
-import { isAllowedOrigin, requestOrigin, rpIdFor } from '../../../lib/webauthn'
+import { isClientOriginAllowed, rpIdFor, serverOrigin } from '../../../lib/webauthn'
 import { badRequest, forbidden, json, serverError } from '../../../lib/http'
 import { createSessionToken, sessionCookieHeader } from '../../../lib/session'
 
@@ -27,8 +27,7 @@ function isAuthenticationCredential(v: unknown): v is AuthenticationResponse {
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  const origin = requestOrigin(request)
-  if (!isAllowedOrigin(origin, env)) return forbidden()
+  if (!isClientOriginAllowed(request, env)) return forbidden() // CSRF: client origin must be on the allowlist
   if (!env.SESSION_SECRET) return serverError('Auth service not configured')
 
   let body: { nonce?: unknown; credential?: unknown }
@@ -71,7 +70,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     verification = await verifyAuthenticationResponse({
       response: body.credential,
       expectedChallenge: row.challenge,
-      expectedOrigin: origin,
+      expectedOrigin: serverOrigin(request),
       expectedRPID: rpID,
       credential: {
         id: credential.id,
@@ -91,7 +90,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   // it (stored counter > authenticator counter on the next attempt).
   try {
     const user = await getUser(env.DB, credential.user_id)
-    if (!user) return serverError('User not found for verified credential')
+    if (!user) return serverError('Login failed — please try again')
 
     // Counter rollback is the clone-detection signal; SimpleWebAuthn already
     // rejected a lower counter, so persisting the new one is safe and atomic.
