@@ -31,6 +31,11 @@ tasks:
 
   build:
     desc: Type-check and build production bundle to dist/
+    # astro 7.2 static builds exceed Node's default ~4 GB heap and OOM
+    # (exit 134). CI sets NODE_OPTIONS=6144 per-step; the local task needs
+    # its own bump so `task web:build` works out of the box.
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     cmds:
       - npm run build
 
@@ -62,12 +67,16 @@ tasks:
 
   deploy:preview:
     desc: Build and deploy to CF Pages preview (current branch)
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     cmds:
       - npm run build
       - npx wrangler pages deploy dist/
 
   deploy:release:
     desc: Build and deploy to CF Pages production (master branch)
+    env:
+      NODE_OPTIONS: --max-old-space-size=8192
     cmds:
       - npm run build
       - npx wrangler pages deploy dist/ --branch master
