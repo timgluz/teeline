@@ -1,7 +1,8 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import ApiKeyManager from '../../components/ApiKeyManager'
 
-const description = 'How to sign in and generate a personal API key for the Teeline TSP solver REST API.'
+const description = 'Sign in with a passkey and generate a personal API key for the Teeline TSP solver REST API.'
 const canonicalUrl = 'https://tspsolver.com/api-key/'
 
 const jsonLd = {
@@ -31,44 +32,24 @@ const jsonLd = {
     <p>
       The <a href="https://api.tspsolver.com/docs" target="_blank" rel="noopener">Teeline REST API</a>
       requires a personal API key for every endpoint except <code>/api/v1/health</code>.
-      Getting one takes about a minute — no separate Teeline account or password to create,
-      and no request to us.
+      Getting one takes about a minute — no account, no password, no third-party sign-in.
+      Your <strong>passkey</strong> (stored by your browser or password manager) is your identity.
     </p>
 
-    <h2>1. Sign in</h2>
+    <ApiKeyManager client:visible />
+
+    <h2>Save it now — it's shown once</h2>
     <p>
-      Go to <a href="https://accounts.tspsolver.com/sign-in" target="_blank" rel="noopener">accounts.tspsolver.com/sign-in</a>
-      and continue with GitHub, GitLab, Google, or an email address — whichever's easiest.
-      There's nothing to install and no separate signup form.
+      Your new key (it looks like <code>ak_&hellip;</code>) is revealed exactly once, right after
+      you create it. We only store a fingerprint of it, so it can never be shown to you again.
+    </p>
+    <p>
+      <strong>Copy it straight into a password manager</strong> (1Password, Bitwarden, or similar)
+      before you refresh or leave the page. If you lose it, there's no way to recover it — revoke it
+      on this page and create a new one.
     </p>
 
-    <h2>2. Create a key</h2>
-    <p>
-      Signing in takes you straight to the <strong>API keys</strong> page. From there:
-    </p>
-    <ol>
-      <li>Click <strong>Add new key</strong>.</li>
-      <li>
-        Give it a name you'll recognize later — e.g. <code>my-laptop</code> or
-        <code>ci-pipeline</code>. An expiration date is optional; leave it blank for a
-        key that never expires.
-      </li>
-      <li>Click <strong>Create key</strong>.</li>
-    </ol>
-
-    <h2>3. Save it now — it's shown once</h2>
-    <p>
-      Your new key (it looks like <code>ak_&hellip;</code>) is revealed exactly once,
-      immediately after you create it. Clerk (the identity provider we use) cannot show it
-      to you again.
-    </p>
-    <p>
-      <strong>Copy it straight into a password manager</strong> (1Password, Bitwarden, or
-      similar) before you navigate away. If you lose it, there's no way to recover it — you'll
-      need to revoke it from the same page and create a new one.
-    </p>
-
-    <h2>4. Use it</h2>
+    <h2>Using your key</h2>
     <p>Send it as a bearer token on every request:</p>
     <pre><code>curl -H "Authorization: Bearer ak_your_key_here" \
   https://api.tspsolver.com/api/v1/solvers</code></pre>
@@ -80,10 +61,8 @@ const jsonLd = {
 
     <h2>Managing or revoking a key</h2>
     <p>
-      Sign back in at the same
-      <a href="https://accounts.tspsolver.com/sign-in" target="_blank" rel="noopener">sign-in link</a> any
-      time — you'll land on the API keys page, where you can add more keys or revoke ones
-      you no longer use.
+      Sign back in with your passkey any time — you'll land on your keys, where you can add more
+      or revoke ones you no longer use.
     </p>
 
     <p>
