@@ -7,7 +7,9 @@
 import { getCollection } from 'astro:content'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 
-const allPosts = await getCollection('blog', ({ data }) => !data.draft)
+// Standard Astro draft handling: `astro dev` shows drafts (for preview),
+// production builds (`astro build`/preview) exclude them.
+const allPosts = await getCollection('blog', ({ data }) => !data.draft || !import.meta.env.PROD)
 const posts = allPosts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
 
 const jsonLd = {
