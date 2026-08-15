@@ -6,10 +6,13 @@ import { generateRegistrationOptions } from '@simplewebauthn/server'
 import type { Env } from '../../../lib/env'
 import { insertChallenge } from '../../../lib/db'
 import { CHALLENGE_TTL_MS, RP_NAME, isClientOriginAllowed, rpIdFor } from '../../../lib/webauthn'
+import { rateLimit } from '../../../lib/ratelimit'
 import { forbidden, json, serverError } from '../../../lib/http'
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   if (!isClientOriginAllowed(request, env)) return forbidden() // CSRF: client origin must be on the allowlist
+  const limited = await rateLimit(request, env, 'register-begin', 10)
+  if (limited) return limited
   if (!env.SESSION_SECRET) return serverError('Auth service not configured')
 
   // Optional friendly name; defaults to a generic label. A null/primitive

@@ -11,12 +11,16 @@ import type { Env } from '../../../lib/env'
 import { findActiveKeyByHash, timingSafeEqual, touchKeyLastUsed } from '../../../lib/db'
 import { badRequest, json, unauthorized } from '../../../lib/http'
 import { hashSecret, isKeySecretShape } from '../../../lib/keys'
+import { rateLimit } from '../../../lib/ratelimit'
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const presented = request.headers.get('X-Auth-Secret')
   if (!env.AUTH_SERVICE_SECRET || !presented || !timingSafeEqual(presented, env.AUTH_SERVICE_SECRET)) {
     return unauthorized()
   }
+  // Generous: teeline-api verifies on every request (its own limit is 100 RPM).
+  const limited = await rateLimit(request, env, 'keys-verify', 600)
+  if (limited) return limited
 
   let body: { secret?: unknown }
   try {
