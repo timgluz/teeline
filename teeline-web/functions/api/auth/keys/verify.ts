@@ -10,7 +10,7 @@
 import type { Env } from '../../../lib/env'
 import { findActiveKeyByHash, timingSafeEqual, touchKeyLastUsed } from '../../../lib/db'
 import { badRequest, json, unauthorized } from '../../../lib/http'
-import { hashSecret } from '../../../lib/keys'
+import { hashSecret, isKeySecretShape } from '../../../lib/keys'
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const presented = request.headers.get('X-Auth-Secret')
@@ -24,7 +24,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   } catch {
     return badRequest('Invalid JSON body')
   }
-  if (typeof body.secret !== 'string') return badRequest('secret is required')
+  if (!body || typeof body.secret !== 'string') return badRequest('secret is required')
+  // Early reject of malformed secrets before hashing + DB lookup.
+  if (!isKeySecretShape(body.secret)) return json({ error: 'Unknown or revoked key' }, 404)
 
   try {
     const hash = await hashSecret(body.secret)

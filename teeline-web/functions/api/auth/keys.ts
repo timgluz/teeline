@@ -2,20 +2,10 @@
 // secret is returned exactly once; only its SHA-256 hash is stored.
 // GET  /api/auth/keys — list key metadata (never the secret/hash).
 import type { Env } from '../../lib/env'
-import { createApiKey, getUser, listApiKeysByUser } from '../../lib/db'
-import { forbidden, json, serverError, unauthorized } from '../../lib/http'
+import { createApiKey, listApiKeysByUser } from '../../lib/db'
+import { json, serverError } from '../../lib/http'
 import { generateKeySecret, hashSecret, newKeyId } from '../../lib/keys'
-import { getSessionUser } from '../../lib/session'
-import { isClientOriginAllowed } from '../../lib/webauthn'
-
-async function requireSession(request: Request, env: Env) {
-  if (!isClientOriginAllowed(request, env)) return forbidden() // CSRF
-  const session = await getSessionUser(env, request.headers)
-  if (!session) return unauthorized()
-  const user = await getUser(env.DB, session.sub)
-  if (!user) return unauthorized() // deleted account → session void
-  return { userId: user.id }
-}
+import { requireSession } from '../../lib/auth'
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const auth = await requireSession(request, env)

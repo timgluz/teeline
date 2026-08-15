@@ -153,4 +153,14 @@ describe('internal verify endpoint', () => {
     const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: '{}', headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
     expect(res.status).toBe(400)
   })
+
+  it('handles a literal null body without crashing', async () => {
+    const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: 'null', headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects malformed secrets early (shape check)', async () => {
+    const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret: 'not-a-key' }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
+    expect(res.status).toBe(404)
+  })
 })
