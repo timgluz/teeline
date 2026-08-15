@@ -2,7 +2,9 @@ import rss from '@astrojs/rss'
 import { getCollection } from 'astro:content'
 
 export async function GET(context) {
-  const posts = await getCollection('blog', ({ data }) => !data.draft)
+  // Standard Astro draft handling: `astro dev` shows drafts (for preview),
+  // production builds (`astro build`/preview) exclude them.
+  const posts = await getCollection('blog', ({ data }) => !data.draft || !import.meta.env.PROD)
   return rss({
     title: 'Teeline Blog',
     description: 'Notes on TSP algorithms, teeline development, and the occasional deep dive.',
