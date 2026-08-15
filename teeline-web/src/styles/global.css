@@ -1,24 +1,39 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Design tokens — Tailwind v4 is CSS-first: the @theme block below generates
+   the utility classes (bg-accent, text-canvas, …) AND the matching CSS
+   variables (--color-accent, …) on :root, so raw var() references in
+   component rules (e.g. SVG strokes) keep working. */
+@theme {
+  --color-canvas: #0A0A0B;
+  --color-surface: #141416;
+  --color-surface-2: #1C1C20;
+  --color-border: #232327;
+  --color-border-hover: #3A3A40;
+  --color-text: #F5F5F6;
+  --color-text-dim: #8A8A92;
+  --color-accent: #6366F1;
+  --color-accent-dim: rgba(99, 102, 241, 0.12);
+  --color-positive: #22D3A5;
+  --color-negative: #F87171;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --text-xs: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-3xl: 3rem;
+
+  --tracking-tight: -0.02em;
+
+  --container-content: 1200px;
+}
 
 @layer base {
-  /* Design tokens as CSS variables — Tailwind v3 generates utility classes
-     (bg-accent, text-canvas, …) but NOT var(--color-*) like v4 does, so the
-     raw var() references in component rules (e.g. SVG strokes) need them here. */
-  :root {
-    --color-canvas: #0A0A0B;
-    --color-surface: #141416;
-    --color-surface-2: #1C1C20;
-    --color-border: #232327;
-    --color-border-hover: #3A3A40;
-    --color-text: #F5F5F6;
-    --color-text-dim: #8A8A92;
-    --color-accent: #6366F1;
-    --color-accent-dim: rgba(99, 102, 241, 0.12);
-    --color-positive: #22D3A5;
-    --color-negative: #F87171;
-  }
   html {
     color-scheme: dark;
   }
@@ -106,7 +121,7 @@
   /* Shiki (Astro markdown) wraps code in .astro-code with the theme's own
      background — force it onto the dark surface so code blocks match the site. */
   .astro-code {
-    @apply rounded-lg border border-border bg-surface !important;
+    @apply rounded-lg border border-border bg-surface!;
   }
   .astro-code code {
     background: transparent !important;
