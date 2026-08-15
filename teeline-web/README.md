@@ -29,6 +29,40 @@ Add these in **GitHub → repo Settings → Secrets and variables → Actions**:
 
 `SENTRY_AUTH_TOKEN` is optional — the build succeeds without it; Sentry source map uploads are simply skipped.
 
+### Cloudflare Pages Secrets — auth service
+
+The WebAuthn auth service (Pages Functions under `functions/api/auth/`) needs two secrets on the
+**teeline-web** Pages project (set from a terminal with wrangler logged in):
+
+```bash
+# Generate values
+openssl rand -hex 32   # → AUTH_SERVICE_SECRET
+openssl rand -hex 32   # → SESSION_SECRET
+
+# Set them on the Pages project (production; preview inherits unless overridden
+# in the dashboard → Settings → Environment Variables)
+echo "<AUTH_SERVICE_SECRET>" | npx wrangler pages secret put AUTH_SERVICE_SECRET --project-name teeline-web
+echo "<SESSION_SECRET>"      | npx wrangler pages secret put SESSION_SECRET      --project-name teeline-web
+npx wrangler pages secret list --project-name teeline-web   # verify
+```
+
+- **`AUTH_SERVICE_SECRET` is the shared secret with the API** — the exact same value must be set on
+  Fly.io (`fly secrets set AUTH_SERVICE_SECRET=… --app teeline-api`), or `POST /api/auth/keys/verify`
+  rejects the API's calls. See `teeline-api/README.md` → *Required Fly.io Secrets*.
+- **`SESSION_SECRET`** signs the session cookie (`__Host-teeline-session`); rotate it and everyone
+  gets signed out (acceptable — it's just a re-login).
+- Local dev: put both in `teeline-web/.dev.vars` (plus `ALLOWED_ORIGINS=http://localhost:8788`).
+
+### Cloudflare D1 — auth database
+
+```bash
+# First-time only: create the database and apply the schema (id lands in wrangler.toml)
+npx wrangler d1 create teeline-auth          # paste database_id into wrangler.toml
+npx wrangler d1 migrations apply teeline-auth --remote
+
+# Deploys run migrations automatically (deploy-web.yml), so this is only for a fresh setup.
+```
+
 ### Manual Deploy
 
 ```bash
