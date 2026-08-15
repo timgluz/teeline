@@ -16,21 +16,13 @@ export function rpIdFor(hostname: string): string {
   return h
 }
 
-const LOCAL_DEV_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]'])
-
 export function isAllowedOrigin(origin: string, env: Env): boolean {
   if (origin === 'https://tspsolver.com') return true
   const extra = env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
-  if (extra.includes(origin)) return true
-  // Local-dev convenience: any http://localhost / 127.0.0.1 origin. Only the
-  // user's own machine can produce these, so it's safe to allow by default.
-  try {
-    const u = new URL(origin)
-    if (u.protocol === 'http:' && LOCAL_DEV_HOSTS.has(u.hostname)) return true
-  } catch {
-    /* not a URL — not allowed */
-  }
-  return false
+  // Local dev origins (http://localhost / 127.0.0.1) are allowed only when
+  // explicitly listed in ALLOWED_ORIGINS (e.g. via .dev.vars) — no blanket
+  // allowance, so a misconfigured shared/staging environment can't inherit it.
+  return extra.includes(origin)
 }
 
 export function requestOrigin(request: Request): string {

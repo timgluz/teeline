@@ -164,3 +164,13 @@ describe('crypto helpers', () => {
     expect(timingSafeEqual('', '')).toBe(true)
   })
 })
+
+describe('d1 shim', () => {
+  it('first(col) returns a single column value like real D1', async () => {
+    await createUser(db as never, { id: 'u1', displayName: 'Tim', createdAt: NOW })
+    const name = await db.prepare('SELECT id, display_name FROM users WHERE id = ?1').bind('u1').first<{ display_name: string }>('display_name')
+    expect(name).toBe('Tim')
+    const missing = await db.prepare('SELECT id, display_name FROM users WHERE id = ?1').bind('nope').first('display_name')
+    expect(missing).toBeNull()
+  })
+})

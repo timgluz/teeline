@@ -25,7 +25,7 @@ import { onRequestGet as me } from './me'
 import { onRequestPost as logout } from './logout'
 
 let shim: D1Like
-const env = { SESSION_SECRET: 'test-session-secret' } as never // DB injected below
+const env = { SESSION_SECRET: 'test-session-secret', ALLOWED_ORIGINS: 'http://localhost:8788' } as never // DB injected below
 
 function ctx(request: Request) {
   return { request, env: { ...env, DB: shim } } as never
@@ -76,7 +76,7 @@ describe('register', () => {
     expect(stored?.user_handle).toBeTruthy()
 
     const completeRes = await registerComplete(
-      ctx(req('/api/auth/register/complete', { body: JSON.stringify({ nonce, credential: { id: 'x', response: {} } }) })),
+      ctx(req('/api/auth/register/complete', { body: JSON.stringify({ nonce, credential: { id: 'x', response: { clientDataJSON: 'client', attestationObject: 'att' } } }) })),
     )
     expect(completeRes.status).toBe(201)
     const setCookie = completeRes.headers.get('Set-Cookie')
@@ -97,13 +97,13 @@ describe('register', () => {
   it('rejects a replayed nonce', async () => {
     const begin = (await registerBegin(ctx(req('/api/auth/register/begin', { body: '{}' })))).json() as unknown as Promise<{ nonce: string }>
     const { nonce } = await begin
-    const body = JSON.stringify({ nonce, credential: { id: 'x', response: {} } })
+    const body = JSON.stringify({ nonce, credential: { id: 'x', response: { clientDataJSON: 'client', attestationObject: 'att' } } })
     expect((await registerComplete(ctx(req('/api/auth/register/complete', { body })))).status).toBe(201)
     expect((await registerComplete(ctx(req('/api/auth/register/complete', { body })))).status).toBe(400)
   })
 
   it('rejects an unknown nonce', async () => {
-    const res = await registerComplete(ctx(req('/api/auth/register/complete', { body: JSON.stringify({ nonce: 'ghost', credential: { id: 'x', response: {} } }) })))
+    const res = await registerComplete(ctx(req('/api/auth/register/complete', { body: JSON.stringify({ nonce: 'ghost', credential: { id: 'x', response: { clientDataJSON: 'client', attestationObject: 'att' } } }) })))
     expect(res.status).toBe(400)
   })
 })
@@ -127,7 +127,7 @@ describe('login', () => {
     const { nonce } = (await beginRes.json()) as { nonce: string }
 
     const completeRes = await loginComplete(
-      ctx(req('/api/auth/login/complete', { body: JSON.stringify({ nonce, credential: { id: 'cred-1', response: {} } }) })),
+      ctx(req('/api/auth/login/complete', { body: JSON.stringify({ nonce, credential: { id: 'cred-1', response: { clientDataJSON: 'client', authenticatorData: 'auth', signature: 'sig' } } }) })),
     )
     expect(completeRes.status).toBe(200)
     expect(completeRes.headers.get('Set-Cookie')).toContain('__Host-teeline-session')
@@ -139,7 +139,7 @@ describe('login', () => {
     const beginRes = await loginBegin(ctx(req('/api/auth/login/begin', { body: '{}' })))
     const { nonce } = (await beginRes.json()) as { nonce: string }
     const res = await loginComplete(
-      ctx(req('/api/auth/login/complete', { body: JSON.stringify({ nonce, credential: { id: 'ghost', response: {} } }) })),
+      ctx(req('/api/auth/login/complete', { body: JSON.stringify({ nonce, credential: { id: 'ghost', response: { clientDataJSON: 'client', authenticatorData: 'auth', signature: 'sig' } } }) })),
     )
     expect(res.status).toBe(400)
   })

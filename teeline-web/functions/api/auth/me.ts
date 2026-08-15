@@ -13,8 +13,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (!user) return unauthorized() // account deleted → session is void
 
   const headers: Record<string, string> = {}
-  if (shouldRefreshSession(session)) {
-    headers['Set-Cookie'] = sessionCookieHeader(await createSessionToken(env.SESSION_SECRET!, user.id))
+  if (shouldRefreshSession(session) && env.SESSION_SECRET) {
+    headers['Set-Cookie'] = sessionCookieHeader(await createSessionToken(env.SESSION_SECRET, user.id))
   }
   return json({ user: { id: user.id, displayName: user.display_name, createdAt: user.created_at } }, 200, headers)
 }

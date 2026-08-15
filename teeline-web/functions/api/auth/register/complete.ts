@@ -11,10 +11,19 @@ import { createSessionToken, sessionCookieHeader } from '../../../lib/session'
 
 type RegistrationResponse = Parameters<typeof verifyRegistrationResponse>[0]['response']
 
+// Minimal runtime shape check before handing the payload to the verifier
+// (defense-in-depth; the library validates the details).
+function isRegistrationCredential(v: unknown): v is RegistrationResponse {
+  if (typeof v !== 'object' || v === null) return false
+  const c = v as { response?: unknown }
+  const r = c.response as { clientDataJSON?: unknown; attestationObject?: unknown } | undefined
+  return typeof r?.clientDataJSON === 'string' && typeof r.attestationObject === 'string'
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const origin = requestOrigin(request)
   if (!isAllowedOrigin(origin, env)) return forbidden()
-  if (!env.SESSION_SECRET) return serverError('Auth service not configured (SESSION_SECRET missing)')
+  if (!env.SESSION_SECRET) return serverError('Auth service not configured')
 
   let body: { nonce?: unknown; credential?: unknown }
   try {
@@ -22,7 +31,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   } catch {
     return badRequest('Invalid JSON body')
   }
-  if (typeof body.nonce !== 'string' || !body.credential || typeof body.credential !== 'object') {
+  if (typeof body.nonce !== 'string' || !isRegistrationCredential(body.credential)) {
     return badRequest('nonce and credential are required')
   }
 
@@ -39,13 +48,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let verification
   try {
     verification = await verifyRegistrationResponse({
-      response: body.credential as RegistrationResponse,
+      response: body.credential,
       expectedChallenge: row.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
     })
   } catch (err) {
-    return badRequest(`Registration verification failed: ${String(err)}`)
+    console.error('Registration verification failed:', err)
+    return badRequest('Registration verification failed')
   }
   if (!verification.verified || !verification.registrationInfo) {
     return badRequest('Registration not verified')
@@ -56,17 +66,24 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const userId = row.user_handle
   const now = Date.now()
 
-  await createUserWithCredential(
-    env.DB,
-    { id: userId, displayName: undefined, createdAt: now },
-    {
-      id: credential.id, // already base64url (SimpleWebAuthn v13)
-      publicKey: isoBase64URL.fromBuffer(credential.publicKey),
-      counter,
-      transports: credential.transports ?? [],
-      createdAt: now,
-    },
-  )
+  try {
+    await createUserWithCredential(
+      env.DB,
+      { id: userId, displayName: undefined, createdAt: now },
+      {
+        id: credential.id, // already base64url (SimpleWebAuthn v13)
+        publicKey: isoBase64URL.fromBuffer(credential.publicKey),
+        counter,
+        transports: credential.transports ?? [],
+        createdAt: now,
+      },
+    )
+  } catch (err) {
+    // Challenge is already consumed; surface a generic error rather than a
+    // bare 500 (e.g. duplicate credential id, transient DB failure).
+    console.error('Failed to create user with credential:', err)
+    return serverError('Failed to complete registration — please try again')
+  }
 
   const token = await createSessionToken(env.SESSION_SECRET, userId, now)
   return json(

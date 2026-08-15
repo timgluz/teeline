@@ -11,7 +11,7 @@ import { forbidden, json, serverError } from '../../../lib/http'
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const origin = requestOrigin(request)
   if (!isAllowedOrigin(origin, env)) return forbidden()
-  if (!env.SESSION_SECRET) return serverError('Auth service not configured (SESSION_SECRET missing)')
+  if (!env.SESSION_SECRET) return serverError('Auth service not configured')
 
   // Optional friendly name; defaults to a generic label.
   let displayName = 'Teeline user'
@@ -28,27 +28,33 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const userHandle = crypto.randomUUID()
   const nonce = crypto.randomUUID()
 
-  const options = await generateRegistrationOptions({
-    rpName: RP_NAME,
-    rpID,
-    userName: userHandle, // stable unique id; the authenticator shows displayName
-    userDisplayName: displayName,
-    userID: new Uint8Array(new TextEncoder().encode(userHandle)),
-    attestationType: 'none',
-    authenticatorSelection: {
-      residentKey: 'required',
-      userVerification: 'preferred',
-    },
-    timeout: CHALLENGE_TTL_MS,
-  })
+  let options
+  try {
+    options = await generateRegistrationOptions({
+      rpName: RP_NAME,
+      rpID,
+      userName: userHandle, // stable unique id; the authenticator shows displayName
+      userDisplayName: displayName,
+      userID: new Uint8Array(new TextEncoder().encode(userHandle)),
+      attestationType: 'none',
+      authenticatorSelection: {
+        residentKey: 'required',
+        userVerification: 'preferred',
+      },
+      timeout: CHALLENGE_TTL_MS,
+    })
 
-  await insertChallenge(env.DB, {
-    id: nonce,
-    type: 'register',
-    challenge: options.challenge,
-    userHandle,
-    expiresAt: Date.now() + CHALLENGE_TTL_MS,
-  })
+    await insertChallenge(env.DB, {
+      id: nonce,
+      type: 'register',
+      challenge: options.challenge,
+      userHandle,
+      expiresAt: Date.now() + CHALLENGE_TTL_MS,
+    })
+  } catch (err) {
+    console.error('Failed to start registration:', err)
+    return serverError('Failed to start registration — please try again')
+  }
 
   return json({ options, nonce }, 201)
 }

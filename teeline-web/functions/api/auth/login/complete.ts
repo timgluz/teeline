@@ -12,21 +12,35 @@ import { createSessionToken, sessionCookieHeader } from '../../../lib/session'
 
 type AuthenticationResponse = Parameters<typeof verifyAuthenticationResponse>[0]['response']
 
+// Minimal runtime shape check before handing the payload to the verifier
+// (defense-in-depth; the library validates the details).
+function isAuthenticationCredential(v: unknown): v is AuthenticationResponse {
+  if (typeof v !== 'object' || v === null) return false
+  const c = v as { id?: unknown; response?: unknown }
+  const r = c.response as { clientDataJSON?: unknown; authenticatorData?: unknown; signature?: unknown } | undefined
+  return (
+    typeof c.id === 'string' &&
+    typeof r?.clientDataJSON === 'string' &&
+    typeof r.authenticatorData === 'string' &&
+    typeof r.signature === 'string'
+  )
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const origin = requestOrigin(request)
   if (!isAllowedOrigin(origin, env)) return forbidden()
-  if (!env.SESSION_SECRET) return serverError('Auth service not configured (SESSION_SECRET missing)')
+  if (!env.SESSION_SECRET) return serverError('Auth service not configured')
 
-  let body: { nonce?: unknown; credential?: { id?: unknown } }
+  let body: { nonce?: unknown; credential?: unknown }
   try {
-    body = (await request.json()) as { nonce?: unknown; credential?: { id?: unknown } }
+    body = (await request.json()) as { nonce?: unknown; credential?: unknown }
   } catch {
     return badRequest('Invalid JSON body')
   }
-  const credentialId = body.credential?.id
-  if (typeof body.nonce !== 'string' || typeof credentialId !== 'string') {
-    return badRequest('nonce and credential.id are required')
+  if (typeof body.nonce !== 'string' || !isAuthenticationCredential(body.credential)) {
+    return badRequest('nonce and credential are required')
   }
+  const credentialId = (body.credential as { id: string }).id
 
   const row = await getChallenge(env.DB, body.nonce)
   if (!row || row.type !== 'login' || row.expires_at < Date.now()) {
@@ -48,7 +62,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let verification
   try {
     verification = await verifyAuthenticationResponse({
-      response: body.credential as AuthenticationResponse,
+      response: body.credential,
       expectedChallenge: row.challenge,
       expectedOrigin: origin,
       expectedRPID: rpID,
@@ -60,7 +74,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       },
     })
   } catch (err) {
-    return badRequest(`Authentication verification failed: ${String(err)}`)
+    console.error('Authentication verification failed:', err)
+    return badRequest('Authentication verification failed')
   }
   if (!verification.verified) return badRequest('Authentication not verified')
 

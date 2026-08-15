@@ -35,8 +35,11 @@ export function makeD1(db: Database.Database): D1Like {
       return {
         bind(...params) {
           return {
-            first<T>(): T | null {
-              return (stmt.get(...params) as T | undefined) ?? null
+            first<T>(col?: string): T | null {
+              const row = stmt.get(...params) as Record<string, unknown> | undefined
+              if (row === undefined) return null
+              if (col !== undefined) return (row[col] as T | undefined) ?? null
+              return row as T
             },
             all<T>(): { results: T[] } {
               return { results: stmt.all(...params) as T[] }

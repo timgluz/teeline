@@ -23,9 +23,12 @@ describe('isAllowedOrigin', () => {
     expect(isAllowedOrigin('https://tspsolver.com', baseEnv)).toBe(true)
   })
 
-  it('allows local dev origins without config', () => {
-    expect(isAllowedOrigin('http://localhost:8788', baseEnv)).toBe(true)
-    expect(isAllowedOrigin('http://127.0.0.1:8788', baseEnv)).toBe(true)
+  it('rejects local dev origins unless explicitly listed (no blanket allowance)', () => {
+    expect(isAllowedOrigin('http://localhost:8788', baseEnv)).toBe(false)
+    expect(isAllowedOrigin('http://127.0.0.1:8788', baseEnv)).toBe(false)
+    const env = { ...baseEnv, ALLOWED_ORIGINS: 'http://localhost:8788' }
+    expect(isAllowedOrigin('http://localhost:8788', env)).toBe(true)
+    expect(isAllowedOrigin('http://127.0.0.1:8788', env)).toBe(false)
   })
 
   it('rejects unknown remote origins', () => {

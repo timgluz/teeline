@@ -50,18 +50,24 @@ export async function createSessionToken(secret: string, sub: string, now: numbe
   return `${body}.${sig}`
 }
 
-export async function readSessionToken(secret: string, token: string | null): Promise<SessionPayload | null> {
+export async function readSessionToken(
+  secret: string,
+  token: string | null,
+  now: number = Date.now(),
+): Promise<SessionPayload | null> {
   if (!token) return null
   const dot = token.indexOf('.')
   if (dot <= 0) return null
   const body = token.slice(0, dot)
   const sig = token.slice(dot + 1)
-  const expected = await hmacSha256Hex(secret, body)
-  if (!timingSafeEqual(sig, expected)) return null
+  // Fail closed: any error in parsing/validation (including a crypto.subtle
+  // rejection) degrades to "unauthenticated" rather than crashing the request.
   try {
+    const expected = await hmacSha256Hex(secret, body)
+    if (!timingSafeEqual(sig, expected)) return null
     const payload = JSON.parse(new TextDecoder().decode(b64urlDecode(body))) as SessionPayload
-    if (typeof payload.sub !== 'string' || typeof payload.exp !== 'number') return null
-    if (payload.exp <= Date.now()) return null
+    if (typeof payload.sub !== 'string' || typeof payload.iat !== 'number' || typeof payload.exp !== 'number') return null
+    if (payload.exp <= now) return null
     return payload
   } catch {
     return null
