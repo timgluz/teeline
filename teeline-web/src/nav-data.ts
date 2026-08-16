@@ -5,30 +5,33 @@
 export interface SolverMeta {
   id: string
   name: string
+  // Runtime/memory complexity, transcribed from the Rust solver registry
+  // (src/tsp/mod.rs SolverInfo::complexity).
+  complexity: string
 }
 
 export const SOLVER_META: Record<string, SolverMeta> = {
-  bhk: { id: 'bhk', name: 'Bellman-Held-Karp' },
-  branch_bound: { id: 'branch_bound', name: 'Branch & Bound' },
-  nn: { id: 'nn', name: 'Nearest Neighbor' },
-  fourier: { id: 'fourier', name: 'Fourier' },
-  christofides: { id: 'christofides', name: 'Christofides' },
-  greedy_edge: { id: 'greedy_edge', name: 'Greedy Edge' },
-  '2opt': { id: '2opt', name: '2-opt' },
-  '3opt': { id: '3opt', name: '3-opt' },
-  or_opt: { id: 'or_opt', name: 'Or-opt' },
-  stochastic_hill: { id: 'stochastic_hill', name: 'Stochastic Hill Climbing' },
-  lk: { id: 'lk', name: 'Lin-Kernighan' },
-  sa: { id: 'sa', name: 'Simulated Annealing' },
-  tabu: { id: 'tabu', name: 'Tabu Search' },
-  ga: { id: 'ga', name: 'Genetic Algorithm' },
-  pso: { id: 'pso', name: 'Particle Swarm' },
-  cs: { id: 'cs', name: 'Cuckoo Search' },
-  fpa: { id: 'fpa', name: 'Flower Pollination' },
-  gsa: { id: 'gsa', name: 'Gravitational Search' },
-  som: { id: 'som', name: 'Kohonen SOM' },
-  aco: { id: 'aco', name: 'Ant Colony Optimization' },
-  savings: { id: 'savings', name: 'Savings' },
+  bhk: { id: 'bhk', name: 'Bellman-Held-Karp', complexity: 'O(n² · 2ⁿ)' },
+  branch_bound: { id: 'branch_bound', name: 'Branch & Bound', complexity: 'O(n!)' },
+  nn: { id: 'nn', name: 'Nearest Neighbor', complexity: 'O(n²)' },
+  fourier: { id: 'fourier', name: 'Fourier', complexity: 'O(K·epochs·n·M)' },
+  christofides: { id: 'christofides', name: 'Christofides', complexity: 'O(n²)' },
+  greedy_edge: { id: 'greedy_edge', name: 'Greedy Edge', complexity: 'O(n² log n) time, O(n²) memory' },
+  '2opt': { id: '2opt', name: '2-opt', complexity: 'O(n²) / pass' },
+  '3opt': { id: '3opt', name: '3-opt', complexity: 'O(n³) / pass' },
+  or_opt: { id: 'or_opt', name: 'Or-opt', complexity: 'O(n²) / pass' },
+  stochastic_hill: { id: 'stochastic_hill', name: 'Stochastic Hill Climbing', complexity: 'O(epochs · n)' },
+  lk: { id: 'lk', name: 'Lin-Kernighan', complexity: 'O(epochs · n²)' },
+  sa: { id: 'sa', name: 'Simulated Annealing', complexity: 'O(epochs · n)' },
+  tabu: { id: 'tabu', name: 'Tabu Search', complexity: 'O(epochs · n)' },
+  ga: { id: 'ga', name: 'Genetic Algorithm', complexity: 'O(epochs · pop · n)' },
+  pso: { id: 'pso', name: 'Particle Swarm', complexity: 'O(epochs · swarm · n)' },
+  cs: { id: 'cs', name: 'Cuckoo Search', complexity: 'O(epochs · nests · n)' },
+  fpa: { id: 'fpa', name: 'Flower Pollination', complexity: 'O(epochs · pop · n)' },
+  gsa: { id: 'gsa', name: 'Gravitational Search', complexity: 'O(epochs · pop²)' },
+  som: { id: 'som', name: 'Kohonen SOM', complexity: 'O(epochs·N·n)' },
+  aco: { id: 'aco', name: 'Ant Colony Optimization', complexity: 'O(epochs · ants · n²)' },
+  savings: { id: 'savings', name: 'Savings', complexity: 'O(n² log n) time, O(n²) memory' },
 }
 
 export interface SolverGroup {

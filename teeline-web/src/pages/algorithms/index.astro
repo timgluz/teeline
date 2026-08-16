@@ -1,14 +1,9 @@
 ---
 // Index page for all algorithms — replaces the topbar's algorithms
 // drop-down with a browsable destination, mirroring the Problems page.
-import { getCollection } from 'astro:content'
 import BaseLayout from '../../layouts/BaseLayout.astro'
 import { SOLVER_GROUPS, SOLVER_META } from '../../nav-data'
 import { EXPLAINER_META } from '../../explainers/registry'
-
-const docs = await getCollection('docs')
-const typeBadge: Record<string, string> = {}
-for (const d of docs) typeBadge[d.data.id] = d.data.typeBadge ?? ''
 
 const title = 'Algorithms — Teeline'
 const description =
@@ -41,7 +36,7 @@ const groupDesc: Record<string, string> = {
               <thead>
                 <tr class="border-b border-border">
                   <th class="px-4 py-2 text-left font-semibold text-text-dim">Name</th>
-                  <th class="px-4 py-2 text-left font-semibold text-text-dim">Type</th>
+                  <th class="px-4 py-2 text-left font-semibold text-text-dim">Complexity</th>
                   <th class="px-4 py-2 text-left font-semibold text-text-dim">Interactive explainer</th>
                 </tr>
               </thead>
@@ -54,7 +49,7 @@ const groupDesc: Record<string, string> = {
                       <td class="px-4 py-2">
                         <a href={`/algorithms/${id}/`} class="text-accent no-underline hover:underline">{meta.name}</a>
                       </td>
-                      <td class="px-4 py-2 text-text-dim">{typeBadge[id] ?? '—'}</td>
+                      <td class="px-4 py-2 font-mono text-xs text-text-dim">{meta.complexity}</td>
                       <td class="px-4 py-2">
                         {id in EXPLAINER_META ? (
                           <a href={`/algorithms/${id}/explainer/`} class="text-accent no-underline hover:underline" aria-label={`Open interactive explainer for ${meta.name}`}>▶ interactive</a>
