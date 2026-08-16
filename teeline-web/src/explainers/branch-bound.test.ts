@@ -130,6 +130,32 @@ describe('correctness & scenario pins', () => {
     }
   })
 
+  it('finds the exact optimum on random instances (brute-force sweep)', () => {
+    let seed = 42
+    const rnd = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed / 2147483648
+    }
+    for (let t = 0; t < 20; t++) {
+      const cities: [number, number][] = []
+      for (let i = 0; i < 6; i++) {
+        cities.push([Math.round(20 + rnd() * 260), Math.round(20 + rnd() * 260)] as [number, number])
+      }
+      const s = runToDone({ label: '', desc: '', cities })
+      expect(s.bestCost, `random instance ${t} must match brute force`).toBeCloseTo(bruteForce(cities), 6)
+    }
+  })
+
+  it('new-best events display the CLOSED cycle (return edge included)', () => {
+    let s = makeInitState(SCENARIOS.early_best)
+    let guard = 20
+    while (s.bestCost === null && guard-- > 0) s = stepOnce(s)
+    expect(s.lastEvent).toContain('New best')
+    expect(s.lastEvent).toContain('→0') // the tour closes back at the start
+    expect(s.bestTour![0]).toBe(0)
+    expect(s.bestTour![s.bestTour!.length - 1]).toBe(0)
+  })
+
   it('node/leaf counts are pinned per scenario', () => {
     for (const [key, sc] of Object.entries(SCENARIOS)) {
       const s = runToDone(sc)
