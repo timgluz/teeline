@@ -176,9 +176,11 @@ export function stepOnce(state: SimState): SimState {
     const id = state.nodes.length
 
     if (unvisited.length === 0) {
-      // Leaf — a complete tour
+      // Leaf — a complete tour. TSP tours are closed cycles, so the displayed
+      // tour includes the return edge back to the start.
       const tourCost = cost + state.dm[c][state.startCity]
       const isBest = state.bestCost === null || tourCost < state.bestCost
+      const closed = [...path, state.startCity].join('→')
       const node: BnBNode = {
         id, parent: topId, depth: path.length, path, cost, unvisited,
         lb: tourCost,
@@ -191,8 +193,8 @@ export function stepOnce(state: SimState): SimState {
         bestCost: isBest ? tourCost : state.bestCost,
         bestTour: isBest ? [...path, state.startCity] : state.bestTour,
         lastEvent: isBest
-          ? `New best — complete tour ${path.join('→')} costs ${tourCost.toFixed(0)}`
-          : `Leaf — tour ${path.join('→')} costs ${tourCost.toFixed(0)} (not better than ${state.bestCost!.toFixed(0)})`,
+          ? `New best — complete tour ${closed} costs ${tourCost.toFixed(0)}`
+          : `Leaf — tour ${closed} costs ${tourCost.toFixed(0)} (not better than ${state.bestCost!.toFixed(0)})`,
         step: state.step + 1,
       }
     }
