@@ -3,10 +3,12 @@ import { test, expect } from '@playwright/test'
 // E2E smoke tests for the Branch & Bound explainer (/algorithms/branch_bound/explainer/).
 async function waitHydrated(page: import('@playwright/test').Page) {
   const root = page.locator('.bb-root')
-  await root.scrollIntoViewIfNeeded()
   const chip = page.locator('.bb-chip')
   const step = page.getByRole('button', { name: 'Step' })
+  // scroll + probe in a retry loop: `client:visible` hydration swaps the SSR
+  // DOM, which can detach the locator mid-scroll — a transient failure is retried
   await expect(async () => {
+    await root.scrollIntoViewIfNeeded()
     await step.click()
     await expect(chip).toContainText('Expanded', { timeout: 1500 })
   }).toPass({ timeout: 15_000 })
