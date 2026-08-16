@@ -46,11 +46,14 @@ function TourCanvas({ sim, showMst, showMatch, showTour }: {
   // multigraph edges the walker has already used, per unordered pair
   const usedPairs = useMemo(() => {
     const map = new Map<string, number>()
-    const upto = phase === 'euler'
-      ? sim.walkerPos
-      : phase === 'shortcut' || phase === 'done'
-        ? sim.eulerCircuit.length - 1
-        : 0
+    let upto: number
+    if (phase === 'euler') {
+      upto = sim.walkerPos
+    } else if (phase === 'shortcut' || phase === 'done') {
+      upto = sim.eulerCircuit.length - 1
+    } else {
+      upto = 0
+    }
     for (let t = 0; t < upto; t++) {
       const k = edgeKey(sim.eulerCircuit[t], sim.eulerCircuit[t + 1])
       map.set(k, (map.get(k) ?? 0) + 1)
@@ -83,21 +86,25 @@ function TourCanvas({ sim, showMst, showMatch, showTour }: {
   const skippedSet = new Set(sim.skipped)
 
   // walker position: euler phase follows walkerPos; shortcut follows shortcutStep
-  const walkerCity = phase === 'euler'
-    ? sim.eulerCircuit[Math.min(sim.walkerPos, sim.eulerCircuit.length - 1)]
-    : phase === 'shortcut'
-      ? sim.eulerCircuit[Math.min(sim.shortcutStep, sim.eulerCircuit.length - 1)]
-      : null
+  let walkerCity: number | null = null
+  if (phase === 'euler') {
+    walkerCity = sim.eulerCircuit[Math.min(sim.walkerPos, sim.eulerCircuit.length - 1)]
+  } else if (phase === 'shortcut') {
+    walkerCity = sim.eulerCircuit[Math.min(sim.shortcutStep, sim.eulerCircuit.length - 1)]
+  }
 
   const constructing = phase === 'mst' || phase === 'odd' || phase === 'matching'
-  const mstShown: [number, number][] = showMst && constructing
-    ? sim.mstEdges.slice(0, phase === 'mst' ? sim.mstRevealed : sim.mstEdges.length)
-    : []
-  const matchShown: [number, number][] = showMatch && phase === 'matching'
-    ? sim.matchingEdges.slice(0, sim.matchingRevealed)
-    : showMatch && (phase === 'euler' || phase === 'shortcut' || phase === 'done')
-      ? sim.matchingEdges
-      : []
+  let mstShown: [number, number][] = []
+  if (showMst && constructing) {
+    const limit = phase === 'mst' ? sim.mstRevealed : sim.mstEdges.length
+    mstShown = sim.mstEdges.slice(0, limit)
+  }
+  let matchShown: [number, number][] = []
+  if (showMatch && phase === 'matching') {
+    matchShown = sim.matchingEdges.slice(0, sim.matchingRevealed)
+  } else if (showMatch && (phase === 'euler' || phase === 'shortcut' || phase === 'done')) {
+    matchShown = sim.matchingEdges
+  }
   const showMultigraph = phase === 'euler' || phase === 'shortcut'
   const showTourLayer = showTour && (phase === 'shortcut' || phase === 'done')
 
@@ -167,7 +174,7 @@ function RatioMeter({ ratio }: { ratio: number }) {
       <div className="chr-meter-track">
         <div className="chr-meter-fill" style={{ width: `${Math.min(100, pct)}%` }} />
         <div className="chr-meter-mark chr-meter-mark-opt" />
-        <div className="chr-meter-mark chr-meter-mark-bound" style={{ left: '83.3%' }} />
+        <div className="chr-meter-mark chr-meter-mark-bound" />
         <div className="chr-meter-dot" style={{ left: `${Math.min(100, pct)}%` }} />
       </div>
       <div className="chr-meter-labels">
@@ -263,11 +270,13 @@ export default function ChristofidesExplainer() {
   let chipText = "Step 1 — growing the Minimum Spanning Tree (Prim's)"
   let chipClass = "chr-chip chr-chip-idle"
   if (s.phase === 'mst') {
-    chipText = s.mstRevealed === 0
-      ? `MST — click Step to grow the tree (Prim's, cost ${s.mstCost.toFixed(0)})`
-      : s.mstRevealed < s.mstEdges.length
-        ? `MST — added edge ${s.mstEdges[s.mstRevealed - 1][0]}–${s.mstEdges[s.mstRevealed - 1][1]} (${s.mstRevealed}/${s.mstEdges.length})`
-        : `MST complete — cost ${s.mstCost.toFixed(0)} ≤ OPT ${s.opt.toFixed(0)}. Step to find odd-degree vertices`
+    if (s.mstRevealed === 0) {
+      chipText = `MST — click Step to grow the tree (Prim's, cost ${s.mstCost.toFixed(0)})`
+    } else if (s.mstRevealed < s.mstEdges.length) {
+      chipText = `MST — added edge ${s.mstEdges[s.mstRevealed - 1][0]}–${s.mstEdges[s.mstRevealed - 1][1]} (${s.mstRevealed}/${s.mstEdges.length})`
+    } else {
+      chipText = `MST complete — cost ${s.mstCost.toFixed(0)} ≤ OPT ${s.opt.toFixed(0)}. Step to find odd-degree vertices`
+    }
   } else if (s.phase === 'odd') {
     chipText = `Odd-degree vertices: ${s.odd.join(', ')} — always an even count (handshaking lemma)`
     chipClass = "chr-chip chr-chip-odd"
@@ -391,7 +400,7 @@ export default function ChristofidesExplainer() {
       </div>
 
       <div className="chr-controls">
-        <button className="chr-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>⏴ Back</button>
+        <button className="chr-btn" onClick={stepBack} disabled={running || s.step === 0}>⏴ Back</button>
         <button className="chr-btn" onClick={stepForward} disabled={running || s.phase === 'done'}>⏵ Step</button>
         <button className="chr-btn" onClick={() => setRunning(!running)} disabled={s.phase === 'done'}>
           {running ? "⏸ Pause" : "▶ Run"}
@@ -525,7 +534,7 @@ const CSS = `
   position: absolute; top: -2px; bottom: -2px; width: 2px; background: #64748b;
 }
 .chr-meter-mark-opt { left: 0; }
-.chr-meter-mark-bound { background: #dc2626; }
+.chr-meter-mark-bound { left: 83.3%; background: #dc2626; }
 .chr-meter-labels {
   display: flex; justify-content: space-between; font-size: 0.68rem; color: var(--muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

@@ -168,9 +168,13 @@ export function hierholzer(adjIn: number[][], start: number): number[] {
     const v = stack[stack.length - 1]
     if (adj[v].length > 0) {
       const u = adj[v].pop()!
+      // swap_remove the reverse half-edge, exactly like Rust's
+      // `if let Some(pos) = adj[u].iter().position(...)` guard.
       const pos = adj[u].indexOf(v)
-      if (pos >= 0) adj[u][pos] = adj[u][adj[u].length - 1] // swap_remove
-      adj[u].pop()
+      if (pos >= 0) {
+        adj[u][pos] = adj[u][adj[u].length - 1]
+        adj[u].pop()
+      }
       stack.push(u)
     } else {
       circuit.push(stack.pop()!)
