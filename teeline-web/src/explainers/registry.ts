@@ -96,6 +96,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of Stochastic Hill Climbing: watch random 2-opt candidates get accepted only when they beat the best tour so far, with random restarts when the search goes stale.',
     backLabel: 'Stochastic Hill Climbing',
   },
+  or_opt: {
+    title: 'Or-opt — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of Or-opt: watch segments of 1–3 consecutive cities get cut from one part of the tour and pasted into a better position, with reversed insertions for Or-2/Or-3 and best-improvement passes running to a local optimum.',
+    backLabel: 'Or-opt',
+  },
   '2opt': {
     title: '2-opt — Interactive Explainer — Teeline',
     description:
