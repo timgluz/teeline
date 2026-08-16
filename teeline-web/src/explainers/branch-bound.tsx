@@ -190,7 +190,7 @@ export default function BranchBoundExplainer() {
         <div className="bb-side">
           <div className="bb-section-label">Search tree</div>
           <SearchTree sim={s} selectedId={selectedId} onSelect={setSelectedId} />
-          <div className="bb-section-label" style={{ marginTop: 6 }}>Tour at selected node</div>
+          <div className="bb-section-label bb-mt6">Tour at selected node</div>
           <CityMap sim={s} node={infoNode} />
         </div>
         <div className="bb-panel">
@@ -213,12 +213,12 @@ export default function BranchBoundExplainer() {
             )}
           </div>
 
-          <div className="bb-section-label" style={{ marginTop: 10 }}>Best tour</div>
+          <div className="bb-section-label bb-mt10">Best tour</div>
           <div className="bb-best">
             <span className="bb-mono">{s.bestCost === null ? '— (none yet)' : s.bestTour!.join(' → ') + ' = ' + s.bestCost.toFixed(1)}</span>
           </div>
 
-          <div className="bb-section-label" style={{ marginTop: 10 }}>Stats</div>
+          <div className="bb-section-label bb-mt10">Stats</div>
           <div className="bb-statgrid">
             <div><div className="bb-statlabel">nodes</div><div className="bb-mono">{s.nodes.length}</div></div>
             <div><div className="bb-statlabel">explored</div><div className="bb-mono">{s.explored}</div></div>
@@ -321,6 +321,8 @@ const CSS = `
 .bb-panel { width: 250px; flex-shrink: 0; display: flex; flex-direction: column; }
 
 .bb-section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.bb-mt6 { margin-top: 6px; }
+.bb-mt10 { margin-top: 10px; }
 
 .bb-tree-scroll {
   overflow: auto; max-height: 300px;

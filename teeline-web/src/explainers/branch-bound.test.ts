@@ -87,7 +87,7 @@ describe('stepOnce', () => {
     let guard = 20
     while (s.bestCost === null && guard-- > 0) s = stepOnce(s)
     expect(s.bestCost).not.toBeNull()
-    expect(s.bestTour).toHaveLength(6)
+    expect(s.bestTour).toHaveLength(7) // closed cycle: start + 5 cities + start
     expect(s.nodes.some((nd) => nd.status === 'best')).toBe(true)
   })
 
@@ -121,8 +121,11 @@ describe('correctness & scenario pins', () => {
     for (const [key, sc] of Object.entries(SCENARIOS)) {
       const s = runToDone(sc)
       expect(s.bestCost, `${key} must find the optimum`).toBeCloseTo(bruteForce(sc.cities), 6)
-      expect([...s.bestTour!].sort((a, b) => a - b), `${key} best tour must be a permutation`).toEqual(
-        Array.from({ length: sc.cities.length }, (_, i) => i),
+      // bestTour is the closed cycle: starts and ends at city 0, middle is a permutation
+      expect(s.bestTour![0], `${key} cycle must start at city 0`).toBe(0)
+      expect(s.bestTour![s.bestTour!.length - 1], `${key} cycle must end at city 0`).toBe(0)
+      expect([...s.bestTour!.slice(1, -1)].sort((a, b) => a - b), `${key} middle must be a permutation`).toEqual(
+        Array.from({ length: sc.cities.length - 1 }, (_, i) => i + 1),
       )
     }
   })

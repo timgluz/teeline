@@ -85,6 +85,7 @@ export function mstCost(ids: number[], dm: number[][]): number {
         u = i
       }
     }
+    if (u === -1) return total // disconnected — no further edges can be added
     inTree[u] = true
     total += key[u]
     for (let v = 0; v < n; v++) {
@@ -174,7 +175,10 @@ export function stepOnce(state: SimState): SimState {
   const top = state.nodes[topId]
   const prev = top.path[top.path.length - 1]
 
-  // Candidates not yet branched: unvisited sorted by distance from prev
+  // Candidates not yet branched: unvisited sorted by distance from the
+  // previous city. This equals the solver's bound-ascending order — for a
+  // fixed node the MST({start} ∪ unvisited) term is the same for every
+  // candidate, so the lower bound differs only in the added edge.
   const childCount = state.nodes.filter((nd) => nd.parent === topId).length
   const candidates = [...top.unvisited].sort((a, b) => state.dm[prev][a] - state.dm[prev][b])
 
@@ -186,7 +190,7 @@ export function stepOnce(state: SimState): SimState {
     const id = state.nodes.length
 
     if (unvisited.length === 0) {
-      // Leaf — a complete tour
+      // Leaf — a complete tour. bestTour stores the closed cycle (start re-appended).
       const tourCost = cost + state.dm[c][state.startCity]
       const isBest = state.bestCost === null || tourCost < state.bestCost
       const node: BnBNode = {
@@ -199,7 +203,7 @@ export function stepOnce(state: SimState): SimState {
         nodes: [...state.nodes, node],
         leaves: state.leaves + 1,
         bestCost: isBest ? tourCost : state.bestCost,
-        bestTour: isBest ? path : state.bestTour,
+        bestTour: isBest ? [...path, state.startCity] : state.bestTour,
         lastEvent: isBest
           ? `New best — complete tour ${path.join('→')} costs ${tourCost.toFixed(0)}`
           : `Leaf — tour ${path.join('→')} costs ${tourCost.toFixed(0)} (not better than ${state.bestCost?.toFixed(0) ?? '∞'})`,

@@ -4,7 +4,7 @@
 // sidebar, linking to /algorithms/<id>/explainer/. Built from the registry so
 // it stays in sync with EXPLAINER_META automatically.
 import { EXPLAINER_META } from '../explainers/registry'
-import { SOLVER_GROUPS, SOLVER_META } from '../nav-data'
+import { SOLVER_GROUPS } from '../nav-data'
 
 interface Props {
   currentId: string | null
@@ -24,7 +24,6 @@ const { currentId } = Astro.props
           <ul class="m-0 list-none p-0">
             {explainerIds.map((id) => {
               const label = EXPLAINER_META[id].backLabel
-              const meta = SOLVER_META[id]
               const isCurrent = id === currentId
               return (
                 <li class={isCurrent ? 'border-l-2 border-accent bg-accent-dim' : ''}>
