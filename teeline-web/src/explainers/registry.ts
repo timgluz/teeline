@@ -102,6 +102,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of Or-opt: watch segments of 1–3 consecutive cities get cut from one part of the tour and pasted into a better position, with reversed insertions for Or-2/Or-3 and best-improvement passes running to a local optimum.',
     backLabel: 'Or-opt',
   },
+  '3opt': {
+    title: '3-opt — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the 3-opt local-search algorithm: watch three edges get removed and the three segments reconnected in one of seven ways, with the chosen reconnection pattern highlighted in a case diagram.',
+    backLabel: '3-opt',
+  },
   '2opt': {
     title: '2-opt — Interactive Explainer — Teeline',
     description:
