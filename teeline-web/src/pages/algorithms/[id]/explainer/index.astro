@@ -28,6 +28,7 @@ import FourierExplainer from '../../../../explainers/fourier'
 import GreedyEdgeExplainer from '../../../../explainers/greedy-edge'
 import SavingsExplainer from '../../../../explainers/savings'
 import AcoExplainer from '../../../../explainers/aco'
+import StochasticHillExplainer from '../../../../explainers/stochastic-hill'
 import TwoOptExplainer from '../../../../explainers/two-opt'
 import NNExplainer from '../../../../explainers/nearest-neighbor'
 
@@ -69,6 +70,7 @@ const jsonLd = {
     {id === 'greedy_edge' && <GreedyEdgeExplainer client:visible />}
     {id === 'savings' && <SavingsExplainer client:visible />}
     {id === 'aco' && <AcoExplainer client:visible />}
+    {id === 'stochastic_hill' && <StochasticHillExplainer client:visible />}
     {id === '2opt' && <TwoOptExplainer client:visible />}
     {id === 'nn' && <NNExplainer client:visible />}
   </main>

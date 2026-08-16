@@ -90,6 +90,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of Ant Colony Optimization: watch a colony of ants construct tours probabilistically, biased by a shared pheromone matrix that strengthens on short edges and decays over epochs. Adjust α (pheromone influence), β (heuristic weight), evaporation rate, and colony size.',
     backLabel: 'ACO',
   },
+  stochastic_hill: {
+    title: 'Stochastic Hill Climbing — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of Stochastic Hill Climbing: watch random 2-opt candidates get accepted only when they beat the best tour so far, with random restarts when the search goes stale.',
+    backLabel: 'Stochastic Hill Climbing',
+  },
   '2opt': {
     title: '2-opt — Interactive Explainer — Teeline',
     description:

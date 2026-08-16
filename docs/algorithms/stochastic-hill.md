@@ -3,7 +3,7 @@ id: "stochastic_hill"
 name: "Stochastic Hill Climbing"
 typeBadge: "Heuristic — local search"
 description: "Iterative improvement with random restarts. Each step applies a random perturbation to the current tour; the new tour is accepted if it is better."
-hasExplainer: false
+hasExplainer: true
 ---
 
 # Stochastic Hill Climbing
