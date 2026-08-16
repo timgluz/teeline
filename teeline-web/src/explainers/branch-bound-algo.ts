@@ -189,7 +189,7 @@ export function stepOnce(state: SimState): SimState {
         nodes: [...state.nodes, node],
         leaves: state.leaves + 1,
         bestCost: isBest ? tourCost : state.bestCost,
-        bestTour: isBest ? path : state.bestTour,
+        bestTour: isBest ? [...path, state.startCity] : state.bestTour,
         lastEvent: isBest
           ? `New best — complete tour ${path.join('→')} costs ${tourCost.toFixed(0)}`
           : `Leaf — tour ${path.join('→')} costs ${tourCost.toFixed(0)} (not better than ${state.bestCost!.toFixed(0)})`,
