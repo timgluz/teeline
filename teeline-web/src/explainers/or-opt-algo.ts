@@ -166,7 +166,7 @@ export function scanBestMove(tour: number[]): MoveEvent | null {
 export function applyRelocation(
   tour: number[],
   i: number,
-  segLen: number,
+  segLen: 1 | 2 | 3,
   j: number,
   reversed: boolean,
 ): number[] {

@@ -39,22 +39,27 @@ function TourCanvas({ tour, pending, lastMove, phase, morph }: {
   const showCandidate = phase === 'candidate' && pending
   const showApplied = phase === 'move_applied' && lastMove
 
-  const cutSet = useMemo(() => {
-    const m = showCandidate ? pending : showApplied ? lastMove : null
-    if (!m) return new Set<string>()
-    return new Set(m.cutEdges.map(([a, b]) => edgeKey(a, b)))
-  }, [pending, lastMove, showCandidate, showApplied])
-  const pasteSet = useMemo(() => {
-    const m = showCandidate ? pending : showApplied ? lastMove : null
-    if (!m) return new Set<string>()
-    return new Set(m.pasteEdges.map(([a, b]) => edgeKey(a, b)))
+  // The move currently being displayed: the proposed candidate, or the one
+  // just applied.
+  const activeMove = useMemo<MoveEvent | null>(() => {
+    if (showCandidate) return pending
+    if (showApplied) return lastMove
+    return null
   }, [pending, lastMove, showCandidate, showApplied])
 
+  const cutSet = useMemo(() => {
+    if (!activeMove) return new Set<string>()
+    return new Set(activeMove.cutEdges.map(([a, b]) => edgeKey(a, b)))
+  }, [activeMove])
+  const pasteSet = useMemo(() => {
+    if (!activeMove) return new Set<string>()
+    return new Set(activeMove.pasteEdges.map(([a, b]) => edgeKey(a, b)))
+  }, [activeMove])
+
   const segSet = useMemo(() => {
-    const m = showCandidate ? pending : showApplied ? lastMove : null
-    if (!m) return new Set<number>()
-    return new Set(m.segCities)
-  }, [pending, lastMove, showCandidate, showApplied])
+    if (!activeMove) return new Set<number>()
+    return new Set(activeMove.segCities)
+  }, [activeMove])
 
   const edges: Array<{ from: number; to: number; key: string }> = []
   for (let k = 0; k < tour.length; k++) {
@@ -176,6 +181,9 @@ export default function OrOptExplainer() {
   }, [])
 
   const stepForward = useCallback(() => {
+    // Guard against an in-flight interval tick after the run already finished:
+    // stepping a local_optimum state would push a phantom undo entry.
+    if (simRef.current.phase === 'local_optimum') return
     historyRef.current.push(structuredClone(simRef.current))
     const next = stepOnce(simRef.current)
     simRef.current = next
@@ -332,7 +340,7 @@ export default function OrOptExplainer() {
         <div className="or-scenario-row">
           {Object.entries(SCENARIOS).map(([key, s]) => (
             <button key={key} className="or-scenario-btn" title={s.desc}
-              onClick={() => reinit(s)}>
+              onClick={() => reinit(s)} disabled={running}>
               {s.label}
             </button>
           ))}
@@ -487,7 +495,8 @@ const CSS = `
   border: 1px solid var(--line); background: var(--bg); color: var(--text);
   cursor: pointer; transition: background 0.15s;
 }
-.or-scenario-btn:hover { background: #f0fdf4; border-color: var(--accent); }
+.or-scenario-btn:hover:not(:disabled) { background: #f0fdf4; border-color: var(--accent); }
+.or-scenario-btn:disabled { opacity: 0.4; cursor: default; }
 
 .or-footer {
   display: flex; gap: 12px; justify-content: center;

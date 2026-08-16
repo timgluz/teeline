@@ -75,20 +75,32 @@ test.describe('or-opt explainer', () => {
     await expect(stepStat).toHaveText('1')
   })
 
-  test('Run animates passes; Pause and Reset stop and reset', async ({ page }) => {
+  test('Run animates passes to the local optimum; Reset restores idle', async ({ page }) => {
     const pass = page.locator('.or-statgrid').locator('div', { hasText: /^pass/ }).locator('.or-mono')
+    const moves = page.locator('.or-statgrid').locator('div', { hasText: /^moves/ }).locator('.or-mono')
 
     await page.getByRole('button', { name: 'Run' }).click()
+    // single_segment converges in one pass — watch it advance and finish
     await expect(pass).not.toHaveText('0', { timeout: 10_000 })
-
-    await page.getByRole('button', { name: 'Pause' }).click()
-    const paused = await pass.textContent()
-    await page.waitForTimeout(500)
-    await expect(pass).toHaveText(paused ?? '')
+    await expect(page.locator('.or-chip')).toContainText('Local optimum', { timeout: 10_000 })
+    // one applied move + the final local-optimum scan
+    await expect(pass).toHaveText('2')
+    await expect(moves).toHaveText('1')
 
     await page.getByRole('button', { name: 'Reset' }).click()
     await expect(pass).toHaveText('0')
     await expect(page.locator('.or-chip')).toContainText('Click Step')
+  })
+
+  test('Pause stops the animation mid-run', async ({ page }) => {
+    const pass = page.locator('.or-statgrid').locator('div', { hasText: /^pass/ }).locator('.or-mono')
+
+    await page.getByRole('button', { name: 'Run' }).click()
+    // pause immediately — before or during the first tick, pass is 0 or 1
+    await page.getByRole('button', { name: 'Pause' }).click()
+    const paused = await pass.textContent()
+    await page.waitForTimeout(700)
+    await expect(pass).toHaveText(paused ?? '')
   })
 
   test('already_optimal reaches the local optimum in one Step', async ({ page }) => {
