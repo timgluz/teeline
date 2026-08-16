@@ -137,7 +137,11 @@ export function scanBestMove(tour: number[]): MoveEvent | null {
           const savings = orig - bestCost
           if (savings > bestSavings) {
             bestSavings = savings
-            bestMove = { i, j, k, caseNo: (bestCase + 1) as CaseNo, delta: bestCost - orig }
+            const caseNo = (bestCase + 1) as CaseNo
+            if (caseNo < 1 || caseNo > 7) {
+              throw new Error(`3-opt: invalid caseNo ${caseNo}`)
+            }
+            bestMove = { i, j, k, caseNo, delta: bestCost - orig }
           }
         }
       }
@@ -149,13 +153,13 @@ export function scanBestMove(tour: number[]): MoveEvent | null {
   const a = tour[i]
   const b = tour[i + 1]
   const c = tour[j]
-  const d = tour[j + 1]
+  const dt = tour[j + 1]
   const e = tour[k]
   const f = tour[(k + 1) % n]
   return {
     i, j, k, caseNo, delta,
-    removedEdges: [[a, b], [c, d], [e, f]],
-    addedEdges: addedEdgesForCase(a, b, c, d, e, f, caseNo),
+    removedEdges: [[a, b], [c, dt], [e, f]],
+    addedEdges: addedEdgesForCase(a, b, c, dt, e, f, caseNo),
   }
 }
 
@@ -168,8 +172,8 @@ export function apply3Opt(tour: number[], i: number, j: number, k: number, caseN
   const head = tour.slice(0, i + 1)
   const tail = tour.slice(k + 1)
   switch (caseNo) {
-    case 1: return [...head, ...rev(s1), ...tour.slice(j + 1)]
-    case 2: return [...tour.slice(0, j + 1), ...rev(s2), ...tail]
+    case 1: return [...head, ...rev(s1), ...s2, ...tail]
+    case 2: return [...head, ...s1, ...rev(s2), ...tail]
     case 3: return [...head, ...rev(s1), ...rev(s2), ...tail]
     case 4: return [...head, ...s2, ...s1, ...tail]
     case 5: return [...head, ...s2, ...rev(s1), ...tail]

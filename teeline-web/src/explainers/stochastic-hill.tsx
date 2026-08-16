@@ -357,7 +357,7 @@ export default function StochasticHillExplainer() {
         <button className="shc-btn" onClick={() => setRunning(!running)} disabled={phase === 'done'}>
           {running ? "⏸ Pause" : "▶ Run"}
         </button>
-        <button className="shc-btn" onClick={() => reinit(scenarioRef.current)}>↺ Reset</button>
+        <button className="shc-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
       </div>
 
       <div className="shc-scenarios">

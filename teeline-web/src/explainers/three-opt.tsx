@@ -234,11 +234,12 @@ export default function ThreeOptExplainer() {
   }, [running, speedIdx, stepForward])
 
   const distance = tourLength(tour)
-  const activeCase = phase === 'candidate' && pending
-    ? pending.caseNo
-    : phase === 'swap_applied' && lastMove
-      ? lastMove.caseNo
-      : null
+  let activeCase: CaseNo | null = null
+  if (phase === 'candidate' && pending) {
+    activeCase = pending.caseNo
+  } else if (phase === 'swap_applied' && lastMove) {
+    activeCase = lastMove.caseNo
+  }
 
   // Status chip
   let chipText = "Click Step to scan triples for the best 3-opt reconnection"
@@ -351,7 +352,7 @@ export default function ThreeOptExplainer() {
         <button className="t3-btn" onClick={() => setRunning(!running)} disabled={phase === 'local_optimum'}>
           {running ? "⏸ Pause" : "▶ Run"}
         </button>
-        <button className="t3-btn" onClick={() => reinit(scenarioRef.current)}>↺ Reset</button>
+        <button className="t3-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
       </div>
 
       <div className="t3-scenarios">
