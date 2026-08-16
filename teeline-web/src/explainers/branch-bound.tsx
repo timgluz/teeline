@@ -191,11 +191,13 @@ export default function BranchBoundExplainer() {
         <div className="bb-side">
           <div className="bb-section-label">Search tree</div>
           <SearchTree sim={s} selectedId={selectedId} onSelect={setSelectedId} />
-          <div className="bb-section-label" style={{ marginTop: 6 }}>Tour at selected node</div>
-          <CityMap sim={s} node={infoNode} />
         </div>
         <div className="bb-panel">
-          <div className="bb-section-label">Node info</div>
+          <div className="bb-section-label">Tour at selected node</div>
+          <div className="bb-minimap">
+            <CityMap sim={s} node={infoNode} />
+          </div>
+          <div className="bb-section-label bb-mt10">Node info</div>
           <div className="bb-nodeinfo">
             {infoNode ? (
               <>
@@ -320,11 +322,12 @@ const CSS = `
 .bb-viz-row { display: flex; gap: 12px; align-items: stretch; }
 .bb-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .bb-panel { width: 250px; flex-shrink: 0; display: flex; flex-direction: column; }
+.bb-minimap { width: 200px; align-self: flex-start; }
 
 .bb-section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 
 .bb-tree-scroll {
-  overflow: auto; max-height: 300px;
+  overflow: auto; max-height: 600px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
 }
 .bb-tree { display: block; }
