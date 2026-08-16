@@ -327,7 +327,7 @@ const CSS = `
 .bb-section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
 
 .bb-tree-scroll {
-  overflow: auto; max-height: 600px;
+  overflow: auto; height: 740px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--panel);
 }
 .bb-tree { display: block; }
