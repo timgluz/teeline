@@ -1,0 +1,62 @@
+---
+// Index page for all algorithms — replaces the topbar's algorithms
+// drop-down with a browsable destination, mirroring the Problems page.
+import { getCollection } from 'astro:content'
+import BaseLayout from '../../layouts/BaseLayout.astro'
+import { SOLVER_GROUPS, SOLVER_META } from '../../nav-data'
+import { EXPLAINER_META } from '../../explainers/registry'
+
+const docs = await getCollection('docs')
+const typeBadge: Record<string, string> = {}
+for (const d of docs) typeBadge[d.data.id] = d.data.typeBadge ?? ''
+
+const title = 'Algorithms — Teeline'
+const description =
+  'Browse the TSP solvers implemented in teeline: exact algorithms, constructive heuristics, local search and metaheuristics — each with docs and, where available, an interactive explainer.'
+---
+<BaseLayout title={title} description={description} path="/algorithms/">
+  <main class="mx-auto max-w-content px-6 py-8">
+    <h1 class="text-2xl font-semibold tracking-tight lg:text-3xl">Algorithms</h1>
+    <p class="mt-3 text-text-dim">{description}</p>
+
+    {
+      SOLVER_GROUPS.map((g) => (
+        <section class="mt-6">
+          <h2 class="text-xl font-semibold tracking-tight">{g.label}</h2>
+          <div class="mt-3 overflow-x-auto rounded-lg border border-border bg-surface">
+            <table class="w-full border-collapse text-sm">
+              <thead>
+                <tr class="border-b border-border">
+                  <th class="px-4 py-2 text-left font-semibold text-text-dim">Name</th>
+                  <th class="px-4 py-2 text-left font-semibold text-text-dim">Type</th>
+                  <th class="px-4 py-2 text-left font-semibold text-text-dim">Interactive explainer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {g.ids.map((id) => {
+                  const meta = SOLVER_META[id]
+                  if (!meta) return null
+                  return (
+                    <tr class="border-b border-border last:border-b-0">
+                      <td class="px-4 py-2">
+                        <a href={`/algorithms/${id}/`} class="text-accent no-underline hover:underline">{meta.name}</a>
+                      </td>
+                      <td class="px-4 py-2 text-text-dim">{typeBadge[id] ?? '—'}</td>
+                      <td class="px-4 py-2">
+                        {id in EXPLAINER_META ? (
+                          <a href={`/algorithms/${id}/explainer/`} class="text-accent no-underline hover:underline">▶ interactive</a>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))
+    }
+  </main>
+</BaseLayout>
