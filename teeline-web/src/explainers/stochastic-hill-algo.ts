@@ -17,17 +17,8 @@
 // small enough that a full scenario run stays short, which suits an explainer
 // whose job is to show the mechanics (random 2-opt, accept-if-better,
 // restart-when-stale), not to solve the instance.
-export const CITIES: [number, number][] = [
-  [150, 20],   // 0 — top
-  [270, 70],   // 1 — top-right
-  [260, 180],  // 2 — right
-  [180, 280],  // 3 — bottom-right
-  [120, 290],  // 4 — bottom
-  [35, 220],   // 5 — bottom-left
-  [25, 80],    // 6 — left
-  [80, 25],    // 7 — top-left
-]
-export const N_CITIES = CITIES.length
+import { CITIES_8 as CITIES, N_CITIES_8 as N_CITIES, dist8 as dist, tourLength8 as tourLength } from './explainer-cities'
+export { CITIES, N_CITIES, dist, tourLength }
 
 export type Phase = 'idle' | 'propose' | 'accepted' | 'rejected' | 'restart' | 'done'
 
@@ -53,23 +44,6 @@ export function nextRand(rng: RngState): { value: number; rng: RngState } {
     value: ((t ^ (t >>> 14)) >>> 0) / 4294967296,
     rng: { seed: rng.seed, counter: rng.counter + 1 },
   }
-}
-
-// ---------------------------------------------------------------
-// Geometry (same 10-city set as the 2-opt and NN explainers)
-// ---------------------------------------------------------------
-export function dist(i: number, j: number): number {
-  const dx = CITIES[i][0] - CITIES[j][0]
-  const dy = CITIES[i][1] - CITIES[j][1]
-  return Math.sqrt(dx * dx + dy * dy)
-}
-
-export function tourLength(tour: number[]): number {
-  let d = 0
-  for (let k = 0; k < tour.length; k++) {
-    d += dist(tour[k], tour[(k + 1) % tour.length])
-  }
-  return d
 }
 
 // ---------------------------------------------------------------

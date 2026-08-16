@@ -9,35 +9,10 @@
 // max-savings move overall) and the degenerate (i==0, k==n-1) skip all mirror
 // the solver. Deterministic — no RNG, so Back/Step replay identically.
 
-export const CITIES: [number, number][] = [
-  [150, 20],   // 0 — top
-  [270, 70],   // 1 — top-right
-  [260, 180],  // 2 — right
-  [180, 280],  // 3 — bottom-right
-  [120, 290],  // 4 — bottom
-  [35, 220],   // 5 — bottom-left
-  [25, 80],    // 6 — left
-  [80, 25],    // 7 — top-left
-  [155, 155],  // 8 — centre
-  [90, 140],   // 9 — inner-left
-]
-export const N_CITIES = CITIES.length
+import { CITIES, N_CITIES, dist, tourLength } from './explainer-cities'
+export { CITIES, N_CITIES, dist, tourLength }
 
 export type Phase = 'idle' | 'candidate' | 'swap_applied' | 'local_optimum'
-
-export function dist(i: number, j: number): number {
-  const dx = CITIES[i][0] - CITIES[j][0]
-  const dy = CITIES[i][1] - CITIES[j][1]
-  return Math.sqrt(dx * dx + dy * dy)
-}
-
-export function tourLength(tour: number[]): number {
-  let d = 0
-  for (let k = 0; k < tour.length; k++) {
-    d += dist(tour[k], tour[(k + 1) % tour.length])
-  }
-  return d
-}
 
 // ---------------------------------------------------------------
 // The candidate move (Rust find_best_move + apply_3opt port)
