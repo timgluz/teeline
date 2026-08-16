@@ -1,10 +1,6 @@
 // Fixed 12-city demo (same layout as SA / CS / FPA / GA explainers)
-export const CITIES: [number, number][] = [
-  [45, 45], [155, 18], [265, 45], [285, 150],
-  [255, 265], [150, 285], [40, 260], [18, 150],
-  [110, 115], [200, 95], [220, 210], [95, 215],
-]
-export const N_CITIES = CITIES.length
+import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, tourLength12 as tourLength } from './explainer-cities'
+export { CITIES, N_CITIES, tourLength }
 
 // PSO constants (mirrors particle_swarm.rs)
 const W_MAX = 0.9
@@ -48,17 +44,6 @@ export type SimState = {
 // ---------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------
-export function tourLength(tour: number[]): number {
-  if (tour.length <= 1) return 0
-  let d = 0
-  for (let i = 0; i < tour.length; i++) {
-    const [x1, y1] = CITIES[tour[i]]
-    const [x2, y2] = CITIES[tour[(i + 1) % tour.length]]
-    d += Math.hypot(x2 - x1, y2 - y1)
-  }
-  return d
-}
-
 // Adjacent transpositions transforming a into b — mirrors swap_sequence in Rust
 export function swapSequence(a: number[], b: number[]): Swap[] {
   const arr = a.slice()

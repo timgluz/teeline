@@ -5,12 +5,8 @@
 // instead of raw distance (ascending). A hub city (nearest the centroid) is
 // computed and highlighted but visited like every other city.
 
-export const CITIES: [number, number][] = [
-  [45, 45], [155, 18], [265, 45], [285, 150],
-  [255, 265], [150, 285], [40, 260], [18, 150],
-  [110, 115], [200, 95], [220, 210], [95, 215],
-]
-export const N_CITIES = CITIES.length
+import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, dist12 as dist } from './explainer-cities'
+export { CITIES, N_CITIES, dist }
 
 export type Edge = { u: number; v: number; dist: number; val: number }
 
@@ -30,12 +26,6 @@ export type SimState = {
   lastEvent: EventMode | null
   done: boolean
   tour: number[] | null      // ordered path once the cycle closes (null until done)
-}
-
-export function dist(i: number, j: number): number {
-  const [x1, y1] = CITIES[i]
-  const [x2, y2] = CITIES[j]
-  return Math.hypot(x2 - x1, y2 - y1)
 }
 
 // Savings for edge (i, j) relative to hub h: s(i,j) = d(h,i) + d(h,j) - d(i,j).

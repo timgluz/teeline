@@ -4,12 +4,8 @@
 // and advances the epoch. Mirrors the Rust `ant_colony.rs` Ant System loop
 // (construct -> best-update -> evaporate -> deposit).
 
-export const CITIES: [number, number][] = [
-  [45, 45], [155, 18], [265, 45], [285, 150],
-  [255, 265], [150, 285], [40, 260], [18, 150],
-  [110, 115], [200, 95], [220, 210], [95, 215],
-]
-export const N_CITIES = CITIES.length
+import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, dist12 as dist, tourLength12 as tourLength } from './explainer-cities'
+export { CITIES, N_CITIES, dist, tourLength }
 
 export type Phase = 'building' | 'depositing'
 export type EventMode = 'ant-built' | 'improved' | 'evaporated' | 'deposited'
@@ -35,13 +31,7 @@ export type SimState = {
   step: number
 }
 
-export function dist(i: number, j: number): number {
-  const [x1, y1] = CITIES[i]
-  const [x2, y2] = CITIES[j]
-  return Math.hypot(x2 - x1, y2 - y1)
-}
-
-function averageDistance(): number {
+export function averageDistance(): number {
   let sum = 0, count = 0
   for (let i = 0; i < N_CITIES; i++)
     for (let j = i + 1; j < N_CITIES; j++)
@@ -60,15 +50,6 @@ function computeEta(beta: number): number[][] {
     }
   }
   return eta
-}
-
-export function tourLength(tour: number[]): number {
-  if (tour.length <= 1) return 0
-  let d = 0
-  for (let i = 0; i < tour.length; i++) {
-    d += dist(tour[i], tour[(i + 1) % tour.length])
-  }
-  return d
 }
 
 // Roulette-wheel construction: starting from a random city, each next city is

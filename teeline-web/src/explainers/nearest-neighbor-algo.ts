@@ -2,19 +2,10 @@
 // One `stepOnce` call picks the closest unvisited city and adds it to the tour.
 // Reuses the same 10-city set as the 2-opt explainer. No DOM, fully testable.
 
-export const CITIES: [number, number][] = [
-  [150, 20],   // 0 — top
-  [270, 70],   // 1 — top-right
-  [260, 180],  // 2 — right
-  [180, 280],  // 3 — bottom-right
-  [120, 290],  // 4 — bottom
-  [35, 220],   // 5 — bottom-left
-  [25, 80],    // 6 — left
-  [80, 25],    // 7 — top-left
-  [155, 155],  // 8 — centre
-  [90, 140],   // 9 — inner-left
-]
-export const N_CITIES = CITIES.length
+// Note: this explainer keeps its own OPEN-PATH tourLength (no wrap-around edge);
+// only the layout and dist come from the shared module.
+import { CITIES, N_CITIES, dist } from './explainer-cities'
+export { CITIES, N_CITIES, dist }
 
 export type EventMode = 'visited' | 'closing' | 'done'
 
@@ -32,12 +23,6 @@ export interface SimState {
   lastCity: number | null    // most recently visited city (or start on closing)
   lastDist: number           // distance of the most recent edge
   candidateDists: Candidate[] | null // distances from current city to all unvisited
-}
-
-export function dist(i: number, j: number): number {
-  const dx = CITIES[i][0] - CITIES[j][0]
-  const dy = CITIES[i][1] - CITIES[j][1]
-  return Math.sqrt(dx * dx + dy * dy)
 }
 
 export function tourLength(tour: number[]): number {
