@@ -170,6 +170,9 @@ export default function StochasticHillExplainer() {
   }, [])
 
   const stepForward = useCallback(() => {
+    // Guard against an in-flight interval tick after the run already finished:
+    // stepping a 'done' state would push a phantom undo entry.
+    if (simRef.current.phase === 'done') return
     historyRef.current.push(structuredClone(simRef.current))
     const next = stepOnce(simRef.current)
     simRef.current = next
@@ -362,7 +365,7 @@ export default function StochasticHillExplainer() {
         <div className="shc-scenario-row">
           {Object.entries(SCENARIOS).map(([key, s]) => (
             <button key={key} className="shc-scenario-btn" title={s.desc}
-              onClick={() => reinit(s)}>
+              onClick={() => reinit(s)} disabled={running}>
               {s.label}
             </button>
           ))}
@@ -528,7 +531,8 @@ const CSS = `
   border: 1px solid var(--line); background: var(--bg); color: var(--text);
   cursor: pointer; transition: background 0.15s;
 }
-.shc-scenario-btn:hover { background: #f0fdf4; border-color: var(--accent); }
+.shc-scenario-btn:hover:not(:disabled) { background: #f0fdf4; border-color: var(--accent); }
+.shc-scenario-btn:disabled { opacity: 0.4; cursor: default; }
 
 .shc-footer {
   display: flex; gap: 12px; justify-content: center;
