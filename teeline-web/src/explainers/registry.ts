@@ -120,6 +120,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of the Branch & Bound exact TSP solver: watch the search tree grow as partial tours branch, with the MST lower bound pruning any branch that cannot beat the best tour found so far.',
     backLabel: 'Branch & Bound',
   },
+  bhk: {
+    title: 'Bellman-Held-Karp — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the Bellman-Held-Karp dynamic program: watch the subset-cost table fill cell by cell (dp[mask][i] built from one smaller subset plus one edge), then read the optimal route back through the recorded predecessors.',
+    backLabel: 'BHK',
+  },
   '2opt': {
     title: '2-opt — Interactive Explainer — Teeline',
     description:
