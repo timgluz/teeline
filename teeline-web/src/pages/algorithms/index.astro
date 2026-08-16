@@ -44,7 +44,7 @@ const description =
                       <td class="px-4 py-2 text-text-dim">{typeBadge[id] ?? '—'}</td>
                       <td class="px-4 py-2">
                         {id in EXPLAINER_META ? (
-                          <a href={`/algorithms/${id}/explainer/`} class="text-accent no-underline hover:underline">▶ interactive</a>
+                          <a href={`/algorithms/${id}/explainer/`} class="text-accent no-underline hover:underline" aria-label={`Open interactive explainer for ${meta.name}`}>▶ interactive</a>
                         ) : (
                           '—'
                         )}

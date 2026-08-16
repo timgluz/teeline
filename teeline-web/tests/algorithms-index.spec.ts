@@ -17,15 +17,15 @@ test.describe('algorithms index & topbar nav', () => {
   test('the index lists the solver groups with explainer links', async ({ page }) => {
     await page.goto('/algorithms/')
     // one "▶ interactive" link per explainer (21 at the time of writing)
-    await expect(page.getByRole('link', { name: '▶ interactive' })).toHaveCount(21)
+    await expect(page.getByRole('link', { name: /Open interactive explainer for/ })).toHaveCount(21)
     // a known solver doc link is present
-    await expect(page.getByRole('link', { name: 'Christofides' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Christofides', exact: true })).toBeVisible()
   })
 
   test('an explainer link from the index opens the explainer page', async ({ page }) => {
     await page.goto('/algorithms/')
     const christofidesRow = page.getByRole('row').filter({ hasText: 'Christofides' })
-    await christofidesRow.getByRole('link', { name: '▶ interactive' }).click()
+    await christofidesRow.getByRole('link', { name: /Open interactive explainer for Christofides/ }).click()
     await expect(page).toHaveURL(/\/algorithms\/christofides\/explainer\/$/)
     await expect(page.locator('.chr-root')).toBeVisible({ timeout: 10_000 })
   })
