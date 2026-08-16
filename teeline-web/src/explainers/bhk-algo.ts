@@ -13,6 +13,9 @@
 // n = 6 per scenario → the table is 5 rows × 32 subsets, easy to scan.
 // Deterministic — no RNG; SimState holds only plain data (cloneable for Back).
 
+import { makeDm } from './explainer-cities'
+export { makeDm }
+
 export type Phase = 'forward' | 'readback' | 'done'
 
 export interface Scenario {
@@ -61,19 +64,6 @@ export const SCENARIOS: Record<string, Scenario> = {
 }
 
 const INF = Infinity
-
-export function makeDm(cities: [number, number][]): number[][] {
-  const n = cities.length
-  const dm: number[][] = Array.from({ length: n }, () => new Array(n).fill(0))
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = Math.hypot(cities[i][0] - cities[j][0], cities[i][1] - cities[j][1])
-      dm[i][j] = d
-      dm[j][i] = d
-    }
-  }
-  return dm
-}
 
 export function popcount(x: number): number {
   let c = 0
@@ -163,6 +153,7 @@ export function computeRoute(state: SimState): { cost: number; route: number[] }
       end = i
     }
   }
+  if (end < 0) return { cost: best, route: [0] } // no complete tour found
   const routeRev = [end + 1]
   let cur = end
   let mask = full

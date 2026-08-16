@@ -22,6 +22,7 @@ function DpTable({ sim, selected, onSelect }: {
 }) {
   const m = sim.m
   const full = (1 << m) - 1
+  const masks = Array.from({ length: full }, (_, i) => i + 1)
 
   // cells of the optimal route (mask, row) — gold in readback/done
   const routeCells = useMemo(() => {
@@ -45,7 +46,7 @@ function DpTable({ sim, selected, onSelect }: {
         <thead>
           <tr>
             <th className="bhk-th bhk-th-row">end \ subset</th>
-            {Array.from({ length: full }, (_, i) => i + 1).map((mask) => (
+            {masks.map((mask) => (
               <th key={mask} className="bhk-th">{mask.toString(2).padStart(m, '0')}</th>
             ))}
           </tr>
@@ -54,7 +55,7 @@ function DpTable({ sim, selected, onSelect }: {
           {Array.from({ length: m }, (_, row) => (
             <tr key={row}>
               <th className="bhk-th bhk-th-row">{row + 1}</th>
-              {Array.from({ length: full }, (_, i) => i + 1).map((mask) => {
+              {masks.map((mask) => {
                 const val = sim.table[row][mask]
                 const isSel = selected?.mask === mask && selected?.row === row
                 const isNext = nextCell?.mask === mask && nextCell?.row === row
@@ -116,7 +117,9 @@ function CityMap({ sim }: { sim: SimState }) {
       ))}
       {Array.from({ length: n }, (_, i) => i).map((i) => {
         const inSub = subset.has(i)
-        const cls = i === 0 ? 'bhk-city-start' : inSub ? 'bhk-city' : 'bhk-city-dim'
+        let cls = 'bhk-city-dim'
+        if (i === 0) cls = 'bhk-city-start'
+        else if (inSub) cls = 'bhk-city'
         return (
           <g key={i}>
             <circle className={cls} cx={sim.cities[i][0]} cy={sim.cities[i][1]} r={7} />
@@ -138,7 +141,7 @@ export default function BhkExplainer() {
   const [selected, setSelected] = useState<{ mask: number; row: number } | null>(null)
 
   const simRef = useRef(sim)
-  const historyRef = useRef<Array<typeof sim>>([])
+  const historyRef = useRef<SimState[]>([])
   const scenarioRef = useRef<Scenario>(DEFAULT_SCENARIO)
 
   const commit = useCallback((next: SimState) => {
@@ -190,7 +193,7 @@ export default function BhkExplainer() {
   const s = sim
   const full = (1 << s.m) - 1
   const currentMask = s.fillPtr < s.fillOrder.length ? s.fillOrder[s.fillPtr].mask : full
-  const selectedCell = selected && selected.mask >= 1 && selected.mask <= full
+  const selectedCell = selected && selected.mask >= 1 && selected.mask <= full && selected.row >= 0 && selected.row < s.m
     ? { value: s.table[selected.row][selected.mask], mask: selected.mask, row: selected.row }
     : null
 

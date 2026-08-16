@@ -76,6 +76,21 @@ export const tourLength8 = makeTourLength(dist8)
 
 // Defaults (the 10-city layout) — the local-search explainers re-export these
 // names directly; the 12/8-city explainers alias the *_12 / *_8 bindings.
+/** Distance matrix for an arbitrary small city layout (the exact-algorithm
+ * explainers — B&B, BHK — run on custom ≤6-city layouts). */
+export function makeDm(cities: [number, number][]): number[][] {
+  const n = cities.length
+  const dm: number[][] = Array.from({ length: n }, () => new Array(n).fill(0))
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const d = Math.hypot(cities[i][0] - cities[j][0], cities[i][1] - cities[j][1])
+      dm[i][j] = d
+      dm[j][i] = d
+    }
+  }
+  return dm
+}
+
 export const CITIES = CITIES_10
 export const N_CITIES = N_CITIES_10
 export const dist = dist10

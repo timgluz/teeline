@@ -13,6 +13,9 @@
 // The search runs on ≤ 6 cities per scenario so the tree stays renderable.
 // Deterministic — no RNG; SimState holds only plain data (cloneable for Back).
 
+import { makeDm } from './explainer-cities'
+export { makeDm }
+
 export type NodeStatus = 'open' | 'explored' | 'pruned' | 'leaf' | 'best'
 
 export interface BnBNode {
@@ -55,19 +58,6 @@ export interface Scenario {
 // ---------------------------------------------------------------
 // Primitives
 // ---------------------------------------------------------------
-export function makeDm(cities: [number, number][]): number[][] {
-  const n = cities.length
-  const dm: number[][] = Array.from({ length: n }, () => new Array(n).fill(0))
-  for (let i = 0; i < n; i++) {
-    for (let j = i + 1; j < n; j++) {
-      const d = Math.hypot(cities[i][0] - cities[j][0], cities[i][1] - cities[j][1])
-      dm[i][j] = d
-      dm[j][i] = d
-    }
-  }
-  return dm
-}
-
 // Prim's MST cost over the given city id set (dm is indexed by city id).
 export function mstCost(ids: number[], dm: number[][]): number {
   const n = ids.length
@@ -199,7 +189,7 @@ export function stepOnce(state: SimState): SimState {
         nodes: [...state.nodes, node],
         leaves: state.leaves + 1,
         bestCost: isBest ? tourCost : state.bestCost,
-        bestTour: isBest ? path : state.bestTour,
+        bestTour: isBest ? [...path, state.startCity] : state.bestTour,
         lastEvent: isBest
           ? `New best — complete tour ${path.join('→')} costs ${tourCost.toFixed(0)}`
           : `Leaf — tour ${path.join('→')} costs ${tourCost.toFixed(0)} (not better than ${state.bestCost!.toFixed(0)})`,
