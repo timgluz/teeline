@@ -114,6 +114,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of the Christofides ≤1.5× approximation: grow the MST, patch the odd-degree vertices with a matching, walk the Eulerian circuit, and shortcut it into a tour — with the proof made visible.',
     backLabel: 'Christofides',
   },
+  branch_bound: {
+    title: 'Branch & Bound — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the Branch & Bound exact TSP solver: watch the search tree grow as partial tours branch, with the MST lower bound pruning any branch that cannot beat the best tour found so far.',
+    backLabel: 'Branch & Bound',
+  },
   '2opt': {
     title: '2-opt — Interactive Explainer — Teeline',
     description:
