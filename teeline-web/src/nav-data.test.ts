@@ -46,6 +46,26 @@ describe('SOLVER_GROUPS', () => {
   })
 })
 
+describe('complexity', () => {
+  it('matches each docs page Complexity row (so index and docs agree)', () => {
+    // Vite ?raw glob — no node:fs needed
+    const docs = import.meta.glob<string>('../../docs/algorithms/*.md', { query: '?raw', import: 'default', eager: true })
+    const files = Object.keys(docs)
+    expect(files.length).toBeGreaterThan(0)
+    let checked = 0
+    for (const f of files) {
+      const md = docs[f]
+      const id = md.match(/^id: "([^"]+)"/m)?.[1]
+      if (!id || !(id in SOLVER_META)) continue
+      const row = md.match(/^\| \*\*Complexity\*\* \| (.*) \|$/m)?.[1]
+      expect(row, `${f} must have a Complexity row`).not.toBeUndefined()
+      expect(row, `${f} Complexity row must match nav-data`).toBe(SOLVER_META[id].complexity)
+      checked++
+    }
+    expect(checked).toBe(Object.keys(SOLVER_META).length)
+  })
+})
+
 describe('PAGED_SOLVERS', () => {
   it('equals the full SOLVER_META id set (every solver gets a doc page)', () => {
     expect(PAGED_SOLVERS).toEqual(new Set(Object.keys(SOLVER_META)))

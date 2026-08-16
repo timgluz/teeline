@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `stochastic_hill` |
 | **Type** | Heuristic — local search |
+| **Complexity** | O(epochs · n) |
 | **Auto-seeds from** | `shuffle` (random tour) |
 
 ## Description

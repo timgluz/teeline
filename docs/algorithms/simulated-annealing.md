@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `sa`, `simulated_annealing` |
 | **Type** | Heuristic — local search (stochastic) |
+| **Complexity** | O(epochs · n) |
 | **Auto-seeds from** | `shuffle` (random tour) |
 
 ## Description

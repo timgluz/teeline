@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `3opt`, `three_opt` |
 | **Type** | Heuristic — local search |
+| **Complexity** | O(n³) / pass |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
 
 ## Description

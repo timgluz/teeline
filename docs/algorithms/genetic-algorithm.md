@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `ga`, `genetic_algorithm` |
 | **Type** | Heuristic — evolutionary metaheuristic |
+| **Complexity** | O(epochs · pop · n) |
 | **Auto-seeds from** | `shuffle` (random population) |
 
 ## Description

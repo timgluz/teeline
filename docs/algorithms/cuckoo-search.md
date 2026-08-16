@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `cs`, `cuckoo_search` |
 | **Type** | Heuristic — nature-inspired metaheuristic |
+| **Complexity** | O(epochs · nests · n) |
 | **Auto-seeds from** | `shuffle` (random nests) |
 
 ## Description
