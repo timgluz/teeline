@@ -21,6 +21,7 @@ teeline-qt/.qtcreator/
 teeline-web/dist/
 node_modules/
 .playwright-mcp/
+.pw-browsers/
 
 # visual companion brainstorm files
 .superpowers/
