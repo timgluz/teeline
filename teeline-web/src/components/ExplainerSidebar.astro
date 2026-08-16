@@ -1,0 +1,44 @@
+---
+// Server-rendered sidebar for the interactive explainer pages: lists every
+// solver that HAS an explainer, grouped by the same categories as the docs
+// sidebar, linking to /algorithms/<id>/explainer/. Built from the registry so
+// it stays in sync with EXPLAINER_META automatically.
+import { EXPLAINER_META } from '../explainers/registry'
+import { SOLVER_GROUPS, SOLVER_META } from '../nav-data'
+
+interface Props {
+  currentId: string | null
+}
+
+const { currentId } = Astro.props
+---
+<ul class="m-0 list-none p-0">
+  <li class="px-4 pb-1 pt-2 font-sans text-xs font-semibold tracking-wide text-text">Explorers</li>
+  {
+    SOLVER_GROUPS.map((g) => {
+      const explainerIds = g.ids.filter((id) => id in EXPLAINER_META)
+      if (explainerIds.length === 0) return null
+      return (
+        <li class="mb-1">
+          <span class="block px-4 pb-1 pt-2 font-sans text-[0.7rem] font-bold uppercase tracking-wider text-text-dim">{g.label}</span>
+          <ul class="m-0 list-none p-0">
+            {explainerIds.map((id) => {
+              const label = EXPLAINER_META[id].backLabel
+              const meta = SOLVER_META[id]
+              const isCurrent = id === currentId
+              return (
+                <li class={isCurrent ? 'border-l-2 border-accent bg-accent-dim' : ''}>
+                  {isCurrent ? (
+                    <span aria-current="page" class="block px-4 py-1 text-sm font-semibold text-accent">{label}</span>
+                  ) : (
+                    <a href={`/algorithms/${id}/explainer/`} class="block px-4 py-1 text-sm text-text no-underline hover:bg-surface-2 hover:text-accent">{label}</a>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </li>
+      )
+    })
+  }
+</ul>

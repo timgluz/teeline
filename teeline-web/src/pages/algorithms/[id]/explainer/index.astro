@@ -14,6 +14,7 @@
 // client bundle to ship). Hence the explicit per-id branches below instead
 // of a single `<ExplainerComponent client:visible />`.
 import BaseLayout from '../../../../layouts/BaseLayout.astro'
+import ExplainerSidebar from '../../../../components/ExplainerSidebar.astro'
 import { EXPLAINER_META, EXPLAINER_IDS } from '../../../../explainers/registry'
 import PsoExplainer from '../../../../explainers/pso'
 import GsaExplainer from '../../../../explainers/gsa'
@@ -56,28 +57,35 @@ const jsonLd = {
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </Fragment>
-  <main class="mx-auto max-w-content px-6 py-8">
-    <p class="mb-4 font-mono text-xs text-text-dim">
-      <a href={`/algorithms/${id}/`} class="text-accent no-underline hover:underline">← Back to {meta.backLabel} docs</a>
-    </p>
-    {id === 'pso' && <PsoExplainer client:visible />}
-    {id === 'gsa' && <GsaExplainer client:visible />}
-    {id === 'tabu' && <TabuExplainer client:visible />}
-    {id === 'ga' && <GaExplainer client:visible />}
-    {id === 'cs' && <CsExplainer client:visible />}
-    {id === 'fpa' && <FpaExplainer client:visible />}
-    {id === 'lk' && <LkExplainer client:visible />}
-    {id === 'sa' && <SaExplainer client:visible />}
-    {id === 'som' && <SomExplainer client:visible />}
-    {id === 'fourier' && <FourierExplainer client:visible />}
-    {id === 'greedy_edge' && <GreedyEdgeExplainer client:visible />}
-    {id === 'savings' && <SavingsExplainer client:visible />}
-    {id === 'aco' && <AcoExplainer client:visible />}
+  <div class="mx-auto grid w-full max-w-content grid-cols-1 md:grid-cols-[220px_1fr]">
+    <aside class="hidden border-r border-border md:block">
+      <nav aria-label="Explainer" class="sticky top-14 max-h-[calc(100vh-56px)] overflow-y-auto py-4">
+        <ExplainerSidebar currentId={id} />
+      </nav>
+    </aside>
+    <main class="docs-main min-w-0 px-6 py-8 md:px-10">
+      <p class="mb-4 font-mono text-xs text-text-dim">
+        <a href={`/algorithms/${id}/`} class="text-accent no-underline hover:underline">← Back to {meta.backLabel} docs</a>
+      </p>
+      {id === 'pso' && <PsoExplainer client:visible />}
+      {id === 'gsa' && <GsaExplainer client:visible />}
+      {id === 'tabu' && <TabuExplainer client:visible />}
+      {id === 'ga' && <GaExplainer client:visible />}
+      {id === 'cs' && <CsExplainer client:visible />}
+      {id === 'fpa' && <FpaExplainer client:visible />}
+      {id === 'lk' && <LkExplainer client:visible />}
+      {id === 'sa' && <SaExplainer client:visible />}
+      {id === 'som' && <SomExplainer client:visible />}
+      {id === 'fourier' && <FourierExplainer client:visible />}
+      {id === 'greedy_edge' && <GreedyEdgeExplainer client:visible />}
+      {id === 'savings' && <SavingsExplainer client:visible />}
+      {id === 'aco' && <AcoExplainer client:visible />}
     {id === 'stochastic_hill' && <StochasticHillExplainer client:visible />}
     {id === 'or_opt' && <OrOptExplainer client:visible />}
     {id === '3opt' && <ThreeOptExplainer client:visible />}
     {id === 'christofides' && <ChristofidesExplainer client:visible />}
     {id === '2opt' && <TwoOptExplainer client:visible />}
     {id === 'nn' && <NNExplainer client:visible />}
-  </main>
+    </main>
+  </div>
 </BaseLayout>
