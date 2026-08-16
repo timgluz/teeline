@@ -332,7 +332,7 @@ export default function OrOptExplainer() {
         <button className="or-btn" onClick={() => setRunning(!running)} disabled={phase === 'local_optimum'}>
           {running ? "⏸ Pause" : "▶ Run"}
         </button>
-        <button className="or-btn" onClick={() => reinit(scenarioRef.current)}>↺ Reset</button>
+        <button className="or-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
       </div>
 
       <div className="or-scenarios">
