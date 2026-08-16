@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `tabu_search` |
 | **Type** | Heuristic — local search |
+| **Complexity** | O(epochs · n) |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
 
 ## Description

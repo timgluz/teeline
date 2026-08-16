@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `2opt`, `two_opt` |
 | **Type** | Heuristic — local search |
+| **Complexity** | O(n²) / pass |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
 
 ## Description

@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `pso`, `particle_swarm` |
 | **Type** | Heuristic — swarm metaheuristic |
+| **Complexity** | O(epochs · swarm · n) |
 | **Auto-seeds from** | `shuffle` (random swarm) |
 
 ## Description

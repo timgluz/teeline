@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `aco`, `ant_colony` |
 | **Type** | Heuristic — nature-inspired metaheuristic |
+| **Complexity** | O(epochs · ants · n²) |
 | **Auto-seeds from** | `shuffle` (random ants); a warm-start tour also bootstraps the initial pheromone level (see below) |
 
 ## Description

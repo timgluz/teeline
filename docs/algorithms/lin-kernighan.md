@@ -12,6 +12,7 @@ hasExplainer: true
 | --- | --- |
 | **Alias** | `lk`, `lin_kernighan` |
 | **Type** | Heuristic — iterated local search |
+| **Complexity** | O(epochs · n²) |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
 
 ## Description
