@@ -128,14 +128,24 @@ export function randomSuccessor(tour: number[], rng: RngState): {
     if (j - i > 1) break
   }
   const next = reverseSegment(tour, i, j)
-  const removed: [number, number][] = [
-    [tour[(i - 1 + n) % n], tour[i]],
-    [tour[j], tour[(j + 1) % n]],
-  ]
-  const added: [number, number][] = [
-    [tour[(i - 1 + n) % n], tour[j]],
-    [tour[i], tour[(j + 1) % n]],
-  ]
+  let removed: [number, number][]
+  let added: [number, number][]
+  if (i === 0 && j === n - 1) {
+    // Full-tour reversal: both break points sit on the same wrap-around edge,
+    // so report that single edge once (the general formula would duplicate it
+    // and build self-loop "added" edges that never match a real tour edge).
+    removed = [[tour[n - 1], tour[0]]]
+    added = [[tour[n - 1], tour[0]]]
+  } else {
+    removed = [
+      [tour[(i - 1 + n) % n], tour[i]],
+      [tour[j], tour[(j + 1) % n]],
+    ]
+    added = [
+      [tour[(i - 1 + n) % n], tour[j]],
+      [tour[i], tour[(j + 1) % n]],
+    ]
+  }
   return { tour: next, i, j, removed, added, rng: r }
 }
 
@@ -267,19 +277,20 @@ export function stepOnce(state: SimState): SimState {
     const epoch = state.epoch + 1
     const accepted = p.accepted
     const restart = p.restart
-    const tour = accepted
-      ? p.candidateTour
-      : restart && p.restartTour
-        ? p.restartTour
-        : state.tour
+
+    let phase: Phase
+    let tour: number[]
+    if (accepted) {
+      phase = epoch >= state.maxEpochs ? 'done' : 'accepted'
+      tour = p.candidateTour
+    } else if (restart && p.restartTour) {
+      phase = epoch >= state.maxEpochs ? 'done' : 'restart'
+      tour = p.restartTour
+    } else {
+      phase = epoch >= state.maxEpochs ? 'done' : 'rejected'
+      tour = state.tour
+    }
     const bestCost = accepted ? p.candidateCost : state.bestCost
-    const phase: Phase = epoch >= state.maxEpochs
-      ? 'done'
-      : accepted
-        ? 'accepted'
-        : restart
-          ? 'restart'
-          : 'rejected'
 
     return {
       ...state,
@@ -289,7 +300,7 @@ export function stepOnce(state: SimState): SimState {
       bestCost,
       currentCost: tourLength(tour),
       epoch,
-      nStale: accepted ? 0 : restart ? 0 : state.nStale + 1,
+      nStale: accepted || restart ? 0 : state.nStale + 1,
       restarts: state.restarts + (restart ? 1 : 0),
       acceptedCount: state.acceptedCount + (accepted ? 1 : 0),
       rejectedCount: state.rejectedCount + (!accepted && !restart ? 1 : 0),

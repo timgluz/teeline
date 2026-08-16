@@ -170,6 +170,19 @@ describe('randomSuccessor', () => {
       [tour[i], tour[(j + 1) % n]],
     ])
   })
+
+  it('handles the (0, n−1) full-tour reversal with a single wrap edge (no self-loops)', () => {
+    const tour = [0, 1, 2, 3, 4, 5, 6, 7]
+    const n = tour.length
+    let hit: { removed: [number, number][]; added: [number, number][] } | null = null
+    for (let seed = 1; seed <= 5000 && !hit; seed++) {
+      const { i, j, removed, added } = randomSuccessor(tour, makeRng(seed))
+      if (i === 0 && j === n - 1) hit = { removed, added }
+    }
+    expect(hit, 'expected a seed producing the (0, n−1) full-tour reversal').not.toBeNull()
+    expect(hit!.removed).toEqual([[tour[n - 1], tour[0]]])
+    expect(hit!.added).toEqual([[tour[n - 1], tour[0]]])
+  })
 })
 
 // ---------------------------------------------------------------

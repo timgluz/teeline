@@ -169,7 +169,7 @@ export default function StochasticHillExplainer() {
     setPatienceInput(scenario.patience)
   }, [])
 
-  const step_fn = useCallback(() => {
+  const stepForward = useCallback(() => {
     historyRef.current.push(structuredClone(simRef.current))
     const next = stepOnce(simRef.current)
     simRef.current = next
@@ -212,19 +212,22 @@ export default function StochasticHillExplainer() {
   useEffect(() => {
     if (!running) return
     const ms = SPEEDS[speedIdx]
-    const id = setInterval(step_fn, ms)
+    const id = setInterval(stepForward, ms)
     return () => clearInterval(id)
-  }, [running, speedIdx, step_fn])
+  }, [running, speedIdx, stepForward])
 
   // Restart-pace params are per-scenario defaults, user-adjustable; changing
   // them restarts the run with the new values (keeps the current scenario).
   const applyParams = useCallback((epochs: number, patience: number) => {
     const sc = scenarioRef.current
-    reinit({
-      ...sc,
-      epochs: Math.max(1, Math.min(500, Math.floor(epochs))),
-      patience: Math.max(1, Math.min(100, Math.floor(patience))),
-    })
+    // Math.floor(x) || 1 guards against NaN (a partially-typed number input
+    // like "-" or ".") and 0 — either would otherwise break the epoch cap /
+    // restart threshold (e.g. maxEpochs: NaN never triggers 'done').
+    const clampedEpochs = Math.max(1, Math.min(500, Math.floor(epochs) || 1))
+    const clampedPatience = Math.max(1, Math.min(100, Math.floor(patience) || 1))
+    setEpochsInput(clampedEpochs)
+    setPatienceInput(clampedPatience)
+    reinit({ ...sc, epochs: clampedEpochs, patience: clampedPatience })
   }, [reinit])
 
   const acceptRate = acceptedCount + rejectedCount > 0
@@ -345,7 +348,7 @@ export default function StochasticHillExplainer() {
         <button className="shc-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>
           ⏴ Back
         </button>
-        <button className="shc-btn" onClick={step_fn} disabled={running || phase === 'done'}>
+        <button className="shc-btn" onClick={stepForward} disabled={running || phase === 'done'}>
           ⏵ Step
         </button>
         <button className="shc-btn" onClick={() => setRunning(!running)} disabled={phase === 'done'}>
