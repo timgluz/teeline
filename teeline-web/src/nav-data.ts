@@ -5,18 +5,19 @@
 export interface SolverMeta {
   id: string
   name: string
-  // Runtime/memory complexity, transcribed from the Rust solver registry
-  // (src/tsp/mod.rs SolverInfo::complexity).
+  // Runtime/memory complexity shown on the algorithms index. Values mirror
+  // each algorithm's docs page Complexity row (which carry the detail);
+  // most originate from the Rust solver registry (SolverInfo::complexity).
   complexity: string
 }
 
 export const SOLVER_META: Record<string, SolverMeta> = {
-  bhk: { id: 'bhk', name: 'Bellman-Held-Karp', complexity: 'O(n² · 2ⁿ)' },
-  branch_bound: { id: 'branch_bound', name: 'Branch & Bound', complexity: 'O(n!)' },
-  nn: { id: 'nn', name: 'Nearest Neighbor', complexity: 'O(n²)' },
-  fourier: { id: 'fourier', name: 'Fourier', complexity: 'O(K·epochs·n·M)' },
+  bhk: { id: 'bhk', name: 'Bellman-Held-Karp', complexity: 'O(2ⁿ · n²) time, O(2ⁿ · n) space' },
+  branch_bound: { id: 'branch_bound', name: 'Branch & Bound', complexity: 'Exponential worst-case; effective pruning often makes it practical for small instances' },
+  nn: { id: 'nn', name: 'Nearest Neighbor', complexity: 'O(n log n) with KD-tree' },
+  fourier: { id: 'fourier', name: 'Fourier', complexity: 'O(K_max · epochs · (n + M) log M) per run' },
   christofides: { id: 'christofides', name: 'Christofides', complexity: 'O(n²)' },
-  greedy_edge: { id: 'greedy_edge', name: 'Greedy Edge', complexity: 'O(n² log n) time, O(n²) memory' },
+  greedy_edge: { id: 'greedy_edge', name: 'Greedy Edge', complexity: 'O(n² log n) edge sort + O(n² α(n)) scan' },
   '2opt': { id: '2opt', name: '2-opt', complexity: 'O(n²) / pass' },
   '3opt': { id: '3opt', name: '3-opt', complexity: 'O(n³) / pass' },
   or_opt: { id: 'or_opt', name: 'Or-opt', complexity: 'O(n²) / pass' },
@@ -29,9 +30,9 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   cs: { id: 'cs', name: 'Cuckoo Search', complexity: 'O(epochs · nests · n)' },
   fpa: { id: 'fpa', name: 'Flower Pollination', complexity: 'O(epochs · pop · n)' },
   gsa: { id: 'gsa', name: 'Gravitational Search', complexity: 'O(epochs · pop²)' },
-  som: { id: 'som', name: 'Kohonen SOM', complexity: 'O(epochs·N·n)' },
+  som: { id: 'som', name: 'Kohonen SOM', complexity: 'O(epochs · N · n) per run' },
   aco: { id: 'aco', name: 'Ant Colony Optimization', complexity: 'O(epochs · ants · n²)' },
-  savings: { id: 'savings', name: 'Savings', complexity: 'O(n² log n) time, O(n²) memory' },
+  savings: { id: 'savings', name: 'Savings', complexity: 'O(n² log n) edge sort + O(n² α(n)) scan' },
 }
 
 export interface SolverGroup {
