@@ -108,6 +108,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of the 3-opt local-search algorithm: watch three edges get removed and the three segments reconnected in one of seven ways, with the chosen reconnection pattern highlighted in a case diagram.',
     backLabel: '3-opt',
   },
+  christofides: {
+    title: 'Christofides — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the Christofides ≤1.5× approximation: grow the MST, patch the odd-degree vertices with a matching, walk the Eulerian circuit, and shortcut it into a tour — with the proof made visible.',
+    backLabel: 'Christofides',
+  },
   '2opt': {
     title: '2-opt — Interactive Explainer — Teeline',
     description:
