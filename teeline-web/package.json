@@ -24,7 +24,7 @@
     "@sentry/vite-plugin": "^5.4.0",
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "13.3.2",
-    "astro": "^7.2.1",
+    "astro": "^7.2.2",
     "preact": "^10.29.8",
     "tailwindcss": "^4.3.3",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
@@ -35,10 +35,10 @@
     "@playwright/test": "^1.62.1",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
-    "better-sqlite3": "11.10.0",
+    "better-sqlite3": "13.0.3",
     "typescript": "6.0.3",
     "vitest": "4.1.10",
-    "wrangler": "4.119.0"
+    "wrangler": "4.123.0"
   },
   "overrides": {
     "esbuild": "0.28.1"
