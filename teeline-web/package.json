@@ -37,7 +37,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "better-sqlite3": "13.0.3",
     "typescript": "6.0.3",
-    "vitest": "4.1.10",
+    "vitest": "4.1.11",
     "wrangler": "4.123.0"
   },
   "overrides": {
