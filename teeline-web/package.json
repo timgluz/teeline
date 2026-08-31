@@ -23,7 +23,7 @@
     "@sentry/browser": "^10.70.0",
     "@sentry/vite-plugin": "^5.4.0",
     "@simplewebauthn/browser": "13.3.0",
-    "@simplewebauthn/server": "13.3.2",
+    "@simplewebauthn/server": "13.3.3",
     "astro": "^7.2.4",
     "preact": "^10.29.8",
     "tailwindcss": "^4.3.3",
