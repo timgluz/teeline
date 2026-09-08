@@ -14,13 +14,13 @@
     "deploy": "npm run build && wrangler pages deploy dist/"
   },
   "dependencies": {
-    "@astrojs/preact": "^6.0.4",
+    "@astrojs/preact": "^6.0.5",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.4",
     "@bytecodealliance/preview2-shim": "^0.17.9",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
-    "@sentry/browser": "^10.70.0",
+    "@sentry/browser": "^10.72.0",
     "@sentry/vite-plugin": "^5.4.0",
     "@simplewebauthn/browser": "14.0.0",
     "@simplewebauthn/server": "13.3.2",
@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
-    "@cloudflare/workers-types": "5.20260830.1",
+    "@cloudflare/workers-types": "5.20260904.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
