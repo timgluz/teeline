@@ -20,7 +20,7 @@
     "@bytecodealliance/preview2-shim": "^0.17.9",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
-    "@sentry/browser": "^10.70.0",
+    "@sentry/browser": "^10.72.0",
     "@sentry/vite-plugin": "^5.4.0",
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "13.3.2",
