@@ -38,7 +38,7 @@
     "better-sqlite3": "13.0.3",
     "typescript": "6.0.3",
     "vitest": "5.0.0",
-    "wrangler": "4.127.1"
+    "wrangler": "4.129.0"
   },
   "overrides": {
     "esbuild": "0.28.1"
