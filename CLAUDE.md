@@ -102,6 +102,15 @@ After adding a new WIT export:
 2. Run jco: `npx jco transpile ...` (see Taskfile)
 3. **Update `teeline-web/src/teeline-wasm.d.ts`** with the new export's TypeScript type
 
+## Git & PR Workflow
+
+- Branch off `master` as `type/short-description` (e.g. `fix/web-opt-tour-url`, `feat/algorithms-index`, `docs/agent-git-pr-workflow`, `chore/web-prettier`).
+- Use Conventional Commits scoped by area, e.g. `fix(web): ...`, `build(deps): ...`.
+- **Open pull requests with `gh pr create`** (the `gh` CLI is authenticated as `timgluz`) — do not create PRs by hand.
+- The `.githooks/pre-commit` hook runs cargo fmt/clippy, markdownlint, `tsc`, Prettier, etc. on staged files; let it run and fix any failures before committing.
+- SSH pushes can fail with `Bad owner or permissions on /usr/etc/ssh/ssh_config.d/50-suse.conf` (that system file is owned by `nobody`). Work around it per-command without changing repo or remote config:
+  `git -c core.sshCommand="ssh -F /dev/null" push -u origin <branch>`
+
 ## GitKB
 
 This project uses GitKB for knowledge management.
