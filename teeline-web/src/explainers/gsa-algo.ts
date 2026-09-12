@@ -1,4 +1,8 @@
-import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, tourLength12 as tourLength } from './explainer-cities'
+import {
+  CITIES_12 as CITIES,
+  N_CITIES_12 as N_CITIES,
+  tourLength12 as tourLength,
+} from './explainer-cities'
 export { CITIES, N_CITIES, tourLength }
 
 const G0 = 20.0
@@ -71,16 +75,23 @@ export function shuffle(n: number): number[] {
   return t
 }
 
-function computeMassesAndKbest(agents: Agent[]): { masses: number[]; kbest: number[] } {
-  const worstCost = Math.max(...agents.map(a => a.cost))
-  const rawFitness = agents.map(a => worstCost - a.cost)
+function computeMassesAndKbest(agents: Agent[]): {
+  masses: number[]
+  kbest: number[]
+} {
+  const worstCost = Math.max(...agents.map((a) => a.cost))
+  const rawFitness = agents.map((a) => worstCost - a.cost)
   const sumFitness = rawFitness.reduce((s, f) => s + f, 0)
   // Uniform mass fallback when all agents share the same cost (avoids NaN)
-  const masses = sumFitness < 1e-10
-    ? agents.map(() => 1 / agents.length)
-    : rawFitness.map(f => f / sumFitness)
+  const masses =
+    sumFitness < 1e-10
+      ? agents.map(() => 1 / agents.length)
+      : rawFitness.map((f) => f / sumFitness)
   const kSize = Math.ceil(agents.length / 2)
-  const kbest = agents.map((_, i) => i).sort((a, b) => masses[b] - masses[a]).slice(0, kSize)
+  const kbest = agents
+    .map((_, i) => i)
+    .sort((a, b) => masses[b] - masses[a])
+    .slice(0, kSize)
   return { masses, kbest }
 }
 
@@ -90,8 +101,13 @@ export function makeInitState(nAgents: number): SimState {
     return { position, velocity: [], cost: tourLength(position), mass: 0 }
   })
   const { masses, kbest } = computeMassesAndKbest(agents)
-  agents.forEach((a, i) => { a.mass = masses[i] })
-  const bestIdx = agents.reduce((b, a, i) => a.cost < agents[b].cost ? i : b, 0)
+  agents.forEach((a, i) => {
+    a.mass = masses[i]
+  })
+  const bestIdx = agents.reduce(
+    (b, a, i) => (a.cost < agents[b].cost ? i : b),
+    0,
+  )
   return {
     agents,
     gbest: agents[bestIdx].position.slice(),
@@ -112,13 +128,14 @@ export function stepAgent(s: SimState): SimState {
   const v_max = Math.max(1, Math.ceil(N_CITIES * V_MAX_FACTOR))
 
   // Recompute masses, kbest, and G at the start of each epoch (agentIdx === 0)
-  const { masses, kbest, G } = s.agentIdx === 0
-    ? (() => {
-        const { masses, kbest } = computeMassesAndKbest(s.agents)
-        const G = G0 * Math.exp(-ALPHA * s.epoch / TOTAL_EPOCHS)
-        return { masses, kbest, G }
-      })()
-    : { masses: s.masses, kbest: s.kbest, G: s.G }
+  const { masses, kbest, G } =
+    s.agentIdx === 0
+      ? (() => {
+          const { masses, kbest } = computeMassesAndKbest(s.agents)
+          const G = G0 * Math.exp((-ALPHA * s.epoch) / TOTAL_EPOCHS)
+          return { masses, kbest, G }
+        })()
+      : { masses: s.masses, kbest: s.kbest, G: s.G }
 
   const i = s.agentIdx
   const agent = s.agents[i]
@@ -153,7 +170,12 @@ export function stepAgent(s: SimState): SimState {
   const updatedAgents = s.agents.map((a, idx) =>
     idx !== i
       ? { ...a, mass: masses[idx] }
-      : { position: new_pos, velocity: new_vel, cost: new_cost, mass: masses[i] }
+      : {
+          position: new_pos,
+          velocity: new_vel,
+          cost: new_cost,
+          mass: masses[i],
+        },
   )
 
   const nextAgentIdx = i + 1

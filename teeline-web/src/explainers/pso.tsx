@@ -1,9 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from "preact/hooks"
-import type { Particle, VelocityBreakdown, SimState } from "./pso-algo"
-import {
-  CITIES, N_CITIES,
-  makeInitState, stepEpoch,
-} from "./pso-algo"
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
+import type { Particle, VelocityBreakdown, SimState } from './pso-algo'
+import { CITIES, N_CITIES, makeInitState, stepEpoch } from './pso-algo'
 
 // PSO display constants — for UI labels and gauge only
 const W_MAX = 0.9
@@ -15,7 +12,7 @@ const V_MAX = Math.max(1, Math.ceil(N_CITIES * 0.35))
 // SVG helpers
 // ---------------------------------------------------------------
 function polyPts(tour: number[]): string {
-  const pts = tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
+  const pts = tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ')
   return pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
 }
 
@@ -28,7 +25,7 @@ interface SwarmHeatmapProps {
 }
 function SwarmHeatmap({ particles, gbest_cost }: SwarmHeatmapProps) {
   if (!particles.length) return null
-  const costs = particles.map(p => p.cost)
+  const costs = particles.map((p) => p.cost)
   const minC = Math.min(...costs)
   const maxC = Math.max(...costs)
   const range = maxC - minC || 1
@@ -40,16 +37,18 @@ function SwarmHeatmap({ particles, gbest_cost }: SwarmHeatmapProps) {
         const hue = Math.round(norm * 120)
         const bg = `hsl(${hue},55%,42%)`
         const isGbest = Math.abs(p.cost - gbest_cost) < 0.01
-        const outline = isGbest ? "2px solid #16a34a" : "2px solid transparent"
+        const outline = isGbest ? '2px solid #16a34a' : '2px solid transparent'
         return (
           <div
             key={i}
             className="pso-heatmap-cell"
-            style={{ background: bg, outline, outlineOffset: "1px" }}
+            style={{ background: bg, outline, outlineOffset: '1px' }}
           >
             <span className="pso-heatmap-idx">{i}</span>
             <span className="pso-heatmap-cost">{p.cost.toFixed(0)}</span>
-            <div className="pso-heatmap-overlay">{isGbest ? "gbest" : `dist ${p.cost.toFixed(0)}`}</div>
+            <div className="pso-heatmap-overlay">
+              {isGbest ? 'gbest' : `dist ${p.cost.toFixed(0)}`}
+            </div>
           </div>
         )
       })}
@@ -67,23 +66,43 @@ interface TourSVGProps {
 }
 function TourSVG({ particles, gbest, newGbest }: TourSVGProps) {
   if (!particles.length) return null
-  const bestIdx = particles.reduce((b, p, i) => p.cost < particles[b].cost ? i : b, 0)
+  const bestIdx = particles.reduce(
+    (b, p, i) => (p.cost < particles[b].cost ? i : b),
+    0,
+  )
   return (
-    <svg viewBox="0 0 300 300" className="pso-canvas" role="img" aria-label="PSO tour canvas">
+    <svg
+      viewBox="0 0 300 300"
+      className="pso-canvas"
+      role="img"
+      aria-label="PSO tour canvas"
+    >
       <rect x={0} y={0} width={300} height={300} className="pso-bg" />
-      {particles.map((p, i) => i !== bestIdx && (
-        <polyline key={i} className="pso-ghost" points={polyPts(p.position)} />
-      ))}
-      <polyline className="pso-active" points={polyPts(particles[bestIdx].position)} />
+      {particles.map(
+        (p, i) =>
+          i !== bestIdx && (
+            <polyline
+              key={i}
+              className="pso-ghost"
+              points={polyPts(p.position)}
+            />
+          ),
+      )}
       <polyline
-        className={`pso-gbest${newGbest ? " pso-gbest-pulse" : ""}`}
+        className="pso-active"
+        points={polyPts(particles[bestIdx].position)}
+      />
+      <polyline
+        className={`pso-gbest${newGbest ? ' pso-gbest-pulse' : ''}`}
         points={polyPts(gbest)}
       />
       {CITIES.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r={4} className="pso-city" />
       ))}
       {CITIES.map(([x, y], i) => (
-        <text key={i} x={x + 6} y={y - 5} className="pso-city-label">{i}</text>
+        <text key={i} x={x + 6} y={y - 5} className="pso-city-label">
+          {i}
+        </text>
       ))}
     </svg>
   )
@@ -92,14 +111,25 @@ function TourSVG({ particles, gbest, newGbest }: TourSVGProps) {
 // ---------------------------------------------------------------
 // VelocityChip — epoch-level aggregate breakdown of ω / C₁ / C₂ swaps
 // ---------------------------------------------------------------
-function VelocityChip({ breakdown, newGbest }: { breakdown: VelocityBreakdown | null; newGbest: boolean }) {
+function VelocityChip({
+  breakdown,
+  newGbest,
+}: {
+  breakdown: VelocityBreakdown | null
+  newGbest: boolean
+}) {
   if (!breakdown) {
-    return <div className="pso-chip pso-chip-idle">Press Step or Run to begin</div>
+    return (
+      <div className="pso-chip pso-chip-idle">Press Step or Run to begin</div>
+    )
   }
   return (
-    <div className={`pso-chip ${newGbest ? "pso-chip-gbest" : "pso-chip-normal"}`}>
-      {newGbest ? "⭐ new gbest!  " : ""}
-      ω: {breakdown.inertia} · C₁: {breakdown.cognitive} · C₂: {breakdown.social} → {breakdown.applied} swaps applied
+    <div
+      className={`pso-chip ${newGbest ? 'pso-chip-gbest' : 'pso-chip-normal'}`}
+    >
+      {newGbest ? '⭐ new gbest!  ' : ''}
+      ω: {breakdown.inertia} · C₁: {breakdown.cognitive} · C₂:{' '}
+      {breakdown.social} → {breakdown.applied} swaps applied
     </div>
   )
 }
@@ -110,16 +140,21 @@ function VelocityChip({ breakdown, newGbest }: { breakdown: VelocityBreakdown | 
 function InertiaGauge({ w }: { w: number }) {
   const pct = ((w - W_MIN) / (W_MAX - W_MIN)) * 100
   const hint =
-    w > 0.7 ? "High — broad exploration" :
-    w < 0.5 ? "Low — local exploitation" :
-    "Mid — balanced"
+    w > 0.7
+      ? 'High — broad exploration'
+      : w < 0.5
+        ? 'Low — local exploitation'
+        : 'Mid — balanced'
   return (
     <div className="pso-gauge">
       <div className="pso-gauge-label">
         ω (inertia) = <strong>{w.toFixed(3)}</strong>
       </div>
       <div className="pso-gauge-track">
-        <div className="pso-gauge-fill" style={{ width: `${Math.max(0, pct).toFixed(1)}%` }} />
+        <div
+          className="pso-gauge-fill"
+          style={{ width: `${Math.max(0, pct).toFixed(1)}%` }}
+        />
       </div>
       <div className="pso-gauge-hint">{hint}</div>
     </div>
@@ -135,7 +170,9 @@ export default function PSOExplainer() {
 
   const simRef = useRef<SimState>(makeInitState(6))
 
-  const [particles, setParticles] = useState<Particle[]>(() => simRef.current.particles)
+  const [particles, setParticles] = useState<Particle[]>(
+    () => simRef.current.particles,
+  )
   const [gbest, setGbest] = useState<number[]>(() => simRef.current.gbest)
   const [gbest_cost, setGbestCost] = useState(() => simRef.current.gbest_cost)
   const [epoch, setEpoch] = useState(0)
@@ -178,7 +215,7 @@ export default function PSOExplainer() {
 
   const avgDist = particles.length
     ? (particles.reduce((s, p) => s + p.cost, 0) / particles.length).toFixed(0)
-    : "—"
+    : '—'
 
   return (
     <div className="pso-root">
@@ -188,12 +225,13 @@ export default function PSOExplainer() {
         <div className="pso-eyebrow">teeline · algorithms/pso</div>
         <h2 className="pso-title">Particle Swarm Optimisation</h2>
         <p className="pso-sub">
-          A swarm of tour-particles updates each epoch. Each particle's{" "}
-          <strong>velocity</strong> is a list of city-swap moves built from three
-          components: <code>ω</code> keeps momentum from the previous epoch,{" "}
-          <code>C₁</code> pulls toward the particle's own personal best, and{" "}
-          <code>C₂</code> pulls toward the global best. Inertia <code>ω</code>{" "}
-          decays over time, shifting the swarm from exploration toward exploitation.
+          A swarm of tour-particles updates each epoch. Each particle's{' '}
+          <strong>velocity</strong> is a list of city-swap moves built from
+          three components: <code>ω</code> keeps momentum from the previous
+          epoch, <code>C₁</code> pulls toward the particle's own personal best,
+          and <code>C₂</code> pulls toward the global best. Inertia{' '}
+          <code>ω</code> decays over time, shifting the swarm from exploration
+          toward exploitation.
         </p>
       </header>
 
@@ -205,10 +243,18 @@ export default function PSOExplainer() {
       </div>
 
       <div className="pso-legend">
-        <span><span className="pso-dot pso-dot-gbest">●</span> gbest tour</span>
-        <span><span className="pso-dot pso-dot-active">●</span> best particle</span>
-        <span><span className="pso-dot pso-dot-ghost">●</span> swarm</span>
-        <span><span className="pso-dot pso-dot-city">●</span> city</span>
+        <span>
+          <span className="pso-dot pso-dot-gbest">●</span> gbest tour
+        </span>
+        <span>
+          <span className="pso-dot pso-dot-active">●</span> best particle
+        </span>
+        <span>
+          <span className="pso-dot pso-dot-ghost">●</span> swarm
+        </span>
+        <span>
+          <span className="pso-dot pso-dot-city">●</span> city
+        </span>
       </div>
 
       <VelocityChip breakdown={breakdown} newGbest={newGbest} />
@@ -240,7 +286,11 @@ export default function PSOExplainer() {
             Particles = <strong>{nParticles}</strong>
           </label>
           <input
-            type="range" min={3} max={12} step={1} value={nParticles}
+            type="range"
+            min={3}
+            max={12}
+            step={1}
+            value={nParticles}
             className="pso-slider"
             onInput={(e) => {
               const n = Number((e.target as HTMLInputElement).value)
@@ -250,38 +300,50 @@ export default function PSOExplainer() {
           />
           <div className="pso-hint">
             {nParticles <= 4
-              ? "Small swarm — fast but low diversity"
+              ? 'Small swarm — fast but low diversity'
               : nParticles >= 10
-                ? "Large swarm — high diversity, slower per epoch"
-                : "Balanced swarm size"}
+                ? 'Large swarm — high diversity, slower per epoch'
+                : 'Balanced swarm size'}
           </div>
         </div>
 
         <div className="pso-config-row">
           <label className="pso-config-label">Speed</label>
           <input
-            type="range" min={1} max={10} step={1} value={speed}
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
             className="pso-slider"
-            onInput={(e) => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
         </div>
       </div>
 
       <div className="pso-controls">
-        <button className="pso-btn" onClick={stepOnce} disabled={running}>◀ Step</button>
-        <button
-          className={`pso-btn ${!running ? "pso-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)}
-        >
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button className="pso-btn" onClick={stepOnce} disabled={running}>
+          ◀ Step
         </button>
-        <button className="pso-btn" onClick={() => reinit(nParticles)}>↺ Reset</button>
+        <button
+          className={`pso-btn ${!running ? 'pso-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button className="pso-btn" onClick={() => reinit(nParticles)}>
+          ↺ Reset
+        </button>
       </div>
 
       <footer className="pso-footer">
         <span className="pso-mono">cities: {N_CITIES}</span>
         <span className="pso-mono">particles: {nParticles}</span>
-        <span className="pso-mono">ω: {W_MIN}→{W_MAX}</span>
+        <span className="pso-mono">
+          ω: {W_MIN}→{W_MAX}
+        </span>
         <span className="pso-mono">C₁=C₂={C1}</span>
         <span className="pso-mono">v_max: {V_MAX}</span>
       </footer>

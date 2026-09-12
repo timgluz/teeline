@@ -5,7 +5,12 @@
 import { generateRegistrationOptions } from '@simplewebauthn/server'
 import type { Env } from '../../../lib/env'
 import { insertChallenge } from '../../../lib/db'
-import { CHALLENGE_TTL_MS, RP_NAME, isClientOriginAllowed, rpIdFor } from '../../../lib/webauthn'
+import {
+  CHALLENGE_TTL_MS,
+  RP_NAME,
+  isClientOriginAllowed,
+  rpIdFor,
+} from '../../../lib/webauthn'
 import { rateLimit } from '../../../lib/ratelimit'
 import { forbidden, json, serverError } from '../../../lib/http'
 

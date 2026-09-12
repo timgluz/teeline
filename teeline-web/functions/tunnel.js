@@ -13,7 +13,10 @@ export async function onRequest({ request }) {
     const header = JSON.parse(body.split('\n')[0])
     const dsn = new URL(header.dsn)
     const projectId = dsn.pathname.replace('/', '')
-    if (dsn.hostname !== SENTRY_HOST || !ALLOWED_PROJECT_IDS.includes(projectId)) {
+    if (
+      dsn.hostname !== SENTRY_HOST ||
+      !ALLOWED_PROJECT_IDS.includes(projectId)
+    ) {
       return new Response('Forbidden', { status: 403 })
     }
     return fetch(`https://${SENTRY_HOST}/api/${projectId}/envelope/`, {

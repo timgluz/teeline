@@ -4,13 +4,23 @@
 import { verifyRegistrationResponse } from '@simplewebauthn/server'
 import { isoBase64URL } from '@simplewebauthn/server/helpers'
 import type { Env } from '../../../lib/env'
-import { consumeChallenge, createUserWithCredential, getChallenge } from '../../../lib/db'
-import { isClientOriginAllowed, rpIdFor, serverOrigin } from '../../../lib/webauthn'
+import {
+  consumeChallenge,
+  createUserWithCredential,
+  getChallenge,
+} from '../../../lib/db'
+import {
+  isClientOriginAllowed,
+  rpIdFor,
+  serverOrigin,
+} from '../../../lib/webauthn'
 import { badRequest, forbidden, json, serverError } from '../../../lib/http'
 import { rateLimit } from '../../../lib/ratelimit'
 import { createSessionToken, sessionCookieHeader } from '../../../lib/session'
 
-type RegistrationResponse = Parameters<typeof verifyRegistrationResponse>[0]['response']
+type RegistrationResponse = Parameters<
+  typeof verifyRegistrationResponse
+>[0]['response']
 
 // D1/SQLite unique-constraint failures surface as an error whose message
 // contains the constraint name — distinguish "already registered" from a
@@ -25,8 +35,12 @@ function isConstraintViolation(err: unknown): boolean {
 function isRegistrationCredential(v: unknown): v is RegistrationResponse {
   if (typeof v !== 'object' || v === null) return false
   const c = v as { response?: unknown }
-  const r = c.response as { clientDataJSON?: unknown; attestationObject?: unknown } | undefined
-  return typeof r?.clientDataJSON === 'string' && typeof r.attestationObject === 'string'
+  const r = c.response as
+    { clientDataJSON?: unknown; attestationObject?: unknown } | undefined
+  return (
+    typeof r?.clientDataJSON === 'string' &&
+    typeof r.attestationObject === 'string'
+  )
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -41,7 +55,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   } catch {
     return badRequest('Invalid JSON body')
   }
-  if (typeof body.nonce !== 'string' || !isRegistrationCredential(body.credential)) {
+  if (
+    typeof body.nonce !== 'string' ||
+    !isRegistrationCredential(body.credential)
+  ) {
     return badRequest('nonce and credential are required')
   }
 
@@ -106,7 +123,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     // bare 500 (e.g. duplicate credential id, transient DB failure).
     console.error('Failed to create user with credential:', err)
     if (isConstraintViolation(err)) {
-      return badRequest('This passkey is already registered — please log in instead')
+      return badRequest(
+        'This passkey is already registered — please log in instead',
+      )
     }
     return serverError('Failed to complete registration — please try again')
   }
@@ -120,7 +139,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     // duplicate registration attempt).
     console.error('Failed to create session token after registration:', err)
     return json(
-      { error: 'Registration succeeded but the session could not be established — please log in.', user: { id: userId }, session_established: false },
+      {
+        error:
+          'Registration succeeded but the session could not be established — please log in.',
+        user: { id: userId },
+        session_established: false,
+      },
       201,
     )
   }

@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, SCENARIOS, CASE_LABELS,
-  dist, tourLength, scanBestMove, apply3Opt, makeInitState, stepOnce,
+  N_CITIES,
+  SCENARIOS,
+  CASE_LABELS,
+  dist,
+  tourLength,
+  scanBestMove,
+  apply3Opt,
+  makeInitState,
+  stepOnce,
 } from './three-opt-algo'
 import type { SimState } from './three-opt-algo'
 import { scanOnePass, makeInitState as twoOptInit } from './two-opt-algo'
@@ -108,7 +115,13 @@ describe('scanBestMove', () => {
     expect(move.j).toBe(2)
     expect(move.k).toBe(4)
     // applying it reaches the optimum
-    const after = apply3Opt(SCENARIOS.single_3opt.tour, move.i, move.j, move.k, move.caseNo)
+    const after = apply3Opt(
+      SCENARIOS.single_3opt.tour,
+      move.i,
+      move.j,
+      move.k,
+      move.caseNo,
+    )
     expect(tourLength(after)).toBeCloseTo(OPT, 3)
   })
 
@@ -127,7 +140,9 @@ describe('scanBestMove', () => {
       if (key === 'already_3optimal') continue
       const move = scanBestMove(s.tour)!
       const before = tourLength(s.tour)
-      const after = tourLength(apply3Opt(s.tour, move.i, move.j, move.k, move.caseNo))
+      const after = tourLength(
+        apply3Opt(s.tour, move.i, move.j, move.k, move.caseNo),
+      )
       expect(after - before, `${key} delta mismatch`).toBeCloseTo(move.delta, 3)
     }
   })
@@ -153,7 +168,15 @@ describe('stepOnce phase machine', () => {
     expect(s2.phase).toBe('swap_applied')
     expect(s2.pass).toBe(1)
     expect(s2.swaps).toBe(1)
-    expect(s2.tour).toEqual(apply3Opt(s0.tour, s1.pending!.i, s1.pending!.j, s1.pending!.k, s1.pending!.caseNo))
+    expect(s2.tour).toEqual(
+      apply3Opt(
+        s0.tour,
+        s1.pending!.i,
+        s1.pending!.j,
+        s1.pending!.k,
+        s1.pending!.caseNo,
+      ),
+    )
     expect(s2.costHistory).toHaveLength(2)
     expect(s2.step).toBe(2)
   })
@@ -238,7 +261,9 @@ describe('purity & determinism', () => {
   it('all scenario tours are valid permutations', () => {
     for (const [key, s] of Object.entries(SCENARIOS)) {
       const sorted = s.tour.slice().sort((a, b) => a - b)
-      expect(sorted, `${key} must be a permutation`).toEqual(Array.from({ length: N_CITIES }, (_, i) => i))
+      expect(sorted, `${key} must be a permutation`).toEqual(
+        Array.from({ length: N_CITIES }, (_, i) => i),
+      )
     }
   })
 })

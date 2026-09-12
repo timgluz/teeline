@@ -27,11 +27,15 @@ test.describe('stochastic hill explainer', () => {
   })
 
   test('renders the canvas, stats panel and controls', async ({ page }) => {
-    await expect(page.locator('.shc-title')).toHaveText('Stochastic Hill Climbing')
+    await expect(page.locator('.shc-title')).toHaveText(
+      'Stochastic Hill Climbing',
+    )
     await expect(page.locator('.shc-canvas')).toBeVisible()
     // sparkline section label is present; the line itself appears after the
     // first verdict (needs ≥ 2 cost samples)
-    await expect(page.locator('.shc-section-label', { hasText: 'Best cost over epochs' })).toBeVisible()
+    await expect(
+      page.locator('.shc-section-label', { hasText: 'Best cost over epochs' }),
+    ).toBeVisible()
 
     // stats panel
     const stats = page.locator('.shc-statgrid')
@@ -42,12 +46,18 @@ test.describe('stochastic hill explainer', () => {
     await expect(stats).toContainText('accept rate')
 
     // all three scenario buttons
-    for (const label of ['Quick convergence', 'Rugged landscape', 'Needle in haystack']) {
+    for (const label of [
+      'Quick convergence',
+      'Rugged landscape',
+      'Needle in haystack',
+    ]) {
       await expect(page.getByRole('button', { name: label })).toBeVisible()
     }
   })
 
-  test('Step advances the two-phase machine (propose → verdict)', async ({ page }) => {
+  test('Step advances the two-phase machine (propose → verdict)', async ({
+    page,
+  }) => {
     const chip = page.locator('.shc-chip')
 
     await page.getByRole('button', { name: 'Step' }).click()
@@ -60,13 +70,19 @@ test.describe('stochastic hill explainer', () => {
     await expect(page.locator('.shc-spark')).toBeVisible()
 
     // epoch advanced by exactly one verdict
-    const epoch = page.locator('.shc-statgrid').locator('div', { hasText: /^epoch/ }).locator('.shc-mono')
+    const epoch = page
+      .locator('.shc-statgrid')
+      .locator('div', { hasText: /^epoch/ })
+      .locator('.shc-mono')
     await expect(epoch).toHaveText('1')
   })
 
   test('Back restores the previous phase', async ({ page }) => {
     const chip = page.locator('.shc-chip')
-    const stepStat = page.locator('.shc-statgrid').locator('div', { hasText: /^step/ }).locator('.shc-mono')
+    const stepStat = page
+      .locator('.shc-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.shc-mono')
 
     await page.getByRole('button', { name: 'Step' }).click() // propose
     await page.getByRole('button', { name: 'Step' }).click() // verdict
@@ -77,8 +93,13 @@ test.describe('stochastic hill explainer', () => {
     await expect(stepStat).toHaveText('1')
   })
 
-  test('Run animates epochs; Pause and Reset stop and reset', async ({ page }) => {
-    const epoch = page.locator('.shc-statgrid').locator('div', { hasText: /^epoch/ }).locator('.shc-mono')
+  test('Run animates epochs; Pause and Reset stop and reset', async ({
+    page,
+  }) => {
+    const epoch = page
+      .locator('.shc-statgrid')
+      .locator('div', { hasText: /^epoch/ })
+      .locator('.shc-mono')
     const run = page.getByRole('button', { name: 'Run' })
 
     await run.click()
@@ -94,9 +115,17 @@ test.describe('stochastic hill explainer', () => {
     await expect(page.locator('.shc-chip')).toContainText('Click Step')
   })
 
-  test('scenario buttons restart the run with their own parameters', async ({ page }) => {
-    const epoch = page.locator('.shc-statgrid').locator('div', { hasText: /^epoch/ }).locator('.shc-mono')
-    const restarts = page.locator('.shc-statgrid').locator('div', { hasText: /^restarts/ }).locator('.shc-mono')
+  test('scenario buttons restart the run with their own parameters', async ({
+    page,
+  }) => {
+    const epoch = page
+      .locator('.shc-statgrid')
+      .locator('div', { hasText: /^epoch/ })
+      .locator('.shc-mono')
+    const restarts = page
+      .locator('.shc-statgrid')
+      .locator('div', { hasText: /^restarts/ })
+      .locator('.shc-mono')
 
     await page.getByRole('button', { name: 'Rugged landscape' }).click()
     await expect(epoch).toHaveText('0')
@@ -107,9 +136,14 @@ test.describe('stochastic hill explainer', () => {
     await expect(page.locator('.shc-chip')).toContainText('Candidate')
   })
 
-  test('epochs / restart-patience inputs commit on blur and restart the run', async ({ page }) => {
+  test('epochs / restart-patience inputs commit on blur and restart the run', async ({
+    page,
+  }) => {
     const epochsInput = page.locator('#shc-epochs')
-    const epoch = page.locator('.shc-statgrid').locator('div', { hasText: /^epoch/ }).locator('.shc-mono')
+    const epoch = page
+      .locator('.shc-statgrid')
+      .locator('div', { hasText: /^epoch/ })
+      .locator('.shc-mono')
 
     // advance a few steps first
     await page.getByRole('button', { name: 'Run' }).click()

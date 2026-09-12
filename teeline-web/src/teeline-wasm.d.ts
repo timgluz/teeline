@@ -45,8 +45,16 @@ declare module 'teeline-wasm' {
     kind: string
     params: Array<ParamSpec>
   }
-  export function solve(solver: string, cities: Array<City>, options: SolveOptions): Solution
-  export function parseAndSolve(solver: string, input: string, options: SolveOptions): Solution
+  export function solve(
+    solver: string,
+    cities: Array<City>,
+    options: SolveOptions,
+  ): Solution
+  export function parseAndSolve(
+    solver: string,
+    input: string,
+    options: SolveOptions,
+  ): Solution
   export function parse(input: string): ParsedProblem
   export function listAlgorithms(): Array<AlgorithmInfo>
   export function getVersion(): string
@@ -58,9 +66,20 @@ declare module 'teeline-wasm' {
     solverOnlyEdges: number
     optimalOnlyEdges: number
   }
-  export function compareTours(solverRoute: Uint32Array, optRoute: Uint32Array, cities: Array<City>): ComparisonStats
+  export function compareTours(
+    solverRoute: Uint32Array,
+    optRoute: Uint32Array,
+    cities: Array<City>,
+  ): ComparisonStats
   export function tourDistance(route: Uint32Array, cities: Array<City>): number
-  export function compareToursFromInput(solverRoute: Uint32Array, optRoute: Uint32Array, input: string): ComparisonStats
-  export function tourDistanceFromInput(route: Uint32Array, input: string): number
+  export function compareToursFromInput(
+    solverRoute: Uint32Array,
+    optRoute: Uint32Array,
+    input: string,
+  ): ComparisonStats
+  export function tourDistanceFromInput(
+    route: Uint32Array,
+    input: string,
+  ): number
   export type Result<T, E> = { tag: 'ok'; val: T } | { tag: 'err'; val: E }
 }

@@ -1,12 +1,10 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
-import {
-  SCENARIOS, makeInitState, stepOnce, popcount,
-} from "./bhk-algo"
-import type { Phase, Scenario, SimState } from "./bhk-algo"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
+import { SCENARIOS, makeInitState, stepOnce, popcount } from './bhk-algo'
+import type { Phase, Scenario, SimState } from './bhk-algo'
 
 const DEFAULT_SCENARIO = SCENARIOS.grid_6
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 
 const INF = Infinity
 
@@ -15,7 +13,11 @@ const INF = Infinity
 // pre-filled; the next cell to compute is ringed; click a cell to
 // inspect its computation. Read-back cells turn gold.
 // ---------------------------------------------------------------
-function DpTable({ sim, selected, onSelect }: {
+function DpTable({
+  sim,
+  selected,
+  onSelect,
+}: {
   sim: SimState
   selected: { mask: number; row: number } | null
   onSelect: (mask: number, row: number) => void
@@ -38,7 +40,8 @@ function DpTable({ sim, selected, onSelect }: {
     return cells
   }, [sim.route, full])
 
-  const nextCell = sim.fillPtr < sim.fillOrder.length ? sim.fillOrder[sim.fillPtr] : null
+  const nextCell =
+    sim.fillPtr < sim.fillOrder.length ? sim.fillOrder[sim.fillPtr] : null
 
   return (
     <div className="bhk-table-scroll">
@@ -47,7 +50,9 @@ function DpTable({ sim, selected, onSelect }: {
           <tr>
             <th className="bhk-th bhk-th-row">end \ subset</th>
             {masks.map((mask) => (
-              <th key={mask} className="bhk-th">{mask.toString(2).padStart(m, '0')}</th>
+              <th key={mask} className="bhk-th">
+                {mask.toString(2).padStart(m, '0')}
+              </th>
             ))}
           </tr>
         </thead>
@@ -68,9 +73,15 @@ function DpTable({ sim, selected, onSelect }: {
                   isRoute ? 'bhk-cell-route' : '',
                   isNext ? 'bhk-cell-next' : '',
                   isSel ? 'bhk-cell-sel' : '',
-                ].join(' ').trim()
+                ]
+                  .join(' ')
+                  .trim()
                 return (
-                  <td key={mask} className={cls} onClick={() => onSelect(mask, row)}>
+                  <td
+                    key={mask}
+                    className={cls}
+                    onClick={() => onSelect(mask, row)}
+                  >
                     {val === INF ? '·' : val.toFixed(0)}
                   </td>
                 )
@@ -103,17 +114,28 @@ function CityMap({ sim }: { sim: SimState }) {
   const routeEdges: Array<[number, number]> = []
   if (inReadback && sim.readback.length >= 2) {
     const pts = [0, ...sim.readback]
-    for (let k = 0; k < pts.length - 1; k++) routeEdges.push([pts[k], pts[k + 1]])
+    for (let k = 0; k < pts.length - 1; k++)
+      routeEdges.push([pts[k], pts[k + 1]])
     if (sim.phase === 'done') routeEdges.push([pts[pts.length - 1], 0])
   }
 
   return (
-    <svg viewBox="0 0 300 300" className="bhk-map" role="img" aria-label="Current subset on the map">
+    <svg
+      viewBox="0 0 300 300"
+      className="bhk-map"
+      role="img"
+      aria-label="Current subset on the map"
+    >
       <rect x={0} y={0} width={300} height={300} className="bhk-bg" />
       {routeEdges.map(([a, b]) => (
-        <line key={`${a}-${b}`} className="bhk-map-edge"
-          x1={sim.cities[a][0]} y1={sim.cities[a][1]}
-          x2={sim.cities[b][0]} y2={sim.cities[b][1]} />
+        <line
+          key={`${a}-${b}`}
+          className="bhk-map-edge"
+          x1={sim.cities[a][0]}
+          y1={sim.cities[a][1]}
+          x2={sim.cities[b][0]}
+          y2={sim.cities[b][1]}
+        />
       ))}
       {Array.from({ length: n }, (_, i) => i).map((i) => {
         const inSub = subset.has(i)
@@ -122,8 +144,19 @@ function CityMap({ sim }: { sim: SimState }) {
         else if (inSub) cls = 'bhk-city'
         return (
           <g key={i}>
-            <circle className={cls} cx={sim.cities[i][0]} cy={sim.cities[i][1]} r={7} />
-            <text className="bhk-label" x={sim.cities[i][0]} y={sim.cities[i][1] + 16}>{i}</text>
+            <circle
+              className={cls}
+              cx={sim.cities[i][0]}
+              cy={sim.cities[i][1]}
+              r={7}
+            />
+            <text
+              className="bhk-label"
+              x={sim.cities[i][0]}
+              y={sim.cities[i][1] + 16}
+            >
+              {i}
+            </text>
           </g>
         )
       })}
@@ -135,10 +168,15 @@ function CityMap({ sim }: { sim: SimState }) {
 // Root component
 // ---------------------------------------------------------------
 export default function BhkExplainer() {
-  const [sim, setSim] = useState<SimState>(() => makeInitState(DEFAULT_SCENARIO))
+  const [sim, setSim] = useState<SimState>(() =>
+    makeInitState(DEFAULT_SCENARIO),
+  )
   const [running, setRunning] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(2)
-  const [selected, setSelected] = useState<{ mask: number; row: number } | null>(null)
+  const [selected, setSelected] = useState<{
+    mask: number
+    row: number
+  } | null>(null)
 
   const simRef = useRef(sim)
   const historyRef = useRef<SimState[]>([])
@@ -149,13 +187,16 @@ export default function BhkExplainer() {
     setSim(next)
   }, [])
 
-  const reinit = useCallback((scenario: Scenario) => {
-    scenarioRef.current = scenario
-    historyRef.current = []
-    setSelected(null)
-    commit(makeInitState(scenario))
-    setRunning(false)
-  }, [commit])
+  const reinit = useCallback(
+    (scenario: Scenario) => {
+      scenarioRef.current = scenario
+      historyRef.current = []
+      setSelected(null)
+      commit(makeInitState(scenario))
+      setRunning(false)
+    },
+    [commit],
+  )
 
   const stepForward = useCallback(() => {
     const cur = simRef.current
@@ -180,22 +221,36 @@ export default function BhkExplainer() {
   }, [running, speedIdx, stepForward])
 
   // jump to a phase (forward start / read-back start / done)
-  const jumpTo = useCallback((target: Phase) => {
-    let s = makeInitState(scenarioRef.current)
-    let guard = 600
-    while (s.phase !== target && s.phase !== 'done' && guard-- > 0) s = stepOnce(s)
-    if (s.phase !== target && target !== 'done') s = stepOnce(s)
-    historyRef.current = []
-    commit(s)
-    setRunning(false)
-  }, [commit])
+  const jumpTo = useCallback(
+    (target: Phase) => {
+      let s = makeInitState(scenarioRef.current)
+      let guard = 600
+      while (s.phase !== target && s.phase !== 'done' && guard-- > 0)
+        s = stepOnce(s)
+      if (s.phase !== target && target !== 'done') s = stepOnce(s)
+      historyRef.current = []
+      commit(s)
+      setRunning(false)
+    },
+    [commit],
+  )
 
   const s = sim
   const full = (1 << s.m) - 1
-  const currentMask = s.fillPtr < s.fillOrder.length ? s.fillOrder[s.fillPtr].mask : full
-  const selectedCell = selected && selected.mask >= 1 && selected.mask <= full && selected.row >= 0 && selected.row < s.m
-    ? { value: s.table[selected.row][selected.mask], mask: selected.mask, row: selected.row }
-    : null
+  const currentMask =
+    s.fillPtr < s.fillOrder.length ? s.fillOrder[s.fillPtr].mask : full
+  const selectedCell =
+    selected &&
+    selected.mask >= 1 &&
+    selected.mask <= full &&
+    selected.row >= 0 &&
+    selected.row < s.m
+      ? {
+          value: s.table[selected.row][selected.mask],
+          mask: selected.mask,
+          row: selected.row,
+        }
+      : null
 
   // cell info text
   let cellInfo = 'click a cell to see how its value was computed'
@@ -212,11 +267,12 @@ export default function BhkExplainer() {
     }
   }
 
-  let chipText = s.lastEvent ?? 'Bellman-Held-Karp — the DP table fills subset by subset'
-  let chipClass = "bhk-chip bhk-chip-idle"
-  if (s.phase === 'done') chipClass = "bhk-chip bhk-chip-done"
-  else if (s.phase === 'readback') chipClass = "bhk-chip bhk-chip-readback"
-  else if (chipText.includes('dp[')) chipClass = "bhk-chip bhk-chip-cell"
+  let chipText =
+    s.lastEvent ?? 'Bellman-Held-Karp — the DP table fills subset by subset'
+  let chipClass = 'bhk-chip bhk-chip-idle'
+  if (s.phase === 'done') chipClass = 'bhk-chip bhk-chip-done'
+  else if (s.phase === 'readback') chipClass = 'bhk-chip bhk-chip-readback'
+  else if (chipText.includes('dp[')) chipClass = 'bhk-chip bhk-chip-cell'
 
   return (
     <div className="bhk-root">
@@ -224,53 +280,115 @@ export default function BhkExplainer() {
 
       <header className="bhk-header">
         <div className="bhk-eyebrow">teeline · algorithms/bhk</div>
-        <h2 className="bhk-title">Bellman-Held-Karp — exact dynamic programming</h2>
+        <h2 className="bhk-title">
+          Bellman-Held-Karp — exact dynamic programming
+        </h2>
         <p className="bhk-sub">
-          BHK fills a table of <strong>subset costs</strong>: <code>dp[mask][i]</code> is the cheapest
-          path from city 0 that visits exactly the cities in <code>mask</code> and ends at city{' '}
-          <code>i</code>. Every cell is built from one smaller subset plus one edge — then the optimal
-          route is <strong>read back</strong> through the recorded predecessors.
+          BHK fills a table of <strong>subset costs</strong>:{' '}
+          <code>dp[mask][i]</code> is the cheapest path from city 0 that visits
+          exactly the cities in <code>mask</code> and ends at city{' '}
+          <code>i</code>. Every cell is built from one smaller subset plus one
+          edge — then the optimal route is <strong>read back</strong> through
+          the recorded predecessors.
         </p>
       </header>
 
       <div className="bhk-viz-row">
         <div className="bhk-side">
-          <div className="bhk-section-label">DP table — rows end city, columns subset</div>
-          <DpTable sim={s} selected={selected} onSelect={(mask, row) => setSelected({ mask, row })} />
-          <div className="bhk-section-label" style={{ marginTop: 6 }}>Subset on the map</div>
+          <div className="bhk-section-label">
+            DP table — rows end city, columns subset
+          </div>
+          <DpTable
+            sim={s}
+            selected={selected}
+            onSelect={(mask, row) => setSelected({ mask, row })}
+          />
+          <div className="bhk-section-label" style={{ marginTop: 6 }}>
+            Subset on the map
+          </div>
           <CityMap sim={s} />
         </div>
         <div className="bhk-panel">
           <div className="bhk-section-label">Cell info</div>
           <div className="bhk-cellinfo">{cellInfo}</div>
 
-          <div className="bhk-section-label" style={{ marginTop: 10 }}>Optimal</div>
+          <div className="bhk-section-label" style={{ marginTop: 10 }}>
+            Optimal
+          </div>
           <div className="bhk-best">
-            <span className="bhk-mono">{s.optCost === null ? '— (after the table fills)' : s.route!.join(' → ') + ' = ' + s.optCost.toFixed(1)}</span>
+            <span className="bhk-mono">
+              {s.optCost === null
+                ? '— (after the table fills)'
+                : s.route!.join(' → ') + ' = ' + s.optCost.toFixed(1)}
+            </span>
           </div>
 
-          <div className="bhk-section-label" style={{ marginTop: 10 }}>Stats</div>
+          <div className="bhk-section-label" style={{ marginTop: 10 }}>
+            Stats
+          </div>
           <div className="bhk-statgrid">
-            <div><div className="bhk-statlabel">subset size</div><div className="bhk-mono">{popcount(currentMask)}</div></div>
-            <div><div className="bhk-statlabel">bits set</div><div className="bhk-mono">{currentMask.toString(2).padStart(s.m, '0')}</div></div>
-            <div><div className="bhk-statlabel">phase</div><div className="bhk-mono">{s.phase}</div></div>
-            <div><div className="bhk-statlabel">step</div><div className="bhk-mono">{s.step}</div></div>
+            <div>
+              <div className="bhk-statlabel">subset size</div>
+              <div className="bhk-mono">{popcount(currentMask)}</div>
+            </div>
+            <div>
+              <div className="bhk-statlabel">bits set</div>
+              <div className="bhk-mono">
+                {currentMask.toString(2).padStart(s.m, '0')}
+              </div>
+            </div>
+            <div>
+              <div className="bhk-statlabel">phase</div>
+              <div className="bhk-mono">{s.phase}</div>
+            </div>
+            <div>
+              <div className="bhk-statlabel">step</div>
+              <div className="bhk-mono">{s.step}</div>
+            </div>
           </div>
 
-          <div className="bhk-section-label" style={{ marginTop: 10 }}>Mode</div>
+          <div className="bhk-section-label" style={{ marginTop: 10 }}>
+            Mode
+          </div>
           <div className="bhk-mode-row">
-            <button className={`bhk-mode-btn ${s.phase === 'forward' ? 'bhk-mode-cur' : ''}`} onClick={() => jumpTo('forward')} disabled={running}>Forward</button>
-            <button className={`bhk-mode-btn ${s.phase === 'readback' ? 'bhk-mode-cur' : ''}`} onClick={() => jumpTo('readback')} disabled={running}>Read-back</button>
-            <button className={`bhk-mode-btn ${s.phase === 'done' ? 'bhk-mode-cur' : ''}`} onClick={() => jumpTo('done')} disabled={running}>Done</button>
+            <button
+              className={`bhk-mode-btn ${s.phase === 'forward' ? 'bhk-mode-cur' : ''}`}
+              onClick={() => jumpTo('forward')}
+              disabled={running}
+            >
+              Forward
+            </button>
+            <button
+              className={`bhk-mode-btn ${s.phase === 'readback' ? 'bhk-mode-cur' : ''}`}
+              onClick={() => jumpTo('readback')}
+              disabled={running}
+            >
+              Read-back
+            </button>
+            <button
+              className={`bhk-mode-btn ${s.phase === 'done' ? 'bhk-mode-cur' : ''}`}
+              onClick={() => jumpTo('done')}
+              disabled={running}
+            >
+              Done
+            </button>
           </div>
         </div>
       </div>
 
       <div className="bhk-legend">
-        <span><span className="bhk-swatch bhk-swatch-base" /> base cell</span>
-        <span><span className="bhk-swatch bhk-swatch-filled" /> filled</span>
-        <span><span className="bhk-swatch bhk-swatch-next" /> next cell</span>
-        <span><span className="bhk-swatch bhk-swatch-route" /> optimal route</span>
+        <span>
+          <span className="bhk-swatch bhk-swatch-base" /> base cell
+        </span>
+        <span>
+          <span className="bhk-swatch bhk-swatch-filled" /> filled
+        </span>
+        <span>
+          <span className="bhk-swatch bhk-swatch-next" /> next cell
+        </span>
+        <span>
+          <span className="bhk-swatch bhk-swatch-route" /> optimal route
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -280,28 +398,61 @@ export default function BhkExplainer() {
           <span className="bhk-label">Speed</span>
           <div className="bhk-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l} className={`bhk-speed-btn ${i === speedIdx ? 'bhk-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>{l}</button>
+              <button
+                key={l}
+                className={`bhk-speed-btn ${i === speedIdx ? 'bhk-speed-btn-sel' : ''}`}
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
+                {l}
+              </button>
             ))}
           </div>
         </div>
       </div>
 
       <div className="bhk-controls">
-        <button className="bhk-btn" onClick={stepBack} disabled={running || s.step === 0}>⏴ Back</button>
-        <button className="bhk-btn" onClick={stepForward} disabled={running || s.phase === 'done'}>⏵ Step</button>
-        <button className="bhk-btn" onClick={() => setRunning(!running)} disabled={s.phase === 'done'}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="bhk-btn"
+          onClick={stepBack}
+          disabled={running || s.step === 0}
+        >
+          ⏴ Back
         </button>
-        <button className="bhk-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
+        <button
+          className="bhk-btn"
+          onClick={stepForward}
+          disabled={running || s.phase === 'done'}
+        >
+          ⏵ Step
+        </button>
+        <button
+          className="bhk-btn"
+          onClick={() => setRunning(!running)}
+          disabled={s.phase === 'done'}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button
+          className="bhk-btn"
+          onClick={() => reinit(scenarioRef.current)}
+          disabled={running}
+        >
+          ↺ Reset
+        </button>
       </div>
 
       <div className="bhk-scenarios">
         <div className="bhk-section-label">Scenarios</div>
         <div className="bhk-scenario-row">
           {Object.entries(SCENARIOS).map(([key, sc]) => (
-            <button key={key} className="bhk-scenario-btn" title={sc.desc}
-              onClick={() => reinit(sc)} disabled={running}>
+            <button
+              key={key}
+              className="bhk-scenario-btn"
+              title={sc.desc}
+              onClick={() => reinit(sc)}
+              disabled={running}
+            >
               {sc.label}
             </button>
           ))}
@@ -310,7 +461,9 @@ export default function BhkExplainer() {
 
       <footer className="bhk-footer">
         <span className="bhk-mono">cities: {s.n}</span>
-        <span className="bhk-mono">{'dp[mask][i] = min_j dp[mask∖{i}][j] + d(j, i)'}</span>
+        <span className="bhk-mono">
+          {'dp[mask][i] = min_j dp[mask∖{i}][j] + d(j, i)'}
+        </span>
       </footer>
     </div>
   )

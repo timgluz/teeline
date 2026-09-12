@@ -1,12 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
 
 // ---------------------------------------------------------------
 // Fixed 12-city demo (same layout as CS / FPA explainers)
 // ---------------------------------------------------------------
 const CITIES: [number, number][] = [
-  [45, 45], [155, 18], [265, 45], [285, 150],
-  [255, 265], [150, 285], [40, 260], [18, 150],
-  [110, 115], [200, 95], [220, 210], [95, 215],
+  [45, 45],
+  [155, 18],
+  [265, 45],
+  [285, 150],
+  [255, 265],
+  [150, 285],
+  [40, 260],
+  [18, 150],
+  [110, 115],
+  [200, 95],
+  [220, 210],
+  [95, 215],
 ]
 const N_CITIES = CITIES.length
 const T_MIN = 0.5
@@ -41,10 +50,12 @@ function twoOptSwap(tour: number[]): { tour: number[]; i: number; j: number } {
   if (j >= n) j = n - 1
   const next = tour.slice()
   // reverse segment [i..j]
-  let lo = i, hi = j
+  let lo = i,
+    hi = j
   while (lo < hi) {
     ;[next[lo], next[hi]] = [next[hi], next[lo]]
-    lo++; hi--
+    lo++
+    hi--
   }
   return { tour: next, i, j }
 }
@@ -73,12 +84,22 @@ function computeEdgeDiff(before: number[], after: number[]): EdgeDiff {
   const added: [number, number][] = []
   const changedCities = new Set<number>()
   for (let i = 0; i < before.length; i++) {
-    const a = before[i], b = before[(i + 1) % before.length]
-    if (!aSet.has(edgeKey(a, b))) { removed.push([a, b]); changedCities.add(a); changedCities.add(b) }
+    const a = before[i],
+      b = before[(i + 1) % before.length]
+    if (!aSet.has(edgeKey(a, b))) {
+      removed.push([a, b])
+      changedCities.add(a)
+      changedCities.add(b)
+    }
   }
   for (let i = 0; i < after.length; i++) {
-    const a = after[i], b = after[(i + 1) % after.length]
-    if (!bSet.has(edgeKey(a, b))) { added.push([a, b]); changedCities.add(a); changedCities.add(b) }
+    const a = after[i],
+      b = after[(i + 1) % after.length]
+    if (!bSet.has(edgeKey(a, b))) {
+      added.push([a, b])
+      changedCities.add(a)
+      changedCities.add(b)
+    }
   }
   return { removed, added, changedCities }
 }
@@ -86,7 +107,7 @@ function computeEdgeDiff(before: number[], after: number[]): EdgeDiff {
 // ---------------------------------------------------------------
 // Simulation state
 // ---------------------------------------------------------------
-type MoveMode = "improvement" | "accepted" | "rejected" | "converged"
+type MoveMode = 'improvement' | 'accepted' | 'rejected' | 'converged'
 
 type SimState = {
   tour: number[]
@@ -97,15 +118,21 @@ type SimState = {
   iter: number
   accepted: number
   rejected: number
-  recentOutcomes: boolean[]  // last 100 for acceptance rate
+  recentOutcomes: boolean[] // last 100 for acceptance rate
 }
 
 function makeInitState(initTemp: number): SimState {
   const tour = shuffle(N_CITIES)
   const cost = tourLength(tour)
   return {
-    tour, best: tour.slice(), bestCost: cost, currentCost: cost,
-    temperature: initTemp, iter: 0, accepted: 0, rejected: 0,
+    tour,
+    best: tour.slice(),
+    bestCost: cost,
+    currentCost: cost,
+    temperature: initTemp,
+    iter: 0,
+    accepted: 0,
+    rejected: 0,
     recentOutcomes: [],
   }
 }
@@ -114,8 +141,10 @@ function makeInitState(initTemp: number): SimState {
 // SVG helpers
 // ---------------------------------------------------------------
 function polyPts(tour: number[]): string {
-  const pts = tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
-  return tour.length > 0 ? pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}` : pts
+  const pts = tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ')
+  return tour.length > 0
+    ? pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
+    : pts
 }
 
 // ---------------------------------------------------------------
@@ -129,41 +158,63 @@ interface TourSVGProps {
 }
 function TourSVG({ tour, best, diff, converged }: TourSVGProps) {
   return (
-    <svg viewBox="0 0 300 300" className="sa-canvas" role="img" aria-label="SA tour">
+    <svg
+      viewBox="0 0 300 300"
+      className="sa-canvas"
+      role="img"
+      aria-label="SA tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="sa-bg" />
       {/* best tour underlay */}
       <polyline
         points={polyPts(best)}
-        className={converged ? "sa-best-converged" : "sa-best"}
+        className={converged ? 'sa-best-converged' : 'sa-best'}
       />
       {/* removed edges from proposed swap */}
-      {diff && diff.removed.map(([a, b], i) => (
-        <line key={i}
-          x1={CITIES[a][0]} y1={CITIES[a][1]}
-          x2={CITIES[b][0]} y2={CITIES[b][1]}
-          className="sa-edge-removed"
-        />
-      ))}
+      {diff &&
+        diff.removed.map(([a, b], i) => (
+          <line
+            key={i}
+            x1={CITIES[a][0]}
+            y1={CITIES[a][1]}
+            x2={CITIES[b][0]}
+            y2={CITIES[b][1]}
+            className="sa-edge-removed"
+          />
+        ))}
       {/* current tour */}
       <polyline points={polyPts(tour)} className="sa-tour" />
       {/* added edges from proposed swap */}
-      {diff && diff.added.map(([a, b], i) => (
-        <line key={i}
-          x1={CITIES[a][0]} y1={CITIES[a][1]}
-          x2={CITIES[b][0]} y2={CITIES[b][1]}
-          className="sa-edge-added"
-        />
-      ))}
+      {diff &&
+        diff.added.map(([a, b], i) => (
+          <line
+            key={i}
+            x1={CITIES[a][0]}
+            y1={CITIES[a][1]}
+            x2={CITIES[b][0]}
+            y2={CITIES[b][1]}
+            className="sa-edge-added"
+          />
+        ))}
       {/* city dots */}
       {CITIES.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y}
+        <circle
+          key={i}
+          cx={x}
+          cy={y}
           r={diff && diff.changedCities.has(i) ? 7 : 4}
-          className={diff && diff.changedCities.has(i) ? "sa-city sa-city-changed" : "sa-city"}
+          className={
+            diff && diff.changedCities.has(i)
+              ? 'sa-city sa-city-changed'
+              : 'sa-city'
+          }
         />
       ))}
       {/* city labels */}
       {CITIES.map(([x, y], i) => (
-        <text key={i} x={x + 6} y={y - 5} className="sa-city-label">{i}</text>
+        <text key={i} x={x + 6} y={y - 5} className="sa-city-label">
+          {i}
+        </text>
       ))}
     </svg>
   )
@@ -178,7 +229,8 @@ interface TDecayCurveProps {
   alpha: number
 }
 function TDecayCurve({ tHistory, initTemp, alpha }: TDecayCurveProps) {
-  const W = 200, H = 54
+  const W = 200,
+    H = 54
   // expected total steps to reach T_MIN
   const totalSteps = Math.ceil(Math.log(T_MIN / initTemp) / Math.log(1 - alpha))
   const xMax = Math.max(totalSteps, tHistory.length, 1)
@@ -189,14 +241,14 @@ function TDecayCurve({ tHistory, initTemp, alpha }: TDecayCurveProps) {
     const t = (k / 60) * totalSteps
     const temp = initTemp * Math.pow(1 - alpha, t)
     const x = (t / xMax) * W
-    const y = H - 4 - ((Math.max(temp - T_MIN, 0)) / (initTemp - T_MIN)) * (H - 8)
+    const y = H - 4 - (Math.max(temp - T_MIN, 0) / (initTemp - T_MIN)) * (H - 8)
     arcPts.push(`${x.toFixed(1)},${y.toFixed(1)}`)
   }
 
   // actual T history polyline with colour segments (warm→cool gradient approximation)
   const histPts = tHistory.map((temp, idx) => {
     const x = (idx / xMax) * W
-    const y = H - 4 - ((Math.max(temp - T_MIN, 0)) / (initTemp - T_MIN)) * (H - 8)
+    const y = H - 4 - (Math.max(temp - T_MIN, 0) / (initTemp - T_MIN)) * (H - 8)
     return `${x.toFixed(1)},${y.toFixed(1)}`
   })
 
@@ -204,7 +256,8 @@ function TDecayCurve({ tHistory, initTemp, alpha }: TDecayCurveProps) {
   const curIdx = tHistory.length - 1
   const curTemp = curIdx >= 0 ? tHistory[curIdx] : initTemp
   const dotX = curIdx >= 0 ? (curIdx / xMax) * W : 0
-  const dotY = H - 4 - ((Math.max(curTemp - T_MIN, 0)) / (initTemp - T_MIN)) * (H - 8)
+  const dotY =
+    H - 4 - (Math.max(curTemp - T_MIN, 0) / (initTemp - T_MIN)) * (H - 8)
   // colour of dot: red when hot, blue when cool
   const norm = Math.max(curTemp - T_MIN, 0) / (initTemp - T_MIN)
   const r = Math.round(norm * 220)
@@ -214,15 +267,24 @@ function TDecayCurve({ tHistory, initTemp, alpha }: TDecayCurveProps) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="sa-tdecay">
       {/* theoretical arc */}
-      <polyline points={arcPts.join(" ")} fill="none" stroke="#d0d7de" strokeWidth={1} />
+      <polyline
+        points={arcPts.join(' ')}
+        fill="none"
+        stroke="#d0d7de"
+        strokeWidth={1}
+      />
       {/* actual history */}
       {histPts.length > 1 && (
-        <polyline points={histPts.join(" ")} fill="none" stroke="#d97706" strokeWidth={1.5} opacity={0.7} />
+        <polyline
+          points={histPts.join(' ')}
+          fill="none"
+          stroke="#d97706"
+          strokeWidth={1.5}
+          opacity={0.7}
+        />
       )}
       {/* current position dot */}
-      {curIdx >= 0 && (
-        <circle cx={dotX} cy={dotY} r={4} fill={dotColor} />
-      )}
+      {curIdx >= 0 && <circle cx={dotX} cy={dotY} r={4} fill={dotColor} />}
     </svg>
   )
 }
@@ -233,26 +295,31 @@ function TDecayCurve({ tHistory, initTemp, alpha }: TDecayCurveProps) {
 type SparkEntry = { prob: number; mode: MoveMode }
 
 function AcceptanceSparkline({ history }: { history: SparkEntry[] }) {
-  const W = 180, H = 54
+  const W = 180,
+    H = 54
   const visible = history.slice(-30)
-  if (!visible.length) return <svg viewBox={`0 0 ${W} ${H}`} className="sa-spark" />
+  if (!visible.length)
+    return <svg viewBox={`0 0 ${W} ${H}`} className="sa-spark" />
   const slotW = W / 30
   const barW = Math.max(1, slotW - 1)
   const modeColor: Record<string, string> = {
-    improvement: "#16a34a",
-    accepted: "#d97706",
-    rejected: "#dc2626",
-    converged: "#0969da",
+    improvement: '#16a34a',
+    accepted: '#d97706',
+    rejected: '#dc2626',
+    converged: '#0969da',
   }
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="sa-spark">
       {visible.map((h, i) => {
         const bh = Math.max(2, h.prob * (H - 4))
         return (
-          <rect key={i}
-            x={i * slotW} y={H - bh - 2}
-            width={barW} height={bh}
-            fill={modeColor[h.mode] ?? "#9ca3af"}
+          <rect
+            key={i}
+            x={i * slotW}
+            y={H - bh - 2}
+            width={barW}
+            height={bh}
+            fill={modeColor[h.mode] ?? '#9ca3af'}
             opacity={0.85}
           />
         )
@@ -276,8 +343,12 @@ export default function SAExplainer() {
   const [tour, setTour] = useState<number[]>(() => simRef.current.tour)
   const [best, setBest] = useState<number[]>(() => simRef.current.best)
   const [bestCost, setBestCost] = useState(() => simRef.current.bestCost)
-  const [currentCost, setCurrentCost] = useState(() => simRef.current.currentCost)
-  const [temperature, setTemperature] = useState(() => simRef.current.temperature)
+  const [currentCost, setCurrentCost] = useState(
+    () => simRef.current.currentCost,
+  )
+  const [temperature, setTemperature] = useState(
+    () => simRef.current.temperature,
+  )
   const [iter, setIter] = useState(0)
 
   const [mode, setMode] = useState<MoveMode | null>(null)
@@ -310,7 +381,7 @@ export default function SAExplainer() {
   const stepOnce = useCallback(() => {
     const s = simRef.current
     if (s.temperature < T_MIN) {
-      setMode("converged")
+      setMode('converged')
       setRunning(false)
       return
     }
@@ -328,11 +399,11 @@ export default function SAExplainer() {
     if (delta < 0) {
       accepted = true
       prob = 1.0
-      stepMode = "improvement"
+      stepMode = 'improvement'
     } else {
       prob = Math.exp(-delta / s.temperature)
       accepted = Math.random() < prob
-      stepMode = accepted ? "accepted" : "rejected"
+      stepMode = accepted ? 'accepted' : 'rejected'
     }
 
     const nextTour = accepted ? proposed : s.tour
@@ -365,12 +436,12 @@ export default function SAExplainer() {
     setCurrentCost(nextCost)
     setTemperature(nextTemp)
     setIter(simRef.current.iter)
-    setMode(nextTemp < T_MIN ? "converged" : stepMode)
+    setMode(nextTemp < T_MIN ? 'converged' : stepMode)
     setLastDelta(delta)
     setLastProb(prob)
     setDiff(edgeDiff)
-    setSparkHistory(h => [...h.slice(-29), { prob, mode: stepMode }])
-    setTHistory(h => [...h, nextTemp])
+    setSparkHistory((h) => [...h.slice(-29), { prob, mode: stepMode }])
+    setTHistory((h) => [...h, nextTemp])
 
     if (nextTemp < T_MIN) {
       setRunning(false)
@@ -385,27 +456,32 @@ export default function SAExplainer() {
     return () => clearInterval(id)
   }, [running, speed, stepOnce])
 
-  const acceptanceRate = simRef.current.recentOutcomes.length > 0
-    ? (simRef.current.recentOutcomes.filter(Boolean).length / simRef.current.recentOutcomes.length * 100).toFixed(0)
-    : "—"
+  const acceptanceRate =
+    simRef.current.recentOutcomes.length > 0
+      ? (
+          (simRef.current.recentOutcomes.filter(Boolean).length /
+            simRef.current.recentOutcomes.length) *
+          100
+        ).toFixed(0)
+      : '—'
 
-  const converged = mode === "converged"
+  const converged = mode === 'converged'
 
   // event chip
-  let chipText = ""
-  let chipClass = "sa-chip"
-  if (mode === "improvement") {
-    chipText = `✅ improved  ΔE = ${lastDelta !== null ? lastDelta.toFixed(1) : "—"}`
-    chipClass = "sa-chip sa-chip-improve"
-  } else if (mode === "accepted") {
-    chipText = `⚠️ worsening accepted  p = ${lastProb !== null ? lastProb.toFixed(2) : "—"}  ΔE = +${lastDelta !== null ? lastDelta.toFixed(1) : "—"}`
-    chipClass = "sa-chip sa-chip-accepted"
-  } else if (mode === "rejected") {
-    chipText = `❌ rejected  p = ${lastProb !== null ? lastProb.toFixed(2) : "—"}  ΔE = +${lastDelta !== null ? lastDelta.toFixed(1) : "—"}`
-    chipClass = "sa-chip sa-chip-rejected"
-  } else if (mode === "converged") {
-    chipText = "🏁 Converged — best tour highlighted"
-    chipClass = "sa-chip sa-chip-converged"
+  let chipText = ''
+  let chipClass = 'sa-chip'
+  if (mode === 'improvement') {
+    chipText = `✅ improved  ΔE = ${lastDelta !== null ? lastDelta.toFixed(1) : '—'}`
+    chipClass = 'sa-chip sa-chip-improve'
+  } else if (mode === 'accepted') {
+    chipText = `⚠️ worsening accepted  p = ${lastProb !== null ? lastProb.toFixed(2) : '—'}  ΔE = +${lastDelta !== null ? lastDelta.toFixed(1) : '—'}`
+    chipClass = 'sa-chip sa-chip-accepted'
+  } else if (mode === 'rejected') {
+    chipText = `❌ rejected  p = ${lastProb !== null ? lastProb.toFixed(2) : '—'}  ΔE = +${lastDelta !== null ? lastDelta.toFixed(1) : '—'}`
+    chipClass = 'sa-chip sa-chip-rejected'
+  } else if (mode === 'converged') {
+    chipText = '🏁 Converged — best tour highlighted'
+    chipClass = 'sa-chip sa-chip-converged'
   }
 
   return (
@@ -416,9 +492,11 @@ export default function SAExplainer() {
         <div className="sa-eyebrow">teeline · algorithms/sa</div>
         <h2 className="sa-title">Simulated Annealing</h2>
         <p className="sa-sub">
-          A single tour evolves by random 2-opt swaps. Improvements always accepted;
-          worsenings accepted with probability <code>exp(−ΔE / T)</code>.
-          As temperature <code>T</code> cools, acceptance of bad moves drops — shifting from exploration to exploitation.
+          A single tour evolves by random 2-opt swaps. Improvements always
+          accepted; worsenings accepted with probability{' '}
+          <code>exp(−ΔE / T)</code>. As temperature <code>T</code> cools,
+          acceptance of bad moves drops — shifting from exploration to
+          exploitation.
         </p>
       </div>
 
@@ -446,19 +524,39 @@ export default function SAExplainer() {
       {mode !== null && <div className={chipClass}>{chipText}</div>}
 
       <div className="sa-stats">
-        <div className="sa-stat"><span className="sa-stat-val">{iter}</span><span className="sa-stat-label">iter</span></div>
-        <div className="sa-stat"><span className="sa-stat-val">{temperature.toFixed(2)}</span><span className="sa-stat-label">T</span></div>
-        <div className="sa-stat"><span className="sa-stat-val">{currentCost.toFixed(0)}</span><span className="sa-stat-label">current</span></div>
-        <div className="sa-stat"><span className="sa-stat-val">{bestCost.toFixed(0)}</span><span className="sa-stat-label">best</span></div>
-        <div className="sa-stat"><span className="sa-stat-val">{acceptanceRate}%</span><span className="sa-stat-label">acc rate</span></div>
+        <div className="sa-stat">
+          <span className="sa-stat-val">{iter}</span>
+          <span className="sa-stat-label">iter</span>
+        </div>
+        <div className="sa-stat">
+          <span className="sa-stat-val">{temperature.toFixed(2)}</span>
+          <span className="sa-stat-label">T</span>
+        </div>
+        <div className="sa-stat">
+          <span className="sa-stat-val">{currentCost.toFixed(0)}</span>
+          <span className="sa-stat-label">current</span>
+        </div>
+        <div className="sa-stat">
+          <span className="sa-stat-val">{bestCost.toFixed(0)}</span>
+          <span className="sa-stat-label">best</span>
+        </div>
+        <div className="sa-stat">
+          <span className="sa-stat-val">{acceptanceRate}%</span>
+          <span className="sa-stat-label">acc rate</span>
+        </div>
       </div>
 
       <div className="sa-config">
         <label className="sa-label">
           T₀ = {initTemp}
-          <input type="range" min={10} max={500} step={10} value={initTemp}
+          <input
+            type="range"
+            min={10}
+            max={500}
+            step={10}
+            value={initTemp}
             className="sa-slider"
-            onInput={e => {
+            onInput={(e) => {
               const v = Number((e.target as HTMLInputElement).value)
               setInitTemp(v)
               initTempRef.current = v
@@ -468,9 +566,14 @@ export default function SAExplainer() {
         </label>
         <label className="sa-label">
           α = {alpha.toFixed(3)}
-          <input type="range" min={0.005} max={0.10} step={0.005} value={alpha}
+          <input
+            type="range"
+            min={0.005}
+            max={0.1}
+            step={0.005}
+            value={alpha}
             className="sa-slider"
-            onInput={e => {
+            onInput={(e) => {
               const v = Number((e.target as HTMLInputElement).value)
               setAlpha(v)
               alphaRef.current = v
@@ -480,29 +583,43 @@ export default function SAExplainer() {
         </label>
         <label className="sa-label">
           speed = {speed}
-          <input type="range" min={1} max={10} step={1} value={speed}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
             className="sa-slider"
-            onInput={e => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
         </label>
       </div>
 
       <div className="sa-controls">
-        <button className="sa-btn"
+        <button
+          className="sa-btn"
           onClick={stepOnce}
           disabled={running || converged}
-        >Step</button>
-        <button className="sa-btn sa-btn-primary"
-          onClick={() => setRunning(r => !r)}
+        >
+          Step
+        </button>
+        <button
+          className="sa-btn sa-btn-primary"
+          onClick={() => setRunning((r) => !r)}
           disabled={converged}
-        >{running ? "Pause" : "Run"}</button>
-        <button className="sa-btn"
-          onClick={() => reinit(initTempRef.current)}
-        >Reset</button>
+        >
+          {running ? 'Pause' : 'Run'}
+        </button>
+        <button className="sa-btn" onClick={() => reinit(initTempRef.current)}>
+          Reset
+        </button>
       </div>
 
       <div className="sa-footer">
-        {N_CITIES} cities · T₀ = {initTemp} · α = {alpha.toFixed(3)} · T_min = {T_MIN}
+        {N_CITIES} cities · T₀ = {initTemp} · α = {alpha.toFixed(3)} · T_min ={' '}
+        {T_MIN}
       </div>
     </div>
   )

@@ -1,7 +1,14 @@
 import { describe, test, expect } from 'vitest'
 import {
-  N_CITIES, N_NEURONS, SIGMA0, MAX_STEPS,
-  makeInitState, stepOnce, tourLength, neighbourRadiusPx, phaseLabel,
+  N_CITIES,
+  N_NEURONS,
+  SIGMA0,
+  MAX_STEPS,
+  makeInitState,
+  stepOnce,
+  tourLength,
+  neighbourRadiusPx,
+  phaseLabel,
 } from './som-algo'
 
 describe('tourLength', () => {
@@ -94,7 +101,9 @@ describe('neighbourRadiusPx', () => {
   })
   test('larger sigma gives larger radius', () => {
     const { neurons } = makeInitState()
-    expect(neighbourRadiusPx(4, neurons)).toBeGreaterThan(neighbourRadiusPx(2, neurons))
+    expect(neighbourRadiusPx(4, neurons)).toBeGreaterThan(
+      neighbourRadiusPx(2, neurons),
+    )
   })
 })
 

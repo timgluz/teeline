@@ -17,10 +17,16 @@
 // small enough that a full scenario run stays short, which suits an explainer
 // whose job is to show the mechanics (random 2-opt, accept-if-better,
 // restart-when-stale), not to solve the instance.
-import { CITIES_8 as CITIES, N_CITIES_8 as N_CITIES, dist8 as dist, tourLength8 as tourLength } from './explainer-cities'
+import {
+  CITIES_8 as CITIES,
+  N_CITIES_8 as N_CITIES,
+  dist8 as dist,
+  tourLength8 as tourLength,
+} from './explainer-cities'
 export { CITIES, N_CITIES, dist, tourLength }
 
-export type Phase = 'idle' | 'propose' | 'accepted' | 'rejected' | 'restart' | 'done'
+export type Phase =
+  'idle' | 'propose' | 'accepted' | 'rejected' | 'restart' | 'done'
 
 // ---------------------------------------------------------------
 // Seeded RNG — pure (seed, counter) → [0, 1), so it can be
@@ -49,7 +55,10 @@ export function nextRand(rng: RngState): { value: number; rng: RngState } {
 // ---------------------------------------------------------------
 // Moves — Rust route.rs semantics
 // ---------------------------------------------------------------
-export function seededShuffle(rng: RngState): { tour: number[]; rng: RngState } {
+export function seededShuffle(rng: RngState): {
+  tour: number[]
+  rng: RngState
+} {
   const tour = Array.from({ length: N_CITIES }, (_, i) => i)
   let r = rng
   for (let i = N_CITIES - 1; i > 0; i--) {
@@ -78,7 +87,10 @@ export function reverseSegment(tour: number[], i: number, j: number): number[] {
 // Rust random_successor(): draw a random pair with positions > 1 apart (the
 // wrap pair (0, n−1) is allowed), then reverse the inclusive segment [i..=j].
 // Returns the candidate tour plus the removed/added edge pairs for display.
-export function randomSuccessor(tour: number[], rng: RngState): {
+export function randomSuccessor(
+  tour: number[],
+  rng: RngState,
+): {
   tour: number[]
   i: number
   j: number
@@ -144,22 +156,22 @@ export interface CandidateEvent {
   j: number
   removed: [number, number][]
   added: [number, number][]
-  delta: number            // candidateCost − currentCost (visual Δ on screen)
+  delta: number // candidateCost − currentCost (visual Δ on screen)
   candidateTour: number[]
   candidateCost: number
-  accepted: boolean        // candidateCost < bestCost (Rust: < best_distance)
-  restart: boolean         // this rejection pushes nStale past patience
+  accepted: boolean // candidateCost < bestCost (Rust: < best_distance)
+  restart: boolean // this rejection pushes nStale past patience
   restartTour: number[] | null // fresh random tour if restarting
 }
 
 export interface SimState {
   phase: Phase
-  tour: number[]           // current tour (== bestTour except right after a restart)
+  tour: number[] // current tour (== bestTour except right after a restart)
   bestTour: number[]
   bestCost: number
   currentCost: number
-  epoch: number            // completed candidate evaluations (verdicts)
-  nStale: number           // consecutive rejections since last accept/restart
+  epoch: number // completed candidate evaluations (verdicts)
+  nStale: number // consecutive rejections since last accept/restart
   restarts: number
   acceptedCount: number
   rejectedCount: number
@@ -167,7 +179,7 @@ export interface SimState {
   patience: number
   rng: RngState
   pending: CandidateEvent | null // drawn candidate awaiting its verdict phase
-  costHistory: number[]    // best cost after each epoch (sparkline)
+  costHistory: number[] // best cost after each epoch (sparkline)
   step: number
 }
 
@@ -287,7 +299,14 @@ export function stepOnce(state: SimState): SimState {
   if (state.epoch >= state.maxEpochs) {
     return { ...state, phase: 'done', step: state.step + 1 }
   }
-  const { tour: candidateTour, i, j, removed, added, rng } = randomSuccessor(state.tour, state.rng)
+  const {
+    tour: candidateTour,
+    i,
+    j,
+    removed,
+    added,
+    rng,
+  } = randomSuccessor(state.tour, state.rng)
   const candidateCost = tourLength(candidateTour)
   const delta = candidateCost - state.currentCost
   const accepted = candidateCost < state.bestCost
@@ -307,7 +326,11 @@ export function stepOnce(state: SimState): SimState {
     phase: 'propose',
     rng: rng2,
     pending: {
-      i, j, removed, added, delta,
+      i,
+      j,
+      removed,
+      added,
+      delta,
       candidateTour,
       candidateCost,
       accepted,

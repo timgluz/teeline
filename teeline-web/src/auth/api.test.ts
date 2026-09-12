@@ -8,13 +8,18 @@ afterEach(() => {
 
 function stubFetch(status: number, body: unknown) {
   const res = new Response(JSON.stringify(body), { status })
-  vi.stubGlobal('fetch', vi.fn(async () => res))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => res),
+  )
 }
 
 describe('apiFetch', () => {
   it('returns parsed JSON on success', async () => {
     stubFetch(200, { ok: true })
-    await expect(apiFetch<{ ok: boolean }>('/api/auth/me')).resolves.toEqual({ ok: true })
+    await expect(apiFetch<{ ok: boolean }>('/api/auth/me')).resolves.toEqual({
+      ok: true,
+    })
   })
 
   it('sends same-origin credentials and JSON content type', async () => {
@@ -23,7 +28,9 @@ describe('apiFetch', () => {
     const [url, init] = vi.mocked(fetch).mock.calls[0]
     expect(url).toBe('/api/auth/keys')
     expect((init as RequestInit).credentials).toBe('same-origin')
-    expect(((init as RequestInit).headers as Record<string, string>)['Content-Type']).toBe('application/json')
+    expect(
+      ((init as RequestInit).headers as Record<string, string>)['Content-Type'],
+    ).toBe('application/json')
   })
 
   it('throws ApiError with the server error message', async () => {

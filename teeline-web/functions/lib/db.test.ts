@@ -46,7 +46,11 @@ const NOW = 1_752_000_000_000
 
 describe('users', () => {
   it('creates and reads a user', async () => {
-    await createUser(db as never, { id: 'u1', displayName: 'Tim', createdAt: NOW })
+    await createUser(db as never, {
+      id: 'u1',
+      displayName: 'Tim',
+      createdAt: NOW,
+    })
     const u = await getUser(db as never, 'u1')
     expect(u).toMatchObject({ id: 'u1', display_name: 'Tim', created_at: NOW })
   })
@@ -57,8 +61,19 @@ describe('users', () => {
 
   it('deleteUser wipes user, credentials and keys atomically', async () => {
     await createUser(db as never, { id: 'u1', createdAt: NOW })
-    await addCredential(db as never, { id: 'c1', userId: 'u1', publicKey: 'pk', counter: 0, createdAt: NOW })
-    await createApiKey(db as never, { id: 'k1', userId: 'u1', secretHash: await hashSecret('ak_x'), createdAt: NOW })
+    await addCredential(db as never, {
+      id: 'c1',
+      userId: 'u1',
+      publicKey: 'pk',
+      counter: 0,
+      createdAt: NOW,
+    })
+    await createApiKey(db as never, {
+      id: 'k1',
+      userId: 'u1',
+      secretHash: await hashSecret('ak_x'),
+      createdAt: NOW,
+    })
     await deleteUser(db as never, 'u1')
     expect(await getUser(db as never, 'u1')).toBeNull()
     expect(await getCredentialById(db as never, 'c1')).toBeNull()
@@ -80,8 +95,21 @@ describe('users', () => {
 describe('credentials', () => {
   it('adds, lists and looks up by id (login path)', async () => {
     await createUser(db as never, { id: 'u1', createdAt: NOW })
-    await addCredential(db as never, { id: 'c1', userId: 'u1', publicKey: 'pk1', counter: 1, transports: ['internal'], createdAt: NOW })
-    await addCredential(db as never, { id: 'c2', userId: 'u1', publicKey: 'pk2', counter: 2, createdAt: NOW })
+    await addCredential(db as never, {
+      id: 'c1',
+      userId: 'u1',
+      publicKey: 'pk1',
+      counter: 1,
+      transports: ['internal'],
+      createdAt: NOW,
+    })
+    await addCredential(db as never, {
+      id: 'c2',
+      userId: 'u1',
+      publicKey: 'pk2',
+      counter: 2,
+      createdAt: NOW,
+    })
 
     const byUser = await listCredentialsByUser(db as never, 'u1')
     expect(byUser.map((c) => c.id)).toEqual(['c1', 'c2'])
@@ -94,7 +122,13 @@ describe('credentials', () => {
 
   it('updates the counter atomically', async () => {
     await createUser(db as never, { id: 'u1', createdAt: NOW })
-    await addCredential(db as never, { id: 'c1', userId: 'u1', publicKey: 'pk', counter: 0, createdAt: NOW })
+    await addCredential(db as never, {
+      id: 'c1',
+      userId: 'u1',
+      publicKey: 'pk',
+      counter: 0,
+      createdAt: NOW,
+    })
     await updateCredentialCounter(db as never, 'c1', 7)
     expect((await getCredentialById(db as never, 'c1'))?.counter).toBe(7)
   })
@@ -104,7 +138,13 @@ describe('api keys', () => {
   it('creates, lists metadata and finds by hash', async () => {
     await createUser(db as never, { id: 'u1', createdAt: NOW })
     const secret = 'ak_abc123'
-    await createApiKey(db as never, { id: 'k1', userId: 'u1', name: 'laptop', secretHash: await hashSecret(secret), createdAt: NOW })
+    await createApiKey(db as never, {
+      id: 'k1',
+      userId: 'u1',
+      name: 'laptop',
+      secretHash: await hashSecret(secret),
+      createdAt: NOW,
+    })
 
     const keys = await listApiKeysByUser(db as never, 'u1')
     expect(keys).toHaveLength(1)
@@ -112,39 +152,71 @@ describe('api keys', () => {
     // secret_hash is present (needed for verify) but callers must never expose it
     expect(keys[0].secret_hash).toBe(await hashSecret(secret))
 
-    const found = await findActiveKeyByHash(db as never, await hashSecret(secret))
+    const found = await findActiveKeyByHash(
+      db as never,
+      await hashSecret(secret),
+    )
     expect(found?.user_id).toBe('u1')
-    expect(await findActiveKeyByHash(db as never, await hashSecret('ak_wrong'))).toBeNull()
+    expect(
+      await findActiveKeyByHash(db as never, await hashSecret('ak_wrong')),
+    ).toBeNull()
   })
 
   it('revoke hides the key from verify immediately, scoped to owner', async () => {
     await createUser(db as never, { id: 'u1', createdAt: NOW })
     await createUser(db as never, { id: 'u2', createdAt: NOW })
     const secret = 'ak_xyz'
-    await createApiKey(db as never, { id: 'k1', userId: 'u1', secretHash: await hashSecret(secret), createdAt: NOW })
+    await createApiKey(db as never, {
+      id: 'k1',
+      userId: 'u1',
+      secretHash: await hashSecret(secret),
+      createdAt: NOW,
+    })
 
     // non-owner cannot revoke
     expect(await revokeKey(db as never, 'k1', 'u2')).toBe(false)
-    expect(await findActiveKeyByHash(db as never, await hashSecret(secret))).not.toBeNull()
+    expect(
+      await findActiveKeyByHash(db as never, await hashSecret(secret)),
+    ).not.toBeNull()
 
     // owner revokes → verify path immediately returns nothing
     expect(await revokeKey(db as never, 'k1', 'u1')).toBe(true)
-    expect(await findActiveKeyByHash(db as never, await hashSecret(secret))).toBeNull()
+    expect(
+      await findActiveKeyByHash(db as never, await hashSecret(secret)),
+    ).toBeNull()
   })
 
   it('touchKeyLastUsed records usage', async () => {
     await createUser(db as never, { id: 'u1', createdAt: NOW })
-    await createApiKey(db as never, { id: 'k1', userId: 'u1', secretHash: 'h', createdAt: NOW })
+    await createApiKey(db as never, {
+      id: 'k1',
+      userId: 'u1',
+      secretHash: 'h',
+      createdAt: NOW,
+    })
     await touchKeyLastUsed(db as never, 'k1', 123)
-    expect((await listApiKeysByUser(db as never, 'u1'))[0].last_used_at).toBe(123)
+    expect((await listApiKeysByUser(db as never, 'u1'))[0].last_used_at).toBe(
+      123,
+    )
   })
 })
 
 describe('challenges', () => {
   it('insert, read and single-use consume', async () => {
-    await insertChallenge(db as never, { id: 'ch1', type: 'register', challenge: 'abc', userHandle: 'uh', expiresAt: NOW + 300_000 })
+    await insertChallenge(db as never, {
+      id: 'ch1',
+      type: 'register',
+      challenge: 'abc',
+      userHandle: 'uh',
+      expiresAt: NOW + 300_000,
+    })
     const c = await getChallenge(db as never, 'ch1')
-    expect(c).toMatchObject({ id: 'ch1', type: 'register', challenge: 'abc', user_handle: 'uh' })
+    expect(c).toMatchObject({
+      id: 'ch1',
+      type: 'register',
+      challenge: 'abc',
+      user_handle: 'uh',
+    })
 
     expect(await consumeChallenge(db as never, 'ch1')).toBe(true)
     expect(await consumeChallenge(db as never, 'ch1')).toBe(false) // replay fails
@@ -152,7 +224,13 @@ describe('challenges', () => {
   })
 
   it('login challenge stores a user_id', async () => {
-    await insertChallenge(db as never, { id: 'ch2', type: 'login', challenge: 'def', userId: 'u1', expiresAt: NOW + 300_000 })
+    await insertChallenge(db as never, {
+      id: 'ch2',
+      type: 'login',
+      challenge: 'def',
+      userId: 'u1',
+      expiresAt: NOW + 300_000,
+    })
     expect((await getChallenge(db as never, 'ch2'))?.user_id).toBe('u1')
   })
 })
@@ -175,10 +253,20 @@ describe('crypto helpers', () => {
 
 describe('d1 shim', () => {
   it('first(col) returns a single column value like real D1', async () => {
-    await createUser(db as never, { id: 'u1', displayName: 'Tim', createdAt: NOW })
-    const name = await db.prepare('SELECT id, display_name FROM users WHERE id = ?1').bind('u1').first<{ display_name: string }>('display_name')
+    await createUser(db as never, {
+      id: 'u1',
+      displayName: 'Tim',
+      createdAt: NOW,
+    })
+    const name = await db
+      .prepare('SELECT id, display_name FROM users WHERE id = ?1')
+      .bind('u1')
+      .first<{ display_name: string }>('display_name')
     expect(name).toBe('Tim')
-    const missing = await db.prepare('SELECT id, display_name FROM users WHERE id = ?1').bind('nope').first('display_name')
+    const missing = await db
+      .prepare('SELECT id, display_name FROM users WHERE id = ?1')
+      .bind('nope')
+      .first('display_name')
     expect(missing).toBeNull()
   })
 })

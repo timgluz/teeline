@@ -1,7 +1,9 @@
 import { berlin52, type HeroCity } from './hero-cities'
 
 export function initHeroCanvas(): void {
-  const svg = document.getElementById('hero-canvas') as unknown as SVGSVGElement | null
+  const svg = document.getElementById(
+    'hero-canvas',
+  ) as unknown as SVGSVGElement | null
   const lengthEl = document.getElementById('hero-tour-length')
   const iterEl = document.getElementById('hero-iterations')
   const bestEl = document.getElementById('hero-best')
@@ -13,7 +15,6 @@ export function initHeroCanvas(): void {
 
   const NS = 'http://www.w3.org/2000/svg'
   const cities: HeroCity[] = berlin52.map((c) => ({ id: c.id, x: c.x, y: c.y }))
-  
 
   function dist(a: number, b: number): number {
     const dx = cities[a].x - cities[b].x
@@ -148,7 +149,9 @@ export function initHeroCanvas(): void {
     nodeEls[dragging]?.setAttribute('cy', String(cities[dragging].y))
     frames = buildFrames()
     best = Math.min(best, ...frames.map((f) => f.cost))
-    bestNode.textContent = best.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    bestNode.textContent = best.toLocaleString('en-US', {
+      maximumFractionDigits: 0,
+    })
     renderRoute(frames[0].route)
     length.textContent = Math.round(frames[0].cost).toLocaleString('en-US')
     iterations.textContent = '0'

@@ -38,21 +38,34 @@ export async function checkRateLimit(
     db.prepare('SELECT count FROM rate_limits WHERE key = ?1').bind(key),
   ])
 
-  const row = (results[1] as { results: { count: number }[] }).results[0] ?? undefined
+  const row =
+    (results[1] as { results: { count: number }[] }).results[0] ?? undefined
   if (!row) {
     // INSERT succeeded but the row isn't visible — unexpected; don't mask it.
-    console.warn('[rate-limit] INSERT succeeded but SELECT returned no row for key:', key)
+    console.warn(
+      '[rate-limit] INSERT succeeded but SELECT returned no row for key:',
+      key,
+    )
   }
   const count = row?.count ?? 1
   return {
     allowed: count <= limit,
-    retryAfterSeconds: Math.max(1, Math.ceil((windowStart + windowMs - now) / 1000)),
+    retryAfterSeconds: Math.max(
+      1,
+      Math.ceil((windowStart + windowMs - now) / 1000),
+    ),
   }
 }
 
 /** Opportunistic cleanup of expired windows — call occasionally, never block. */
-export async function cleanupRateLimits(db: D1Database, now: number = Date.now()): Promise<void> {
-  await db.prepare('DELETE FROM rate_limits WHERE window_start < ?1').bind(now - 24 * 3600 * 1000).run()
+export async function cleanupRateLimits(
+  db: D1Database,
+  now: number = Date.now(),
+): Promise<void> {
+  await db
+    .prepare('DELETE FROM rate_limits WHERE window_start < ?1')
+    .bind(now - 24 * 3600 * 1000)
+    .run()
 }
 
 /**
@@ -77,18 +90,28 @@ export async function rateLimit(
 
   // ~1% of requests also sweep stale windows, regardless of allow/deny.
   if (Math.random() < 0.01) {
-    cleanupRateLimits(env.DB).catch((err) => console.error('[rate-limit] cleanup failed:', err))
+    cleanupRateLimits(env.DB).catch((err) =>
+      console.error('[rate-limit] cleanup failed:', err),
+    )
   }
 
   let allowed: boolean
   let retryAfterSeconds: number
   try {
-    ;({ allowed, retryAfterSeconds } = await checkRateLimit(env.DB, ip, scope, limit, windowMs))
+    ;({ allowed, retryAfterSeconds } = await checkRateLimit(
+      env.DB,
+      ip,
+      scope,
+      limit,
+      windowMs,
+    ))
   } catch (err) {
     console.error('[rate-limit] D1 error, failing open:', err)
     return null
   }
 
   if (allowed) return null
-  return json({ error: 'Too many requests' }, 429, { 'Retry-After': String(retryAfterSeconds) })
+  return json({ error: 'Too many requests' }, 429, {
+    'Retry-After': String(retryAfterSeconds),
+  })
 }

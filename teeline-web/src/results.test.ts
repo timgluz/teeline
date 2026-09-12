@@ -41,7 +41,12 @@ describe('RunRecord type', () => {
   })
 
   it('allows comparison to be absent', () => {
-    const record: RunRecord = { solver: 'nn', total: 8296, runtime: 12, route: [1, 2, 3] }
+    const record: RunRecord = {
+      solver: 'nn',
+      total: 8296,
+      runtime: 12,
+      route: [1, 2, 3],
+    }
     expect(record.comparison).toBeUndefined()
   })
 })

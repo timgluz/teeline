@@ -1,13 +1,10 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
-import {
-  PHASES, SCENARIOS,
-  makeInitState, stepOnce,
-} from "./christofides-algo"
-import type { Phase, Instance, SimState } from "./christofides-algo"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
+import { PHASES, SCENARIOS, makeInitState, stepOnce } from './christofides-algo'
+import type { Phase, Instance, SimState } from './christofides-algo'
 
 const DEFAULT_SCENARIO = SCENARIOS.balanced
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 
 const PHASE_LABELS: Record<Phase, string> = {
   mst: 'MST',
@@ -27,7 +24,12 @@ function edgeKey(a: number, b: number): string {
 // green MST edges, purple dashed matching, the multigraph with a
 // walking dot (euler), and the final tour being carved out (shortcut).
 // ---------------------------------------------------------------
-function TourCanvas({ sim, showMst, showMatch, showTour }: {
+function TourCanvas({
+  sim,
+  showMst,
+  showMatch,
+  showTour,
+}: {
   sim: SimState
   showMst: boolean
   showMatch: boolean
@@ -37,9 +39,16 @@ function TourCanvas({ sim, showMst, showMatch, showTour }: {
   const pos = (i: number) => cities[i]
 
   const multigraphEdges = useMemo(() => {
-    const list: Array<{ id: number; a: number; b: number; kind: 'mst' | 'match' }> = []
-    for (const [a, b] of sim.mstEdges) list.push({ id: list.length, a, b, kind: 'mst' })
-    for (const [a, b] of sim.matchingEdges) list.push({ id: list.length, a, b, kind: 'match' })
+    const list: Array<{
+      id: number
+      a: number
+      b: number
+      kind: 'mst' | 'match'
+    }> = []
+    for (const [a, b] of sim.mstEdges)
+      list.push({ id: list.length, a, b, kind: 'mst' })
+    for (const [a, b] of sim.matchingEdges)
+      list.push({ id: list.length, a, b, kind: 'match' })
     return list
   }, [sim.mstEdges, sim.matchingEdges])
 
@@ -80,20 +89,25 @@ function TourCanvas({ sim, showMst, showMatch, showTour }: {
   // final tour edges (built during shortcut; complete at done)
   const tourEdges: Array<[number, number]> = []
   const kept = phase === 'done' ? sim.shortcutTour : sim.kept
-  for (let t = 0; t < kept.length - 1; t++) tourEdges.push([kept[t], kept[t + 1]])
-  if (phase === 'done' && kept.length > 1) tourEdges.push([kept[kept.length - 1], kept[0]])
+  for (let t = 0; t < kept.length - 1; t++)
+    tourEdges.push([kept[t], kept[t + 1]])
+  if (phase === 'done' && kept.length > 1)
+    tourEdges.push([kept[kept.length - 1], kept[0]])
 
   const skippedSet = new Set(sim.skipped)
 
   // walker position: euler phase follows walkerPos; shortcut follows shortcutStep
   let walkerCity: number | null = null
   if (phase === 'euler') {
-    walkerCity = sim.eulerCircuit[Math.min(sim.walkerPos, sim.eulerCircuit.length - 1)]
+    walkerCity =
+      sim.eulerCircuit[Math.min(sim.walkerPos, sim.eulerCircuit.length - 1)]
   } else if (phase === 'shortcut') {
-    walkerCity = sim.eulerCircuit[Math.min(sim.shortcutStep, sim.eulerCircuit.length - 1)]
+    walkerCity =
+      sim.eulerCircuit[Math.min(sim.shortcutStep, sim.eulerCircuit.length - 1)]
   }
 
-  const constructing = phase === 'mst' || phase === 'odd' || phase === 'matching'
+  const constructing =
+    phase === 'mst' || phase === 'odd' || phase === 'matching'
   let mstShown: [number, number][] = []
   if (showMst && constructing) {
     const limit = phase === 'mst' ? sim.mstRevealed : sim.mstEdges.length
@@ -102,62 +116,113 @@ function TourCanvas({ sim, showMst, showMatch, showTour }: {
   let matchShown: [number, number][] = []
   if (showMatch && phase === 'matching') {
     matchShown = sim.matchingEdges.slice(0, sim.matchingRevealed)
-  } else if (showMatch && (phase === 'euler' || phase === 'shortcut' || phase === 'done')) {
+  } else if (
+    showMatch &&
+    (phase === 'euler' || phase === 'shortcut' || phase === 'done')
+  ) {
     matchShown = sim.matchingEdges
   }
   const showMultigraph = phase === 'euler' || phase === 'shortcut'
   const showTourLayer = showTour && (phase === 'shortcut' || phase === 'done')
 
   return (
-    <svg viewBox="0 0 300 300" className="chr-canvas" role="img" aria-label="Christofides construction">
+    <svg
+      viewBox="0 0 300 300"
+      className="chr-canvas"
+      role="img"
+      aria-label="Christofides construction"
+    >
       <rect x={0} y={0} width={300} height={300} className="chr-bg" />
 
       {/* Plain construction layers */}
       {mstShown.map(([a, b]) => (
-        <line key={`m${edgeKey(a, b)}`} className="chr-mst-edge"
-          x1={pos(a)[0]} y1={pos(a)[1]} x2={pos(b)[0]} y2={pos(b)[1]} />
+        <line
+          key={`m${edgeKey(a, b)}`}
+          className="chr-mst-edge"
+          x1={pos(a)[0]}
+          y1={pos(a)[1]}
+          x2={pos(b)[0]}
+          y2={pos(b)[1]}
+        />
       ))}
       {matchShown.map(([a, b]) => (
-        <line key={`p${edgeKey(a, b)}`} className="chr-match-edge"
-          x1={pos(a)[0]} y1={pos(a)[1]} x2={pos(b)[0]} y2={pos(b)[1]} />
+        <line
+          key={`p${edgeKey(a, b)}`}
+          className="chr-match-edge"
+          x1={pos(a)[0]}
+          y1={pos(a)[1]}
+          x2={pos(b)[0]}
+          y2={pos(b)[1]}
+        />
       ))}
 
       {/* Multigraph (euler/shortcut): used edges fade */}
-      {showMultigraph && multigraphEdges.map((e) => {
-        const used = isEdgeUsed(e.a, e.b)
-        const cls = `chr-multi-edge ${e.kind === 'mst' ? 'chr-multi-mst' : 'chr-multi-match'} ${used ? 'chr-multi-used' : ''}`
-        return <line key={e.id} className={cls}
-          x1={pos(e.a)[0]} y1={pos(e.a)[1]} x2={pos(e.b)[0]} y2={pos(e.b)[1]} />
-      })}
+      {showMultigraph &&
+        multigraphEdges.map((e) => {
+          const used = isEdgeUsed(e.a, e.b)
+          const cls = `chr-multi-edge ${e.kind === 'mst' ? 'chr-multi-mst' : 'chr-multi-match'} ${used ? 'chr-multi-used' : ''}`
+          return (
+            <line
+              key={e.id}
+              className={cls}
+              x1={pos(e.a)[0]}
+              y1={pos(e.a)[1]}
+              x2={pos(e.b)[0]}
+              y2={pos(e.b)[1]}
+            />
+          )
+        })}
 
       {/* Final tour (shortcut phase + done) */}
-      {showTourLayer && tourEdges.map(([a, b]) => (
-        <line key={`t${edgeKey(a, b)}`} className="chr-tour-edge"
-          x1={pos(a)[0]} y1={pos(a)[1]} x2={pos(b)[0]} y2={pos(b)[1]} />
-      ))}
+      {showTourLayer &&
+        tourEdges.map(([a, b]) => (
+          <line
+            key={`t${edgeKey(a, b)}`}
+            className="chr-tour-edge"
+            x1={pos(a)[0]}
+            y1={pos(a)[1]}
+            x2={pos(b)[0]}
+            y2={pos(b)[1]}
+          />
+        ))}
 
       {/* Cities */}
       {cities.map(([x, y], id) => {
         const oddHighlight = phase === 'odd' || phase === 'matching'
         return (
           <g key={id}>
-            <circle className={`chr-city ${sim.odd.includes(id) && oddHighlight ? 'chr-city-odd' : ''}`}
-              cx={x} cy={y} r={7} />
-            <text className="chr-label" x={x} y={y + 16}>{id}</text>
+            <circle
+              className={`chr-city ${sim.odd.includes(id) && oddHighlight ? 'chr-city-odd' : ''}`}
+              cx={x}
+              cy={y}
+              r={7}
+            />
+            <text className="chr-label" x={x} y={y + 16}>
+              {id}
+            </text>
           </g>
         )
       })}
 
       {/* Walker dot */}
       {walkerCity !== null && (
-        <circle className="chr-walker" cx={pos(walkerCity)[0]} cy={pos(walkerCity)[1]} r={5} />
+        <circle
+          className="chr-walker"
+          cx={pos(walkerCity)[0]}
+          cy={pos(walkerCity)[1]}
+          r={5}
+        />
       )}
 
       {/* Skipped repeat markers (shortcut) */}
       {[...skippedSet].map((idx) => {
         const city = sim.eulerCircuit[idx]
         const [x, y] = pos(city)
-        return <text key={`sk${idx}`} className="chr-skip" x={x} y={y - 8}>✕</text>
+        return (
+          <text key={`sk${idx}`} className="chr-skip" x={x} y={y - 8}>
+            ✕
+          </text>
+        )
       })}
     </svg>
   )
@@ -172,10 +237,16 @@ function RatioMeter({ ratio }: { ratio: number }) {
   return (
     <div className="chr-meter">
       <div className="chr-meter-track">
-        <div className="chr-meter-fill" style={{ width: `${Math.min(100, pct)}%` }} />
+        <div
+          className="chr-meter-fill"
+          style={{ width: `${Math.min(100, pct)}%` }}
+        />
         <div className="chr-meter-mark chr-meter-mark-opt" />
         <div className="chr-meter-mark chr-meter-mark-bound" />
-        <div className="chr-meter-dot" style={{ left: `${Math.min(100, pct)}%` }} />
+        <div
+          className="chr-meter-dot"
+          style={{ left: `${Math.min(100, pct)}%` }}
+        />
       </div>
       <div className="chr-meter-labels">
         <span>1.0× OPT</span>
@@ -189,14 +260,27 @@ function RatioMeter({ ratio }: { ratio: number }) {
 // ---------------------------------------------------------------
 // Comparison rows — NN / doubled-MST / Christofides
 // ---------------------------------------------------------------
-function CompareRow({ label, cost, opt, best }: { label: string; cost: number; opt: number; best: boolean }) {
+function CompareRow({
+  label,
+  cost,
+  opt,
+  best,
+}: {
+  label: string
+  cost: number
+  opt: number
+  best: boolean
+}) {
   const ratio = cost / opt
   const pct = Math.min(100, ((ratio - 1) / 0.6) * 100)
   return (
     <div className={`chr-compare-row ${best ? 'chr-compare-best' : ''}`}>
       <span className="chr-compare-label">{label}</span>
       <div className="chr-compare-track">
-        <div className="chr-compare-fill" style={{ width: `${Math.max(0, pct)}%` }} />
+        <div
+          className="chr-compare-fill"
+          style={{ width: `${Math.max(0, pct)}%` }}
+        />
       </div>
       <span className="chr-compare-value">{ratio.toFixed(2)}×</span>
     </div>
@@ -207,7 +291,9 @@ function CompareRow({ label, cost, opt, best }: { label: string; cost: number; o
 // Root component
 // ---------------------------------------------------------------
 export default function ChristofidesExplainer() {
-  const [sim, setSim] = useState<SimState>(() => makeInitState(DEFAULT_SCENARIO))
+  const [sim, setSim] = useState<SimState>(() =>
+    makeInitState(DEFAULT_SCENARIO),
+  )
   const [running, setRunning] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(2) // 3x default
   const [showMstLayer, setShowMstLayer] = useState(true)
@@ -223,12 +309,15 @@ export default function ChristofidesExplainer() {
     setSim(next)
   }, [])
 
-  const reinit = useCallback((instance: Instance) => {
-    scenarioRef.current = instance
-    historyRef.current = []
-    commit(makeInitState(instance))
-    setRunning(false)
-  }, [commit])
+  const reinit = useCallback(
+    (instance: Instance) => {
+      scenarioRef.current = instance
+      historyRef.current = []
+      commit(makeInitState(instance))
+      setRunning(false)
+    },
+    [commit],
+  )
 
   const stepForward = useCallback(() => {
     const cur = simRef.current
@@ -253,14 +342,18 @@ export default function ChristofidesExplainer() {
   }, [running, speedIdx, stepForward])
 
   // Phase selector — jump straight to a phase's start (replays deterministically)
-  const jumpTo = useCallback((target: Phase) => {
-    let s = makeInitState(scenarioRef.current)
-    let guard = 600
-    while (s.phase !== target && s.phase !== 'done' && guard-- > 0) s = stepOnce(s)
-    historyRef.current = []
-    commit(s)
-    setRunning(false)
-  }, [commit])
+  const jumpTo = useCallback(
+    (target: Phase) => {
+      let s = makeInitState(scenarioRef.current)
+      let guard = 600
+      while (s.phase !== target && s.phase !== 'done' && guard-- > 0)
+        s = stepOnce(s)
+      historyRef.current = []
+      commit(s)
+      setRunning(false)
+    },
+    [commit],
+  )
 
   const s = sim
   const phaseIdx = PHASES.indexOf(s.phase)
@@ -268,7 +361,7 @@ export default function ChristofidesExplainer() {
 
   // Status chip
   let chipText = "Step 1 — growing the Minimum Spanning Tree (Prim's)"
-  let chipClass = "chr-chip chr-chip-idle"
+  let chipClass = 'chr-chip chr-chip-idle'
   if (s.phase === 'mst') {
     if (s.mstRevealed === 0) {
       chipText = `MST — click Step to grow the tree (Prim's, cost ${s.mstCost.toFixed(0)})`
@@ -279,25 +372,27 @@ export default function ChristofidesExplainer() {
     }
   } else if (s.phase === 'odd') {
     chipText = `Odd-degree vertices: ${s.odd.join(', ')} — always an even count (handshaking lemma)`
-    chipClass = "chr-chip chr-chip-odd"
+    chipClass = 'chr-chip chr-chip-odd'
   } else if (s.phase === 'matching') {
-    chipText = s.matchingRevealed < s.matchingEdges.length
-      ? `Matching — paired ${s.matchingEdges[s.matchingRevealed - 1][0]}–${s.matchingEdges[s.matchingRevealed - 1][1]} (${s.matchingRevealed}/${s.matchingEdges.length} pairs)`
-      : `Matching complete — cost ${s.matchingCost.toFixed(0)}`
-    chipClass = "chr-chip chr-chip-match"
+    chipText =
+      s.matchingRevealed < s.matchingEdges.length
+        ? `Matching — paired ${s.matchingEdges[s.matchingRevealed - 1][0]}–${s.matchingEdges[s.matchingRevealed - 1][1]} (${s.matchingRevealed}/${s.matchingEdges.length} pairs)`
+        : `Matching complete — cost ${s.matchingCost.toFixed(0)}`
+    chipClass = 'chr-chip chr-chip-match'
   } else if (s.phase === 'euler') {
     chipText = `Eulerian circuit — walking ${s.eulerCircuit[s.walkerPos - 1] ?? '—'}→${s.eulerCircuit[s.walkerPos]} (${s.walkerPos}/${s.eulerCircuit.length - 1})`
-    chipClass = "chr-chip chr-chip-euler"
+    chipClass = 'chr-chip chr-chip-euler'
   } else if (s.phase === 'shortcut') {
-    const city = s.eulerCircuit[Math.min(s.shortcutStep, s.eulerCircuit.length - 1)]
+    const city =
+      s.eulerCircuit[Math.min(s.shortcutStep, s.eulerCircuit.length - 1)]
     const fresh = s.kept.includes(city)
     chipText = fresh
       ? `Shortcut — ${city} added to the tour`
       : `Shortcut — ${city} already visited, skipped (✕)`
-    chipClass = "chr-chip chr-chip-shortcut"
+    chipClass = 'chr-chip chr-chip-shortcut'
   } else if (s.phase === 'done') {
     chipText = `Done — tour cost ${s.tourCost.toFixed(0)} = ${s.ratio.toFixed(2)}× OPT (bound 1.5×)`
-    chipClass = "chr-chip chr-chip-done"
+    chipClass = 'chr-chip chr-chip-done'
   }
 
   return (
@@ -308,16 +403,25 @@ export default function ChristofidesExplainer() {
         <div className="chr-eyebrow">teeline · algorithms/christofides</div>
         <h2 className="chr-title">Christofides — a ≤1.5× Approximation</h2>
         <p className="chr-sub">
-          The only simple TSP heuristic with a <strong>provable worst-case bound</strong>: the tour is
-          always within 1.5× of optimal. Three ingredients — <strong>MST</strong> (skeleton, ≤ OPT),
-          <strong>matching</strong> on the odd-degree vertices (patch, ≤ OPT/2), and an
-          <strong>Eulerian walk + shortcut</strong> (≤ MST + matching) — add up to the guarantee.
+          The only simple TSP heuristic with a{' '}
+          <strong>provable worst-case bound</strong>: the tour is always within
+          1.5× of optimal. Three ingredients — <strong>MST</strong> (skeleton, ≤
+          OPT),
+          <strong>matching</strong> on the odd-degree vertices (patch, ≤ OPT/2),
+          and an
+          <strong>Eulerian walk + shortcut</strong> (≤ MST + matching) — add up
+          to the guarantee.
         </p>
       </header>
 
       <div className="chr-viz-row">
         <div className="chr-canvas-wrap">
-          <TourCanvas sim={s} showMst={showMstLayer} showMatch={showMatchLayer} showTour={showTourLayer} />
+          <TourCanvas
+            sim={s}
+            showMst={showMstLayer}
+            showMatch={showMatchLayer}
+            showTour={showTourLayer}
+          />
         </div>
         <div className="chr-side">
           <div className="chr-section-label">Pipeline</div>
@@ -325,8 +429,12 @@ export default function ChristofidesExplainer() {
             {PHASES.map((p, i) => {
               const done = i < phaseIdx || s.phase === 'done'
               return (
-                <button key={p} className={`chr-phase-btn ${i === phaseIdx ? 'chr-phase-cur' : ''} ${done ? 'chr-phase-done' : ''}`}
-                  onClick={() => jumpTo(p)} disabled={running}>
+                <button
+                  key={p}
+                  className={`chr-phase-btn ${i === phaseIdx ? 'chr-phase-cur' : ''} ${done ? 'chr-phase-done' : ''}`}
+                  onClick={() => jumpTo(p)}
+                  disabled={running}
+                >
                   <span className="chr-phase-num">{done ? '✓' : i + 1}</span>
                   {PHASE_LABELS[p]}
                 </button>
@@ -339,81 +447,202 @@ export default function ChristofidesExplainer() {
 
           <div className="chr-section-label">Why ≤ 1.5×?</div>
           <div className="chr-proof">
-            <div className={`chr-proof-line ${phaseIdx >= 1 ? 'chr-proof-on' : ''}`}>
-              <span className="chr-proof-tag">MST</span> {s.mstCost.toFixed(0)} ≤ OPT {s.opt.toFixed(0)}
+            <div
+              className={`chr-proof-line ${phaseIdx >= 1 ? 'chr-proof-on' : ''}`}
+            >
+              <span className="chr-proof-tag">MST</span> {s.mstCost.toFixed(0)}{' '}
+              ≤ OPT {s.opt.toFixed(0)}
             </div>
-            <div className={`chr-proof-line ${phaseIdx >= 3 ? 'chr-proof-on' : ''}`}>
-              <span className="chr-proof-tag">Match</span> {s.matchingCost.toFixed(0)} {s.matchingCost > s.opt / 2 ? '>' : '≤'} OPT/2 {(s.opt / 2).toFixed(0)}
+            <div
+              className={`chr-proof-line ${phaseIdx >= 3 ? 'chr-proof-on' : ''}`}
+            >
+              <span className="chr-proof-tag">Match</span>{' '}
+              {s.matchingCost.toFixed(0)}{' '}
+              {s.matchingCost > s.opt / 2 ? '>' : '≤'} OPT/2{' '}
+              {(s.opt / 2).toFixed(0)}
               {s.matchingCost > s.opt / 2 && (
-                <span className="chr-proof-note"> greedy &gt; theory — the 1.5× bound assumes the true minimum matching</span>
+                <span className="chr-proof-note">
+                  {' '}
+                  greedy &gt; theory — the 1.5× bound assumes the true minimum
+                  matching
+                </span>
               )}
             </div>
-            <div className={`chr-proof-line ${s.phase === 'done' ? 'chr-proof-on' : ''}`}>
-              <span className="chr-proof-tag">Tour</span> {s.tourCost.toFixed(0)} ≤ MST+matching {s.eulerCost.toFixed(0)} ≤ 1.5·OPT {(1.5 * s.opt).toFixed(0)}
+            <div
+              className={`chr-proof-line ${s.phase === 'done' ? 'chr-proof-on' : ''}`}
+            >
+              <span className="chr-proof-tag">Tour</span>{' '}
+              {s.tourCost.toFixed(0)} ≤ MST+matching {s.eulerCost.toFixed(0)} ≤
+              1.5·OPT {(1.5 * s.opt).toFixed(0)}
             </div>
           </div>
 
           <div className="chr-section-label">Compare on this instance</div>
           <div className="chr-compare">
-            <CompareRow label="Nearest neighbour" cost={s.nnCost} opt={s.opt} best={s.nnCost <= s.approx2Cost && s.nnCost <= s.tourCost} />
-            <CompareRow label="Doubled MST (2×)" cost={s.approx2Cost} opt={s.opt} best={s.approx2Cost < s.nnCost && s.approx2Cost <= s.tourCost} />
-            <CompareRow label="Christofides" cost={s.tourCost} opt={s.opt} best={s.tourCost < s.nnCost && s.tourCost < s.approx2Cost} />
+            <CompareRow
+              label="Nearest neighbour"
+              cost={s.nnCost}
+              opt={s.opt}
+              best={s.nnCost <= s.approx2Cost && s.nnCost <= s.tourCost}
+            />
+            <CompareRow
+              label="Doubled MST (2×)"
+              cost={s.approx2Cost}
+              opt={s.opt}
+              best={s.approx2Cost < s.nnCost && s.approx2Cost <= s.tourCost}
+            />
+            <CompareRow
+              label="Christofides"
+              cost={s.tourCost}
+              opt={s.opt}
+              best={s.tourCost < s.nnCost && s.tourCost < s.approx2Cost}
+            />
           </div>
         </div>
       </div>
 
       <div className="chr-legend">
-        <span><span className="chr-swatch chr-swatch-mst" /> MST edge</span>
-        <span><span className="chr-swatch chr-swatch-match" /> matching edge</span>
-        <span><span className="chr-swatch chr-swatch-tour" /> final tour</span>
-        <span><span className="chr-swatch chr-swatch-odd" /> odd-degree vertex</span>
-        <span><span className="chr-swatch chr-swatch-walker" /> walker</span>
+        <span>
+          <span className="chr-swatch chr-swatch-mst" /> MST edge
+        </span>
+        <span>
+          <span className="chr-swatch chr-swatch-match" /> matching edge
+        </span>
+        <span>
+          <span className="chr-swatch chr-swatch-tour" /> final tour
+        </span>
+        <span>
+          <span className="chr-swatch chr-swatch-odd" /> odd-degree vertex
+        </span>
+        <span>
+          <span className="chr-swatch chr-swatch-walker" /> walker
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
 
       <div className="chr-statgrid">
-        <div><div className="chr-statlabel">phase</div><div className="chr-mono">{PHASE_LABELS[s.phase]}</div></div>
-        <div><div className="chr-statlabel">MST cost</div><div className="chr-mono">{s.mstCost.toFixed(0)}</div></div>
-        <div><div className="chr-statlabel">matching cost</div><div className="chr-mono">{s.matchingCost.toFixed(0)} ({Math.round(matchShare * 100)}%)</div></div>
-        <div><div className="chr-statlabel">tour cost</div><div className="chr-mono">{s.tourCost.toFixed(0)}</div></div>
-        <div><div className="chr-statlabel">ratio</div><div className="chr-mono">{s.ratio.toFixed(2)}×</div></div>
-        <div><div className="chr-statlabel">step</div><div className="chr-mono">{s.step}</div></div>
+        <div>
+          <div className="chr-statlabel">phase</div>
+          <div className="chr-mono">{PHASE_LABELS[s.phase]}</div>
+        </div>
+        <div>
+          <div className="chr-statlabel">MST cost</div>
+          <div className="chr-mono">{s.mstCost.toFixed(0)}</div>
+        </div>
+        <div>
+          <div className="chr-statlabel">matching cost</div>
+          <div className="chr-mono">
+            {s.matchingCost.toFixed(0)} ({Math.round(matchShare * 100)}%)
+          </div>
+        </div>
+        <div>
+          <div className="chr-statlabel">tour cost</div>
+          <div className="chr-mono">{s.tourCost.toFixed(0)}</div>
+        </div>
+        <div>
+          <div className="chr-statlabel">ratio</div>
+          <div className="chr-mono">{s.ratio.toFixed(2)}×</div>
+        </div>
+        <div>
+          <div className="chr-statlabel">step</div>
+          <div className="chr-mono">{s.step}</div>
+        </div>
       </div>
 
       <div className="chr-config">
         <div className="chr-config-row">
           <span className="chr-label">Show</span>
-          <label className="chr-toggle"><input type="checkbox" checked={showMstLayer} onChange={(e) => setShowMstLayer((e.target as HTMLInputElement).checked)} /> MST</label>
-          <label className="chr-toggle"><input type="checkbox" checked={showMatchLayer} onChange={(e) => setShowMatchLayer((e.target as HTMLInputElement).checked)} /> Matching</label>
-          <label className="chr-toggle"><input type="checkbox" checked={showTourLayer} onChange={(e) => setShowTourLayer((e.target as HTMLInputElement).checked)} /> Tour</label>
+          <label className="chr-toggle">
+            <input
+              type="checkbox"
+              checked={showMstLayer}
+              onChange={(e) =>
+                setShowMstLayer((e.target as HTMLInputElement).checked)
+              }
+            />{' '}
+            MST
+          </label>
+          <label className="chr-toggle">
+            <input
+              type="checkbox"
+              checked={showMatchLayer}
+              onChange={(e) =>
+                setShowMatchLayer((e.target as HTMLInputElement).checked)
+              }
+            />{' '}
+            Matching
+          </label>
+          <label className="chr-toggle">
+            <input
+              type="checkbox"
+              checked={showTourLayer}
+              onChange={(e) =>
+                setShowTourLayer((e.target as HTMLInputElement).checked)
+              }
+            />{' '}
+            Tour
+          </label>
         </div>
         <div className="chr-config-row">
           <span className="chr-label">Speed</span>
           <div className="chr-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l} className={`chr-speed-btn ${i === speedIdx ? 'chr-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>{l}</button>
+              <button
+                key={l}
+                className={`chr-speed-btn ${i === speedIdx ? 'chr-speed-btn-sel' : ''}`}
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
+                {l}
+              </button>
             ))}
           </div>
         </div>
       </div>
 
       <div className="chr-controls">
-        <button className="chr-btn" onClick={stepBack} disabled={running || s.step === 0}>⏴ Back</button>
-        <button className="chr-btn" onClick={stepForward} disabled={running || s.phase === 'done'}>⏵ Step</button>
-        <button className="chr-btn" onClick={() => setRunning(!running)} disabled={s.phase === 'done'}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="chr-btn"
+          onClick={stepBack}
+          disabled={running || s.step === 0}
+        >
+          ⏴ Back
         </button>
-        <button className="chr-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
+        <button
+          className="chr-btn"
+          onClick={stepForward}
+          disabled={running || s.phase === 'done'}
+        >
+          ⏵ Step
+        </button>
+        <button
+          className="chr-btn"
+          onClick={() => setRunning(!running)}
+          disabled={s.phase === 'done'}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button
+          className="chr-btn"
+          onClick={() => reinit(scenarioRef.current)}
+          disabled={running}
+        >
+          ↺ Reset
+        </button>
       </div>
 
       <div className="chr-scenarios">
         <div className="chr-section-label">Scenarios</div>
         <div className="chr-scenario-row">
           {Object.entries(SCENARIOS).map(([key, inst]) => (
-            <button key={key} className="chr-scenario-btn" title={inst.desc}
-              onClick={() => reinit(inst)} disabled={running}>
+            <button
+              key={key}
+              className="chr-scenario-btn"
+              title={inst.desc}
+              onClick={() => reinit(inst)}
+              disabled={running}
+            >
               {inst.label}
             </button>
           ))}
@@ -422,7 +651,9 @@ export default function ChristofidesExplainer() {
 
       <footer className="chr-footer">
         <span className="chr-mono">cities: {s.n}</span>
-        <span className="chr-mono">MST + matching + Euler + shortcut · ≤ 1.5× optimal</span>
+        <span className="chr-mono">
+          MST + matching + Euler + shortcut · ≤ 1.5× optimal
+        </span>
       </footer>
     </div>
   )

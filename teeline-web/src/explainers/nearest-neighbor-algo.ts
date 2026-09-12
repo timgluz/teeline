@@ -15,13 +15,13 @@ export interface Candidate {
 }
 
 export interface SimState {
-  tour: number[]             // ordered path, grows from [start] to [start,...,start]
-  unvisited: number[]        // cities not yet added to tour
+  tour: number[] // ordered path, grows from [start] to [start,...,start]
+  unvisited: number[] // cities not yet added to tour
   step: number
   done: boolean
   lastEvent: EventMode | null
-  lastCity: number | null    // most recently visited city (or start on closing)
-  lastDist: number           // distance of the most recent edge
+  lastCity: number | null // most recently visited city (or start on closing)
+  lastDist: number // distance of the most recent edge
   candidateDists: Candidate[] | null // distances from current city to all unvisited
 }
 
@@ -33,7 +33,10 @@ export function tourLength(tour: number[]): number {
   return d
 }
 
-export const SCENARIOS: Record<string, { label: string; desc: string; startCity: number }> = {
+export const SCENARIOS: Record<
+  string,
+  { label: string; desc: string; startCity: number }
+> = {
   balanced: {
     label: 'Balanced',
     desc: 'Start from city 0 (top) — walks clockwise, decent result',
@@ -91,7 +94,7 @@ export function stepOnce(state: SimState): SimState {
 
   // Find nearest unvisited
   const cands: Candidate[] = state.unvisited
-    .map(c => ({ city: c, dist: dist(current, c) }))
+    .map((c) => ({ city: c, dist: dist(current, c) }))
     .sort((a, b) => a.dist - b.dist)
 
   const nearest = cands[0]
@@ -99,7 +102,7 @@ export function stepOnce(state: SimState): SimState {
   return {
     ...state,
     tour: [...state.tour, nearest.city],
-    unvisited: state.unvisited.filter(c => c !== nearest.city),
+    unvisited: state.unvisited.filter((c) => c !== nearest.city),
     step: state.step + 1,
     lastEvent: 'visited',
     lastCity: nearest.city,

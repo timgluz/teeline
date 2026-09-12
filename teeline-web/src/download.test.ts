@@ -66,7 +66,12 @@ describe('buildCsvText', () => {
 })
 
 describe('buildJsonText', () => {
-  const record: RunRecord = { solver: 'nn', total: 42.5, runtime: 123, route: [1, 2, 3] }
+  const record: RunRecord = {
+    solver: 'nn',
+    total: 42.5,
+    runtime: 123,
+    route: [1, 2, 3],
+  }
 
   it('parses back to a valid object', () => {
     const text = buildJsonText('berlin52', record, cities, 9999)

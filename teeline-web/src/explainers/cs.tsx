@@ -1,12 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
 
 // ---------------------------------------------------------------
 // Fixed demo instance: same 18 cities as fpa.tsx (300×300 canvas)
 // ---------------------------------------------------------------
 const CITIES: [number, number][] = [
-  [45, 45], [155, 18], [265, 45], [285, 150],
-  [255, 265], [150, 285], [40, 260], [18, 150],
-  [110, 115], [200, 95], [220, 210], [95, 215],
+  [45, 45],
+  [155, 18],
+  [265, 45],
+  [285, 150],
+  [255, 265],
+  [150, 285],
+  [40, 260],
+  [18, 150],
+  [110, 115],
+  [200, 95],
+  [220, 210],
+  [95, 215],
 ]
 const N_CITIES = CITIES.length
 
@@ -71,9 +80,9 @@ function tourEdgeSet(tour: number[]): EdgeSet {
 }
 
 type EdgeDiff = {
-  removed: [number, number][]   // orange dashed
-  added: [number, number][]     // green
-  changedCities: Set<number>    // larger circles
+  removed: [number, number][] // orange dashed
+  added: [number, number][] // green
+  changedCities: Set<number> // larger circles
 }
 
 function computeEdgeDiff(before: number[], after: number[]): EdgeDiff {
@@ -84,7 +93,8 @@ function computeEdgeDiff(before: number[], after: number[]): EdgeDiff {
   const changedCities = new Set<number>()
 
   for (let i = 0; i < before.length; i++) {
-    const a = before[i], b = before[(i + 1) % before.length]
+    const a = before[i],
+      b = before[(i + 1) % before.length]
     const key = edgeKey(a, b)
     if (!aSet.has(key)) {
       removed.push([a, b])
@@ -93,7 +103,8 @@ function computeEdgeDiff(before: number[], after: number[]): EdgeDiff {
     }
   }
   for (let i = 0; i < after.length; i++) {
-    const a = after[i], b = after[(i + 1) % after.length]
+    const a = after[i],
+      b = after[(i + 1) % after.length]
     const key = edgeKey(a, b)
     if (!bSet.has(key)) {
       added.push([a, b])
@@ -112,7 +123,7 @@ type SimState = {
   costs: number[]
   best: number[]
   bestCost: number
-  nestIdx: number       // which nest within the current epoch
+  nestIdx: number // which nest within the current epoch
   epoch: number
   step: number
   replacements: number
@@ -124,11 +135,15 @@ function makeInitState(nNests: number): SimState {
   const costs = nests.map(tourLength)
   const bestIdx = costs.indexOf(Math.min(...costs))
   return {
-    nests, costs,
+    nests,
+    costs,
     best: nests[bestIdx].slice(),
     bestCost: costs[bestIdx],
-    nestIdx: 0, epoch: 0, step: 0,
-    replacements: 0, abandonments: 0,
+    nestIdx: 0,
+    epoch: 0,
+    step: 0,
+    replacements: 0,
+    abandonments: 0,
   }
 }
 
@@ -142,7 +157,12 @@ interface NestHeatmapProps {
   abandonedIdxs: number[]
 }
 
-function NestHeatmap({ costs, activeIdx, targetIdx, abandonedIdxs }: NestHeatmapProps) {
+function NestHeatmap({
+  costs,
+  activeIdx,
+  targetIdx,
+  abandonedIdxs,
+}: NestHeatmapProps) {
   if (!costs.length) return null
   const minC = Math.min(...costs)
   const maxC = Math.max(...costs)
@@ -152,23 +172,28 @@ function NestHeatmap({ costs, activeIdx, targetIdx, abandonedIdxs }: NestHeatmap
     <div className="cs-heatmap" aria-label="Nest quality heatmap">
       <div className="cs-heatmap-title">Nests</div>
       {costs.map((c, i) => {
-        const norm = (maxC - c) / range          // 1 = best, 0 = worst
-        const hue = Math.round(norm * 120)       // 120=green, 0=red
+        const norm = (maxC - c) / range // 1 = best, 0 = worst
+        const hue = Math.round(norm * 120) // 120=green, 0=red
         const isAbandoned = abandonedIdxs.includes(i)
-        const bg = isAbandoned ? "#cbd5e1" : `hsl(${hue},55%,42%)`
+        const bg = isAbandoned ? '#cbd5e1' : `hsl(${hue},55%,42%)`
         const border =
-          i === activeIdx ? "2px solid #3b82f6" :
-          i === targetIdx ? "2px solid #d97706" : "2px solid transparent"
-        const status =
-          isAbandoned ? "abandoned" :
-          i === activeIdx ? "active cuckoo" :
-          i === targetIdx ? "target host" :
-          `quality ${Math.round(norm * 100)}%`
+          i === activeIdx
+            ? '2px solid #3b82f6'
+            : i === targetIdx
+              ? '2px solid #d97706'
+              : '2px solid transparent'
+        const status = isAbandoned
+          ? 'abandoned'
+          : i === activeIdx
+            ? 'active cuckoo'
+            : i === targetIdx
+              ? 'target host'
+              : `quality ${Math.round(norm * 100)}%`
         return (
           <div
             key={i}
             className="cs-heatmap-cell"
-            style={{ background: bg, outline: border, outlineOffset: "1px" }}
+            style={{ background: bg, outline: border, outlineOffset: '1px' }}
           >
             <span className="cs-heatmap-idx">{i}</span>
             <span className="cs-heatmap-cost">{c.toFixed(0)}</span>
@@ -190,13 +215,20 @@ interface TourSVGProps {
 }
 
 function polylinePoints(tour: number[], close = true): string {
-  const pts = tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
-  return close && tour.length ? pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}` : pts
+  const pts = tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ')
+  return close && tour.length
+    ? pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
+    : pts
 }
 
 function TourSVG({ tour, best, diff }: TourSVGProps) {
   return (
-    <svg viewBox="0 0 300 300" className="cs-canvas" role="img" aria-label="Cuckoo search tour">
+    <svg
+      viewBox="0 0 300 300"
+      className="cs-canvas"
+      role="img"
+      aria-label="Cuckoo search tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="cs-bg" />
 
       {/* Best-tour underlay (faint green dashed) */}
@@ -208,8 +240,10 @@ function TourSVG({ tour, best, diff }: TourSVGProps) {
       {diff?.removed.map(([a, b], i) => (
         <line
           key={i}
-          x1={CITIES[a][0]} y1={CITIES[a][1]}
-          x2={CITIES[b][0]} y2={CITIES[b][1]}
+          x1={CITIES[a][0]}
+          y1={CITIES[a][1]}
+          x2={CITIES[b][0]}
+          y2={CITIES[b][1]}
           className="cs-removed"
         />
       ))}
@@ -221,8 +255,10 @@ function TourSVG({ tour, best, diff }: TourSVGProps) {
       {diff?.added.map(([a, b], i) => (
         <line
           key={i}
-          x1={CITIES[a][0]} y1={CITIES[a][1]}
-          x2={CITIES[b][0]} y2={CITIES[b][1]}
+          x1={CITIES[a][0]}
+          y1={CITIES[a][1]}
+          x2={CITIES[b][0]}
+          y2={CITIES[b][1]}
           className="cs-added"
         />
       ))}
@@ -242,7 +278,9 @@ function TourSVG({ tour, best, diff }: TourSVGProps) {
 
       {/* City labels — rendered last so they sit above edges */}
       {CITIES.map(([x, y], i) => (
-        <text key={i} x={x + 6} y={y - 5} className="cs-city-label">{i}</text>
+        <text key={i} x={x + 6} y={y - 5} className="cs-city-label">
+          {i}
+        </text>
       ))}
     </svg>
   )
@@ -251,13 +289,15 @@ function TourSVG({ tour, best, diff }: TourSVGProps) {
 // ---------------------------------------------------------------
 // Lévy sparkline — colored by step outcome (mirrors FPA pattern)
 // ---------------------------------------------------------------
-type SparkEntry = { value: number; mode: "levy-hit" | "levy-miss" | "abandon" }
+type SparkEntry = { value: number; mode: 'levy-hit' | 'levy-miss' | 'abandon' }
 
 function LevySparkline({ history }: { history: SparkEntry[] }) {
-  const W = 180, H = 54
+  const W = 180,
+    H = 54
   const visible = history.slice(-30)
-  if (!visible.length) return <svg viewBox={`0 0 ${W} ${H}`} className="cs-spark" />
-  const maxVal = Math.min(Math.max(...visible.map(h => h.value), 0.5), 4)
+  if (!visible.length)
+    return <svg viewBox={`0 0 ${W} ${H}`} className="cs-spark" />
+  const maxVal = Math.min(Math.max(...visible.map((h) => h.value), 0.5), 4)
   const slotW = W / 30
   const barW = Math.max(1, slotW - 1)
   return (
@@ -265,8 +305,11 @@ function LevySparkline({ history }: { history: SparkEntry[] }) {
       {visible.map((h, i) => {
         const bh = Math.max(2, (Math.min(h.value, maxVal) / maxVal) * (H - 4))
         const fill =
-          h.mode === "levy-hit" ? "#3b82f6" :
-          h.mode === "abandon" ? "#d97706" : "#94a3b8"
+          h.mode === 'levy-hit'
+            ? '#3b82f6'
+            : h.mode === 'abandon'
+              ? '#d97706'
+              : '#94a3b8'
         return (
           <rect
             key={i}
@@ -286,7 +329,7 @@ function LevySparkline({ history }: { history: SparkEntry[] }) {
 // ---------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------
-type Mode = "levy-hit" | "levy-miss" | "abandon" | null
+type Mode = 'levy-hit' | 'levy-miss' | 'abandon' | null
 
 export default function CSExplainer() {
   // Config
@@ -350,10 +393,10 @@ export default function CSExplainer() {
     // --- Cuckoo event for sim.nestIdx ---
     const ci = sim.nestIdx
     const levy = levyStep()
-    const k = Math.max(1, Math.min(
-      Math.ceil(levy * N_CITIES * 0.1),
-      Math.floor(N_CITIES / 2)
-    ))
+    const k = Math.max(
+      1,
+      Math.min(Math.ceil(levy * N_CITIES * 0.1), Math.floor(N_CITIES / 2)),
+    )
 
     const beforeTour = sim.nests[ci].slice()
     const newTour = applyKRandom2Opt(beforeTour, k)
@@ -361,7 +404,9 @@ export default function CSExplainer() {
 
     // Pick random target ≠ ci
     let ti: number
-    do { ti = Math.floor(Math.random() * n) } while (ti === ci && n > 1)
+    do {
+      ti = Math.floor(Math.random() * n)
+    } while (ti === ci && n > 1)
 
     const hit = newCost < sim.costs[ti]
     const newNests = sim.nests.slice()
@@ -433,17 +478,17 @@ export default function CSExplainer() {
     setAbandonedIdxs(abandonedList)
     setLastLevy(levy)
     setLastK(k)
-    const stepMode: "levy-hit" | "levy-miss" | "abandon" =
-      abandonedList.length > 0 ? "abandon" : hit ? "levy-hit" : "levy-miss"
-    setLevyHistory(h => [...h.slice(-99), { value: levy, mode: stepMode }])
+    const stepMode: 'levy-hit' | 'levy-miss' | 'abandon' =
+      abandonedList.length > 0 ? 'abandon' : hit ? 'levy-hit' : 'levy-miss'
+    setLevyHistory((h) => [...h.slice(-99), { value: levy, mode: stepMode }])
     setDiff(computeEdgeDiff(beforeTour, newTour))
 
     if (abandonedList.length > 0) {
-      setMode("abandon")
+      setMode('abandon')
     } else if (hit) {
-      setMode("levy-hit")
+      setMode('levy-hit')
     } else {
-      setMode("levy-miss")
+      setMode('levy-miss')
     }
   }, [])
 
@@ -456,19 +501,24 @@ export default function CSExplainer() {
 
   // Mode chip content
   const modeLabel = (() => {
-    if (!mode) return "Press Step or Run to begin"
-    if (mode === "abandon") {
+    if (!mode) return 'Press Step or Run to begin'
+    if (mode === 'abandon') {
       const n = abandonedIdxs.length
-      return `💨 Epoch ${epoch}: ${n} nest${n !== 1 ? "s" : ""} abandoned and re-seeded`
+      return `💨 Epoch ${epoch}: ${n} nest${n !== 1 ? 's' : ''} abandoned and re-seeded`
     }
-    if (mode === "levy-hit") return `🐦 k=${lastK} reversal${lastK !== 1 ? "s" : ""} → beat host #${targetIdx}`
-    return `❌ k=${lastK} reversal${lastK !== 1 ? "s" : ""} → host #${targetIdx} not beaten`
+    if (mode === 'levy-hit')
+      return `🐦 k=${lastK} reversal${lastK !== 1 ? 's' : ''} → beat host #${targetIdx}`
+    return `❌ k=${lastK} reversal${lastK !== 1 ? 's' : ''} → host #${targetIdx} not beaten`
   })()
 
   const modeClass =
-    mode === "levy-hit" ? "cs-mode-hit" :
-    mode === "levy-miss" ? "cs-mode-miss" :
-    mode === "abandon" ? "cs-mode-abandon" : "cs-mode-idle"
+    mode === 'levy-hit'
+      ? 'cs-mode-hit'
+      : mode === 'levy-miss'
+        ? 'cs-mode-miss'
+        : mode === 'abandon'
+          ? 'cs-mode-abandon'
+          : 'cs-mode-idle'
 
   return (
     <div className="cs-root">
@@ -478,11 +528,13 @@ export default function CSExplainer() {
         <div className="cs-eyebrow">teeline · algorithms/cs</div>
         <h2 className="cs-title">Cuckoo Search</h2>
         <p className="cs-sub">
-          Each step a cuckoo applies <strong>k random 2-opt reversals</strong> (k drawn from a
-          Lévy distribution) and competes with a random host nest — winner keeps the slot.
-          At epoch end, each nest is independently{" "}
-          <strong>abandoned with probability <code>pa</code></strong> and re-seeded to
-          maintain diversity.
+          Each step a cuckoo applies <strong>k random 2-opt reversals</strong>{' '}
+          (k drawn from a Lévy distribution) and competes with a random host
+          nest — winner keeps the slot. At epoch end, each nest is independently{' '}
+          <strong>
+            abandoned with probability <code>pa</code>
+          </strong>{' '}
+          and re-seeded to maintain diversity.
         </p>
       </header>
 
@@ -499,13 +551,29 @@ export default function CSExplainer() {
 
       {/* Canvas legend — directly under the visualization */}
       <div className="cs-canvas-legend">
-        <span><span className="cs-swatch cs-swatch-tour">—</span> current tour</span>
-        <span><span className="cs-swatch cs-swatch-best">- -</span> best tour</span>
-        <span><span className="cs-swatch cs-swatch-added">—</span> added edges</span>
-        <span><span className="cs-swatch cs-swatch-removed">- -</span> removed edges</span>
-        <span><span className="cs-ring-demo">◎</span> reversal endpoint</span>
-        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>▌</span> active cuckoo</span>
-        <span><span style={{ color: "#d97706", fontWeight: 700 }}>▌</span> target host</span>
+        <span>
+          <span className="cs-swatch cs-swatch-tour">—</span> current tour
+        </span>
+        <span>
+          <span className="cs-swatch cs-swatch-best">- -</span> best tour
+        </span>
+        <span>
+          <span className="cs-swatch cs-swatch-added">—</span> added edges
+        </span>
+        <span>
+          <span className="cs-swatch cs-swatch-removed">- -</span> removed edges
+        </span>
+        <span>
+          <span className="cs-ring-demo">◎</span> reversal endpoint
+        </span>
+        <span>
+          <span style={{ color: '#3b82f6', fontWeight: 700 }}>▌</span> active
+          cuckoo
+        </span>
+        <span>
+          <span style={{ color: '#d97706', fontWeight: 700 }}>▌</span> target
+          host
+        </span>
       </div>
 
       {/* Event chip */}
@@ -517,16 +585,20 @@ export default function CSExplainer() {
           <LevySparkline history={levyHistory} />
           <div className="cs-spark-caption">
             Lévy step (last 30) &nbsp;
-            <span style={{ color: "#3b82f6" }}>■</span> hit &nbsp;
-            <span style={{ color: "#94a3b8" }}>■</span> miss &nbsp;
-            <span style={{ color: "#d97706" }}>■</span> abandon
+            <span style={{ color: '#3b82f6' }}>■</span> hit &nbsp;
+            <span style={{ color: '#94a3b8' }}>■</span> miss &nbsp;
+            <span style={{ color: '#d97706' }}>■</span> abandon
           </div>
         </div>
         <div className="cs-stepval-wrap">
           <div className="cs-statlabel">levy draw</div>
-          <div className="cs-mono cs-stepval">{lastLevy !== null ? lastLevy.toFixed(3) : "—"}</div>
-          <div className="cs-statlabel" style={{ marginTop: "6px" }}>k reversals</div>
-          <div className="cs-mono cs-kval">{lastK !== null ? lastK : "—"}</div>
+          <div className="cs-mono cs-stepval">
+            {lastLevy !== null ? lastLevy.toFixed(3) : '—'}
+          </div>
+          <div className="cs-statlabel" style={{ marginTop: '6px' }}>
+            k reversals
+          </div>
+          <div className="cs-mono cs-kval">{lastK !== null ? lastK : '—'}</div>
         </div>
       </div>
 
@@ -561,8 +633,12 @@ export default function CSExplainer() {
             Abandon prob <code>pa</code> = <strong>{pa.toFixed(2)}</strong>
           </label>
           <input
-            type="range" min={0} max={0.5} step={0.05}
-            value={pa} className="cs-slider"
+            type="range"
+            min={0}
+            max={0.5}
+            step={0.05}
+            value={pa}
+            className="cs-slider"
             onInput={(e) => {
               const v = Number((e.target as HTMLInputElement).value)
               setPa(v)
@@ -571,9 +647,9 @@ export default function CSExplainer() {
           />
           <div className="cs-hint">
             {pa === 0
-              ? "No abandonment — population never diversifies"
+              ? 'No abandonment — population never diversifies'
               : pa >= 0.4
-                ? "High abandonment — lots of re-seeding, slower convergence"
+                ? 'High abandonment — lots of re-seeding, slower convergence'
                 : `~${Math.round(pa * 100)}% of nests replaced each epoch`}
           </div>
         </div>
@@ -582,8 +658,12 @@ export default function CSExplainer() {
             Nests (population) = <strong>{nNests}</strong>
           </label>
           <input
-            type="range" min={3} max={15} step={1}
-            value={nNests} className="cs-slider"
+            type="range"
+            min={3}
+            max={15}
+            step={1}
+            value={nNests}
+            className="cs-slider"
             onInput={(e) => {
               const n = Number((e.target as HTMLInputElement).value)
               setNNests(n)
@@ -594,23 +674,33 @@ export default function CSExplainer() {
         <div className="cs-config-row">
           <label className="cs-config-label">Speed</label>
           <input
-            type="range" min={1} max={10} step={1}
-            value={speed} className="cs-slider"
-            onInput={(e) => setSpeed(Number((e.target as HTMLInputElement).value))}
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
+            className="cs-slider"
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
         </div>
       </div>
 
       {/* Controls */}
       <div className="cs-controls">
-        <button className="cs-btn" onClick={stepOnce} disabled={running}>◀ Step</button>
-        <button
-          className={`cs-btn ${!running ? "cs-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)}
-        >
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button className="cs-btn" onClick={stepOnce} disabled={running}>
+          ◀ Step
         </button>
-        <button className="cs-btn" onClick={() => reinit(nNests)}>↺ Reset</button>
+        <button
+          className={`cs-btn ${!running ? 'cs-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button className="cs-btn" onClick={() => reinit(nNests)}>
+          ↺ Reset
+        </button>
       </div>
 
       <footer className="cs-footer">

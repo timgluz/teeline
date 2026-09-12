@@ -1,12 +1,20 @@
 // 12 cities on a circle, canvas 300×300
-const CX = 150, CY = 150, CITY_R = 110
+const CX = 150,
+  CY = 150,
+  CITY_R = 110
 export const N_CITIES = 12
-export const CITIES: [number, number][] = Array.from({ length: N_CITIES }, (_, i) => {
-  const theta = (2 * Math.PI * i) / N_CITIES
-  return [CX + CITY_R * Math.cos(theta), CY + CITY_R * Math.sin(theta)] as [number, number]
-})
+export const CITIES: [number, number][] = Array.from(
+  { length: N_CITIES },
+  (_, i) => {
+    const theta = (2 * Math.PI * i) / N_CITIES
+    return [CX + CITY_R * Math.cos(theta), CY + CITY_R * Math.sin(theta)] as [
+      number,
+      number,
+    ]
+  },
+)
 
-export const N_NEURONS = Math.round(N_CITIES * 1.5)  // 18
+export const N_NEURONS = Math.round(N_CITIES * 1.5) // 18
 export const ALPHA0 = 0.8
 export const SIGMA0 = 4.0
 const SIGMA_FLOOR = 1.0
@@ -28,7 +36,10 @@ export type SomState = {
   lastTourLength: number | null
 }
 
-export function dist([x1, y1]: [number, number], [x2, y2]: [number, number]): number {
+export function dist(
+  [x1, y1]: [number, number],
+  [x2, y2]: [number, number],
+): number {
   return Math.hypot(x2 - x1, y2 - y1)
 }
 
@@ -52,22 +63,32 @@ function gaussian(dRing: number, sigma: number): number {
 }
 
 function extractTour(neurons: [number, number][]): number[] {
-  const cityBmu = CITIES.map(city =>
-    neurons
-      .map((n, ni) => ({ ni, d: dist(n, city) }))
-      .sort((a, b) => a.d - b.d || a.ni - b.ni)[0].ni
+  const cityBmu = CITIES.map(
+    (city) =>
+      neurons
+        .map((n, ni) => ({ ni, d: dist(n, city) }))
+        .sort((a, b) => a.d - b.d || a.ni - b.ni)[0].ni,
   )
   return Array.from({ length: N_CITIES }, (_, ci) => ci).sort((a, b) => {
     if (cityBmu[a] !== cityBmu[b]) return cityBmu[a] - cityBmu[b]
-    return dist(neurons[cityBmu[a]], CITIES[a]) - dist(neurons[cityBmu[b]], CITIES[b])
+    return (
+      dist(neurons[cityBmu[a]], CITIES[a]) -
+      dist(neurons[cityBmu[b]], CITIES[b])
+    )
   })
 }
 
 export function makeInitState(): SomState {
-  const neurons: [number, number][] = Array.from({ length: N_NEURONS }, (_, i) => {
-    const theta = (2 * Math.PI * i) / N_NEURONS
-    return [CX + 15 * Math.cos(theta), CY + 15 * Math.sin(theta)] as [number, number]
-  })
+  const neurons: [number, number][] = Array.from(
+    { length: N_NEURONS },
+    (_, i) => {
+      const theta = (2 * Math.PI * i) / N_NEURONS
+      return [CX + 15 * Math.cos(theta), CY + 15 * Math.sin(theta)] as [
+        number,
+        number,
+      ]
+    },
+  )
   return {
     neurons,
     step: 0,
@@ -106,10 +127,14 @@ export function stepOnce(s: SomState): SomState {
   const city = CITIES[cityIdx]
 
   // Find BMU (closest neuron to city)
-  let bmu = 0, bmuD = Infinity
+  let bmu = 0,
+    bmuD = Infinity
   for (let i = 0; i < N_NEURONS; i++) {
     const d = dist(s.neurons[i], city)
-    if (d < bmuD) { bmuD = d; bmu = i }
+    if (d < bmuD) {
+      bmuD = d
+      bmu = i
+    }
   }
 
   // Update all neurons via Gaussian neighbourhood kernel (ring topology)
@@ -126,29 +151,54 @@ export function stepOnce(s: SomState): SomState {
   }
 
   const phase: Phase =
-    sigma > SIGMA0 * 0.5 ? 'expanding'
-    : sigma > SIGMA_FLOOR * 1.5 ? 'converging'
-    : 'fine-tuning'
+    sigma > SIGMA0 * 0.5
+      ? 'expanding'
+      : sigma > SIGMA_FLOOR * 1.5
+        ? 'converging'
+        : 'fine-tuning'
 
-  return { ...s, neurons: newNeurons, step: t, alpha, sigma, bmu, neighbors, lastCityIdx: cityIdx, phase }
+  return {
+    ...s,
+    neurons: newNeurons,
+    step: t,
+    alpha,
+    sigma,
+    bmu,
+    neighbors,
+    lastCityIdx: cityIdx,
+    phase,
+  }
 }
 
 // Convert σ (neuron-ring-index units) to canvas pixels for the radius circle.
 // Uses average neuron ring radius so the circle scales as the ring expands.
-export function neighbourRadiusPx(sigma: number, neurons: [number, number][]): number {
+export function neighbourRadiusPx(
+  sigma: number,
+  neurons: [number, number][],
+): number {
   const cx = neurons.reduce((s, [x]) => s + x, 0) / neurons.length
   const cy = neurons.reduce((s, [, y]) => s + y, 0) / neurons.length
-  const avgR = neurons.reduce((s, [x, y]) => s + Math.hypot(x - cx, y - cy), 0) / neurons.length
+  const avgR =
+    neurons.reduce((s, [x, y]) => s + Math.hypot(x - cx, y - cy), 0) /
+    neurons.length
   const arcPerNeuron = (2 * Math.PI * Math.max(avgR, 10)) / N_NEURONS
   return sigma * arcPerNeuron
 }
 
-export function phaseLabel(phase: Phase, lastTourLength: number | null): string {
+export function phaseLabel(
+  phase: Phase,
+  lastTourLength: number | null,
+): string {
   switch (phase) {
-    case 'init':        return 'Neurons initialised in a small ring around the centroid.'
-    case 'expanding':   return 'Wide neighbourhood — ring expands and rotates to cover city clusters.'
-    case 'converging':  return 'Neighbourhood shrinking — neurons approach individual cities.'
-    case 'fine-tuning': return 'Fine-tuning — neurons lock onto city positions.'
-    case 'done':        return `Tour extracted from ring order. Length: ${lastTourLength?.toFixed(0) ?? '—'}`
+    case 'init':
+      return 'Neurons initialised in a small ring around the centroid.'
+    case 'expanding':
+      return 'Wide neighbourhood — ring expands and rotates to cover city clusters.'
+    case 'converging':
+      return 'Neighbourhood shrinking — neurons approach individual cities.'
+    case 'fine-tuning':
+      return 'Fine-tuning — neurons lock onto city positions.'
+    case 'done':
+      return `Tour extracted from ring order. Length: ${lastTourLength?.toFixed(0) ?? '—'}`
   }
 }

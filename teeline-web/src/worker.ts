@@ -1,6 +1,15 @@
 /// <reference lib="webworker" />
 
-import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours, compareToursFromInput, type ParsedProblem } from 'teeline-wasm'
+import {
+  solve,
+  parseAndSolve,
+  parse,
+  listAlgorithms,
+  getVersion,
+  compareTours,
+  compareToursFromInput,
+  type ParsedProblem,
+} from 'teeline-wasm'
 import type { AlgorithmInfo } from 'teeline-wasm'
 import { defaultSolveOptions, type SolveOptions } from './solver-options'
 
@@ -129,8 +138,28 @@ export interface WebMCPParseResult {
   error?: string
 }
 
-type WorkerRequest = SolveRequest | ParseAndSolveRequest | ParseRequest | ListAlgorithmsRequest | GetVersionRequest | CompareToursRequest | CompareToursFromInputRequest | WebMCPSolveRequest | WebMCPListAlgorithmsRequest | WebMCPParseRequest
-type WorkerResponse = SolveResult | ParseResult | AlgorithmsResult | VersionResult | SolveError | WorkerReadyMessage | CompareToursResult | WebMCPSolveResult | WebMCPAlgorithmsResult | WebMCPParseResult
+type WorkerRequest =
+  | SolveRequest
+  | ParseAndSolveRequest
+  | ParseRequest
+  | ListAlgorithmsRequest
+  | GetVersionRequest
+  | CompareToursRequest
+  | CompareToursFromInputRequest
+  | WebMCPSolveRequest
+  | WebMCPListAlgorithmsRequest
+  | WebMCPParseRequest
+type WorkerResponse =
+  | SolveResult
+  | ParseResult
+  | AlgorithmsResult
+  | VersionResult
+  | SolveError
+  | WorkerReadyMessage
+  | CompareToursResult
+  | WebMCPSolveResult
+  | WebMCPAlgorithmsResult
+  | WebMCPParseResult
 
 export function handleMessage(data: WorkerRequest): WorkerResponse {
   try {
@@ -148,7 +177,11 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
       const req = data as CompareToursRequest
       try {
         // compareTours returns ComparisonStats directly (jco throws on WIT Err)
-        const s = compareTours(new Uint32Array(req.solverRoute), new Uint32Array(req.optRoute), req.cities)
+        const s = compareTours(
+          new Uint32Array(req.solverRoute),
+          new Uint32Array(req.optRoute),
+          req.cities,
+        )
         return {
           type: 'compare-tours-result',
           id: req.id,
@@ -172,7 +205,11 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
     if (data.type === 'compare-tours-from-input') {
       const req = data as CompareToursFromInputRequest
       try {
-        const s = compareToursFromInput(new Uint32Array(req.solverRoute), new Uint32Array(req.optRoute), req.input)
+        const s = compareToursFromInput(
+          new Uint32Array(req.solverRoute),
+          new Uint32Array(req.optRoute),
+          req.input,
+        )
         return {
           type: 'compare-tours-result',
           id: req.id,
@@ -198,7 +235,11 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
       try {
         const opts = { ...defaultSolveOptions(), ...req.options }
         const raw = parseAndSolve(req.solver, req.input, opts)
-        return { type: 'webmcp-result', id: req.id, solution: { total: raw.total, route: Array.from(raw.route) } }
+        return {
+          type: 'webmcp-result',
+          id: req.id,
+          solution: { total: raw.total, route: Array.from(raw.route) },
+        }
       } catch (e) {
         return { type: 'webmcp-result', id: req.id, error: String(e) }
       }
@@ -206,7 +247,11 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
     if (data.type === 'webmcp-list-algorithms') {
       const req = data as WebMCPListAlgorithmsRequest
       try {
-        return { type: 'webmcp-algorithms', id: req.id, algorithms: listAlgorithms() }
+        return {
+          type: 'webmcp-algorithms',
+          id: req.id,
+          algorithms: listAlgorithms(),
+        }
       } catch (e) {
         return { type: 'webmcp-algorithms', id: req.id, error: String(e) }
       }
@@ -219,7 +264,10 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
         return { type: 'webmcp-parsed', id: req.id, error: String(e) }
       }
     }
-    const mergedOptions: SolveOptions = { ...defaultSolveOptions(), ...data.options }
+    const mergedOptions: SolveOptions = {
+      ...defaultSolveOptions(),
+      ...data.options,
+    }
     let solution: ReturnType<typeof solve>
     if (data.type === 'solve') {
       solution = solve(data.solver, data.cities, mergedOptions)
@@ -230,7 +278,7 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
       type: 'result',
       solution: {
         total: solution.total,
-        route: Array.from(solution.route),  // Uint32Array → plain number[]
+        route: Array.from(solution.route), // Uint32Array → plain number[]
       },
     }
   } catch (err) {
@@ -242,7 +290,10 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
 }
 
 // Only register in Web Worker context (not during Vitest runs)
-if (typeof DedicatedWorkerGlobalScope !== 'undefined' && self instanceof DedicatedWorkerGlobalScope) {
+if (
+  typeof DedicatedWorkerGlobalScope !== 'undefined' &&
+  self instanceof DedicatedWorkerGlobalScope
+) {
   // Signal readiness BEFORE registering onmessage so main.ts knows WASM is
   // initialized and won't send messages that deadlock the jco task scheduler.
   self.postMessage({ type: 'worker-ready' } satisfies WorkerReadyMessage)

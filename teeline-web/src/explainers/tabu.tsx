@@ -1,21 +1,35 @@
-import { useState, useRef, useEffect, useCallback } from "preact/hooks"
-import type { Move, TabuEntry, EventMode, SimState } from "./tabu-algo"
-import { CITIES, N_CITIES, makeInitState, stepOnce } from "./tabu-algo"
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
+import type { Move, TabuEntry, EventMode, SimState } from './tabu-algo'
+import { CITIES, N_CITIES, makeInitState, stepOnce } from './tabu-algo'
 
 function polyPts(tour: number[]): string {
-  const pts = tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
+  const pts = tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ')
   return pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
 }
 
-function getEdgeDiff(tour: number[], move: Move): {
+function getEdgeDiff(
+  tour: number[],
+  move: Move,
+): {
   removed: [[number, number], [number, number]]
   added: [[number, number], [number, number]]
 } {
   const n = tour.length
   const [i, j] = move
-  const a = tour[(i - 1 + n) % n], b = tour[i]
-  const c = tour[j], d = tour[(j + 1) % n]
-  return { removed: [[a, b], [c, d]], added: [[a, c], [b, d]] }
+  const a = tour[(i - 1 + n) % n],
+    b = tour[i]
+  const c = tour[j],
+    d = tour[(j + 1) % n]
+  return {
+    removed: [
+      [a, b],
+      [c, d],
+    ],
+    added: [
+      [a, c],
+      [b, d],
+    ],
+  }
 }
 
 // ---------------------------------------------------------------
@@ -27,36 +41,72 @@ interface CurrentTourSVGProps {
   lastMove: Move | null
   showBest: boolean
 }
-function CurrentTourSVG({ tour, best, lastMove, showBest }: CurrentTourSVGProps) {
+function CurrentTourSVG({
+  tour,
+  best,
+  lastMove,
+  showBest,
+}: CurrentTourSVGProps) {
   const diff = lastMove ? getEdgeDiff(tour, lastMove) : null
-  const changedCities = lastMove ? new Set([lastMove[0], lastMove[1]]) : new Set<number>()
+  const changedCities = lastMove
+    ? new Set([lastMove[0], lastMove[1]])
+    : new Set<number>()
   return (
-    <svg viewBox="0 0 300 300" className="tabu-canvas" role="img" aria-label="Current tour">
+    <svg
+      viewBox="0 0 300 300"
+      className="tabu-canvas"
+      role="img"
+      aria-label="Current tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="tabu-bg" />
-      {showBest && <polyline points={polyPts(best)} className="tabu-best-tour" />}
-      <polyline points={polyPts(tour)} className={showBest ? "tabu-current-tour tabu-current-faded" : "tabu-current-tour"} />
-      {diff && diff.removed.map(([a, b], i) => (
-        <line key={i}
-          x1={CITIES[a][0]} y1={CITIES[a][1]}
-          x2={CITIES[b][0]} y2={CITIES[b][1]}
-          className="tabu-edge-removed"
-        />
-      ))}
-      {diff && diff.added.map(([a, b], i) => (
-        <line key={i}
-          x1={CITIES[a][0]} y1={CITIES[a][1]}
-          x2={CITIES[b][0]} y2={CITIES[b][1]}
-          className="tabu-edge-added"
-        />
-      ))}
+      {showBest && (
+        <polyline points={polyPts(best)} className="tabu-best-tour" />
+      )}
+      <polyline
+        points={polyPts(tour)}
+        className={
+          showBest
+            ? 'tabu-current-tour tabu-current-faded'
+            : 'tabu-current-tour'
+        }
+      />
+      {diff &&
+        diff.removed.map(([a, b], i) => (
+          <line
+            key={i}
+            x1={CITIES[a][0]}
+            y1={CITIES[a][1]}
+            x2={CITIES[b][0]}
+            y2={CITIES[b][1]}
+            className="tabu-edge-removed"
+          />
+        ))}
+      {diff &&
+        diff.added.map(([a, b], i) => (
+          <line
+            key={i}
+            x1={CITIES[a][0]}
+            y1={CITIES[a][1]}
+            x2={CITIES[b][0]}
+            y2={CITIES[b][1]}
+            className="tabu-edge-added"
+          />
+        ))}
       {CITIES.map(([x, y], i) => (
-        <circle key={i} cx={x} cy={y}
+        <circle
+          key={i}
+          cx={x}
+          cy={y}
           r={changedCities.has(i) ? 7 : 4}
-          className={changedCities.has(i) ? "tabu-city tabu-city-changed" : "tabu-city"}
+          className={
+            changedCities.has(i) ? 'tabu-city tabu-city-changed' : 'tabu-city'
+          }
         />
       ))}
       {CITIES.map(([x, y], i) => (
-        <text key={i} x={x + 6} y={y - 5} className="tabu-city-label">{i}</text>
+        <text key={i} x={x + 6} y={y - 5} className="tabu-city-label">
+          {i}
+        </text>
       ))}
     </svg>
   )
@@ -75,18 +125,23 @@ function TabuListPanel({ tabuList, tenure, step }: TabuListPanelProps) {
     <div className="tabu-list-panel">
       <div className="tabu-list-title">Tabu List</div>
       <div className="tabu-list-subtitle">(tenure={tenure})</div>
-      {tabuList.length === 0
-        ? <div className="tabu-list-empty">no forbidden moves yet</div>
-        : tabuList.map((entry, idx) => {
-            const age = step - entry.addedAtStep
-            const opacity = 1 - (age / tenure) * 0.75
-            return (
-              <div key={idx} className="tabu-badge" style={{ opacity: Math.max(0.25, opacity) }}>
-                ({entry.move[0]},{entry.move[1]})
-              </div>
-            )
-          })
-      }
+      {tabuList.length === 0 ? (
+        <div className="tabu-list-empty">no forbidden moves yet</div>
+      ) : (
+        tabuList.map((entry, idx) => {
+          const age = step - entry.addedAtStep
+          const opacity = 1 - (age / tenure) * 0.75
+          return (
+            <div
+              key={idx}
+              className="tabu-badge"
+              style={{ opacity: Math.max(0.25, opacity) }}
+            >
+              ({entry.move[0]},{entry.move[1]})
+            </div>
+          )
+        })
+      )}
     </div>
   )
 }
@@ -95,12 +150,18 @@ function TabuListPanel({ tabuList, tenure, step }: TabuListPanelProps) {
 // CostSparkline — cost per step
 // ---------------------------------------------------------------
 function CostSparkline({ costHistory }: { costHistory: number[] }) {
-  const W = 300, H = 54
+  const W = 300,
+    H = 54
   if (costHistory.length < 2) {
     return (
       <svg viewBox={`0 0 ${W} ${H}`} className="tabu-spark">
         <rect x={0} y={0} width={W} height={H} className="tabu-bg" rx={4} />
-        <text x={W / 2} y={H / 2 + 4} textAnchor="middle" className="tabu-spark-idle">
+        <text
+          x={W / 2}
+          y={H / 2 + 4}
+          textAnchor="middle"
+          className="tabu-spark-idle"
+        >
           Run a few steps to see cost history
         </text>
       </svg>
@@ -113,14 +174,23 @@ function CostSparkline({ costHistory }: { costHistory: number[] }) {
   const xScale = (W - pad * 2) / (costHistory.length - 1)
   const yScale = (H - pad * 2) / range
   const pts = costHistory
-    .map((c, i) => `${(pad + i * xScale).toFixed(1)},${(H - pad - (c - minC) * yScale).toFixed(1)}`)
-    .join(" ")
+    .map(
+      (c, i) =>
+        `${(pad + i * xScale).toFixed(1)},${(H - pad - (c - minC) * yScale).toFixed(1)}`,
+    )
+    .join(' ')
   const lastX = pad + (costHistory.length - 1) * xScale
   const lastY = H - pad - (costHistory[costHistory.length - 1] - minC) * yScale
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="tabu-spark">
       <rect x={0} y={0} width={W} height={H} className="tabu-bg" rx={4} />
-      <polyline points={pts} fill="none" stroke="#0d9488" strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={pts}
+        fill="none"
+        stroke="#0d9488"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
       <circle cx={lastX} cy={lastY} r={3} fill="#0d9488" />
     </svg>
   )
@@ -139,7 +209,9 @@ export default function TabuExplainer() {
   const [tour, setTour] = useState(() => simRef.current.tour)
   const [best, setBest] = useState<number[]>(() => simRef.current.best)
   const [bestCost, setBestCost] = useState(() => simRef.current.bestCost)
-  const [currentCost, setCurrentCost] = useState(() => simRef.current.currentCost)
+  const [currentCost, setCurrentCost] = useState(
+    () => simRef.current.currentCost,
+  )
   const [tabuList, setTabuList] = useState<TabuEntry[]>([])
   const [step, setStep] = useState(0)
   const [lastMove, setLastMove] = useState<Move | null>(null)
@@ -153,21 +225,36 @@ export default function TabuExplainer() {
   const reinit = useCallback((t: number, ss: number) => {
     const s = makeInitState(t, ss)
     simRef.current = s
-    setTour(s.tour.slice()); setBest(s.best.slice()); setBestCost(s.bestCost)
-    setCurrentCost(s.currentCost); setTabuList([]); setStep(0)
-    setLastMove(null); setEventMode(null); setLastDelta(null)
-    setAspirationHits(0); setImprovements(0); setCostHistory([])
+    setTour(s.tour.slice())
+    setBest(s.best.slice())
+    setBestCost(s.bestCost)
+    setCurrentCost(s.currentCost)
+    setTabuList([])
+    setStep(0)
+    setLastMove(null)
+    setEventMode(null)
+    setLastDelta(null)
+    setAspirationHits(0)
+    setImprovements(0)
+    setCostHistory([])
     setRunning(false)
   }, [])
 
   const step_fn = useCallback(() => {
     const next = stepOnce(simRef.current)
     simRef.current = next
-    setTour(next.tour.slice()); setBest(next.best.slice()); setBestCost(next.bestCost)
-    setCurrentCost(next.currentCost); setTabuList(next.tabuList.slice())
-    setStep(next.step); setLastMove(next.lastMove); setEventMode(next.lastEventMode)
-    setLastDelta(next.lastDelta); setAspirationHits(next.aspirationHits)
-    setImprovements(next.improvements); setCostHistory(next.costHistory.slice())
+    setTour(next.tour.slice())
+    setBest(next.best.slice())
+    setBestCost(next.bestCost)
+    setCurrentCost(next.currentCost)
+    setTabuList(next.tabuList.slice())
+    setStep(next.step)
+    setLastMove(next.lastMove)
+    setEventMode(next.lastEventMode)
+    setLastDelta(next.lastDelta)
+    setAspirationHits(next.aspirationHits)
+    setImprovements(next.improvements)
+    setCostHistory(next.costHistory.slice())
   }, [])
 
   useEffect(() => {
@@ -177,17 +264,17 @@ export default function TabuExplainer() {
     return () => clearInterval(id)
   }, [running, speed, step_fn])
 
-  let chipText = "Press Step or Run to begin"
-  let chipClass = "tabu-chip tabu-chip-idle"
+  let chipText = 'Press Step or Run to begin'
+  let chipClass = 'tabu-chip tabu-chip-idle'
   if (eventMode === 'improvement' && lastMove !== null) {
-    chipText = `✅ improved  Δ = ${lastDelta !== null ? lastDelta.toFixed(1) : "—"}  (${lastMove[0]},${lastMove[1]})`
-    chipClass = "tabu-chip tabu-chip-improve"
+    chipText = `✅ improved  Δ = ${lastDelta !== null ? lastDelta.toFixed(1) : '—'}  (${lastMove[0]},${lastMove[1]})`
+    chipClass = 'tabu-chip tabu-chip-improve'
   } else if (eventMode === 'admissible' && lastMove !== null) {
-    chipText = `➡️ best admissible  Δ = +${lastDelta !== null ? Math.abs(lastDelta).toFixed(1) : "—"}  (tabu avoided)`
-    chipClass = "tabu-chip tabu-chip-admissible"
+    chipText = `➡️ best admissible  Δ = +${lastDelta !== null ? Math.abs(lastDelta).toFixed(1) : '—'}  (tabu avoided)`
+    chipClass = 'tabu-chip tabu-chip-admissible'
   } else if (eventMode === 'aspiration' && lastMove !== null) {
     chipText = `⭐ aspiration — new global best!  (${lastMove[0]},${lastMove[1]})`
-    chipClass = "tabu-chip tabu-chip-aspiration"
+    chipClass = 'tabu-chip tabu-chip-aspiration'
   }
 
   return (
@@ -198,25 +285,41 @@ export default function TabuExplainer() {
         <div className="tabu-eyebrow">teeline · algorithms/tabu</div>
         <h2 className="tabu-title">Tabu Search</h2>
         <p className="tabu-sub">
-          A single tour improves via <strong>best-admissible 2-opt</strong> moves. Recent moves are
-          added to the <strong>tabu list</strong> and forbidden for <code>tenure</code> steps —
-          preventing cycles. If a forbidden move beats the global best, the{" "}
+          A single tour improves via <strong>best-admissible 2-opt</strong>{' '}
+          moves. Recent moves are added to the <strong>tabu list</strong> and
+          forbidden for <code>tenure</code> steps — preventing cycles. If a
+          forbidden move beats the global best, the{' '}
           <strong>aspiration criterion</strong> overrides the ban.
         </p>
       </header>
 
       <div className="tabu-viz-row">
         <div className="tabu-canvas-wrap">
-          <CurrentTourSVG tour={tour} best={best} lastMove={lastMove} showBest={!running && step > 0} />
+          <CurrentTourSVG
+            tour={tour}
+            best={best}
+            lastMove={lastMove}
+            showBest={!running && step > 0}
+          />
         </div>
         <TabuListPanel tabuList={tabuList} tenure={tenure} step={step} />
       </div>
 
       <div className="tabu-legend">
-        <span><span className="tabu-swatch tabu-swatch-current" /> current tour</span>
-        <span><span className="tabu-swatch tabu-swatch-removed" /> removed edge</span>
-        <span><span className="tabu-swatch tabu-swatch-added" /> added edge</span>
-        {!running && step > 0 && <span><span className="tabu-swatch tabu-swatch-best" /> best tour</span>}
+        <span>
+          <span className="tabu-swatch tabu-swatch-current" /> current tour
+        </span>
+        <span>
+          <span className="tabu-swatch tabu-swatch-removed" /> removed edge
+        </span>
+        <span>
+          <span className="tabu-swatch tabu-swatch-added" /> added edge
+        </span>
+        {!running && step > 0 && (
+          <span>
+            <span className="tabu-swatch tabu-swatch-best" /> best tour
+          </span>
+        )}
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -231,7 +334,9 @@ export default function TabuExplainer() {
         </div>
         <div>
           <div className="tabu-statlabel">tabu size</div>
-          <div className="tabu-mono">{tabuList.length}/{tenure}</div>
+          <div className="tabu-mono">
+            {tabuList.length}/{tenure}
+          </div>
         </div>
         <div>
           <div className="tabu-statlabel">best cost</div>
@@ -253,43 +358,72 @@ export default function TabuExplainer() {
 
       <div className="tabu-config">
         <div className="tabu-config-row">
-          <label className="tabu-config-label">Tenure = <strong>{tenure}</strong></label>
-          <input type="range" min={3} max={15} step={1} value={tenure}
+          <label className="tabu-config-label">
+            Tenure = <strong>{tenure}</strong>
+          </label>
+          <input
+            type="range"
+            min={3}
+            max={15}
+            step={1}
+            value={tenure}
             className="tabu-slider"
-            onInput={e => {
+            onInput={(e) => {
               const v = Number((e.target as HTMLInputElement).value)
-              setTenure(v); reinit(v, sampleSize)
+              setTenure(v)
+              reinit(v, sampleSize)
             }}
           />
           <div className="tabu-hint">Steps a move stays forbidden</div>
         </div>
         <div className="tabu-config-row">
-          <label className="tabu-config-label">Sample size = <strong>{sampleSize}</strong></label>
-          <input type="range" min={5} max={30} step={5} value={sampleSize}
+          <label className="tabu-config-label">
+            Sample size = <strong>{sampleSize}</strong>
+          </label>
+          <input
+            type="range"
+            min={5}
+            max={30}
+            step={5}
+            value={sampleSize}
             className="tabu-slider"
-            onInput={e => {
+            onInput={(e) => {
               const v = Number((e.target as HTMLInputElement).value)
-              setSampleSize(v); reinit(tenure, v)
+              setSampleSize(v)
+              reinit(tenure, v)
             }}
           />
           <div className="tabu-hint">Neighbours evaluated per step</div>
         </div>
         <div className="tabu-config-row">
           <label className="tabu-config-label">Speed</label>
-          <input type="range" min={1} max={10} step={1} value={speed}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
             className="tabu-slider"
-            onInput={e => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
         </div>
       </div>
 
       <div className="tabu-controls">
-        <button className="tabu-btn" onClick={step_fn} disabled={running}>◀ Step</button>
-        <button className={`tabu-btn ${!running ? "tabu-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button className="tabu-btn" onClick={step_fn} disabled={running}>
+          ◀ Step
         </button>
-        <button className="tabu-btn" onClick={() => reinit(tenure, sampleSize)}>↺ Reset</button>
+        <button
+          className={`tabu-btn ${!running ? 'tabu-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button className="tabu-btn" onClick={() => reinit(tenure, sampleSize)}>
+          ↺ Reset
+        </button>
       </div>
 
       <footer className="tabu-footer">

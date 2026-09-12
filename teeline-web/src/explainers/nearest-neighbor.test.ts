@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, SCENARIOS,
-  dist, tourLength, makeInitState, stepOnce,
+  N_CITIES,
+  SCENARIOS,
+  dist,
+  tourLength,
+  makeInitState,
+  stepOnce,
 } from './nearest-neighbor-algo'
 
 describe('dist', () => {
@@ -109,7 +113,9 @@ describe('stepOnce', () => {
     expect(s1.candidateDists).not.toBeNull()
     expect(s1.candidateDists!.length).toBe(s.unvisited.length)
     for (let i = 1; i < s1.candidateDists!.length; i++) {
-      expect(s1.candidateDists![i - 1].dist).toBeLessThanOrEqual(s1.candidateDists![i].dist + 0.001)
+      expect(s1.candidateDists![i - 1].dist).toBeLessThanOrEqual(
+        s1.candidateDists![i].dist + 0.001,
+      )
     }
   })
 })

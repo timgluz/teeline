@@ -12,7 +12,10 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
   // Destructure `credentials` out so callers cannot override the same-origin
   // policy enforced below (see header comment).
   const { headers, credentials: _enforced, ...rest } = init

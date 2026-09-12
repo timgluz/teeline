@@ -1,29 +1,41 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES, SCENARIOS,
-  tourLength, makeInitState, stepOnce,
-} from "./two-opt-algo"
-import type { Phase } from "./two-opt-algo"
+  CITIES,
+  N_CITIES,
+  SCENARIOS,
+  tourLength,
+  makeInitState,
+  stepOnce,
+} from './two-opt-algo'
+import type { Phase } from './two-opt-algo'
 
 const DEFAULT_TOUR = SCENARIOS.bad_shuffle.tour
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 
 // ---------------------------------------------------------------
 // TourCanvas — current tour with highlighted swap edges
 // ---------------------------------------------------------------
-function TourCanvas({ tour, lastSwap, phase }: {
+function TourCanvas({
+  tour,
+  lastSwap,
+  phase,
+}: {
   tour: number[]
   lastSwap: { removed: [number, number][]; added: [number, number][] } | null
   phase: Phase
 }) {
   const removeSet = useMemo(() => {
     if (!lastSwap) return new Set<string>()
-    return new Set(lastSwap.removed.map(([a, b]) => `${Math.min(a, b)}-${Math.max(a, b)}`))
+    return new Set(
+      lastSwap.removed.map(([a, b]) => `${Math.min(a, b)}-${Math.max(a, b)}`),
+    )
   }, [lastSwap])
   const addSet = useMemo(() => {
     if (!lastSwap) return new Set<string>()
-    return new Set(lastSwap.added.map(([a, b]) => `${Math.min(a, b)}-${Math.max(a, b)}`))
+    return new Set(
+      lastSwap.added.map(([a, b]) => `${Math.min(a, b)}-${Math.max(a, b)}`),
+    )
   }, [lastSwap])
 
   const edges: Array<{ from: number; to: number; key: string }> = []
@@ -37,27 +49,44 @@ function TourCanvas({ tour, lastSwap, phase }: {
   const showApplied = phase === 'swap_found' && lastSwap
 
   return (
-    <svg viewBox="0 0 300 300" className="topt-canvas" role="img" aria-label="2-opt tour">
+    <svg
+      viewBox="0 0 300 300"
+      className="topt-canvas"
+      role="img"
+      aria-label="2-opt tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="topt-bg" />
       {edges.map(({ from, to, key }) => {
-        let cls = "topt-edge"
+        let cls = 'topt-edge'
         if (showCandidate) {
-          if (removeSet.has(key)) cls += " topt-cand-removed"
-          else if (addSet.has(key)) cls += " topt-cand-added"
+          if (removeSet.has(key)) cls += ' topt-cand-removed'
+          else if (addSet.has(key)) cls += ' topt-cand-added'
         } else if (showApplied) {
-          if (removeSet.has(key)) cls += " topt-removed"
-          else if (addSet.has(key)) cls += " topt-added"
+          if (removeSet.has(key)) cls += ' topt-removed'
+          else if (addSet.has(key)) cls += ' topt-added'
         }
-        return <line key={key} className={cls}
-          x1={CITIES[from][0]} y1={CITIES[from][1]}
-          x2={CITIES[to][0]} y2={CITIES[to][1]} />
+        return (
+          <line
+            key={key}
+            className={cls}
+            x1={CITIES[from][0]}
+            y1={CITIES[from][1]}
+            x2={CITIES[to][0]}
+            y2={CITIES[to][1]}
+          />
+        )
       })}
       {tour.map((id) => (
         <g key={id}>
-          <circle className="topt-city"
-            cx={CITIES[id][0]} cy={CITIES[id][1]} r={6} />
-          <text className="topt-label"
-            x={CITIES[id][0]} y={CITIES[id][1] + 16}>{id}</text>
+          <circle
+            className="topt-city"
+            cx={CITIES[id][0]}
+            cy={CITIES[id][1]}
+            r={6}
+          />
+          <text className="topt-label" x={CITIES[id][0]} y={CITIES[id][1] + 16}>
+            {id}
+          </text>
         </g>
       ))}
     </svg>
@@ -69,7 +98,8 @@ function TourCanvas({ tour, lastSwap, phase }: {
 // ---------------------------------------------------------------
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return null
-  const W = 300, H = 46
+  const W = 300,
+    H = 46
   const minV = Math.min(...values)
   const maxV = Math.max(...values)
   const range = maxV - minV || 1
@@ -81,8 +111,13 @@ function Sparkline({ values }: { values: number[] }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="topt-spark">
       <rect x={0} y={0} width={W} height={H} className="topt-bg" rx={4} />
-      <polyline points={pts.join(" ")} fill="none" stroke="#0d9488"
-        strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke="#0d9488"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -97,9 +132,15 @@ export default function TwoOptExplainer() {
   const [pass, setPass] = useState(0)
   const [totalSwaps, setTotalSwaps] = useState(0)
   const [lastSwap, setLastSwap] = useState<{
-    i: number; j: number; removed: [number, number][]; added: [number, number][]; delta: number
+    i: number
+    j: number
+    removed: [number, number][]
+    added: [number, number][]
+    delta: number
   } | null>(null)
-  const [costHistory, setCostHistory] = useState<number[]>(() => [tourLength(DEFAULT_TOUR)])
+  const [costHistory, setCostHistory] = useState<number[]>(() => [
+    tourLength(DEFAULT_TOUR),
+  ])
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(0) // 1x = 600ms — slow enough to observe swaps
@@ -158,21 +199,21 @@ export default function TwoOptExplainer() {
     return () => clearInterval(id)
   }, [running, speedIdx, step_fn])
 
-  let chipText = "Click Step to scan for improving swaps"
-  let chipClass = "topt-chip topt-chip-idle"
+  let chipText = 'Click Step to scan for improving swaps'
+  let chipClass = 'topt-chip topt-chip-idle'
   if (phase === 'candidate' && lastSwap) {
     const [r0a, r0b] = lastSwap.removed[0]
     const [r1a, r1b] = lastSwap.removed[1]
     chipText = `Candidate — edges to remove: ${r0a}→${r0b} and ${r1a}→${r1b}  (Δ=${lastSwap.delta.toFixed(0)})`
-    chipClass = "topt-chip topt-chip-candidate"
+    chipClass = 'topt-chip topt-chip-candidate'
   } else if (phase === 'swap_found' && lastSwap) {
     const [r0a, r0b] = lastSwap.removed[0]
     const [a0a, a0b] = lastSwap.added[0]
     chipText = `Swapped — removed ${r0a}→${r0b}, added ${a0a}→${a0b}  (Δ=${lastSwap.delta.toFixed(0)})`
-    chipClass = "topt-chip topt-chip-swap"
+    chipClass = 'topt-chip topt-chip-swap'
   } else if (phase === 'local_optimum') {
     chipText = `Local optimum reached — no improving swap exists (${totalSwaps} swaps, ${pass} passes)`
-    chipClass = "topt-chip topt-chip-done"
+    chipClass = 'topt-chip topt-chip-done'
   }
 
   return (
@@ -184,9 +225,9 @@ export default function TwoOptExplainer() {
         <h2 className="topt-title">2-opt Local Search</h2>
         <p className="topt-sub">
           2-opt iteratively improves a tour by removing two edges and
-          reconnecting the resulting segments in the only other valid way
-          — reversing the segment between the two removed edges. Each pass
-          scans all edge pairs and applies the <strong>best-improving</strong> swap;
+          reconnecting the resulting segments in the only other valid way —
+          reversing the segment between the two removed edges. Each pass scans
+          all edge pairs and applies the <strong>best-improving</strong> swap;
           the algorithm stops when no improving swap exists (local optimum).
         </p>
       </header>
@@ -198,11 +239,22 @@ export default function TwoOptExplainer() {
       </div>
 
       <div className="topt-legend">
-        <span><span className="topt-swatch topt-swatch-normal" /> tour edge</span>
-        <span><span className="topt-swatch topt-swatch-cand-rm" /> candidate (remove)</span>
-        <span><span className="topt-swatch topt-swatch-cand-ad" /> candidate (add)</span>
-        <span><span className="topt-swatch topt-swatch-removed" /> removed</span>
-        <span><span className="topt-swatch topt-swatch-added" /> new edge</span>
+        <span>
+          <span className="topt-swatch topt-swatch-normal" /> tour edge
+        </span>
+        <span>
+          <span className="topt-swatch topt-swatch-cand-rm" /> candidate
+          (remove)
+        </span>
+        <span>
+          <span className="topt-swatch topt-swatch-cand-ad" /> candidate (add)
+        </span>
+        <span>
+          <span className="topt-swatch topt-swatch-removed" /> removed
+        </span>
+        <span>
+          <span className="topt-swatch topt-swatch-added" /> new edge
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -230,7 +282,10 @@ export default function TwoOptExplainer() {
         {lastSwap && (
           <div>
             <div className="topt-statlabel">last Δ</div>
-            <div className="topt-mono" style={{ color: lastSwap.delta < 0 ? "#16a34a" : "inherit" }}>
+            <div
+              className="topt-mono"
+              style={{ color: lastSwap.delta < 0 ? '#16a34a' : 'inherit' }}
+            >
               {lastSwap.delta.toFixed(0)}
             </div>
           </div>
@@ -242,9 +297,12 @@ export default function TwoOptExplainer() {
           <label className="topt-label">Speed</label>
           <div className="topt-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l}
+              <button
+                key={l}
                 className={`topt-speed-btn ${i === speedIdx ? 'topt-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
                 {l}
               </button>
             ))}
@@ -253,24 +311,42 @@ export default function TwoOptExplainer() {
       </div>
 
       <div className="topt-controls">
-        <button className="topt-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>
+        <button
+          className="topt-btn"
+          onClick={stepBack}
+          disabled={running || historyRef.current.length === 0}
+        >
           ⏴ Back
         </button>
-        <button className="topt-btn" onClick={step_fn} disabled={running || phase === 'local_optimum'}>
+        <button
+          className="topt-btn"
+          onClick={step_fn}
+          disabled={running || phase === 'local_optimum'}
+        >
           ⏵ Step
         </button>
-        <button className="topt-btn" onClick={() => setRunning(!running)} disabled={phase === 'local_optimum'}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="topt-btn"
+          onClick={() => setRunning(!running)}
+          disabled={phase === 'local_optimum'}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
         </button>
-        <button className="topt-btn" onClick={() => reinit([...tour])}>↺ Reset</button>
+        <button className="topt-btn" onClick={() => reinit([...tour])}>
+          ↺ Reset
+        </button>
       </div>
 
       <div className="topt-scenarios">
         <div className="topt-section-label">Scenarios</div>
         <div className="topt-scenario-row">
           {Object.entries(SCENARIOS).map(([key, s]) => (
-            <button key={key} className="topt-scenario-btn" title={s.desc}
-              onClick={() => reinit([...s.tour])}>
+            <button
+              key={key}
+              className="topt-scenario-btn"
+              title={s.desc}
+              onClick={() => reinit([...s.tour])}
+            >
               {s.label}
             </button>
           ))}

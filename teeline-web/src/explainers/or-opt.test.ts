@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, SCENARIOS,
-  dist, tourLength, scanBestMove, applyRelocation, makeInitState, stepOnce,
+  N_CITIES,
+  SCENARIOS,
+  dist,
+  tourLength,
+  scanBestMove,
+  applyRelocation,
+  makeInitState,
+  stepOnce,
 } from './or-opt-algo'
 import type { SimState } from './or-opt-algo'
 import { scanOnePass, makeInitState as twoOptInit } from './two-opt-algo'
@@ -40,23 +46,33 @@ describe('dist / tourLength', () => {
 // ---------------------------------------------------------------
 describe('applyRelocation (ported from Rust)', () => {
   it('or-1 forward: move city at index 1 to after index 3', () => {
-    expect(applyRelocation([0, 1, 2, 3, 4], 1, 1, 3, false)).toEqual([0, 2, 3, 1, 4])
+    expect(applyRelocation([0, 1, 2, 3, 4], 1, 1, 3, false)).toEqual([
+      0, 2, 3, 1, 4,
+    ])
   })
 
   it('or-1 backward: move city at index 3 to after index 0', () => {
-    expect(applyRelocation([0, 1, 2, 3, 4], 3, 1, 0, false)).toEqual([0, 3, 1, 2, 4])
+    expect(applyRelocation([0, 1, 2, 3, 4], 3, 1, 0, false)).toEqual([
+      0, 3, 1, 2, 4,
+    ])
   })
 
   it('or-2 forward: move pair [1,2] to after index 3', () => {
-    expect(applyRelocation([0, 1, 2, 3, 4], 1, 2, 3, false)).toEqual([0, 3, 1, 2, 4])
+    expect(applyRelocation([0, 1, 2, 3, 4], 1, 2, 3, false)).toEqual([
+      0, 3, 1, 2, 4,
+    ])
   })
 
   it('or-2 reversed: move pair [1,2] as [2,1] to after index 3', () => {
-    expect(applyRelocation([0, 1, 2, 3, 4], 1, 2, 3, true)).toEqual([0, 3, 2, 1, 4])
+    expect(applyRelocation([0, 1, 2, 3, 4], 1, 2, 3, true)).toEqual([
+      0, 3, 2, 1, 4,
+    ])
   })
 
   it('or-3 forward: move triple [1,2,3] to after index 4', () => {
-    expect(applyRelocation([0, 1, 2, 3, 4, 5], 1, 3, 4, false)).toEqual([0, 4, 1, 2, 3, 5])
+    expect(applyRelocation([0, 1, 2, 3, 4, 5], 1, 3, 4, false)).toEqual([
+      0, 4, 1, 2, 3, 5,
+    ])
   })
 
   it('never mutates the input', () => {
@@ -91,7 +107,13 @@ describe('scanBestMove', () => {
     expect(move.segCities).toEqual([8])
     expect(move.reversed).toBe(false)
     // applying it reaches the optimum
-    const after = applyRelocation(SCENARIOS.single_segment.tour, move.i, move.segLen, move.j, move.reversed)
+    const after = applyRelocation(
+      SCENARIOS.single_segment.tour,
+      move.i,
+      move.segLen,
+      move.j,
+      move.reversed,
+    )
     expect(tourLength(after)).toBeCloseTo(OPT, 3)
   })
 
@@ -100,7 +122,13 @@ describe('scanBestMove', () => {
     expect(move.segLen).toBe(3)
     expect(move.segCities).toEqual([8, 5, 4])
     expect(move.reversed).toBe(true)
-    const after = applyRelocation(SCENARIOS.triplet_move.tour, move.i, move.segLen, move.j, move.reversed)
+    const after = applyRelocation(
+      SCENARIOS.triplet_move.tour,
+      move.i,
+      move.segLen,
+      move.j,
+      move.reversed,
+    )
     expect(tourLength(after)).toBeCloseTo(OPT, 3)
   })
 
@@ -113,7 +141,9 @@ describe('scanBestMove', () => {
     expect(move.insertBefore).toBe(tour[(move.j + 1) % N_CITIES])
     // improvingGaps lists positions with some improving move
     expect(move.improvingGaps.length).toBeGreaterThan(0)
-    expect(move.improvingGaps).toEqual([...new Set(move.improvingGaps)].sort((a, b) => a - b))
+    expect(move.improvingGaps).toEqual(
+      [...new Set(move.improvingGaps)].sort((a, b) => a - b),
+    )
   })
 
   it('delta matches the measured cost change (Rust debug assertion)', () => {
@@ -121,7 +151,9 @@ describe('scanBestMove', () => {
       if (key === 'already_optimal') continue
       const move = scanBestMove(s.tour)!
       const before = tourLength(s.tour)
-      const after = tourLength(applyRelocation(s.tour, move.i, move.segLen, move.j, move.reversed))
+      const after = tourLength(
+        applyRelocation(s.tour, move.i, move.segLen, move.j, move.reversed),
+      )
       expect(after - before, `${key} delta mismatch`).toBeCloseTo(move.delta, 3)
     }
   })
@@ -159,7 +191,15 @@ describe('stepOnce phase machine', () => {
     expect(s2.phase).toBe('move_applied')
     expect(s2.pass).toBe(1)
     expect(s2.moves).toBe(1)
-    expect(s2.tour).toEqual(applyRelocation(s0.tour, s1.pending!.i, s1.pending!.segLen, s1.pending!.j, s1.pending!.reversed))
+    expect(s2.tour).toEqual(
+      applyRelocation(
+        s0.tour,
+        s1.pending!.i,
+        s1.pending!.segLen,
+        s1.pending!.j,
+        s1.pending!.reversed,
+      ),
+    )
     expect(s2.costHistory).toHaveLength(2)
     expect(s2.step).toBe(2)
   })

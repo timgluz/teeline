@@ -4,7 +4,12 @@
 // and advances the epoch. Mirrors the Rust `ant_colony.rs` Ant System loop
 // (construct -> best-update -> evaporate -> deposit).
 
-import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, dist12 as dist, tourLength12 as tourLength } from './explainer-cities'
+import {
+  CITIES_12 as CITIES,
+  N_CITIES_12 as N_CITIES,
+  dist12 as dist,
+  tourLength12 as tourLength,
+} from './explainer-cities'
 export { CITIES, N_CITIES, dist, tourLength }
 
 export type Phase = 'building' | 'depositing'
@@ -12,10 +17,10 @@ export type EventMode = 'ant-built' | 'improved' | 'evaporated' | 'deposited'
 
 export type SimState = {
   phase: Phase
-  antIdx: number            // 0..numAnts — which ant is building now (building phase only)
+  antIdx: number // 0..numAnts — which ant is building now (building phase only)
   epoch: number
-  pheromone: number[][]     // symmetric NxN; pheromone[i][j] = pheromone[j][i]
-  eta: number[][]           // precomputed (1/dist)^beta; symmetric
+  pheromone: number[][] // symmetric NxN; pheromone[i][j] = pheromone[j][i]
+  eta: number[][] // precomputed (1/dist)^beta; symmetric
   alpha: number
   beta: number
   evaporationRate: number
@@ -24,23 +29,29 @@ export type SimState = {
   tauMin: number
   bestTour: number[]
   bestCost: number
-  lastTours: number[][]     // tours built this epoch (cleared after deposit)
+  lastTours: number[][] // tours built this epoch (cleared after deposit)
   lastEvent: EventMode | null
   lastTour: number[] | null // most recently built tour (for canvas highlight)
-  costHistory: number[]     // epoch-best costs
+  costHistory: number[] // epoch-best costs
   step: number
 }
 
 export function averageDistance(): number {
-  let sum = 0, count = 0
+  let sum = 0,
+    count = 0
   for (let i = 0; i < N_CITIES; i++)
-    for (let j = i + 1; j < N_CITIES; j++)
-      { sum += dist(i, j); count++ }
+    for (let j = i + 1; j < N_CITIES; j++) {
+      sum += dist(i, j)
+      count++
+    }
   return sum / count
 }
 
 function computeEta(beta: number): number[][] {
-  const eta: number[][] = Array.from({ length: N_CITIES }, () => new Array(N_CITIES))
+  const eta: number[][] = Array.from(
+    { length: N_CITIES },
+    () => new Array(N_CITIES),
+  )
   for (let i = 0; i < N_CITIES; i++) {
     eta[i][i] = 0
     for (let j = i + 1; j < N_CITIES; j++) {
@@ -56,7 +67,12 @@ function computeEta(beta: number): number[][] {
 // chosen probabilistically weighted by pheromone^alpha * eta^beta among unvisited
 // cities. Falls back to first-unvisited if all weights are zero (matching the
 // Rust solver's graceful underflow guard).
-function buildTour(pheromone: number[][], eta: number[][], alpha: number, _beta: number): number[] {
+function buildTour(
+  pheromone: number[][],
+  eta: number[][],
+  alpha: number,
+  _beta: number,
+): number[] {
   const unvisited = new Set(Array.from({ length: N_CITIES }, (_, i) => i))
   const start = Math.floor(Math.random() * N_CITIES)
   unvisited.delete(start)
@@ -65,10 +81,10 @@ function buildTour(pheromone: number[][], eta: number[][], alpha: number, _beta:
   while (unvisited.size > 0) {
     const current = tour[tour.length - 1]
     const candidates = Array.from(unvisited)
-    const weights = candidates.map(j => {
+    const weights = candidates.map((j) => {
       const p = Math.max(pheromone[current][j], 1e-30)
       const e = eta[current][j]
-      return (p ** alpha) * e
+      return p ** alpha * e
     })
     const total = weights.reduce((s, w) => s + w, 0)
 
@@ -79,7 +95,10 @@ function buildTour(pheromone: number[][], eta: number[][], alpha: number, _beta:
       let r = Math.random() * total
       for (let k = 0; k < candidates.length; k++) {
         r -= weights[k]
-        if (r <= 0) { next = candidates[k]; break }
+        if (r <= 0) {
+          next = candidates[k]
+          break
+        }
       }
     }
     tour.push(next)
@@ -97,11 +116,16 @@ export function maxPheromone(s: SimState): number {
 }
 
 export function makeInitState(
-  alpha: number, beta: number, evaporationRate: number, numAnts: number,
+  alpha: number,
+  beta: number,
+  evaporationRate: number,
+  numAnts: number,
 ): SimState {
   const avgDist = averageDistance()
   const tau0 = numAnts / avgDist
-  const pheromone: number[][] = Array.from({ length: N_CITIES }, () => new Array(N_CITIES).fill(tau0))
+  const pheromone: number[][] = Array.from({ length: N_CITIES }, () =>
+    new Array(N_CITIES).fill(tau0),
+  )
   for (let i = 0; i < N_CITIES; i++) pheromone[i][i] = 0
   const eta = computeEta(beta)
 
@@ -170,16 +194,19 @@ export function stepOnce(s: SimState): SimState {
 
   // Phase === 'depositing': evaporate + deposit, then advance epoch
   const rate = s.evaporationRate
-  const newPheromone = s.pheromone.map(row => row.map(p => {
-    const evap = p * (1 - rate)
-    return Math.max(evap, s.tauMin)
-  }))
+  const newPheromone = s.pheromone.map((row) =>
+    row.map((p) => {
+      const evap = p * (1 - rate)
+      return Math.max(evap, s.tauMin)
+    }),
+  )
 
   // Deposit from each ant's tour
   for (const tour of s.lastTours) {
     const deposit = 1 / tourLength(tour)
     for (let k = 0; k < tour.length; k++) {
-      const u = tour[k], v = tour[(k + 1) % tour.length]
+      const u = tour[k],
+        v = tour[(k + 1) % tour.length]
       newPheromone[u][v] += deposit
       newPheromone[v][u] += deposit
     }

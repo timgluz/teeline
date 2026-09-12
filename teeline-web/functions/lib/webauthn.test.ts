@@ -1,6 +1,12 @@
 // WebAuthn origin/rpID policy tests.
 import { describe, expect, it } from 'vitest'
-import { clientOrigin, isAllowedOrigin, isClientOriginAllowed, rpIdFor, serverOrigin } from './webauthn'
+import {
+  clientOrigin,
+  isAllowedOrigin,
+  isClientOriginAllowed,
+  rpIdFor,
+  serverOrigin,
+} from './webauthn'
 import type { Env } from './env'
 
 const baseEnv = { DB: null as never } as Env
@@ -33,21 +39,32 @@ describe('isAllowedOrigin', () => {
 
   it('rejects unknown remote origins', () => {
     expect(isAllowedOrigin('https://evil.com', baseEnv)).toBe(false)
-    expect(isAllowedOrigin('https://tspsolver.com.evil.com', baseEnv)).toBe(false)
+    expect(isAllowedOrigin('https://tspsolver.com.evil.com', baseEnv)).toBe(
+      false,
+    )
     expect(isAllowedOrigin('http://localhost.evil.com', baseEnv)).toBe(false)
   })
 
   it('honours ALLOWED_ORIGINS extras (preview deploys etc.)', () => {
-    const env = { ...baseEnv, ALLOWED_ORIGINS: 'https://preview.teeline-web.pages.dev' }
-    expect(isAllowedOrigin('https://preview.teeline-web.pages.dev', env)).toBe(true)
+    const env = {
+      ...baseEnv,
+      ALLOWED_ORIGINS: 'https://preview.teeline-web.pages.dev',
+    }
+    expect(isAllowedOrigin('https://preview.teeline-web.pages.dev', env)).toBe(
+      true,
+    )
     expect(isAllowedOrigin('https://other.pages.dev', env)).toBe(false)
   })
 })
 
 describe('serverOrigin', () => {
   it('derives the destination origin from the request URL (WebAuthn expectedOrigin)', () => {
-    expect(serverOrigin(new Request('https://tspsolver.com/api/auth/me'))).toBe('https://tspsolver.com')
-    expect(serverOrigin(new Request('http://localhost:8788/api/auth/login/begin'))).toBe('http://localhost:8788')
+    expect(serverOrigin(new Request('https://tspsolver.com/api/auth/me'))).toBe(
+      'https://tspsolver.com',
+    )
+    expect(
+      serverOrigin(new Request('http://localhost:8788/api/auth/login/begin')),
+    ).toBe('http://localhost:8788')
   })
 })
 
@@ -55,7 +72,10 @@ describe('clientOrigin / CSRF helper', () => {
   it('prefers the Origin header', () => {
     const req = new Request('https://tspsolver.com/api/auth/logout', {
       method: 'POST',
-      headers: { Origin: 'https://tspsolver.com', Referer: 'https://evil.com/x' },
+      headers: {
+        Origin: 'https://tspsolver.com',
+        Referer: 'https://evil.com/x',
+      },
     })
     expect(clientOrigin(req)).toBe('https://tspsolver.com')
     expect(isClientOriginAllowed(req, baseEnv)).toBe(true)
@@ -70,7 +90,9 @@ describe('clientOrigin / CSRF helper', () => {
   })
 
   it('returns null with neither header, and the origin check rejects', () => {
-    const req = new Request('https://tspsolver.com/api/auth/logout', { method: 'POST' })
+    const req = new Request('https://tspsolver.com/api/auth/logout', {
+      method: 'POST',
+    })
     expect(clientOrigin(req)).toBeNull()
     expect(isClientOriginAllowed(req, baseEnv)).toBe(false)
   })

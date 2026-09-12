@@ -1,4 +1,8 @@
-import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, tourLength12 as tourLength } from './explainer-cities'
+import {
+  CITIES_12 as CITIES,
+  N_CITIES_12 as N_CITIES,
+  tourLength12 as tourLength,
+} from './explainer-cities'
 export { CITIES, N_CITIES, tourLength }
 
 export type Move = [number, number]
@@ -39,8 +43,13 @@ export function shuffle(n: number): number[] {
 
 export function twoOptSwap(tour: number[], i: number, j: number): number[] {
   const t = tour.slice()
-  let lo = i, hi = j
-  while (lo < hi) { ;[t[lo], t[hi]] = [t[hi], t[lo]]; lo++; hi-- }
+  let lo = i,
+    hi = j
+  while (lo < hi) {
+    ;[t[lo], t[hi]] = [t[hi], t[lo]]
+    lo++
+    hi--
+  }
   return t
 }
 
@@ -50,7 +59,7 @@ export function moveKey(i: number, j: number): string {
 
 export function sampleNeighbours(
   tour: number[],
-  k: number
+  k: number,
 ): Array<{ tour: number[]; move: Move; cost: number }> {
   const n = tour.length
   const results = []
@@ -92,17 +101,23 @@ export function makeInitState(tenure: number, sampleSize: number): SimState {
 
 export function stepOnce(s: SimState): SimState {
   const candidates = sampleNeighbours(s.tour, s.sampleSize)
-  const tabuKeys = new Set(s.tabuList.map(e => e.key))
+  const tabuKeys = new Set(s.tabuList.map((e) => e.key))
 
-  const nonTabu = candidates.filter(c => !tabuKeys.has(moveKey(c.move[0], c.move[1])))
-  const tabuCands = candidates.filter(c => tabuKeys.has(moveKey(c.move[0], c.move[1])))
+  const nonTabu = candidates.filter(
+    (c) => !tabuKeys.has(moveKey(c.move[0], c.move[1])),
+  )
+  const tabuCands = candidates.filter((c) =>
+    tabuKeys.has(moveKey(c.move[0], c.move[1])),
+  )
 
-  const aspirationCand = tabuCands
-    .filter(c => c.cost < s.bestCost)
-    .sort((a, b) => a.cost - b.cost)[0] ?? null
+  const aspirationCand =
+    tabuCands
+      .filter((c) => c.cost < s.bestCost)
+      .sort((a, b) => a.cost - b.cost)[0] ?? null
 
-  const bestNonTabu = nonTabu.sort((a, b) => a.cost - b.cost)[0]
-    ?? candidates.sort((a, b) => a.cost - b.cost)[0]
+  const bestNonTabu =
+    nonTabu.sort((a, b) => a.cost - b.cost)[0] ??
+    candidates.sort((a, b) => a.cost - b.cost)[0]
 
   const chosen = aspirationCand ?? bestNonTabu
   const newCost = chosen.cost

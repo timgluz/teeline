@@ -28,7 +28,9 @@ test.describe('or-opt explainer', () => {
   test('renders the canvas, stats panel and controls', async ({ page }) => {
     await expect(page.locator('.or-title')).toHaveText('Or-opt Local Search')
     await expect(page.locator('.or-canvas')).toBeVisible()
-    await expect(page.locator('.or-section-label', { hasText: 'Cost over passes' })).toBeVisible()
+    await expect(
+      page.locator('.or-section-label', { hasText: 'Cost over passes' }),
+    ).toBeVisible()
 
     const stats = page.locator('.or-statgrid')
     await expect(stats).toContainText('pass')
@@ -38,15 +40,28 @@ test.describe('or-opt explainer', () => {
     await expect(stats).toContainText('last Δ')
     await expect(stats).toContainText('step')
 
-    for (const label of ['Single segment', 'Triplet move', 'Already optimal', '2-opt stuck']) {
+    for (const label of [
+      'Single segment',
+      'Triplet move',
+      'Already optimal',
+      '2-opt stuck',
+    ]) {
       await expect(page.getByRole('button', { name: label })).toBeVisible()
     }
   })
 
-  test('Step advances the two-click model (candidate → applied)', async ({ page }) => {
+  test('Step advances the two-click model (candidate → applied)', async ({
+    page,
+  }) => {
     const chip = page.locator('.or-chip')
-    const pass = page.locator('.or-statgrid').locator('div', { hasText: /^pass/ }).locator('.or-mono')
-    const moves = page.locator('.or-statgrid').locator('div', { hasText: /^moves/ }).locator('.or-mono')
+    const pass = page
+      .locator('.or-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.or-mono')
+    const moves = page
+      .locator('.or-statgrid')
+      .locator('div', { hasText: /^moves/ })
+      .locator('.or-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     // single_segment scenario: the best move is an Or-1 relocation of city 8
@@ -64,7 +79,10 @@ test.describe('or-opt explainer', () => {
 
   test('Back restores the previous phase', async ({ page }) => {
     const chip = page.locator('.or-chip')
-    const stepStat = page.locator('.or-statgrid').locator('div', { hasText: /^step/ }).locator('.or-mono')
+    const stepStat = page
+      .locator('.or-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.or-mono')
 
     await page.getByRole('button', { name: 'Step' }).click() // candidate
     await page.getByRole('button', { name: 'Step' }).click() // applied
@@ -75,14 +93,24 @@ test.describe('or-opt explainer', () => {
     await expect(stepStat).toHaveText('1')
   })
 
-  test('Run animates passes to the local optimum; Reset restores idle', async ({ page }) => {
-    const pass = page.locator('.or-statgrid').locator('div', { hasText: /^pass/ }).locator('.or-mono')
-    const moves = page.locator('.or-statgrid').locator('div', { hasText: /^moves/ }).locator('.or-mono')
+  test('Run animates passes to the local optimum; Reset restores idle', async ({
+    page,
+  }) => {
+    const pass = page
+      .locator('.or-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.or-mono')
+    const moves = page
+      .locator('.or-statgrid')
+      .locator('div', { hasText: /^moves/ })
+      .locator('.or-mono')
 
     await page.getByRole('button', { name: 'Run' }).click()
     // single_segment converges in one pass — watch it advance and finish
     await expect(pass).not.toHaveText('0', { timeout: 10_000 })
-    await expect(page.locator('.or-chip')).toContainText('Local optimum', { timeout: 10_000 })
+    await expect(page.locator('.or-chip')).toContainText('Local optimum', {
+      timeout: 10_000,
+    })
     // one applied move + the final local-optimum scan
     await expect(pass).toHaveText('2')
     await expect(moves).toHaveText('1')
@@ -93,7 +121,10 @@ test.describe('or-opt explainer', () => {
   })
 
   test('Pause stops the animation mid-run', async ({ page }) => {
-    const pass = page.locator('.or-statgrid').locator('div', { hasText: /^pass/ }).locator('.or-mono')
+    const pass = page
+      .locator('.or-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.or-mono')
 
     await page.getByRole('button', { name: 'Run' }).click()
     // pause immediately — before or during the first tick, pass is 0 or 1
@@ -103,7 +134,9 @@ test.describe('or-opt explainer', () => {
     await expect(pass).toHaveText(paused ?? '')
   })
 
-  test('already_optimal reaches the local optimum in one Step', async ({ page }) => {
+  test('already_optimal reaches the local optimum in one Step', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: 'Already optimal' }).click()
     await expect(page.locator('.or-chip')).toContainText('Click Step')
 
@@ -112,7 +145,10 @@ test.describe('or-opt explainer', () => {
   })
 
   test('scenario buttons restart the run', async ({ page }) => {
-    const pass = page.locator('.or-statgrid').locator('div', { hasText: /^pass/ }).locator('.or-mono')
+    const pass = page
+      .locator('.or-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.or-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     await page.getByRole('button', { name: 'Step' }).click()

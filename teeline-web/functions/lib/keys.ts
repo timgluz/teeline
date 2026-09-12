@@ -14,7 +14,10 @@ export function generateKeySecret(): string {
   crypto.getRandomValues(bytes)
   let bin = ''
   for (const b of bytes) bin += String.fromCharCode(b)
-  const b64 = btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const b64 = btoa(bin)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
   return `ak_${b64}`
 }
 

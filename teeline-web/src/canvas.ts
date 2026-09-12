@@ -16,8 +16,10 @@ export function scaleCoords(
 
   const xs = cities.map((c) => c.x)
   const ys = cities.map((c) => c.y)
-  const minX = Math.min(...xs), maxX = Math.max(...xs)
-  const minY = Math.min(...ys), maxY = Math.max(...ys)
+  const minX = Math.min(...xs),
+    maxX = Math.max(...xs)
+  const minY = Math.min(...ys),
+    maxY = Math.max(...ys)
   const rangeX = maxX - minX || 1
   const rangeY = maxY - minY || 1
 
@@ -53,7 +55,9 @@ const W = 600
 const H = 400
 const PAD = 20
 
-function el<K extends keyof SVGElementTagNameMap>(tag: K): SVGElementTagNameMap[K] {
+function el<K extends keyof SVGElementTagNameMap>(
+  tag: K,
+): SVGElementTagNameMap[K] {
   return document.createElementNS(SVG_NS, tag)
 }
 

@@ -18,7 +18,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   let name: string | undefined
   try {
     const body = (await request.json()) as { name?: unknown } | null
-    if (typeof body === 'object' && body !== null && typeof body.name === 'string' && body.name.trim()) {
+    if (
+      typeof body === 'object' &&
+      body !== null &&
+      typeof body.name === 'string' &&
+      body.name.trim()
+    ) {
       name = Array.from(body.name.trim()).slice(0, 64).join('')
     }
   } catch (err) {
@@ -37,7 +42,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       createdAt: now,
     })
     const clientIp = request.headers.get('CF-Connecting-IP') ?? null
-    console.log('[audit] api_key_created', JSON.stringify({ keyId: id, userId: auth.userId, ip: clientIp, at: now }))
+    console.log(
+      '[audit] api_key_created',
+      JSON.stringify({ keyId: id, userId: auth.userId, ip: clientIp, at: now }),
+    )
     // `secret` is the only time the plaintext exists — the client must save
     // it now (the UI shows it once until the page is refreshed).
     return json({ id, name: name ?? null, secret, createdAt: now }, 201)

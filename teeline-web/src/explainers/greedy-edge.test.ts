@@ -43,7 +43,7 @@ describe('makeInitState', () => {
   it('starts with zero accepted edges and zero degree everywhere', () => {
     const s = makeInitState()
     expect(s.accepted).toHaveLength(0)
-    expect(s.degree.every(d => d === 0)).toBe(true)
+    expect(s.degree.every((d) => d === 0)).toBe(true)
     expect(s.done).toBe(false)
     expect(s.step).toBe(0)
   })

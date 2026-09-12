@@ -3,7 +3,12 @@
 import type { Env } from '../../lib/env'
 import { getUser } from '../../lib/db'
 import { json, forbidden, serverError, unauthorized } from '../../lib/http'
-import { createSessionToken, getSessionUser, sessionCookieHeader, shouldRefreshSession } from '../../lib/session'
+import {
+  createSessionToken,
+  getSessionUser,
+  sessionCookieHeader,
+  shouldRefreshSession,
+} from '../../lib/session'
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const session = await getSessionUser(env, request.headers)
@@ -22,12 +27,24 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const headers: Record<string, string> = {}
   if (shouldRefreshSession(session) && env.SESSION_SECRET) {
     try {
-      headers['Set-Cookie'] = sessionCookieHeader(await createSessionToken(env.SESSION_SECRET, user.id))
+      headers['Set-Cookie'] = sessionCookieHeader(
+        await createSessionToken(env.SESSION_SECRET, user.id),
+      )
     } catch (err) {
       // Sliding refresh is best-effort: the existing token stays valid until
       // exp, so a mint failure must not break the response.
       console.error('Session refresh failed:', err)
     }
   }
-  return json({ user: { id: user.id, displayName: user.display_name, createdAt: user.created_at } }, 200, headers)
+  return json(
+    {
+      user: {
+        id: user.id,
+        displayName: user.display_name,
+        createdAt: user.created_at,
+      },
+    },
+    200,
+    headers,
+  )
 }

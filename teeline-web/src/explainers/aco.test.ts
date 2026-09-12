@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, tourLength,
-  makeInitState, stepOnce, maxPheromone,
+  N_CITIES,
+  tourLength,
+  makeInitState,
+  stepOnce,
+  maxPheromone,
 } from './aco-algo'
 
 describe('makeInitState', () => {
@@ -50,9 +53,9 @@ describe('stepOnce', () => {
   it('after depositing, advances epoch and returns to building', () => {
     const numAnts = 3
     let s = makeInitState(1, 2, 0.5, numAnts)
-    for (let i = 0; i < numAnts; i++) s = stepOnce(s)  // build all ants
+    for (let i = 0; i < numAnts; i++) s = stepOnce(s) // build all ants
     expect(s.phase).toBe('depositing')
-    s = stepOnce(s)  // deposit
+    s = stepOnce(s) // deposit
     expect(s.phase).toBe('building')
     expect(s.epoch).toBe(1)
     expect(s.antIdx).toBe(0)
@@ -69,7 +72,9 @@ describe('stepOnce', () => {
   })
 
   it('built tours are valid permutations', () => {
-    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort((a, b) => a - b)
+    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort(
+      (a, b) => a - b,
+    )
     let s = makeInitState(1, 2, 0.5, 8)
     for (let i = 0; i < 8; i++) s = stepOnce(s)
     for (const tour of s.lastTours) {
@@ -80,8 +85,8 @@ describe('stepOnce', () => {
   it('pheromone floor (tauMin) is respected after evaporation', () => {
     const evap = 0.9
     let s = makeInitState(1, 2, evap, 3)
-    for (let i = 0; i < 3; i++) s = stepOnce(s)  // build
-    s = stepOnce(s)  // deposit (evaporate happens here)
+    for (let i = 0; i < 3; i++) s = stepOnce(s) // build
+    s = stepOnce(s) // deposit (evaporate happens here)
     for (let i = 0; i < N_CITIES; i++) {
       for (let j = i + 1; j < N_CITIES; j++) {
         expect(s.pheromone[i][j]).toBeGreaterThanOrEqual(s.tauMin - 1e-12)

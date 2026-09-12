@@ -10,9 +10,15 @@ vi.mock('teeline-wasm', () => ({
   compareToursFromInput: vi.fn(),
 }))
 
-
-
-import { solve, parseAndSolve, parse, listAlgorithms, getVersion, compareTours, compareToursFromInput } from 'teeline-wasm'
+import {
+  solve,
+  parseAndSolve,
+  parse,
+  listAlgorithms,
+  getVersion,
+  compareTours,
+  compareToursFromInput,
+} from 'teeline-wasm'
 import {
   handleMessage,
   type ParseAndSolveRequest,
@@ -49,7 +55,11 @@ describe('handleMessage — solve', () => {
     const req: SolveRequest = {
       type: 'solve',
       solver: 'nn',
-      cities: [{ id: 0, x: 1, y: 2 }, { id: 1, x: 3, y: 4 }, { id: 2, x: 5, y: 6 }],
+      cities: [
+        { id: 0, x: 1, y: 2 },
+        { id: 1, x: 3, y: 4 },
+        { id: 2, x: 5, y: 6 },
+      ],
       options: {},
     }
     const res = handleMessage(req)
@@ -61,8 +71,15 @@ describe('handleMessage — solve', () => {
   })
 
   it('returns SolveError when solve throws', () => {
-    vi.mocked(solve).mockImplementation(() => { throw new Error('solver crashed') })
-    const req: SolveRequest = { type: 'solve', solver: 'nn', cities: [], options: {} }
+    vi.mocked(solve).mockImplementation(() => {
+      throw new Error('solver crashed')
+    })
+    const req: SolveRequest = {
+      type: 'solve',
+      solver: 'nn',
+      cities: [],
+      options: {},
+    }
     const res = handleMessage(req)
     expect(res.type).toBe('error')
     if (res.type === 'error') {
@@ -90,7 +107,9 @@ describe('handleMessage — parse-and-solve', () => {
   })
 
   it('returns SolveError when parseAndSolve throws', () => {
-    vi.mocked(parseAndSolve).mockImplementation(() => { throw new Error('bad TSPLIB input') })
+    vi.mocked(parseAndSolve).mockImplementation(() => {
+      throw new Error('bad TSPLIB input')
+    })
     const req: ParseAndSolveRequest = {
       type: 'parse-and-solve',
       solver: 'nn',
@@ -127,7 +146,9 @@ describe('handleMessage — parse', () => {
   })
 
   it('returns SolveError when parse throws', () => {
-    vi.mocked(parse).mockImplementation(() => { throw new Error('bad input') })
+    vi.mocked(parse).mockImplementation(() => {
+      throw new Error('bad input')
+    })
     const req: ParseRequest = { type: 'parse', input: '' }
     const res = handleMessage(req)
     expect(res.type).toBe('error')
@@ -152,7 +173,9 @@ describe('handleMessage — list-algorithms', () => {
   })
 
   it('returns SolveError when listAlgorithms throws', () => {
-    vi.mocked(listAlgorithms).mockImplementation(() => { throw new Error('wasm init failed') })
+    vi.mocked(listAlgorithms).mockImplementation(() => {
+      throw new Error('wasm init failed')
+    })
     const req: ListAlgorithmsRequest = { type: 'list-algorithms' }
     const res = handleMessage(req)
     expect(res.type).toBe('error')
@@ -175,7 +198,9 @@ describe('handleMessage — get-version', () => {
   })
 
   it('returns SolveError when getVersion throws', () => {
-    vi.mocked(getVersion).mockImplementation(() => { throw new Error('version unavailable') })
+    vi.mocked(getVersion).mockImplementation(() => {
+      throw new Error('version unavailable')
+    })
     const req: GetVersionRequest = { type: 'get-version' }
     const res = handleMessage(req)
     expect(res.type).toBe('error')
@@ -201,7 +226,7 @@ describe('handleMessage — compare-tours', () => {
     { id: 4, x: 0.0, y: 1.0 },
   ]
   const solverRoute = [1, 2, 3, 4]
-  const optRoute    = [1, 2, 4, 3]
+  const optRoute = [1, 2, 4, 3]
 
   it('returns compare-tours-result with stats on success', () => {
     vi.mocked(compareTours).mockReturnValue(mockStats)
@@ -280,7 +305,9 @@ describe('handleMessage — webmcp-solve', () => {
   })
 
   it('echoes id in the error response when parseAndSolve throws', () => {
-    vi.mocked(parseAndSolve).mockImplementation(() => { throw new Error('bad tsplib') })
+    vi.mocked(parseAndSolve).mockImplementation(() => {
+      throw new Error('bad tsplib')
+    })
     const req: WebMCPSolveRequest = {
       type: 'webmcp-solve',
       id: 'webmcp-id-err',
@@ -301,7 +328,10 @@ describe('handleMessage — webmcp-solve', () => {
 describe('handleMessage — webmcp-list-algorithms', () => {
   it('calls listAlgorithms and returns webmcp-algorithms with id', () => {
     vi.mocked(listAlgorithms).mockReturnValue([mockAlgorithm])
-    const req: WebMCPListAlgorithmsRequest = { type: 'webmcp-list-algorithms', id: 'algo-id-1' }
+    const req: WebMCPListAlgorithmsRequest = {
+      type: 'webmcp-list-algorithms',
+      id: 'algo-id-1',
+    }
     const res = handleMessage(req)
     expect(listAlgorithms).toHaveBeenCalledOnce()
     expect(res.type).toBe('webmcp-algorithms')
@@ -314,8 +344,13 @@ describe('handleMessage — webmcp-list-algorithms', () => {
   })
 
   it('echoes id in the error response when listAlgorithms throws', () => {
-    vi.mocked(listAlgorithms).mockImplementation(() => { throw new Error('wasm not ready') })
-    const req: WebMCPListAlgorithmsRequest = { type: 'webmcp-list-algorithms', id: 'algo-id-err' }
+    vi.mocked(listAlgorithms).mockImplementation(() => {
+      throw new Error('wasm not ready')
+    })
+    const req: WebMCPListAlgorithmsRequest = {
+      type: 'webmcp-list-algorithms',
+      id: 'algo-id-err',
+    }
     const res = handleMessage(req)
     expect(res.type).toBe('webmcp-algorithms')
     if (res.type === 'webmcp-algorithms') {
@@ -331,12 +366,19 @@ describe('handleMessage — webmcp-parse', () => {
     name: 'test',
     comment: '',
     distanceType: 'EUC_2D',
-    cities: [{ id: 1, x: 0.0, y: 0.0 }, { id: 2, x: 1.0, y: 0.0 }],
+    cities: [
+      { id: 1, x: 0.0, y: 0.0 },
+      { id: 2, x: 1.0, y: 0.0 },
+    ],
   }
 
   it('calls parse and returns webmcp-parsed with full problem', () => {
     vi.mocked(parse).mockReturnValue(mockProblem)
-    const req: WebMCPParseRequest = { type: 'webmcp-parse', id: 'parse-id-1', input: 'NAME: test\n' }
+    const req: WebMCPParseRequest = {
+      type: 'webmcp-parse',
+      id: 'parse-id-1',
+      input: 'NAME: test\n',
+    }
     const res = handleMessage(req)
     expect(parse).toHaveBeenCalledWith('NAME: test\n')
     expect(res.type).toBe('webmcp-parsed')
@@ -349,8 +391,14 @@ describe('handleMessage — webmcp-parse', () => {
   })
 
   it('echoes id in the error response when parse throws', () => {
-    vi.mocked(parse).mockImplementation(() => { throw new Error('invalid tsplib') })
-    const req: WebMCPParseRequest = { type: 'webmcp-parse', id: 'parse-id-err', input: '' }
+    vi.mocked(parse).mockImplementation(() => {
+      throw new Error('invalid tsplib')
+    })
+    const req: WebMCPParseRequest = {
+      type: 'webmcp-parse',
+      id: 'parse-id-err',
+      input: '',
+    }
     const res = handleMessage(req)
     expect(res.type).toBe('webmcp-parsed')
     if (res.type === 'webmcp-parsed') {
@@ -371,8 +419,9 @@ describe('handleMessage — compare-tours-from-input', () => {
     optimalOnlyEdges: 4,
   }
   const solverRoute = [1, 2, 3]
-  const optRoute    = [1, 3, 2]
-  const tspInput = 'NAME: test\nDIMENSION: 3\nEDGE_WEIGHT_TYPE: EXPLICIT\nNODE_COORD_SECTION\n1 0.0 0.0\n2 1.0 0.0\n3 0.0 1.0\nEOF\n'
+  const optRoute = [1, 3, 2]
+  const tspInput =
+    'NAME: test\nDIMENSION: 3\nEDGE_WEIGHT_TYPE: EXPLICIT\nNODE_COORD_SECTION\n1 0.0 0.0\n2 1.0 0.0\n3 0.0 1.0\nEOF\n'
 
   it('returns compare-tours-result with stats when using raw input', () => {
     vi.mocked(compareToursFromInput).mockReturnValue(mockStats)

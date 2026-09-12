@@ -1,6 +1,10 @@
 // Small HTTP helpers shared by the auth Pages Functions.
 
-export function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
+export function json(
+  data: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {

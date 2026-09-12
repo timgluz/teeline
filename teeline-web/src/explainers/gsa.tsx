@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from "preact/hooks"
-import type { Agent, ForceBreakdown, SimState } from "./gsa-algo"
-import { CITIES, N_CITIES, makeInitState, stepAgent } from "./gsa-algo"
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
+import type { Agent, ForceBreakdown, SimState } from './gsa-algo'
+import { CITIES, N_CITIES, makeInitState, stepAgent } from './gsa-algo'
 
 const G0 = 20.0
 
 function polyPts(tour: number[]): string {
-  const pts = tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
+  const pts = tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ')
   return pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
 }
 
@@ -18,9 +18,14 @@ interface AgentHeatmapProps {
   activeIdx: number
   kbest: number[]
 }
-function AgentHeatmap({ agents, gbest_cost, activeIdx, kbest }: AgentHeatmapProps) {
+function AgentHeatmap({
+  agents,
+  gbest_cost,
+  activeIdx,
+  kbest,
+}: AgentHeatmapProps) {
   if (!agents.length) return null
-  const costs = agents.map(a => a.cost)
+  const costs = agents.map((a) => a.cost)
   const minC = Math.min(...costs)
   const maxC = Math.max(...costs)
   const range = maxC - minC || 1
@@ -36,16 +41,22 @@ function AgentHeatmap({ agents, gbest_cost, activeIdx, kbest }: AgentHeatmapProp
         const isKbest = kbestSet.has(i)
         const isGbest = Math.abs(ag.cost - gbest_cost) < 0.01
         const outline = isActive
-          ? "2px solid #d97706"
+          ? '2px solid #d97706'
           : isGbest
-            ? "2px solid #16a34a"
-            : "2px solid transparent"
-        const borderLeft = isKbest && !isActive ? "3px solid #16a34a" : undefined
+            ? '2px solid #16a34a'
+            : '2px solid transparent'
+        const borderLeft =
+          isKbest && !isActive ? '3px solid #16a34a' : undefined
         return (
           <div
             key={i}
             className="gsa-heatmap-cell"
-            style={{ background: bg, outline, outlineOffset: "1px", borderLeft }}
+            style={{
+              background: bg,
+              outline,
+              outlineOffset: '1px',
+              borderLeft,
+            }}
           >
             <span className="gsa-heatmap-idx">{i}</span>
             <span className="gsa-heatmap-cost">{ag.cost.toFixed(0)}</span>
@@ -71,21 +82,38 @@ interface TourSVGProps {
 function TourSVG({ agents, gbest, activeIdx, newGbest }: TourSVGProps) {
   if (!agents.length) return null
   return (
-    <svg viewBox="0 0 300 300" className="gsa-canvas" role="img" aria-label="GSA tour canvas">
+    <svg
+      viewBox="0 0 300 300"
+      className="gsa-canvas"
+      role="img"
+      aria-label="GSA tour canvas"
+    >
       <rect x={0} y={0} width={300} height={300} className="gsa-bg" />
-      {agents.map((ag, i) => i !== activeIdx && (
-        <polyline key={i} className="gsa-ghost" points={polyPts(ag.position)} />
-      ))}
-      <polyline className="gsa-active" points={polyPts(agents[activeIdx].position)} />
+      {agents.map(
+        (ag, i) =>
+          i !== activeIdx && (
+            <polyline
+              key={i}
+              className="gsa-ghost"
+              points={polyPts(ag.position)}
+            />
+          ),
+      )}
       <polyline
-        className={`gsa-gbest${newGbest ? " gsa-gbest-pulse" : ""}`}
+        className="gsa-active"
+        points={polyPts(agents[activeIdx].position)}
+      />
+      <polyline
+        className={`gsa-gbest${newGbest ? ' gsa-gbest-pulse' : ''}`}
         points={polyPts(gbest)}
       />
       {CITIES.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r={4} className="gsa-city" />
       ))}
       {CITIES.map(([x, y], i) => (
-        <text key={i} x={x + 6} y={y - 5} className="gsa-city-label">{i}</text>
+        <text key={i} x={x + 6} y={y - 5} className="gsa-city-label">
+          {i}
+        </text>
       ))}
     </svg>
   )
@@ -101,13 +129,18 @@ interface ForceChipProps {
 }
 function ForceChip({ breakdown, agentIdx, newGbest }: ForceChipProps) {
   if (!breakdown) {
-    return <div className="gsa-chip gsa-chip-idle">Press Step or Run to begin</div>
+    return (
+      <div className="gsa-chip gsa-chip-idle">Press Step or Run to begin</div>
+    )
   }
   const { pulls, totalApplied, G } = breakdown
-  const prefix = newGbest ? "⭐ new gbest!  " : ""
+  const prefix = newGbest ? '⭐ new gbest!  ' : ''
   return (
-    <div className={`gsa-chip ${newGbest ? "gsa-chip-gbest" : "gsa-chip-normal"}`}>
-      {prefix}Agent {agentIdx} · G={G.toFixed(1)} · {pulls.length} pulls → {totalApplied} swaps applied
+    <div
+      className={`gsa-chip ${newGbest ? 'gsa-chip-gbest' : 'gsa-chip-normal'}`}
+    >
+      {prefix}Agent {agentIdx} · G={G.toFixed(1)} · {pulls.length} pulls →{' '}
+      {totalApplied} swaps applied
     </div>
   )
 }
@@ -118,16 +151,21 @@ function ForceChip({ breakdown, agentIdx, newGbest }: ForceChipProps) {
 function GGauge({ G }: { G: number }) {
   const pct = (G / G0) * 100
   const hint =
-    G > 15 ? "High — broad exploration" :
-    G > 8  ? "Mid — balanced" :
-    "Low — exploitation focus"
+    G > 15
+      ? 'High — broad exploration'
+      : G > 8
+        ? 'Mid — balanced'
+        : 'Low — exploitation focus'
   return (
     <div className="gsa-gauge">
       <div className="gsa-gauge-label">
         G (gravitational constant) = <strong>{G.toFixed(2)}</strong>
       </div>
       <div className="gsa-gauge-track">
-        <div className="gsa-gauge-fill" style={{ width: `${Math.max(0, pct).toFixed(1)}%` }} />
+        <div
+          className="gsa-gauge-fill"
+          style={{ width: `${Math.max(0, pct).toFixed(1)}%` }}
+        />
       </div>
       <div className="gsa-gauge-hint">{hint}</div>
     </div>
@@ -192,11 +230,12 @@ export default function GSAExplainer() {
 
   const avgDist = agents.length
     ? (agents.reduce((s, a) => s + a.cost, 0) / agents.length).toFixed(0)
-    : "—"
+    : '—'
 
-  const displayAgentIdx = breakdown ? simRef.current.agentIdx === 0
-    ? nAgents - 1
-    : (simRef.current.agentIdx - 1 + nAgents) % nAgents
+  const displayAgentIdx = breakdown
+    ? simRef.current.agentIdx === 0
+      ? nAgents - 1
+      : (simRef.current.agentIdx - 1 + nAgents) % nAgents
     : 0
 
   return (
@@ -207,32 +246,56 @@ export default function GSAExplainer() {
         <div className="gsa-eyebrow">teeline · algorithms/gsa</div>
         <h2 className="gsa-title">Gravitational Search Algorithm</h2>
         <p className="gsa-sub">
-          Each candidate TSP tour is an <strong>agent</strong> with a{" "}
+          Each candidate TSP tour is an <strong>agent</strong> with a{' '}
           <strong>mass</strong> proportional to its fitness — better tours weigh
-          more. Every step, the active agent is pulled toward the{" "}
-          <strong>k-best</strong> (heaviest) neighbours via swap-move{" "}
-          <strong>velocity</strong>. The gravitational constant{" "}
-          <code>G</code> decays over epochs, shifting the swarm from broad
-          exploration toward fine-grained exploitation.
+          more. Every step, the active agent is pulled toward the{' '}
+          <strong>k-best</strong> (heaviest) neighbours via swap-move{' '}
+          <strong>velocity</strong>. The gravitational constant <code>G</code>{' '}
+          decays over epochs, shifting the swarm from broad exploration toward
+          fine-grained exploitation.
         </p>
       </header>
 
       <div className="gsa-viz-row">
         <div className="gsa-canvas-wrap">
-          <TourSVG agents={agents} gbest={gbest} activeIdx={agentIdx} newGbest={newGbest} />
+          <TourSVG
+            agents={agents}
+            gbest={gbest}
+            activeIdx={agentIdx}
+            newGbest={newGbest}
+          />
         </div>
-        <AgentHeatmap agents={agents} gbest_cost={gbest_cost} activeIdx={agentIdx} kbest={kbest} />
+        <AgentHeatmap
+          agents={agents}
+          gbest_cost={gbest_cost}
+          activeIdx={agentIdx}
+          kbest={kbest}
+        />
       </div>
 
       <div className="gsa-legend">
-        <span><span className="gsa-dot gsa-dot-gbest">●</span> gbest tour</span>
-        <span><span className="gsa-dot gsa-dot-active">●</span> active agent</span>
-        <span><span className="gsa-dot gsa-dot-ghost">●</span> swarm</span>
-        <span><span className="gsa-dot gsa-dot-city">●</span> city</span>
-        <span><span className="gsa-kbest-marker" /> kbest source</span>
+        <span>
+          <span className="gsa-dot gsa-dot-gbest">●</span> gbest tour
+        </span>
+        <span>
+          <span className="gsa-dot gsa-dot-active">●</span> active agent
+        </span>
+        <span>
+          <span className="gsa-dot gsa-dot-ghost">●</span> swarm
+        </span>
+        <span>
+          <span className="gsa-dot gsa-dot-city">●</span> city
+        </span>
+        <span>
+          <span className="gsa-kbest-marker" /> kbest source
+        </span>
       </div>
 
-      <ForceChip breakdown={breakdown} agentIdx={displayAgentIdx} newGbest={newGbest} />
+      <ForceChip
+        breakdown={breakdown}
+        agentIdx={displayAgentIdx}
+        newGbest={newGbest}
+      />
 
       <GGauge G={G} />
 
@@ -243,7 +306,9 @@ export default function GSAExplainer() {
         </div>
         <div>
           <div className="gsa-statlabel">step</div>
-          <div className="gsa-mono">{agentIdx}/{nAgents}</div>
+          <div className="gsa-mono">
+            {agentIdx}/{nAgents}
+          </div>
         </div>
         <div>
           <div className="gsa-statlabel">gbest dist</div>
@@ -261,7 +326,11 @@ export default function GSAExplainer() {
             Agents = <strong>{nAgents}</strong>
           </label>
           <input
-            type="range" min={4} max={12} step={1} value={nAgents}
+            type="range"
+            min={4}
+            max={12}
+            step={1}
+            value={nAgents}
             className="gsa-slider"
             onInput={(e) => {
               const n = Number((e.target as HTMLInputElement).value)
@@ -271,31 +340,41 @@ export default function GSAExplainer() {
           />
           <div className="gsa-hint">
             {nAgents <= 5
-              ? "Small swarm — fast but low diversity"
+              ? 'Small swarm — fast but low diversity'
               : nAgents >= 10
-                ? "Large swarm — high diversity, slower per epoch"
-                : "Balanced swarm size"}
+                ? 'Large swarm — high diversity, slower per epoch'
+                : 'Balanced swarm size'}
           </div>
         </div>
         <div className="gsa-config-row">
           <label className="gsa-config-label">Speed</label>
           <input
-            type="range" min={1} max={10} step={1} value={speed}
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
             className="gsa-slider"
-            onInput={(e) => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
         </div>
       </div>
 
       <div className="gsa-controls">
-        <button className="gsa-btn" onClick={stepOnce} disabled={running}>◀ Step</button>
-        <button
-          className={`gsa-btn ${!running ? "gsa-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)}
-        >
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button className="gsa-btn" onClick={stepOnce} disabled={running}>
+          ◀ Step
         </button>
-        <button className="gsa-btn" onClick={() => reinit(nAgents)}>↺ Reset</button>
+        <button
+          className={`gsa-btn ${!running ? 'gsa-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button className="gsa-btn" onClick={() => reinit(nAgents)}>
+          ↺ Reset
+        </button>
       </div>
 
       <footer className="gsa-footer">
@@ -303,7 +382,9 @@ export default function GSAExplainer() {
         <span className="gsa-mono">agents: {nAgents}</span>
         <span className="gsa-mono">G₀: {G0}</span>
         <span className="gsa-mono">α: 1</span>
-        <span className="gsa-mono">kbest: ⌈{nAgents}/2⌉={Math.ceil(nAgents / 2)}</span>
+        <span className="gsa-mono">
+          kbest: ⌈{nAgents}/2⌉={Math.ceil(nAgents / 2)}
+        </span>
       </footer>
     </div>
   )

@@ -1,19 +1,28 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES, SCENARIOS,
-  tourLength, makeInitState, stepOnce,
-} from "./or-opt-algo"
-import type { Phase, MoveEvent, Scenario } from "./or-opt-algo"
+  CITIES,
+  N_CITIES,
+  SCENARIOS,
+  tourLength,
+  makeInitState,
+  stepOnce,
+} from './or-opt-algo'
+import type { Phase, MoveEvent, Scenario } from './or-opt-algo'
 
 const DEFAULT_SCENARIO = SCENARIOS.single_segment
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 
 function edgeKey(a: number, b: number): string {
   return `${Math.min(a, b)}-${Math.max(a, b)}`
 }
 
-function midTick(x1: number, y1: number, x2: number, y2: number): [number, number, number, number] {
+function midTick(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): [number, number, number, number] {
   const dx = x2 - x1
   const dy = y2 - y1
   const len = Math.hypot(dx, dy) || 1
@@ -29,7 +38,13 @@ function midTick(x1: number, y1: number, x2: number, y2: number): [number, numbe
 // faint scan ticks at improving insertion gaps, and a CSS morph
 // that makes the tour flow to its new shape when a move applies.
 // ---------------------------------------------------------------
-function TourCanvas({ tour, pending, lastMove, phase, morph }: {
+function TourCanvas({
+  tour,
+  pending,
+  lastMove,
+  phase,
+  morph,
+}: {
   tour: number[]
   pending: MoveEvent | null
   lastMove: MoveEvent | null
@@ -68,50 +83,88 @@ function TourCanvas({ tour, pending, lastMove, phase, morph }: {
     edges.push({ from: a, to: b, key: edgeKey(a, b) })
   }
 
-  const ticks: Array<{ key: string; x1: number; y1: number; x2: number; y2: number }> = []
+  const ticks: Array<{
+    key: string
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+  }> = []
   if (showCandidate && pending) {
     for (const j of pending.improvingGaps) {
       if (j === pending.j) continue // the best gap gets the strong paste highlight
       const a = tour[j]
       const b = tour[(j + 1) % tour.length]
-      const [x1, y1, x2, y2] = midTick(CITIES[a][0], CITIES[a][1], CITIES[b][0], CITIES[b][1])
+      const [x1, y1, x2, y2] = midTick(
+        CITIES[a][0],
+        CITIES[a][1],
+        CITIES[b][0],
+        CITIES[b][1],
+      )
       ticks.push({ key: `t${j}`, x1, y1, x2, y2 })
     }
   }
 
   return (
-    <svg viewBox="0 0 300 300"
+    <svg
+      viewBox="0 0 300 300"
       className={`or-canvas ${morph && showApplied ? 'or-morph' : ''}`}
-      role="img" aria-label="Or-opt tour">
+      role="img"
+      aria-label="Or-opt tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="or-bg" />
 
       {/* Faint ticks at every improving insertion gap (the scan) */}
       {ticks.map((t) => (
-        <line key={t.key} className="or-scan-tick" x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} />
+        <line
+          key={t.key}
+          className="or-scan-tick"
+          x1={t.x1}
+          y1={t.y1}
+          x2={t.x2}
+          y2={t.y2}
+        />
       ))}
 
       {/* Best insertion gap marker */}
       {showCandidate && pending && (
-        <line className="or-gap-marker"
-          x1={CITIES[pending.insertAfter][0]} y1={CITIES[pending.insertAfter][1]}
-          x2={CITIES[pending.insertBefore][0]} y2={CITIES[pending.insertBefore][1]} />
+        <line
+          className="or-gap-marker"
+          x1={CITIES[pending.insertAfter][0]}
+          y1={CITIES[pending.insertAfter][1]}
+          x2={CITIES[pending.insertBefore][0]}
+          y2={CITIES[pending.insertBefore][1]}
+        />
       )}
 
       <g className="or-tour">
         {edges.map(({ from, to, key }) => {
           let cls = 'or-edge'
           if (cutSet.has(key)) cls += showCandidate ? ' or-cand-cut' : ' or-cut'
-          else if (pasteSet.has(key)) cls += showCandidate ? ' or-cand-paste' : ' or-paste'
-          return <line key={key} className={cls}
-            x1={CITIES[from][0]} y1={CITIES[from][1]}
-            x2={CITIES[to][0]} y2={CITIES[to][1]} />
+          else if (pasteSet.has(key))
+            cls += showCandidate ? ' or-cand-paste' : ' or-paste'
+          return (
+            <line
+              key={key}
+              className={cls}
+              x1={CITIES[from][0]}
+              y1={CITIES[from][1]}
+              x2={CITIES[to][0]}
+              y2={CITIES[to][1]}
+            />
+          )
         })}
         {tour.map((id) => (
           <g key={id}>
-            <circle className={`or-city ${segSet.has(id) ? 'or-city-seg' : ''}`}
-              cx={CITIES[id][0]} cy={CITIES[id][1]} r={segSet.has(id) ? 8 : 6} />
-            <text className="or-label"
-              x={CITIES[id][0]} y={CITIES[id][1] + 16}>{id}</text>
+            <circle
+              className={`or-city ${segSet.has(id) ? 'or-city-seg' : ''}`}
+              cx={CITIES[id][0]}
+              cy={CITIES[id][1]}
+              r={segSet.has(id) ? 8 : 6}
+            />
+            <text className="or-label" x={CITIES[id][0]} y={CITIES[id][1] + 16}>
+              {id}
+            </text>
           </g>
         ))}
       </g>
@@ -124,7 +177,8 @@ function TourCanvas({ tour, pending, lastMove, phase, morph }: {
 // ---------------------------------------------------------------
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return null
-  const W = 300, H = 46
+  const W = 300,
+    H = 46
   const minV = Math.min(...values)
   const maxV = Math.max(...values)
   const range = maxV - minV || 1
@@ -134,10 +188,19 @@ function Sparkline({ values }: { values: number[] }) {
     return `${x.toFixed(1)},${y.toFixed(1)}`
   })
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="or-spark" aria-label="cost over passes">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="or-spark"
+      aria-label="cost over passes"
+    >
       <rect x={0} y={0} width={W} height={H} className="or-bg" rx={4} />
-      <polyline points={pts.join(" ")} fill="none" stroke="#0d9488"
-        strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke="#0d9488"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -150,10 +213,14 @@ export default function OrOptExplainer() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [pass, setPass] = useState(0)
   const [moves, setMoves] = useState(0)
-  const [bestCost, setBestCost] = useState(() => tourLength(DEFAULT_SCENARIO.tour))
+  const [bestCost, setBestCost] = useState(() =>
+    tourLength(DEFAULT_SCENARIO.tour),
+  )
   const [pending, setPending] = useState<MoveEvent | null>(null)
   const [lastMove, setLastMove] = useState<MoveEvent | null>(null)
-  const [costHistory, setCostHistory] = useState<number[]>(() => [tourLength(DEFAULT_SCENARIO.tour)])
+  const [costHistory, setCostHistory] = useState<number[]>(() => [
+    tourLength(DEFAULT_SCENARIO.tour),
+  ])
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(2) // 3x default
@@ -227,19 +294,19 @@ export default function OrOptExplainer() {
   const distance = tourLength(tour)
 
   // Status chip
-  let chipText = "Click Step to scan for the best Or-1/2/3 relocation"
-  let chipClass = "or-chip or-chip-idle"
+  let chipText = 'Click Step to scan for the best Or-1/2/3 relocation'
+  let chipClass = 'or-chip or-chip-idle'
   if (phase === 'candidate' && pending) {
     const rev = pending.reversed ? ' ↺ reversed' : ''
     chipText = `Candidate — move ${pending.segCities.join('→')} (k=${pending.segLen}) after ${pending.insertAfter}${rev}  (Δ=${pending.delta.toFixed(0)})`
-    chipClass = "or-chip or-chip-candidate"
+    chipClass = 'or-chip or-chip-candidate'
   } else if (phase === 'move_applied' && lastMove) {
     const rev = lastMove.reversed ? ' ↺ reversed' : ''
     chipText = `Moved — ${lastMove.segCities.join('→')} relocated after ${lastMove.insertAfter}${rev}  (Δ=${lastMove.delta.toFixed(0)})`
-    chipClass = "or-chip or-chip-applied"
+    chipClass = 'or-chip or-chip-applied'
   } else if (phase === 'local_optimum') {
     chipText = `Local optimum — no improving Or-1/2/3 relocation exists (${moves} moves, ${pass} passes)`
-    chipClass = "or-chip or-chip-done"
+    chipClass = 'or-chip or-chip-done'
   }
 
   return (
@@ -250,27 +317,47 @@ export default function OrOptExplainer() {
         <div className="or-eyebrow">teeline · algorithms/or_opt</div>
         <h2 className="or-title">Or-opt Local Search</h2>
         <p className="or-sub">
-          Or-opt relocates <strong>segments of 1–3 consecutive cities</strong> to a better position
-          elsewhere in the tour — a <em>cut-and-paste</em> move, unlike 2-opt's edge reversal.
-          Each pass scans every segment size (Or-1, Or-2, Or-3) and every insertion point, applying
-          the single <strong>best-improving</strong> relocation (reversed insertions are also tried
-          for Or-2/Or-3). Repeats until no relocation improves the tour.
+          Or-opt relocates <strong>segments of 1–3 consecutive cities</strong>{' '}
+          to a better position elsewhere in the tour — a <em>cut-and-paste</em>{' '}
+          move, unlike 2-opt's edge reversal. Each pass scans every segment size
+          (Or-1, Or-2, Or-3) and every insertion point, applying the single{' '}
+          <strong>best-improving</strong> relocation (reversed insertions are
+          also tried for Or-2/Or-3). Repeats until no relocation improves the
+          tour.
         </p>
       </header>
 
       <div className="or-viz-row">
         <div className="or-canvas-wrap">
-          <TourCanvas tour={tour} pending={pending} lastMove={lastMove} phase={phase} morph={morphOn} />
+          <TourCanvas
+            tour={tour}
+            pending={pending}
+            lastMove={lastMove}
+            phase={phase}
+            morph={morphOn}
+          />
         </div>
       </div>
 
       <div className="or-legend">
-        <span><span className="or-swatch or-swatch-normal" /> tour edge</span>
-        <span><span className="or-swatch or-swatch-seg" /> segment (relocating)</span>
-        <span><span className="or-swatch or-swatch-cut" /> cut edge</span>
-        <span><span className="or-swatch or-swatch-paste" /> paste edge</span>
-        <span><span className="or-swatch or-swatch-gap" /> insertion gap</span>
-        <span><span className="or-swatch or-swatch-tick" /> improving gap (scan)</span>
+        <span>
+          <span className="or-swatch or-swatch-normal" /> tour edge
+        </span>
+        <span>
+          <span className="or-swatch or-swatch-seg" /> segment (relocating)
+        </span>
+        <span>
+          <span className="or-swatch or-swatch-cut" /> cut edge
+        </span>
+        <span>
+          <span className="or-swatch or-swatch-paste" /> paste edge
+        </span>
+        <span>
+          <span className="or-swatch or-swatch-gap" /> insertion gap
+        </span>
+        <span>
+          <span className="or-swatch or-swatch-tick" /> improving gap (scan)
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -297,7 +384,12 @@ export default function OrOptExplainer() {
         </div>
         <div>
           <div className="or-statlabel">last Δ</div>
-          <div className="or-mono" style={{ color: lastMove && lastMove.delta < 0 ? '#16a34a' : 'inherit' }}>
+          <div
+            className="or-mono"
+            style={{
+              color: lastMove && lastMove.delta < 0 ? '#16a34a' : 'inherit',
+            }}
+          >
             {lastMove ? lastMove.delta.toFixed(0) : '—'}
           </div>
         </div>
@@ -312,9 +404,12 @@ export default function OrOptExplainer() {
           <label className="or-label">Speed</label>
           <div className="or-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l}
+              <button
+                key={l}
                 className={`or-speed-btn ${i === speedIdx ? 'or-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
                 {l}
               </button>
             ))}
@@ -323,24 +418,47 @@ export default function OrOptExplainer() {
       </div>
 
       <div className="or-controls">
-        <button className="or-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>
+        <button
+          className="or-btn"
+          onClick={stepBack}
+          disabled={running || historyRef.current.length === 0}
+        >
           ⏴ Back
         </button>
-        <button className="or-btn" onClick={stepForward} disabled={running || phase === 'local_optimum'}>
+        <button
+          className="or-btn"
+          onClick={stepForward}
+          disabled={running || phase === 'local_optimum'}
+        >
           ⏵ Step
         </button>
-        <button className="or-btn" onClick={() => setRunning(!running)} disabled={phase === 'local_optimum'}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="or-btn"
+          onClick={() => setRunning(!running)}
+          disabled={phase === 'local_optimum'}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
         </button>
-        <button className="or-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
+        <button
+          className="or-btn"
+          onClick={() => reinit(scenarioRef.current)}
+          disabled={running}
+        >
+          ↺ Reset
+        </button>
       </div>
 
       <div className="or-scenarios">
         <div className="or-section-label">Scenarios</div>
         <div className="or-scenario-row">
           {Object.entries(SCENARIOS).map(([key, s]) => (
-            <button key={key} className="or-scenario-btn" title={s.desc}
-              onClick={() => reinit(s)} disabled={running}>
+            <button
+              key={key}
+              className="or-scenario-btn"
+              title={s.desc}
+              onClick={() => reinit(s)}
+              disabled={running}
+            >
               {s.label}
             </button>
           ))}
@@ -349,7 +467,9 @@ export default function OrOptExplainer() {
 
       <footer className="or-footer">
         <span className="or-mono">cities: {N_CITIES}</span>
-        <span className="or-mono">Or-1/2/3 relocation · best-improvement · runs to local optimum</span>
+        <span className="or-mono">
+          Or-1/2/3 relocation · best-improvement · runs to local optimum
+        </span>
       </footer>
     </div>
   )

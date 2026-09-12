@@ -31,7 +31,14 @@ export interface Instance {
 
 export type Phase = 'mst' | 'odd' | 'matching' | 'euler' | 'shortcut' | 'done'
 
-export const PHASES: Phase[] = ['mst', 'odd', 'matching', 'euler', 'shortcut', 'done']
+export const PHASES: Phase[] = [
+  'mst',
+  'odd',
+  'matching',
+  'euler',
+  'shortcut',
+  'done',
+]
 
 export interface SimState {
   phase: Phase
@@ -50,22 +57,25 @@ export interface SimState {
   tourCost: number
   opt: number
   ratio: number
-  nnCost: number       // greedy nearest-neighbor tour (comparison)
-  approx2Cost: number  // doubled-MST tour (comparison)
+  nnCost: number // greedy nearest-neighbor tour (comparison)
+  approx2Cost: number // doubled-MST tour (comparison)
   // progressive state
-  mstRevealed: number      // MST edges revealed so far
+  mstRevealed: number // MST edges revealed so far
   matchingRevealed: number // matching pairs revealed so far
-  walkerPos: number        // index into eulerCircuit (euler phase)
-  shortcutStep: number     // index into eulerCircuit (shortcut phase)
-  kept: number[]           // shortcut: fresh cities so far (in walk order)
-  skipped: number[]        // shortcut: circuit positions that were repeats
+  walkerPos: number // index into eulerCircuit (euler phase)
+  shortcutStep: number // index into eulerCircuit (shortcut phase)
+  kept: number[] // shortcut: fresh cities so far (in walk order)
+  skipped: number[] // shortcut: circuit positions that were repeats
   step: number
 }
 
 // ---------------------------------------------------------------
 // Step 1 — Prim's MST (port of prim_mst)
 // ---------------------------------------------------------------
-export function primMst(n: number, dist: (i: number, j: number) => number): [number, number][] {
+export function primMst(
+  n: number,
+  dist: (i: number, j: number) => number,
+): [number, number][] {
   const inMst = new Array<boolean>(n).fill(false)
   const key = new Array<number>(n).fill(Infinity)
   const parent = new Array<number>(n).fill(-1)
@@ -101,7 +111,10 @@ export function primMst(n: number, dist: (i: number, j: number) => number): [num
 // ---------------------------------------------------------------
 // Step 2 — odd-degree vertices (port of odd_degree_nodes)
 // ---------------------------------------------------------------
-export function oddDegreeNodes(mstEdges: [number, number][], n: number): number[] {
+export function oddDegreeNodes(
+  mstEdges: [number, number][],
+  n: number,
+): number[] {
   const degree = new Array<number>(n).fill(0)
   for (const [u, v] of mstEdges) {
     degree[u]++
@@ -223,7 +236,10 @@ export function christofidesPipeline(
 // ---------------------------------------------------------------
 // Comparisons — the 2× cousin (doubled MST) and greedy NN
 // ---------------------------------------------------------------
-export function doubledMstTourCost(n: number, dist: (i: number, j: number) => number): number {
+export function doubledMstTourCost(
+  n: number,
+  dist: (i: number, j: number) => number,
+): number {
   const mstEdges = primMst(n, dist)
   // double every MST edge → all degrees even → Eulerian
   const adj: number[][] = Array.from({ length: n }, () => [])
@@ -236,7 +252,10 @@ export function doubledMstTourCost(n: number, dist: (i: number, j: number) => nu
   return closedTourCost(tour, dist)
 }
 
-export function nearestNeighborTourCost(n: number, dist: (i: number, j: number) => number): number {
+export function nearestNeighborTourCost(
+  n: number,
+  dist: (i: number, j: number) => number,
+): number {
   const visited = new Array<boolean>(n).fill(false)
   const tour: number[] = []
   let cur = 0
@@ -261,7 +280,10 @@ export function nearestNeighborTourCost(n: number, dist: (i: number, j: number) 
   return closedTourCost(tour, dist)
 }
 
-export function closedTourCost(tour: number[], dist: (i: number, j: number) => number): number {
+export function closedTourCost(
+  tour: number[],
+  dist: (i: number, j: number) => number,
+): number {
   let d = 0
   for (let k = 0; k < tour.length; k++) {
     d += dist(tour[k], tour[(k + 1) % tour.length])
@@ -272,7 +294,10 @@ export function closedTourCost(tour: number[], dist: (i: number, j: number) => n
 // ---------------------------------------------------------------
 // Exact optimum (brute force over (n-1)! permutations, start fixed at 0)
 // ---------------------------------------------------------------
-export function bruteForceOpt(n: number, dist: (i: number, j: number) => number): number {
+export function bruteForceOpt(
+  n: number,
+  dist: (i: number, j: number) => number,
+): number {
   let best = Infinity
   const rest = Array.from({ length: n - 1 }, (_, i) => i + 1)
   const used = new Array<boolean>(rest.length).fill(false)
@@ -309,33 +334,64 @@ export const SCENARIOS: Record<string, Instance> = {
     label: 'Near-optimal',
     desc: 'Cities on a circle — Christofides finds the exact optimum (1.00×)',
     cities: [
-      [280, 150], [255, 226], [190, 274], [110, 274], [45, 226],
-      [20, 150], [45, 74], [110, 26], [190, 26], [255, 74],
+      [280, 150],
+      [255, 226],
+      [190, 274],
+      [110, 274],
+      [45, 226],
+      [20, 150],
+      [45, 74],
+      [110, 26],
+      [190, 26],
+      [255, 74],
     ],
   },
   matching_heavy: {
     label: 'Matching-heavy',
     desc: 'Two tight clusters joined by a bridge — the odd-vertex matching is half the tour cost',
     cities: [
-      [57, 69], [77, 80], [65, 93], [93, 71], [79, 80],
-      [247, 244], [230, 240], [238, 244], [224, 215], [246, 211],
+      [57, 69],
+      [77, 80],
+      [65, 93],
+      [93, 71],
+      [79, 80],
+      [247, 244],
+      [230, 240],
+      [238, 244],
+      [224, 215],
+      [246, 211],
     ],
   },
   clustered: {
     label: 'Clustered',
     desc: 'Three clusters — the matching edges bridge between them (the doubled-MST cousin loses here)',
     cities: [
-      [69, 65], [90, 62], [84, 60],
-      [202, 79], [216, 79], [196, 101],
-      [149, 215], [152, 239], [159, 220], [139, 215],
+      [69, 65],
+      [90, 62],
+      [84, 60],
+      [202, 79],
+      [216, 79],
+      [196, 101],
+      [149, 215],
+      [152, 239],
+      [159, 220],
+      [139, 215],
     ],
   },
   worst_case: {
     label: 'Worst case',
     desc: 'A layout where the ratio stretches to 1.39× — the 1.5× bound is real, not hand-wavy',
     cities: [
-      [155, 192], [60, 131], [170, 148], [187, 60], [148, 139],
-      [105, 224], [108, 20], [52, 220], [148, 262], [165, 174],
+      [155, 192],
+      [60, 131],
+      [170, 148],
+      [187, 60],
+      [148, 139],
+      [105, 224],
+      [108, 20],
+      [52, 220],
+      [148, 262],
+      [165, 174],
     ],
   },
 }
@@ -344,7 +400,8 @@ export function makeInitState(instance: Instance): SimState {
   const cities = instance.cities
   const n = cities.length
   const dist = makeDist(cities)
-  const { mstEdges, odd, matchingEdges, eulerCircuit, shortcutTour } = christofidesPipeline(n, dist)
+  const { mstEdges, odd, matchingEdges, eulerCircuit, shortcutTour } =
+    christofidesPipeline(n, dist)
 
   const mstCost = mstEdges.reduce((s, [u, v]) => s + dist(u, v), 0)
   const matchingCost = matchingEdges.reduce((s, [u, v]) => s + dist(u, v), 0)
@@ -388,7 +445,11 @@ export function stepOnce(state: SimState): SimState {
   // --- MST phase: reveal one Prim edge per step ---
   if (state.phase === 'mst') {
     if (state.mstRevealed < state.mstEdges.length) {
-      return { ...state, mstRevealed: state.mstRevealed + 1, step: state.step + 1 }
+      return {
+        ...state,
+        mstRevealed: state.mstRevealed + 1,
+        step: state.step + 1,
+      }
     }
     return { ...state, phase: 'odd', step: state.step + 1 }
   }
@@ -401,7 +462,11 @@ export function stepOnce(state: SimState): SimState {
   // --- Matching phase: reveal one pair per step ---
   if (state.phase === 'matching') {
     if (state.matchingRevealed < state.matchingEdges.length) {
-      return { ...state, matchingRevealed: state.matchingRevealed + 1, step: state.step + 1 }
+      return {
+        ...state,
+        matchingRevealed: state.matchingRevealed + 1,
+        step: state.step + 1,
+      }
     }
     return { ...state, phase: 'euler', step: state.step + 1 }
   }

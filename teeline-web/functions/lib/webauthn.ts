@@ -20,13 +20,17 @@ export const CHALLENGE_TTL_MS = 5 * 60 * 1000
 
 export function rpIdFor(hostname: string): string {
   const h = hostname.toLowerCase()
-  if (h === 'tspsolver.com' || h.endsWith('.tspsolver.com')) return 'tspsolver.com'
+  if (h === 'tspsolver.com' || h.endsWith('.tspsolver.com'))
+    return 'tspsolver.com'
   return h
 }
 
 export function isAllowedOrigin(origin: string, env: Env): boolean {
   if (origin === 'https://tspsolver.com') return true
-  const extra = env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
+  const extra =
+    env.ALLOWED_ORIGINS?.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean) ?? []
   // Local dev origins (http://localhost / 127.0.0.1) are allowed only when
   // explicitly listed in ALLOWED_ORIGINS (e.g. via .dev.vars) — no blanket
   // allowance, so a misconfigured shared/staging environment can't inherit it.

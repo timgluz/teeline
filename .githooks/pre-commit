@@ -77,6 +77,20 @@ if [ -n "$TS_FILES" ]; then
     fi
 fi
 
+# ── Prettier (teeline-web) ────────────────────────────────────────────────────
+PF_FILES=$(echo "$STAGED" | grep -E '^teeline-web/.*\.(ts|tsx|js|mjs|cjs|json|css)$' || true)
+if [ -n "$PF_FILES" ]; then
+    if [ ! -d "teeline-web/node_modules" ]; then
+        skip_notice "teeline-web/node_modules (run: cd teeline-web && npm install)"
+    else
+        echo "[CHECK] prettier (teeline-web)"
+        PF_REL=$(echo "$PF_FILES" | sed 's|^teeline-web/||')
+        if ! (cd teeline-web && npx prettier --check $PF_REL) 2>&1; then
+            fail_notice "prettier: formatting issues in teeline-web" "cd teeline-web && npx prettier --write <files>"
+        fi
+    fi
+fi
+
 # ── TOML ──────────────────────────────────────────────────────────────────────
 TOML_FILES=$(echo "$STAGED" | grep -E '\.toml$' || true)
 if [ -n "$TOML_FILES" ]; then

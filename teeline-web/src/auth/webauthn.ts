@@ -16,12 +16,18 @@ export interface User {
 }
 
 /** Map common WebAuthn failures to user-friendly messages. */
-async function withCancellation<T>(fn: () => Promise<T>, cancelledMessage: string): Promise<T> {
+async function withCancellation<T>(
+  fn: () => Promise<T>,
+  cancelledMessage: string,
+): Promise<T> {
   try {
     return await fn()
   } catch (err) {
     // User dismissed the prompt or timed out — treat as a graceful cancel.
-    if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) {
+    if (
+      err instanceof DOMException &&
+      (err.name === 'NotAllowedError' || err.name === 'AbortError')
+    ) {
       throw new Error(cancelledMessage)
     }
     throw new Error('Passkey operation failed — please try again')
@@ -43,10 +49,13 @@ export async function registerPasskey(displayName?: string): Promise<User> {
     'Passkey creation was cancelled',
   )
 
-  const { user } = await apiFetch<{ user: User }>('/api/auth/register/complete', {
-    method: 'POST',
-    body: JSON.stringify({ nonce, credential: response }),
-  })
+  const { user } = await apiFetch<{ user: User }>(
+    '/api/auth/register/complete',
+    {
+      method: 'POST',
+      body: JSON.stringify({ nonce, credential: response }),
+    },
+  )
   return user
 }
 

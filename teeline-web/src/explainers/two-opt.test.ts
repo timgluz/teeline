@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, SCENARIOS,
-  dist, tourLength, makeInitState, stepOnce,
-  scanOnePass, applySwap,
+  N_CITIES,
+  SCENARIOS,
+  dist,
+  tourLength,
+  makeInitState,
+  stepOnce,
+  scanOnePass,
+  applySwap,
 } from './two-opt-algo'
 
 describe('dist', () => {
@@ -121,12 +126,12 @@ describe('stepOnce', () => {
     expect(s1.lastSwap).not.toBeNull()
     expect(s1.lastSwap!.delta).toBeLessThan(0)
     expect(s1.tour).toEqual(s.tour) // tour unchanged
-    expect(s1.totalSwaps).toBe(0)   // not applied yet
+    expect(s1.totalSwaps).toBe(0) // not applied yet
   })
 
   it('second click applies the candidate swap', () => {
     const s = makeInitState(SCENARIOS.bad_shuffle.tour)
-    const s1 = stepOnce(s)  // candidate
+    const s1 = stepOnce(s) // candidate
     const s2 = stepOnce(s1) // apply
     expect(s2.phase).toBe('swap_found')
     expect(s2.totalSwaps).toBe(1)
@@ -157,7 +162,7 @@ describe('stepOnce', () => {
 
   it('produces valid swap event fields when applied', () => {
     const s = makeInitState(SCENARIOS.bad_shuffle.tour)
-    const s1 = stepOnce(s)  // candidate
+    const s1 = stepOnce(s) // candidate
     const s2 = stepOnce(s1) // apply
     expect(s2.lastSwap).not.toBeNull()
     expect(s2.lastSwap!.i).toBeGreaterThanOrEqual(0)

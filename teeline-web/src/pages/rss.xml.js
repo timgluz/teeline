@@ -4,10 +4,14 @@ import { getCollection } from 'astro:content'
 export async function GET(context) {
   // Standard Astro draft handling: `astro dev` shows drafts (for preview),
   // production builds (`astro build`/preview) exclude them.
-  const posts = await getCollection('blog', ({ data }) => !data.draft || !import.meta.env.PROD)
+  const posts = await getCollection(
+    'blog',
+    ({ data }) => !data.draft || !import.meta.env.PROD,
+  )
   return rss({
     title: 'Teeline Blog',
-    description: 'Notes on TSP algorithms, teeline development, and the occasional deep dive.',
+    description:
+      'Notes on TSP algorithms, teeline development, and the occasional deep dive.',
     site: context.site,
     items: posts
       .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())

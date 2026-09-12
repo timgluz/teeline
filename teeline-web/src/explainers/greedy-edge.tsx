@@ -1,15 +1,28 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES, components, makeInitState, stepOnce,
-} from "./greedy-edge-algo"
-import type { Edge, EventMode, RejectReason } from "./greedy-edge-algo"
+  CITIES,
+  N_CITIES,
+  components,
+  makeInitState,
+  stepOnce,
+} from './greedy-edge-algo'
+import type { Edge, EventMode, RejectReason } from './greedy-edge-algo'
 
 // One stable colour per component root, so merges are visible as two groups
 // collapsing into one colour. Sized for N_CITIES components (the start state).
 const COMP_PALETTE = [
-  "#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c",
-  "#16a34a", "#0891b2", "#ca8a04", "#dc2626", "#4f46e5",
-  "#0f766e", "#9333ea",
+  '#0d9488',
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+  '#ea580c',
+  '#16a34a',
+  '#0891b2',
+  '#ca8a04',
+  '#dc2626',
+  '#4f46e5',
+  '#0f766e',
+  '#9333ea',
 ]
 function compColor(rootIndex: number): string {
   return COMP_PALETTE[rootIndex % COMP_PALETTE.length]
@@ -32,12 +45,20 @@ interface ScanCanvasProps {
   parent: number[]
   tour: number[] | null
 }
-function ScanCanvas({ accepted, lastEdge, lastEvent, rejectedTrail, degree, parent, tour }: ScanCanvasProps) {
+function ScanCanvas({
+  accepted,
+  lastEdge,
+  lastEvent,
+  rejectedTrail,
+  degree,
+  parent,
+  tour,
+}: ScanCanvasProps) {
   const comps = useMemo(() => components(parent), [parent])
   // root lookup: city -> index into comps (its component slot)
   const rootOf = useMemo(() => {
     const m = new Map<number, number>()
-    comps.forEach((group, gi) => group.forEach(c => m.set(c, gi)))
+    comps.forEach((group, gi) => group.forEach((c) => m.set(c, gi)))
     return m
   }, [comps])
 
@@ -45,11 +66,17 @@ function ScanCanvas({ accepted, lastEdge, lastEvent, rejectedTrail, degree, pare
 
   // tour as a closed polyline (only once done)
   const tourPts = tour
-    ? tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ") + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
-    : ""
+    ? tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ') +
+      ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
+    : ''
 
   return (
-    <svg viewBox="0 0 300 300" className="gec-canvas" role="img" aria-label="Greedy edge scan">
+    <svg
+      viewBox="0 0 300 300"
+      className="gec-canvas"
+      role="img"
+      aria-label="Greedy edge scan"
+    >
       <rect x={0} y={0} width={300} height={300} className="gec-bg" />
 
       {/* final closed tour underlay once complete */}
@@ -57,32 +84,47 @@ function ScanCanvas({ accepted, lastEdge, lastEvent, rejectedTrail, degree, pare
 
       {/* accepted edges */}
       {accepted.map((e, i) => (
-        <line key={"a" + i}
-          x1={CITIES[e.u][0]} y1={CITIES[e.u][1]}
-          x2={CITIES[e.v][0]} y2={CITIES[e.v][1]}
+        <line
+          key={'a' + i}
+          x1={CITIES[e.u][0]}
+          y1={CITIES[e.u][1]}
+          x2={CITIES[e.v][0]}
+          y2={CITIES[e.v][1]}
           className="gec-accepted"
         />
       ))}
 
       {/* faint trail of recent rejects (last few), so the scan is legible */}
       {rejectedTrail.map((r, i) => (
-        <line key={"r" + i}
-          x1={CITIES[r.edge.u][0]} y1={CITIES[r.edge.u][1]}
-          x2={CITIES[r.edge.v][0]} y2={CITIES[r.edge.v][1]}
-          className={r.reason === "degree" ? "gec-rejected gec-rejected-degree" : "gec-rejected gec-rejected-cycle"}
+        <line
+          key={'r' + i}
+          x1={CITIES[r.edge.u][0]}
+          y1={CITIES[r.edge.u][1]}
+          x2={CITIES[r.edge.v][0]}
+          y2={CITIES[r.edge.v][1]}
+          className={
+            r.reason === 'degree'
+              ? 'gec-rejected gec-rejected-degree'
+              : 'gec-rejected gec-rejected-cycle'
+          }
         />
       ))}
 
       {/* the candidate edge currently under evaluation (bold) */}
       {lastEdge && !acceptedSet.has(edgeKey(lastEdge)) && !tour && (
         <line
-          x1={CITIES[lastEdge.u][0]} y1={CITIES[lastEdge.u][1]}
-          x2={CITIES[lastEdge.v][0]} y2={CITIES[lastEdge.v][1]}
+          x1={CITIES[lastEdge.u][0]}
+          y1={CITIES[lastEdge.u][1]}
+          x2={CITIES[lastEdge.v][0]}
+          y2={CITIES[lastEdge.v][1]}
           className={
-            lastEvent === "rejected-degree" ? "gec-cand gec-cand-degree"
-            : lastEvent === "rejected-cycle" ? "gec-cand gec-cand-cycle"
-            : lastEvent === "closing" ? "gec-cand gec-cand-closing"
-            : "gec-cand gec-cand-accept"
+            lastEvent === 'rejected-degree'
+              ? 'gec-cand gec-cand-degree'
+              : lastEvent === 'rejected-cycle'
+                ? 'gec-cand gec-cand-cycle'
+                : lastEvent === 'closing'
+                  ? 'gec-cand gec-cand-closing'
+                  : 'gec-cand gec-cand-accept'
           }
         />
       )}
@@ -93,13 +135,24 @@ function ScanCanvas({ accepted, lastEdge, lastEvent, rejectedTrail, degree, pare
         const full = degree[i] >= 2
         return (
           <g key={i}>
-            <circle cx={x} cy={y} r={5.5}
+            <circle
+              cx={x}
+              cy={y}
+              r={5.5}
               fill={compColor(gi)}
-              className={full ? "gec-city gec-city-full" : "gec-city"}
+              className={full ? 'gec-city gec-city-full' : 'gec-city'}
             />
-            <text x={x + 7} y={y - 6} className="gec-city-label">{i}</text>
-            <text x={x} y={y + 18} className="gec-degree-badge"
-              style={{ opacity: degree[i] > 0 ? 1 : 0.25 }}>{degree[i]}</text>
+            <text x={x + 7} y={y - 6} className="gec-city-label">
+              {i}
+            </text>
+            <text
+              x={x}
+              y={y + 18}
+              className="gec-degree-badge"
+              style={{ opacity: degree[i] > 0 ? 1 : 0.25 }}
+            >
+              {degree[i]}
+            </text>
           </g>
         )
       })}
@@ -115,10 +168,16 @@ function ComponentPanel({ parent }: { parent: number[] }) {
   return (
     <div className="gec-list-panel">
       <div className="gec-list-title">Union-Find</div>
-      <div className="gec-list-subtitle">{comps.length} component{comps.length === 1 ? "" : "s"}</div>
+      <div className="gec-list-subtitle">
+        {comps.length} component{comps.length === 1 ? '' : 's'}
+      </div>
       {comps.map((g, i) => (
-        <div key={i} className="gec-comp-badge" style={{ borderLeftColor: compColor(i) }}>
-          {"{" + g.join(",") + "}"}
+        <div
+          key={i}
+          className="gec-comp-badge"
+          style={{ borderLeftColor: compColor(i) }}
+        >
+          {'{' + g.join(',') + '}'}
         </div>
       ))}
     </div>
@@ -133,9 +192,15 @@ export default function GreedyEdgeExplainer() {
 
   const simRef = useRef(makeInitState())
   const [accepted, setAccepted] = useState<Edge[]>(() => [])
-  const [rejected, setRejected] = useState<Array<{ edge: Edge; reason: RejectReason }>>(() => [])
-  const [degree, setDegree] = useState<number[]>(() => new Array(N_CITIES).fill(0))
-  const [parent, setParent] = useState<number[]>(() => simRef.current.parent.slice())
+  const [rejected, setRejected] = useState<
+    Array<{ edge: Edge; reason: RejectReason }>
+  >(() => [])
+  const [degree, setDegree] = useState<number[]>(() =>
+    new Array(N_CITIES).fill(0),
+  )
+  const [parent, setParent] = useState<number[]>(() =>
+    simRef.current.parent.slice(),
+  )
   const [lastEdge, setLastEdge] = useState<Edge | null>(null)
   const [lastEvent, setLastEvent] = useState<EventMode | null>(null)
   const [step, setStep] = useState(0)
@@ -145,9 +210,16 @@ export default function GreedyEdgeExplainer() {
 
   const reinit = useCallback(() => {
     simRef.current = makeInitState()
-    setAccepted([]); setRejected([]); setDegree(new Array(N_CITIES).fill(0))
-    setParent(simRef.current.parent.slice()); setLastEdge(null); setLastEvent(null)
-    setStep(0); setDone(false); setTour(null); setRunning(false)
+    setAccepted([])
+    setRejected([])
+    setDegree(new Array(N_CITIES).fill(0))
+    setParent(simRef.current.parent.slice())
+    setLastEdge(null)
+    setLastEvent(null)
+    setStep(0)
+    setDone(false)
+    setTour(null)
+    setRunning(false)
   }, [])
 
   const step_fn = useCallback(() => {
@@ -158,8 +230,11 @@ export default function GreedyEdgeExplainer() {
     setRejected(next.rejected.slice(-6))
     setDegree(next.degree.slice())
     setParent(next.parent.slice())
-    setLastEdge(next.lastEdge); setLastEvent(next.lastEvent)
-    setStep(next.step); setDone(next.done); setTour(next.tour)
+    setLastEdge(next.lastEdge)
+    setLastEvent(next.lastEvent)
+    setStep(next.step)
+    setDone(next.done)
+    setTour(next.tour)
     if (next.done) setRunning(false)
   }, [])
 
@@ -175,20 +250,20 @@ export default function GreedyEdgeExplainer() {
     [accepted],
   )
 
-  let chipText = "Press Step or Run to scan the shortest edges first"
-  let chipClass = "gec-chip gec-chip-idle"
-  if (lastEvent === "accepted" && lastEdge) {
+  let chipText = 'Press Step or Run to scan the shortest edges first'
+  let chipClass = 'gec-chip gec-chip-idle'
+  if (lastEvent === 'accepted' && lastEdge) {
     chipText = `✅ accepted  (${lastEdge.u}, ${lastEdge.v})  — degree/union updated`
-    chipClass = "gec-chip gec-chip-accept"
-  } else if (lastEvent === "rejected-degree" && lastEdge) {
+    chipClass = 'gec-chip gec-chip-accept'
+  } else if (lastEvent === 'rejected-degree' && lastEdge) {
     chipText = `✗ rejected  (${lastEdge.u}, ${lastEdge.v})  — would give a city degree 3`
-    chipClass = "gec-chip gec-chip-degree"
-  } else if (lastEvent === "rejected-cycle" && lastEdge) {
+    chipClass = 'gec-chip gec-chip-degree'
+  } else if (lastEvent === 'rejected-cycle' && lastEdge) {
     chipText = `✗ rejected  (${lastEdge.u}, ${lastEdge.v})  — premature sub-cycle`
-    chipClass = "gec-chip gec-chip-cycle"
-  } else if (lastEvent === "closing" && lastEdge) {
+    chipClass = 'gec-chip gec-chip-cycle'
+  } else if (lastEvent === 'closing' && lastEdge) {
     chipText = `🔒 closing edge  (${lastEdge.u}, ${lastEdge.v})  — the path becomes a cycle`
-    chipClass = "gec-chip gec-chip-closing"
+    chipClass = 'gec-chip gec-chip-closing'
   }
 
   const totalEdges = (N_CITIES * (N_CITIES - 1)) / 2
@@ -202,28 +277,47 @@ export default function GreedyEdgeExplainer() {
         <div className="gec-eyebrow">teeline · algorithms/greedy-edge</div>
         <h2 className="gec-title">Greedy Edge Construction</h2>
         <p className="gec-sub">
-          Every pairwise edge is scanned shortest-first and accepted unless it would give a city
-          <strong> degree 3+</strong> or close a <strong>premature sub-cycle</strong> (tracked by a
-          union-find). Watch the components merge until one Hamiltonian cycle remains.
+          Every pairwise edge is scanned shortest-first and accepted unless it
+          would give a city
+          <strong> degree 3+</strong> or close a{' '}
+          <strong>premature sub-cycle</strong> (tracked by a union-find). Watch
+          the components merge until one Hamiltonian cycle remains.
         </p>
       </header>
 
       <div className="gec-viz-row">
         <div className="gec-canvas-wrap">
           <ScanCanvas
-            accepted={accepted} lastEdge={lastEdge} lastEvent={lastEvent}
-            rejectedTrail={rejected} degree={degree} parent={parent} tour={tour}
+            accepted={accepted}
+            lastEdge={lastEdge}
+            lastEvent={lastEvent}
+            rejectedTrail={rejected}
+            degree={degree}
+            parent={parent}
+            tour={tour}
           />
         </div>
         <ComponentPanel parent={parent} />
       </div>
 
       <div className="gec-legend">
-        <span><span className="gec-swatch gec-swatch-accepted" /> accepted edge</span>
-        <span><span className="gec-swatch gec-swatch-degree" /> rejected — degree</span>
-        <span><span className="gec-swatch gec-swatch-cycle" /> rejected — cycle</span>
-        <span><span className="gec-swatch gec-swatch-closing" /> closing edge</span>
-        {done && <span><span className="gec-swatch gec-swatch-tour" /> final tour</span>}
+        <span>
+          <span className="gec-swatch gec-swatch-accepted" /> accepted edge
+        </span>
+        <span>
+          <span className="gec-swatch gec-swatch-degree" /> rejected — degree
+        </span>
+        <span>
+          <span className="gec-swatch gec-swatch-cycle" /> rejected — cycle
+        </span>
+        <span>
+          <span className="gec-swatch gec-swatch-closing" /> closing edge
+        </span>
+        {done && (
+          <span>
+            <span className="gec-swatch gec-swatch-tour" /> final tour
+          </span>
+        )}
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -231,15 +325,21 @@ export default function GreedyEdgeExplainer() {
       <div className="gec-statgrid">
         <div>
           <div className="gec-statlabel">edges scanned</div>
-          <div className="gec-mono">{accepted.length + rejected.length}/{totalEdges}</div>
+          <div className="gec-mono">
+            {accepted.length + rejected.length}/{totalEdges}
+          </div>
         </div>
         <div>
           <div className="gec-statlabel">accepted</div>
-          <div className="gec-mono">{accepted.length}/{N_CITIES}</div>
+          <div className="gec-mono">
+            {accepted.length}/{N_CITIES}
+          </div>
         </div>
         <div>
           <div className="gec-statlabel">rejected</div>
-          <div className="gec-mono">{step > 0 ? simRef.current.rejected.length : 0}</div>
+          <div className="gec-mono">
+            {step > 0 ? simRef.current.rejected.length : 0}
+          </div>
         </div>
         <div>
           <div className="gec-statlabel">components</div>
@@ -258,21 +358,41 @@ export default function GreedyEdgeExplainer() {
       <div className="gec-config">
         <div className="gec-config-row">
           <label className="gec-config-label">Speed</label>
-          <input type="range" min={1} max={10} step={1} value={speed}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
             className="gec-slider"
-            onInput={e => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
-          <div className="gec-hint">Edges are parameter-free — no other knobs to tune.</div>
+          <div className="gec-hint">
+            Edges are parameter-free — no other knobs to tune.
+          </div>
         </div>
       </div>
 
       <div className="gec-controls">
-        <button className="gec-btn" onClick={step_fn} disabled={running || done}>◀ Step</button>
-        <button className={`gec-btn ${!running ? "gec-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)} disabled={done}>
-          {running ? "⏸ Pause" : done ? "✓ Done" : "▶ Run"}
+        <button
+          className="gec-btn"
+          onClick={step_fn}
+          disabled={running || done}
+        >
+          ◀ Step
         </button>
-        <button className="gec-btn" onClick={reinit}>↺ Reset</button>
+        <button
+          className={`gec-btn ${!running ? 'gec-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
+          disabled={done}
+        >
+          {running ? '⏸ Pause' : done ? '✓ Done' : '▶ Run'}
+        </button>
+        <button className="gec-btn" onClick={reinit}>
+          ↺ Reset
+        </button>
       </div>
 
       <footer className="gec-footer">

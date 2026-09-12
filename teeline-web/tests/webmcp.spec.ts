@@ -28,12 +28,16 @@ async function invokeWebMCPTool(
 
       // Fill fields by name
       for (const [name, value] of Object.entries(fields)) {
-        const el = form.elements.namedItem(name) as HTMLInputElement | HTMLTextAreaElement | null
+        const el = form.elements.namedItem(name) as
+          HTMLInputElement | HTMLTextAreaElement | null
         if (el) el.value = value
       }
 
       return new Promise((resolve, reject) => {
-        const event = new Event('submit', { bubbles: true, cancelable: true }) as SubmitEvent & {
+        const event = new Event('submit', {
+          bubbles: true,
+          cancelable: true,
+        }) as SubmitEvent & {
           agentInvoked: boolean
           respondWith(p: Promise<unknown>): void
         }
@@ -49,12 +53,14 @@ async function invokeWebMCPTool(
 }
 
 // DOM test — forms are in the static HTML; no WASM init needed
-test('4 WebMCP forms are present in the DOM with toolname attributes', async ({ page }) => {
+test('4 WebMCP forms are present in the DOM with toolname attributes', async ({
+  page,
+}) => {
   await page.goto('/')
   const forms = await page.locator('form[toolname]').all()
   expect(forms).toHaveLength(4)
 
-  const names = await Promise.all(forms.map(f => f.getAttribute('toolname')))
+  const names = await Promise.all(forms.map((f) => f.getAttribute('toolname')))
   expect(names).toContain('solveTSP')
   expect(names).toContain('listAlgorithms')
   expect(names).toContain('parseProblem')
@@ -68,17 +74,26 @@ test.describe('WebMCP tool invocation', () => {
     await page.waitForSelector('.status-dot--ready', { timeout: 20_000 })
   })
 
-  test('listAlgorithms returns an array of algorithm objects', async ({ page }) => {
-    const result = await invokeWebMCPTool(page, 'webmcp-list-algorithms') as Array<{ id: string; name: string }>
+  test('listAlgorithms returns an array of algorithm objects', async ({
+    page,
+  }) => {
+    const result = (await invokeWebMCPTool(
+      page,
+      'webmcp-list-algorithms',
+    )) as Array<{ id: string; name: string }>
     expect(Array.isArray(result)).toBe(true)
     expect(result.length).toBeGreaterThan(0)
-    const ids = result.map(a => a.id)
+    const ids = result.map((a) => a.id)
     expect(ids).toContain('nn')
     expect(ids).toContain('lk')
   })
 
-  test('parseProblem returns city list for valid TSPLIB input', async ({ page }) => {
-    const result = await invokeWebMCPTool(page, 'webmcp-parse', { problem: SMALL_TSP }) as {
+  test('parseProblem returns city list for valid TSPLIB input', async ({
+    page,
+  }) => {
+    const result = (await invokeWebMCPTool(page, 'webmcp-parse', {
+      problem: SMALL_TSP,
+    })) as {
       name: string
       cities: Array<{ id: number; x: number; y: number }>
     }
@@ -88,27 +103,29 @@ test.describe('WebMCP tool invocation', () => {
   })
 
   test('solveTSP returns tour and cost for valid input', async ({ page }) => {
-    const result = await invokeWebMCPTool(page, 'webmcp-solve', {
+    const result = (await invokeWebMCPTool(page, 'webmcp-solve', {
       problem: SMALL_TSP,
       algorithm: 'nn',
-    }) as { total: number; route: number[] }
+    })) as { total: number; route: number[] }
     expect(typeof result.total).toBe('number')
     expect(result.total).toBeGreaterThan(0)
     expect(result.route).toHaveLength(4)
   })
 
-  test('compareTours returns gap stats for matching city sets', async ({ page }) => {
+  test('compareTours returns gap stats for matching city sets', async ({
+    page,
+  }) => {
     const cities = [
       { id: 1, x: 0, y: 0 },
       { id: 2, x: 1, y: 0 },
       { id: 3, x: 1, y: 1 },
       { id: 4, x: 0, y: 1 },
     ]
-    const result = await invokeWebMCPTool(page, 'webmcp-compare', {
+    const result = (await invokeWebMCPTool(page, 'webmcp-compare', {
       solver_route: JSON.stringify([1, 2, 3, 4]),
       opt_route: JSON.stringify([1, 2, 3, 4]),
       cities: JSON.stringify(cities),
-    }) as { gapPct: number; sharedEdges: number }
+    })) as { gapPct: number; sharedEdges: number }
     expect(result.gapPct).toBe(0)
     expect(result.sharedEdges).toBe(4)
   })

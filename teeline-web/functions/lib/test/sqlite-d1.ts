@@ -29,7 +29,13 @@ export type D1Like = {
       run(): { meta: { changes: number; last_row_id: number } }
     }
   }
-  batch(stmts: { _isSelect?: boolean; all?<T>(): { results: T[] }; run?(): { meta: { changes: number } } }[]): unknown[]
+  batch(
+    stmts: {
+      _isSelect?: boolean
+      all?<T>(): { results: T[] }
+      run?(): { meta: { changes: number } }
+    }[],
+  ): unknown[]
 }
 
 export function makeD1(db: Database.Database): D1Like {
@@ -55,7 +61,8 @@ export function makeD1(db: Database.Database): D1Like {
           return {
             _isSelect: isSelect,
             first<T>(col?: string): T | null {
-              const row = stmt.get(...params) as Record<string, unknown> | undefined
+              const row = stmt.get(...params) as
+                Record<string, unknown> | undefined
               if (row === undefined) return null
               if (col !== undefined) return (row[col] as T | undefined) ?? null
               return row as T
@@ -65,14 +72,21 @@ export function makeD1(db: Database.Database): D1Like {
             },
             run() {
               const info = stmt.run(...params)
-              return { meta: { changes: info.changes, last_row_id: info.lastInsertRowid as number } }
+              return {
+                meta: {
+                  changes: info.changes,
+                  last_row_id: info.lastInsertRowid as number,
+                },
+              }
             },
           }
         },
       }
     },
     batch(stmts) {
-      return db.transaction(() => stmts.map((s) => (s._isSelect ? s.all() : s.run())))()
+      return db.transaction(() =>
+        stmts.map((s) => (s._isSelect ? s.all() : s.run())),
+      )()
     },
   }
 }

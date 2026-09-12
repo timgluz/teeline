@@ -25,7 +25,9 @@ test.describe('3-opt explainer', () => {
     await waitHydrated(page)
   })
 
-  test('renders the canvas, pattern diagram, stats and controls', async ({ page }) => {
+  test('renders the canvas, pattern diagram, stats and controls', async ({
+    page,
+  }) => {
     await expect(page.locator('.t3-title')).toHaveText('3-opt Local Search')
     await expect(page.locator('.t3-canvas')).toBeVisible()
 
@@ -41,15 +43,28 @@ test.describe('3-opt explainer', () => {
     await expect(stats).toContainText('last Δ')
     await expect(stats).toContainText('step')
 
-    for (const label of ['Single 3-opt', 'Beyond 2-opt', 'Already 3-optimal', 'Deep sweep']) {
+    for (const label of [
+      'Single 3-opt',
+      'Beyond 2-opt',
+      'Already 3-optimal',
+      'Deep sweep',
+    ]) {
       await expect(page.getByRole('button', { name: label })).toBeVisible()
     }
   })
 
-  test('Step shows the candidate with the chosen reconnection pattern highlighted, then applies', async ({ page }) => {
+  test('Step shows the candidate with the chosen reconnection pattern highlighted, then applies', async ({
+    page,
+  }) => {
     const chip = page.locator('.t3-chip')
-    const pass = page.locator('.t3-statgrid').locator('div', { hasText: /^pass/ }).locator('.t3-mono')
-    const swaps = page.locator('.t3-statgrid').locator('div', { hasText: /^swaps/ }).locator('.t3-mono')
+    const pass = page
+      .locator('.t3-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.t3-mono')
+    const swaps = page
+      .locator('.t3-statgrid')
+      .locator('div', { hasText: /^swaps/ })
+      .locator('.t3-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     // single_3opt scenario: the best move is a case-4 segment swap
@@ -68,7 +83,10 @@ test.describe('3-opt explainer', () => {
 
   test('Back restores the previous phase', async ({ page }) => {
     const chip = page.locator('.t3-chip')
-    const stepStat = page.locator('.t3-statgrid').locator('div', { hasText: /^step/ }).locator('.t3-mono')
+    const stepStat = page
+      .locator('.t3-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.t3-mono')
 
     await page.getByRole('button', { name: 'Step' }).click() // candidate
     await page.getByRole('button', { name: 'Step' }).click() // applied
@@ -79,14 +97,24 @@ test.describe('3-opt explainer', () => {
     await expect(stepStat).toHaveText('1')
   })
 
-  test('Run animates the deep sweep to the local optimum; Reset restores idle', async ({ page }) => {
-    const pass = page.locator('.t3-statgrid').locator('div', { hasText: /^pass/ }).locator('.t3-mono')
-    const swaps = page.locator('.t3-statgrid').locator('div', { hasText: /^swaps/ }).locator('.t3-mono')
+  test('Run animates the deep sweep to the local optimum; Reset restores idle', async ({
+    page,
+  }) => {
+    const pass = page
+      .locator('.t3-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.t3-mono')
+    const swaps = page
+      .locator('.t3-statgrid')
+      .locator('div', { hasText: /^swaps/ })
+      .locator('.t3-mono')
 
     await page.getByRole('button', { name: 'Deep sweep' }).click()
     await page.getByRole('button', { name: 'Run' }).click()
     // deep_sweep needs several passes to converge
-    await expect(page.locator('.t3-chip')).toContainText('Local optimum', { timeout: 15_000 })
+    await expect(page.locator('.t3-chip')).toContainText('Local optimum', {
+      timeout: 15_000,
+    })
     await expect(swaps).not.toHaveText('0')
     await expect(pass).not.toHaveText('0')
 
@@ -96,7 +124,10 @@ test.describe('3-opt explainer', () => {
   })
 
   test('Pause stops the animation mid-run', async ({ page }) => {
-    const pass = page.locator('.t3-statgrid').locator('div', { hasText: /^pass/ }).locator('.t3-mono')
+    const pass = page
+      .locator('.t3-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.t3-mono')
 
     await page.getByRole('button', { name: 'Run' }).click()
     await page.getByRole('button', { name: 'Pause' }).click()
@@ -105,7 +136,9 @@ test.describe('3-opt explainer', () => {
     await expect(pass).toHaveText(paused ?? '')
   })
 
-  test('already_3optimal reaches the local optimum in one Step', async ({ page }) => {
+  test('already_3optimal reaches the local optimum in one Step', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: 'Already 3-optimal' }).click()
     await expect(page.locator('.t3-chip')).toContainText('Click Step')
 
@@ -114,7 +147,10 @@ test.describe('3-opt explainer', () => {
   })
 
   test('scenario buttons restart the run', async ({ page }) => {
-    const pass = page.locator('.t3-statgrid').locator('div', { hasText: /^pass/ }).locator('.t3-mono')
+    const pass = page
+      .locator('.t3-statgrid')
+      .locator('div', { hasText: /^pass/ })
+      .locator('.t3-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     await page.getByRole('button', { name: 'Step' }).click()

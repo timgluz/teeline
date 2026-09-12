@@ -27,19 +27,19 @@ export interface Scenario {
 export interface SimState {
   phase: Phase
   cities: [number, number][]
-  n: number            // total cities (city 0 = start)
-  m: number            // n-1 (DP cities 1..n-1)
-  dm: number[][]       // distance matrix (plain numbers)
+  n: number // total cities (city 0 = start)
+  m: number // n-1 (DP cities 1..n-1)
+  dm: number[][] // distance matrix (plain numbers)
   // DP table: rows = end city index (0..m-1 ↔ city i+1), cols = mask
-  table: number[][]    // ∞ until computed
-  pred: number[][]     // predecessor city (index into rows) per computed cell, -1 if none
+  table: number[][] // ∞ until computed
+  pred: number[][] // predecessor city (index into rows) per computed cell, -1 if none
   // fill order (deterministic): masks by popcount ascending, then value
   fillOrder: { mask: number; row: number }[]
   fillPtr: number
   // optimal route (computed when forward completes)
   optCost: number | null
-  route: number[] | null       // city ids, [0, c1, ..., cn-1]
-  readback: number[]           // city ids revealed so far (from the end backwards)
+  route: number[] | null // city ids, [0, c1, ..., cn-1]
+  readback: number[] // city ids revealed so far (from the end backwards)
   readbackPtr: number
   lastEvent: string | null
   step: number
@@ -49,17 +49,38 @@ export const SCENARIOS: Record<string, Scenario> = {
   grid_6: {
     label: '6-city grid',
     desc: 'The familiar compact grid — a clean DP table to scan',
-    cities: [[60, 60], [240, 60], [240, 240], [60, 240], [150, 60], [150, 240]],
+    cities: [
+      [60, 60],
+      [240, 60],
+      [240, 240],
+      [60, 240],
+      [150, 60],
+      [150, 240],
+    ],
   },
   circle_6: {
     label: 'Circle',
     desc: 'Six cities on a circle — the optimal route is the perimeter',
-    cities: [[270, 150], [210, 254], [90, 254], [30, 150], [90, 46], [210, 46]],
+    cities: [
+      [270, 150],
+      [210, 254],
+      [90, 254],
+      [30, 150],
+      [90, 46],
+      [210, 46],
+    ],
   },
   clusters_6: {
     label: 'Two clusters',
     desc: 'Two tight triples far apart — the DP must bridge them twice',
-    cities: [[60, 60], [90, 60], [60, 90], [240, 240], [210, 240], [240, 210]],
+    cities: [
+      [60, 60],
+      [90, 60],
+      [60, 90],
+      [240, 240],
+      [210, 240],
+      [240, 210],
+    ],
   },
 }
 
@@ -96,8 +117,12 @@ export function makeInitState(scenario: Scenario): SimState {
   const m = n - 1
   const dm = makeDm(cities)
   const size = 1 << m
-  const table: number[][] = Array.from({ length: m }, () => new Array(size).fill(INF))
-  const pred: number[][] = Array.from({ length: m }, () => new Array(size).fill(-1))
+  const table: number[][] = Array.from({ length: m }, () =>
+    new Array(size).fill(INF),
+  )
+  const pred: number[][] = Array.from({ length: m }, () =>
+    new Array(size).fill(-1),
+  )
 
   // base cells: dp[{i}][i] = d(0, city i+1)
   for (let row = 0; row < m; row++) {
@@ -124,7 +149,11 @@ export function makeInitState(scenario: Scenario): SimState {
 }
 
 // Compute one DP cell (mask, row) from its predecessors; record the argmin.
-function fillCell(state: SimState, mask: number, row: number): { value: number; via: number } {
+function fillCell(
+  state: SimState,
+  mask: number,
+  row: number,
+): { value: number; via: number } {
   const rest = mask & ~(1 << row)
   const city = row + 1
   let best = INF
@@ -142,7 +171,10 @@ function fillCell(state: SimState, mask: number, row: number): { value: number; 
 
 // The optimal route: end city e = argmin_i table[i][full] + d(i+1, 0),
 // then read predecessors back to the start.
-export function computeRoute(state: SimState): { cost: number; route: number[] } {
+export function computeRoute(state: SimState): {
+  cost: number
+  route: number[]
+} {
   const full = (1 << state.m) - 1
   let best = INF
   let end = -1
@@ -174,7 +206,12 @@ export function stepOnce(state: SimState): SimState {
   // ----- readback: reveal one city of the optimal route per step -----
   if (state.phase === 'readback') {
     if (state.readbackPtr >= (state.route?.length ?? 0) - 1) {
-      return { ...state, phase: 'done', lastEvent: `Done — optimal tour ${state.route!.join('→')} = ${state.optCost!.toFixed(1)}`, step: state.step + 1 }
+      return {
+        ...state,
+        phase: 'done',
+        lastEvent: `Done — optimal tour ${state.route!.join('→')} = ${state.optCost!.toFixed(1)}`,
+        step: state.step + 1,
+      }
     }
     // the end city is seeded; each step reveals the next city back toward the start
     const city = state.route![state.route!.length - 1 - state.readbackPtr]
@@ -212,9 +249,10 @@ export function stepOnce(state: SimState): SimState {
   pred[row][mask] = via
 
   const sizeLabel = mask.toString(2).padStart(state.m, '0')
-  const event = value === INF
-    ? `Cell (${sizeLabel}, end ${row + 1}) — unreachable`
-    : `dp[${sizeLabel}][${row + 1}] = ${value.toFixed(1)} via city ${via + 1}`
+  const event =
+    value === INF
+      ? `Cell (${sizeLabel}, end ${row + 1}) — unreachable`
+      : `dp[${sizeLabel}][${row + 1}] = ${value.toFixed(1)} via city ${via + 1}`
 
   return {
     ...state,
