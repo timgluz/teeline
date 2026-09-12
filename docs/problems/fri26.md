@@ -9,6 +9,8 @@ optimalCost: 937
 dataUrl: "https://static.tspsolver.com/tsplib/fri26.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
+creator: "TSPLIB — Gerhard Reinelt, University of Heidelberg"
+license: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
 

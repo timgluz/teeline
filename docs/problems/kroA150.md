@@ -9,6 +9,8 @@ optimalCost: 26524
 dataUrl: "https://static.tspsolver.com/tsplib/kroA150.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
+creator: "TSPLIB — Gerhard Reinelt, University of Heidelberg"
+license: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
 <svg viewBox="0 0 340 200" width="100%" style="max-width:340px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
