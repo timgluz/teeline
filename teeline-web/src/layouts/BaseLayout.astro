@@ -9,13 +9,15 @@ import Topbar from '../components/Topbar.astro'
 interface Props {
   title: string
   description: string
-  path: string
+  // Optional so status pages (404) can omit a canonical URL for a path that
+  // does not exist.
+  path?: string
   ogType?: 'website' | 'article'
   ogDescription?: string
 }
 
 const { title, description, path, ogType = 'website', ogDescription } = Astro.props
-const canonicalUrl = `https://tspsolver.com${path}`
+const canonicalUrl = path ? `https://tspsolver.com${path}` : undefined
 ---
 <html lang="en">
   <head>
@@ -24,7 +26,7 @@ const canonicalUrl = `https://tspsolver.com${path}`
     <title>{title}</title>
     <meta name="description" content={description} />
     <meta property="og:type" content={ogType} />
-    <meta property="og:url" content={canonicalUrl} />
+    {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={ogDescription ?? description} />
     <meta property="og:image" content="https://tspsolver.com/og-image.png" />
@@ -36,7 +38,7 @@ const canonicalUrl = `https://tspsolver.com${path}`
     <meta name="twitter:description" content={ogDescription ?? description} />
     <meta name="twitter:image" content="https://tspsolver.com/og-image.png" />
     <meta name="twitter:image:alt" content="teeline — TSPSolver, find your path" />
-    <link rel="canonical" href={canonicalUrl} />
+    {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <slot name="head" />
   </head>

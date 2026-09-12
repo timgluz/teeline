@@ -1,0 +1,47 @@
+---
+// Astro emits this as dist/404.html. Its presence is what stops Cloudflare
+// Pages from assuming the site is a single-page app: without a top-level
+// 404.html, Pages matches every unmatched path to `/` and serves the homepage
+// with HTTP 200, which is exactly how /sitemap.xml used to return HTML
+// instead of XML (and why bogus URLs looked like valid pages to crawlers).
+import BaseLayout from '../layouts/BaseLayout.astro'
+
+const title = 'Page not found — Teeline'
+const description = 'The page you requested does not exist on tspsolver.com.'
+
+const links = [
+  { href: '/', label: 'Solver home' },
+  { href: '/algorithms/', label: 'Algorithms' },
+  { href: '/problems/', label: 'Problems' },
+  { href: '/blog/', label: 'Blog' },
+]
+---
+<BaseLayout title={title} description={description}>
+  <Fragment slot="head">
+    <meta name="robots" content="noindex" />
+  </Fragment>
+  <main class="mx-auto max-w-content px-6 py-16">
+    <p class="font-mono text-sm text-text-dim">404</p>
+    <h1 class="mt-2 text-2xl font-semibold tracking-tight lg:text-3xl">
+      Page not found
+    </h1>
+    <p class="mt-3 max-w-2xl text-text-dim">
+      The page you requested doesn’t exist (or used to live somewhere else). Pick
+      a destination below, or head back to the solver.
+    </p>
+    <ul class="mt-8 flex list-none flex-wrap gap-3 p-0">
+      {
+        links.map(({ href, label }) => (
+          <li>
+            <a
+              href={href}
+              class="inline-block rounded-lg border border-border bg-surface px-4 py-2 font-mono text-sm text-text no-underline transition-colors hover:border-border-hover hover:text-accent"
+            >
+              {label}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </main>
+</BaseLayout>

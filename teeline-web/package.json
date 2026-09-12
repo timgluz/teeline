@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro check && tsc --noEmit && astro build && node scripts/copy-wasm.mjs",
-    "build:check": "astro check && tsc --noEmit && astro build",
+    "build": "astro check && tsc --noEmit && astro build && node scripts/copy-wasm.mjs && node scripts/sitemap-alias.mjs",
+    "build:check": "astro check && tsc --noEmit && astro build && node scripts/sitemap-alias.mjs",
     "preview": "astro preview",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
