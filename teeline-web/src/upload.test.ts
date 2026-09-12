@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { formatMetadata, exampleUrl, parseOptTour } from './upload'
+import {
+  formatMetadata,
+  exampleUrl,
+  parseOptTour,
+  datasetBaseUrl,
+  datasetTspUrl,
+  datasetOptTourUrl,
+} from './upload'
 import type { ParsedProblem } from 'teeline-wasm'
 
 const cities = (n: number) =>
@@ -67,5 +74,29 @@ describe('exampleUrl', () => {
     expect(exampleUrl('berlin52')).toBe('/examples/berlin52.tsp')
     expect(exampleUrl('burma14')).toBe('/examples/burma14.tsp')
     expect(exampleUrl('ulysses22')).toBe('/examples/ulysses22.tsp')
+  })
+})
+
+describe('dataset URLs', () => {
+  it('uses the dev proxy prefix in dev', () => {
+    expect(datasetBaseUrl(true)).toBe('/tsplib')
+    expect(datasetTspUrl('berlin52', true)).toBe('/tsplib/berlin52.tsp')
+    expect(datasetOptTourUrl('berlin52', true)).toBe('/tsplib/berlin52.opt.tour')
+  })
+
+  it('uses the static host in production', () => {
+    expect(datasetBaseUrl(false)).toBe('https://static.tspsolver.com/tsplib')
+    expect(datasetTspUrl('berlin52', false)).toBe(
+      'https://static.tspsolver.com/tsplib/berlin52.tsp',
+    )
+  })
+
+  // Regression: `.replace('.tsp', '.opt.tour')` matched the ".tsp" inside
+  // "static.tspsolver.com" and produced the non-existent
+  // "static.opt.toursolver.com" host (CORS / ERR_NAME_NOT_RESOLVED).
+  it('never rewrites the static host when building the opt.tour URL', () => {
+    const optUrl = datasetOptTourUrl('berlin52', false)
+    expect(optUrl).toBe('https://static.tspsolver.com/tsplib/berlin52.opt.tour')
+    expect(optUrl).not.toContain('toursolver')
   })
 })
