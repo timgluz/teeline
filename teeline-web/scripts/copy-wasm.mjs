@@ -12,15 +12,21 @@ const distAssets = 'dist/assets'
 const pkgDir = 'node_modules/teeline-wasm'
 
 if (!existsSync(pkgDir)) {
-  console.error('[copy-wasm] ERROR: node_modules/teeline-wasm not found — run npm ci after jco transpile')
+  console.error(
+    '[copy-wasm] ERROR: node_modules/teeline-wasm not found — run npm ci after jco transpile',
+  )
   process.exit(1)
 }
 
 const wasmFiles = readdirSync(pkgDir).filter((f) => f.endsWith('.wasm'))
 
 if (wasmFiles.length === 0) {
-  console.error('[copy-wasm] ERROR: no .wasm files in node_modules/teeline-wasm')
-  console.error('[copy-wasm] Ensure deploy-web.yml runs: jco transpile ... --name teeline_wasm -o ../teeline-wasm/js-bindings')
+  console.error(
+    '[copy-wasm] ERROR: no .wasm files in node_modules/teeline-wasm',
+  )
+  console.error(
+    '[copy-wasm] Ensure deploy-web.yml runs: jco transpile ... --name teeline_wasm -o ../teeline-wasm/js-bindings',
+  )
   process.exit(1)
 }
 

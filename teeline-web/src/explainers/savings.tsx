@@ -1,14 +1,26 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES,
-  components, makeInitState, stepOnce,
-} from "./savings-algo"
-import type { Edge, EventMode, RejectReason } from "./savings-algo"
+  CITIES,
+  N_CITIES,
+  components,
+  makeInitState,
+  stepOnce,
+} from './savings-algo'
+import type { Edge, EventMode, RejectReason } from './savings-algo'
 
 const COMP_PALETTE = [
-  "#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c",
-  "#16a34a", "#0891b2", "#ca8a04", "#dc2626", "#4f46e5",
-  "#0f766e", "#9333ea",
+  '#0d9488',
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+  '#ea580c',
+  '#16a34a',
+  '#0891b2',
+  '#ca8a04',
+  '#dc2626',
+  '#4f46e5',
+  '#0f766e',
+  '#9333ea',
 ]
 function compColor(rootIndex: number): string {
   return COMP_PALETTE[rootIndex % COMP_PALETTE.length]
@@ -28,51 +40,81 @@ interface ScanCanvasProps {
   hubIdx: number
   tour: number[] | null
 }
-function ScanCanvas({ accepted, lastEdge, lastEvent, rejectedTrail, degree, parent, hubIdx, tour }: ScanCanvasProps) {
+function ScanCanvas({
+  accepted,
+  lastEdge,
+  lastEvent,
+  rejectedTrail,
+  degree,
+  parent,
+  hubIdx,
+  tour,
+}: ScanCanvasProps) {
   const comps = useMemo(() => components(parent), [parent])
   const rootOf = useMemo(() => {
     const m = new Map<number, number>()
-    comps.forEach((group, gi) => group.forEach(c => m.set(c, gi)))
+    comps.forEach((group, gi) => group.forEach((c) => m.set(c, gi)))
     return m
   }, [comps])
 
   const acceptedSet = useMemo(() => new Set(accepted.map(edgeKey)), [accepted])
 
   const tourPts = tour
-    ? tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ") + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
-    : ""
+    ? tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ') +
+      ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
+    : ''
 
   return (
-    <svg viewBox="0 0 300 300" className="sav-canvas" role="img" aria-label="Savings edge scan">
+    <svg
+      viewBox="0 0 300 300"
+      className="sav-canvas"
+      role="img"
+      aria-label="Savings edge scan"
+    >
       <rect x={0} y={0} width={300} height={300} className="sav-bg" />
 
       {tour && <polygon points={tourPts} className="sav-tour" />}
 
       {accepted.map((e, i) => (
-        <line key={"a" + i}
-          x1={CITIES[e.u][0]} y1={CITIES[e.u][1]}
-          x2={CITIES[e.v][0]} y2={CITIES[e.v][1]}
+        <line
+          key={'a' + i}
+          x1={CITIES[e.u][0]}
+          y1={CITIES[e.u][1]}
+          x2={CITIES[e.v][0]}
+          y2={CITIES[e.v][1]}
           className="sav-accepted"
         />
       ))}
 
       {rejectedTrail.map((r, i) => (
-        <line key={"r" + i}
-          x1={CITIES[r.edge.u][0]} y1={CITIES[r.edge.u][1]}
-          x2={CITIES[r.edge.v][0]} y2={CITIES[r.edge.v][1]}
-          className={r.reason === "degree" ? "sav-rejected sav-rejected-degree" : "sav-rejected sav-rejected-cycle"}
+        <line
+          key={'r' + i}
+          x1={CITIES[r.edge.u][0]}
+          y1={CITIES[r.edge.u][1]}
+          x2={CITIES[r.edge.v][0]}
+          y2={CITIES[r.edge.v][1]}
+          className={
+            r.reason === 'degree'
+              ? 'sav-rejected sav-rejected-degree'
+              : 'sav-rejected sav-rejected-cycle'
+          }
         />
       ))}
 
       {lastEdge && !acceptedSet.has(edgeKey(lastEdge)) && !tour && (
         <line
-          x1={CITIES[lastEdge.u][0]} y1={CITIES[lastEdge.u][1]}
-          x2={CITIES[lastEdge.v][0]} y2={CITIES[lastEdge.v][1]}
+          x1={CITIES[lastEdge.u][0]}
+          y1={CITIES[lastEdge.u][1]}
+          x2={CITIES[lastEdge.v][0]}
+          y2={CITIES[lastEdge.v][1]}
           className={
-            lastEvent === "rejected-degree" ? "sav-cand sav-cand-degree"
-            : lastEvent === "rejected-cycle" ? "sav-cand sav-cand-cycle"
-            : lastEvent === "closing" ? "sav-cand sav-cand-closing"
-            : "sav-cand sav-cand-accept"
+            lastEvent === 'rejected-degree'
+              ? 'sav-cand sav-cand-degree'
+              : lastEvent === 'rejected-cycle'
+                ? 'sav-cand sav-cand-cycle'
+                : lastEvent === 'closing'
+                  ? 'sav-cand sav-cand-closing'
+                  : 'sav-cand sav-cand-accept'
           }
         />
       )}
@@ -85,16 +127,29 @@ function ScanCanvas({ accepted, lastEdge, lastEvent, rejectedTrail, degree, pare
             {i === hubIdx && (
               <circle cx={x} cy={y} r={11} className="sav-hub-ring" />
             )}
-            <circle cx={x} cy={y} r={5.5}
+            <circle
+              cx={x}
+              cy={y}
+              r={5.5}
               fill={compColor(gi)}
-              className={full ? "sav-city sav-city-full" : "sav-city"}
+              className={full ? 'sav-city sav-city-full' : 'sav-city'}
             />
             {i === hubIdx && (
-              <text x={x} y={y + 3} className="sav-hub-star">★</text>
+              <text x={x} y={y + 3} className="sav-hub-star">
+                ★
+              </text>
             )}
-            <text x={x + 7} y={y - 6} className="sav-city-label">{i}</text>
-            <text x={x} y={y + 18} className="sav-degree-badge"
-              style={{ opacity: degree[i] > 0 ? 1 : 0.25 }}>{degree[i]}</text>
+            <text x={x + 7} y={y - 6} className="sav-city-label">
+              {i}
+            </text>
+            <text
+              x={x}
+              y={y + 18}
+              className="sav-degree-badge"
+              style={{ opacity: degree[i] > 0 ? 1 : 0.25 }}
+            >
+              {degree[i]}
+            </text>
           </g>
         )
       })}
@@ -107,10 +162,16 @@ function ComponentPanel({ parent }: { parent: number[] }) {
   return (
     <div className="sav-list-panel">
       <div className="sav-list-title">Union-Find</div>
-      <div className="sav-list-subtitle">{comps.length} component{comps.length === 1 ? "" : "s"}</div>
+      <div className="sav-list-subtitle">
+        {comps.length} component{comps.length === 1 ? '' : 's'}
+      </div>
       {comps.map((g, i) => (
-        <div key={i} className="sav-comp-badge" style={{ borderLeftColor: compColor(i) }}>
-          {"{" + g.join(",") + "}"}
+        <div
+          key={i}
+          className="sav-comp-badge"
+          style={{ borderLeftColor: compColor(i) }}
+        >
+          {'{' + g.join(',') + '}'}
         </div>
       ))}
     </div>
@@ -122,9 +183,15 @@ export default function SavingsExplainer() {
 
   const simRef = useRef(makeInitState())
   const [accepted, setAccepted] = useState<Edge[]>(() => [])
-  const [rejected, setRejected] = useState<Array<{ edge: Edge; reason: RejectReason }>>(() => [])
-  const [degree, setDegree] = useState<number[]>(() => new Array(N_CITIES).fill(0))
-  const [parent, setParent] = useState<number[]>(() => simRef.current.parent.slice())
+  const [rejected, setRejected] = useState<
+    Array<{ edge: Edge; reason: RejectReason }>
+  >(() => [])
+  const [degree, setDegree] = useState<number[]>(() =>
+    new Array(N_CITIES).fill(0),
+  )
+  const [parent, setParent] = useState<number[]>(() =>
+    simRef.current.parent.slice(),
+  )
   const [hubIdx, setHubIdx] = useState<number>(() => simRef.current.hubIndex)
   const [lastEdge, setLastEdge] = useState<Edge | null>(null)
   const [lastEvent, setLastEvent] = useState<EventMode | null>(null)
@@ -135,10 +202,17 @@ export default function SavingsExplainer() {
 
   const reinit = useCallback(() => {
     simRef.current = makeInitState()
-    setAccepted([]); setRejected([]); setDegree(new Array(N_CITIES).fill(0))
-    setParent(simRef.current.parent.slice()); setLastEdge(null); setLastEvent(null)
+    setAccepted([])
+    setRejected([])
+    setDegree(new Array(N_CITIES).fill(0))
+    setParent(simRef.current.parent.slice())
+    setLastEdge(null)
+    setLastEvent(null)
     setHubIdx(simRef.current.hubIndex)
-    setStep(0); setDone(false); setTour(null); setRunning(false)
+    setStep(0)
+    setDone(false)
+    setTour(null)
+    setRunning(false)
   }, [])
 
   const step_fn = useCallback(() => {
@@ -148,8 +222,11 @@ export default function SavingsExplainer() {
     setRejected(next.rejected.slice(-6))
     setDegree(next.degree.slice())
     setParent(next.parent.slice())
-    setLastEdge(next.lastEdge); setLastEvent(next.lastEvent)
-    setStep(next.step); setDone(next.done); setTour(next.tour)
+    setLastEdge(next.lastEdge)
+    setLastEvent(next.lastEvent)
+    setStep(next.step)
+    setDone(next.done)
+    setTour(next.tour)
     if (next.done) setRunning(false)
   }, [])
 
@@ -165,20 +242,20 @@ export default function SavingsExplainer() {
     [accepted],
   )
 
-  let chipText = "Press Step or Run to scan the highest-savings edges first"
-  let chipClass = "sav-chip sav-chip-idle"
-  if (lastEvent === "accepted" && lastEdge) {
+  let chipText = 'Press Step or Run to scan the highest-savings edges first'
+  let chipClass = 'sav-chip sav-chip-idle'
+  if (lastEvent === 'accepted' && lastEdge) {
     chipText = `✅ accepted  (${lastEdge.u}, ${lastEdge.v})  — saving = +${lastEdge.val.toFixed(1)}`
-    chipClass = "sav-chip sav-chip-accept"
-  } else if (lastEvent === "rejected-degree" && lastEdge) {
+    chipClass = 'sav-chip sav-chip-accept'
+  } else if (lastEvent === 'rejected-degree' && lastEdge) {
     chipText = `✗ rejected  (${lastEdge.u}, ${lastEdge.v})  — would give a city degree 3`
-    chipClass = "sav-chip sav-chip-degree"
-  } else if (lastEvent === "rejected-cycle" && lastEdge) {
+    chipClass = 'sav-chip sav-chip-degree'
+  } else if (lastEvent === 'rejected-cycle' && lastEdge) {
     chipText = `✗ rejected  (${lastEdge.u}, ${lastEdge.v})  — premature sub-cycle`
-    chipClass = "sav-chip sav-chip-cycle"
-  } else if (lastEvent === "closing" && lastEdge) {
+    chipClass = 'sav-chip sav-chip-cycle'
+  } else if (lastEvent === 'closing' && lastEdge) {
     chipText = `🔒 closing edge  (${lastEdge.u}, ${lastEdge.v})  — the path becomes a cycle`
-    chipClass = "sav-chip sav-chip-closing"
+    chipClass = 'sav-chip sav-chip-closing'
   }
 
   const totalEdges = (N_CITIES * (N_CITIES - 1)) / 2
@@ -193,31 +270,53 @@ export default function SavingsExplainer() {
         <div className="sav-eyebrow">teeline · algorithms/savings</div>
         <h2 className="sav-title">Savings Construction</h2>
         <p className="sav-sub">
-          Every pairwise edge is ranked by <strong>Clarke-Wright savings</strong> s(i,j) = d(hub,i) + d(hub,j) − d(i,j)
-          and scanned highest-first. The <strong>hub city</strong> (★, nearest the centroid) is visited like any other
-          city — it only biases the <em>ordering</em> of candidate merges. Acceptance rules reuse the same
-          Kruskal-style scan as Greedy Edge (degree ≤ 2, no premature sub-cycle).
+          Every pairwise edge is ranked by{' '}
+          <strong>Clarke-Wright savings</strong> s(i,j) = d(hub,i) + d(hub,j) −
+          d(i,j) and scanned highest-first. The <strong>hub city</strong> (★,
+          nearest the centroid) is visited like any other city — it only biases
+          the <em>ordering</em> of candidate merges. Acceptance rules reuse the
+          same Kruskal-style scan as Greedy Edge (degree ≤ 2, no premature
+          sub-cycle).
         </p>
       </header>
 
       <div className="sav-viz-row">
         <div className="sav-canvas-wrap">
           <ScanCanvas
-            accepted={accepted} lastEdge={lastEdge} lastEvent={lastEvent}
-            rejectedTrail={rejected} degree={degree} parent={parent}
-            hubIdx={hubIdx} tour={tour}
+            accepted={accepted}
+            lastEdge={lastEdge}
+            lastEvent={lastEvent}
+            rejectedTrail={rejected}
+            degree={degree}
+            parent={parent}
+            hubIdx={hubIdx}
+            tour={tour}
           />
         </div>
         <ComponentPanel parent={parent} />
       </div>
 
       <div className="sav-legend">
-        <span><span className="sav-swatch sav-swatch-accepted" /> accepted edge</span>
-        <span><span className="sav-swatch sav-swatch-degree" /> rejected — degree</span>
-        <span><span className="sav-swatch sav-swatch-cycle" /> rejected — cycle</span>
-        <span><span className="sav-swatch sav-swatch-closing" /> closing edge</span>
-        <span><span className="sav-swatch sav-swatch-hub" /> hub (city {hubCityId})</span>
-        {done && <span><span className="sav-swatch sav-swatch-tour" /> final tour</span>}
+        <span>
+          <span className="sav-swatch sav-swatch-accepted" /> accepted edge
+        </span>
+        <span>
+          <span className="sav-swatch sav-swatch-degree" /> rejected — degree
+        </span>
+        <span>
+          <span className="sav-swatch sav-swatch-cycle" /> rejected — cycle
+        </span>
+        <span>
+          <span className="sav-swatch sav-swatch-closing" /> closing edge
+        </span>
+        <span>
+          <span className="sav-swatch sav-swatch-hub" /> hub (city {hubCityId})
+        </span>
+        {done && (
+          <span>
+            <span className="sav-swatch sav-swatch-tour" /> final tour
+          </span>
+        )}
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -225,15 +324,21 @@ export default function SavingsExplainer() {
       <div className="sav-statgrid">
         <div>
           <div className="sav-statlabel">edges scanned</div>
-          <div className="sav-mono">{accepted.length + rejected.length}/{totalEdges}</div>
+          <div className="sav-mono">
+            {accepted.length + rejected.length}/{totalEdges}
+          </div>
         </div>
         <div>
           <div className="sav-statlabel">accepted</div>
-          <div className="sav-mono">{accepted.length}/{N_CITIES}</div>
+          <div className="sav-mono">
+            {accepted.length}/{N_CITIES}
+          </div>
         </div>
         <div>
           <div className="sav-statlabel">rejected</div>
-          <div className="sav-mono">{step > 0 ? simRef.current.rejected.length : 0}</div>
+          <div className="sav-mono">
+            {step > 0 ? simRef.current.rejected.length : 0}
+          </div>
         </div>
         <div>
           <div className="sav-statlabel">components</div>
@@ -252,21 +357,41 @@ export default function SavingsExplainer() {
       <div className="sav-config">
         <div className="sav-config-row">
           <label className="sav-config-label">Speed</label>
-          <input type="range" min={1} max={10} step={1} value={speed}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
             className="sav-slider"
-            onInput={e => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
-          <div className="sav-hint">Savings is parameter-free — no other knobs to tune.</div>
+          <div className="sav-hint">
+            Savings is parameter-free — no other knobs to tune.
+          </div>
         </div>
       </div>
 
       <div className="sav-controls">
-        <button className="sav-btn" onClick={step_fn} disabled={running || done}>◀ Step</button>
-        <button className={`sav-btn ${!running ? "sav-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)} disabled={done}>
-          {running ? "⏸ Pause" : done ? "✓ Done" : "▶ Run"}
+        <button
+          className="sav-btn"
+          onClick={step_fn}
+          disabled={running || done}
+        >
+          ◀ Step
         </button>
-        <button className="sav-btn" onClick={reinit}>↺ Reset</button>
+        <button
+          className={`sav-btn ${!running ? 'sav-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
+          disabled={done}
+        >
+          {running ? '⏸ Pause' : done ? '✓ Done' : '▶ Run'}
+        </button>
+        <button className="sav-btn" onClick={reinit}>
+          ↺ Reset
+        </button>
       </div>
 
       <footer className="sav-footer">

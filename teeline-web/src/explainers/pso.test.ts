@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, tourLength, swapSequence, applySwaps,
-  makeInitState, stepEpoch,
+  N_CITIES,
+  tourLength,
+  swapSequence,
+  applySwaps,
+  makeInitState,
+  stepEpoch,
 } from './pso-algo'
 
 describe('tourLength', () => {
@@ -37,7 +41,16 @@ describe('swapSequence', () => {
 
 describe('applySwaps', () => {
   it('returns original tour when n=0', () => {
-    expect(applySwaps([0, 1, 2, 3], [[0, 1], [1, 2]], 0)).toEqual([0, 1, 2, 3])
+    expect(
+      applySwaps(
+        [0, 1, 2, 3],
+        [
+          [0, 1],
+          [1, 2],
+        ],
+        0,
+      ),
+    ).toEqual([0, 1, 2, 3])
   })
 
   it('does not mutate the input tour', () => {
@@ -62,7 +75,9 @@ describe('makeInitState', () => {
   })
 
   it('each particle position is a valid permutation of 0..N_CITIES-1', () => {
-    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort((a, b) => a - b)
+    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort(
+      (a, b) => a - b,
+    )
     for (const p of makeInitState(4).particles) {
       expect(p.position.slice().sort((a, b) => a - b)).toEqual(expected)
     }
@@ -77,7 +92,7 @@ describe('makeInitState', () => {
 
   it('gbest_cost equals minimum particle cost', () => {
     const s = makeInitState(6)
-    const min = Math.min(...s.particles.map(p => p.cost))
+    const min = Math.min(...s.particles.map((p) => p.cost))
     expect(s.gbest_cost).toBeCloseTo(min, 1)
   })
 
@@ -103,7 +118,9 @@ describe('stepEpoch', () => {
   })
 
   it('each particle position remains a valid permutation', () => {
-    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort((a, b) => a - b)
+    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort(
+      (a, b) => a - b,
+    )
     let s = makeInitState(4)
     s = stepEpoch(s)
     for (const p of s.particles) {

@@ -5,7 +5,10 @@ import Database from 'better-sqlite3'
 import { onRequestPost as registerBegin } from './register/begin'
 
 let shim: D1Like
-const env = { SESSION_SECRET: 'test-session-secret', ALLOWED_ORIGINS: 'http://localhost:8788' } as never
+const env = {
+  SESSION_SECRET: 'test-session-secret',
+  ALLOWED_ORIGINS: 'http://localhost:8788',
+} as never
 
 function ctx(request: Request) {
   return { request, env: { ...env, DB: shim } } as never
@@ -23,7 +26,11 @@ describe('register/begin rate limit', () => {
     const makeReq = (ip: string) =>
       new Request('http://localhost:8788/api/auth/register/begin', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8788', 'CF-Connecting-IP': ip },
+        headers: {
+          'Content-Type': 'application/json',
+          Origin: 'http://localhost:8788',
+          'CF-Connecting-IP': ip,
+        },
         body: '{}',
       })
 

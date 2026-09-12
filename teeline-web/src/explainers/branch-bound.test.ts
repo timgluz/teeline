@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import {
-  SCENARIOS, makeInitState, stepOnce,
-  mstCost, makeDm,
+  SCENARIOS,
+  makeInitState,
+  stepOnce,
+  mstCost,
+  makeDm,
 } from './branch-bound-algo'
 import type { SimState } from './branch-bound-algo'
 
@@ -44,11 +47,25 @@ function runToDone(scenario: (typeof SCENARIOS)[string]): SimState {
 // ---------------------------------------------------------------
 describe('mstCost', () => {
   it('is zero for a single node', () => {
-    expect(mstCost([0], makeDm([[0, 0], [1, 0]]))).toBe(0)
+    expect(
+      mstCost(
+        [0],
+        makeDm([
+          [0, 0],
+          [1, 0],
+        ]),
+      ),
+    ).toBe(0)
   })
 
   it('finds the minimal chain MST', () => {
-    const dm = makeDm([[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]])
+    const dm = makeDm([
+      [0, 0],
+      [1, 0],
+      [2, 0],
+      [3, 0],
+      [4, 0],
+    ])
     expect(mstCost([0, 1, 2, 3, 4], dm)).toBeCloseTo(4, 6)
   })
 })
@@ -120,13 +137,20 @@ describe('correctness & scenario pins', () => {
   it('every scenario finds the exact optimum (verified against brute force)', () => {
     for (const [key, sc] of Object.entries(SCENARIOS)) {
       const s = runToDone(sc)
-      expect(s.bestCost, `${key} must find the optimum`).toBeCloseTo(bruteForce(sc.cities), 6)
+      expect(s.bestCost, `${key} must find the optimum`).toBeCloseTo(
+        bruteForce(sc.cities),
+        6,
+      )
       // bestTour is the closed cycle: starts and ends at city 0, middle is a permutation
       expect(s.bestTour![0], `${key} cycle must start at city 0`).toBe(0)
-      expect(s.bestTour![s.bestTour!.length - 1], `${key} cycle must end at city 0`).toBe(0)
-      expect([...s.bestTour!.slice(1, -1)].sort((a, b) => a - b), `${key} middle must be a permutation`).toEqual(
-        Array.from({ length: sc.cities.length - 1 }, (_, i) => i + 1),
-      )
+      expect(
+        s.bestTour![s.bestTour!.length - 1],
+        `${key} cycle must end at city 0`,
+      ).toBe(0)
+      expect(
+        [...s.bestTour!.slice(1, -1)].sort((a, b) => a - b),
+        `${key} middle must be a permutation`,
+      ).toEqual(Array.from({ length: sc.cities.length - 1 }, (_, i) => i + 1))
     }
   })
 
@@ -139,10 +163,16 @@ describe('correctness & scenario pins', () => {
     for (let t = 0; t < 20; t++) {
       const cities: [number, number][] = []
       for (let i = 0; i < 6; i++) {
-        cities.push([Math.round(20 + rnd() * 260), Math.round(20 + rnd() * 260)] as [number, number])
+        cities.push([
+          Math.round(20 + rnd() * 260),
+          Math.round(20 + rnd() * 260),
+        ] as [number, number])
       }
       const s = runToDone({ label: '', desc: '', cities })
-      expect(s.bestCost, `random instance ${t} must match brute force`).toBeCloseTo(bruteForce(cities), 6)
+      expect(
+        s.bestCost,
+        `random instance ${t} must match brute force`,
+      ).toBeCloseTo(bruteForce(cities), 6)
     }
   })
 

@@ -6,12 +6,14 @@ export function initSolverConfig(
   isProblemLoaded: () => boolean,
   onSolverReady: (solver: string, options: SolveOptions) => void,
 ): { refresh: () => void } {
-  const step02       = document.getElementById('step-02') as HTMLElement
-  const solverSelect = document.getElementById('solver-select') as HTMLSelectElement
-  const configPanel  = document.getElementById('config-panel') as HTMLElement
-  const btnRun       = document.getElementById('btn-run') as HTMLButtonElement
+  const step02 = document.getElementById('step-02') as HTMLElement
+  const solverSelect = document.getElementById(
+    'solver-select',
+  ) as HTMLSelectElement
+  const configPanel = document.getElementById('config-panel') as HTMLElement
+  const btnRun = document.getElementById('btn-run') as HTMLButtonElement
   const checkProblem = document.getElementById('check-problem') as HTMLElement
-  const checkSolver  = document.getElementById('check-solver') as HTMLElement
+  const checkSolver = document.getElementById('check-solver') as HTMLElement
 
   let selectedId: string | null = null
   let currentOptions: SolveOptions = defaultSolveOptions()
@@ -37,10 +39,12 @@ export function initSolverConfig(
   }
 
   function highlightActivePill(id: string): void {
-    document.querySelectorAll<HTMLButtonElement>('.pill[data-solver]').forEach((btn) => {
-      btn.classList.toggle('pill--active', btn.dataset.solver === id)
-      btn.ariaCurrent = btn.dataset.solver === id ? 'true' : 'false'
-    })
+    document
+      .querySelectorAll<HTMLButtonElement>('.pill[data-solver]')
+      .forEach((btn) => {
+        btn.classList.toggle('pill--active', btn.dataset.solver === id)
+        btn.ariaCurrent = btn.dataset.solver === id ? 'true' : 'false'
+      })
   }
 
   // ---- Config panel rendering ----
@@ -86,7 +90,8 @@ export function initSolverConfig(
       input.addEventListener('input', () => {
         const raw = parseFloat(input.value)
         if (!isNaN(raw)) {
-          ;(currentOptions as unknown as Record<string, number>)[param.key] = raw
+          ;(currentOptions as unknown as Record<string, number>)[param.key] =
+            raw
         }
       })
 
@@ -101,7 +106,7 @@ export function initSolverConfig(
 
   function updateChecklist(): void {
     const problemMet = isProblemLoaded()
-    const solverMet  = selectedId !== null
+    const solverMet = selectedId !== null
 
     checkProblem.classList.toggle('checklist-item--met', problemMet)
     checkSolver.classList.toggle('checklist-item--met', solverMet)
@@ -121,12 +126,14 @@ export function initSolverConfig(
 
   // ---- Wire pills ----
 
-  document.querySelectorAll<HTMLButtonElement>('.pill[data-solver]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.solver!
-      selectSolver(id)
+  document
+    .querySelectorAll<HTMLButtonElement>('.pill[data-solver]')
+    .forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.solver!
+        selectSolver(id)
+      })
     })
-  })
 
   // ---- Wire dropdown ----
 

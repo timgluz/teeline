@@ -1,12 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, tourLength, twoOptSwap, moveKey,
-  sampleNeighbours, makeInitState, stepOnce,
+  N_CITIES,
+  tourLength,
+  twoOptSwap,
+  moveKey,
+  sampleNeighbours,
+  makeInitState,
+  stepOnce,
 } from './tabu-algo'
 
 describe('tourLength', () => {
   it('is positive for a full tour', () => {
-    expect(tourLength(Array.from({ length: N_CITIES }, (_, i) => i))).toBeGreaterThan(0)
+    expect(
+      tourLength(Array.from({ length: N_CITIES }, (_, i) => i)),
+    ).toBeGreaterThan(0)
   })
   it('returns 0 for a single city', () => {
     expect(tourLength([0])).toBe(0)
@@ -62,7 +69,9 @@ describe('sampleNeighbours', () => {
 describe('makeInitState', () => {
   it('tour is a valid permutation', () => {
     const s = makeInitState(7, 10)
-    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort((a, b) => a - b)
+    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort(
+      (a, b) => a - b,
+    )
     expect(s.tour.slice().sort((a, b) => a - b)).toEqual(expected)
   })
   it('initial tabu list is empty', () => {
@@ -105,7 +114,9 @@ describe('stepOnce', () => {
     }
   })
   it('tour remains a valid permutation after step', () => {
-    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort((a, b) => a - b)
+    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort(
+      (a, b) => a - b,
+    )
     let s = makeInitState(7, 10)
     s = stepOnce(s)
     expect(s.tour.slice().sort((a, b) => a - b)).toEqual(expected)
@@ -117,7 +128,9 @@ describe('stepOnce', () => {
   })
   it('lastEventMode is set after first step', () => {
     const s = stepOnce(makeInitState(7, 10))
-    expect(['improvement', 'admissible', 'aspiration']).toContain(s.lastEventMode)
+    expect(['improvement', 'admissible', 'aspiration']).toContain(
+      s.lastEventMode,
+    )
   })
   it('improvements counter matches improvement events', () => {
     let s = makeInitState(7, 10)

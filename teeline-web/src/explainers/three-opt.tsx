@@ -1,13 +1,18 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES, SCENARIOS, CASE_LABELS,
-  tourLength, makeInitState, stepOnce,
-} from "./three-opt-algo"
-import type { Phase, MoveEvent, Scenario, CaseNo } from "./three-opt-algo"
+  CITIES,
+  N_CITIES,
+  SCENARIOS,
+  CASE_LABELS,
+  tourLength,
+  makeInitState,
+  stepOnce,
+} from './three-opt-algo'
+import type { Phase, MoveEvent, Scenario, CaseNo } from './three-opt-algo'
 
 const DEFAULT_SCENARIO = SCENARIOS.single_3opt
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 const CASES: CaseNo[] = [1, 2, 3, 4, 5, 6, 7]
 
 function edgeKey(a: number, b: number): string {
@@ -28,37 +33,95 @@ const NODE_POS: Record<string, [number, number]> = {
   E: [7, 27],
   F: [7, 13],
 }
-const REMOVED_LABEL_PAIRS: [string, string][] = [['A', 'B'], ['C', 'D'], ['E', 'F']]
+const REMOVED_LABEL_PAIRS: [string, string][] = [
+  ['A', 'B'],
+  ['C', 'D'],
+  ['E', 'F'],
+]
 
 function caseLabelPairs(caseNo: CaseNo): [string, string][] {
   switch (caseNo) {
-    case 1: return [['A', 'C'], ['B', 'D'], ['E', 'F']]
-    case 2: return [['A', 'B'], ['C', 'E'], ['D', 'F']]
-    case 3: return [['A', 'C'], ['B', 'E'], ['D', 'F']]
-    case 4: return [['A', 'D'], ['E', 'B'], ['C', 'F']]
-    case 5: return [['A', 'D'], ['E', 'C'], ['B', 'F']]
-    case 6: return [['A', 'E'], ['D', 'B'], ['C', 'F']]
-    case 7: return [['A', 'E'], ['D', 'C'], ['B', 'F']]
+    case 1:
+      return [
+        ['A', 'C'],
+        ['B', 'D'],
+        ['E', 'F'],
+      ]
+    case 2:
+      return [
+        ['A', 'B'],
+        ['C', 'E'],
+        ['D', 'F'],
+      ]
+    case 3:
+      return [
+        ['A', 'C'],
+        ['B', 'E'],
+        ['D', 'F'],
+      ]
+    case 4:
+      return [
+        ['A', 'D'],
+        ['E', 'B'],
+        ['C', 'F'],
+      ]
+    case 5:
+      return [
+        ['A', 'D'],
+        ['E', 'C'],
+        ['B', 'F'],
+      ]
+    case 6:
+      return [
+        ['A', 'E'],
+        ['D', 'B'],
+        ['C', 'F'],
+      ]
+    case 7:
+      return [
+        ['A', 'E'],
+        ['D', 'C'],
+        ['B', 'F'],
+      ]
   }
 }
 
 function PatternCell({ caseNo, active }: { caseNo: CaseNo; active: boolean }) {
   const pairs = caseLabelPairs(caseNo)
   return (
-    <div className={`t3-pattern-cell ${active ? 't3-pattern-active' : ''}`} title={CASE_LABELS[caseNo]}>
-      <svg viewBox="0 0 48 40" className="t3-pattern-svg" aria-label={`case ${caseNo}: ${CASE_LABELS[caseNo]}`}>
+    <div
+      className={`t3-pattern-cell ${active ? 't3-pattern-active' : ''}`}
+      title={CASE_LABELS[caseNo]}
+    >
+      <svg
+        viewBox="0 0 48 40"
+        className="t3-pattern-svg"
+        aria-label={`case ${caseNo}: ${CASE_LABELS[caseNo]}`}
+      >
         {REMOVED_LABEL_PAIRS.map(([a, b]) => (
-          <line key={`r${a}${b}`} className="t3-pattern-removed"
-            x1={NODE_POS[a][0]} y1={NODE_POS[a][1]}
-            x2={NODE_POS[b][0]} y2={NODE_POS[b][1]} />
+          <line
+            key={`r${a}${b}`}
+            className="t3-pattern-removed"
+            x1={NODE_POS[a][0]}
+            y1={NODE_POS[a][1]}
+            x2={NODE_POS[b][0]}
+            y2={NODE_POS[b][1]}
+          />
         ))}
         {pairs.map(([a, b]) => (
-          <line key={`n${a}${b}`} className="t3-pattern-new"
-            x1={NODE_POS[a][0]} y1={NODE_POS[a][1]}
-            x2={NODE_POS[b][0]} y2={NODE_POS[b][1]} />
+          <line
+            key={`n${a}${b}`}
+            className="t3-pattern-new"
+            x1={NODE_POS[a][0]}
+            y1={NODE_POS[a][1]}
+            x2={NODE_POS[b][0]}
+            y2={NODE_POS[b][1]}
+          />
         ))}
         {Object.entries(NODE_POS).map(([label, [x, y]]) => (
-          <text key={label} className="t3-pattern-node" x={x} y={y}>{label}</text>
+          <text key={label} className="t3-pattern-node" x={x} y={y}>
+            {label}
+          </text>
         ))}
       </svg>
       <div className="t3-pattern-case">{caseNo}</div>
@@ -70,7 +133,13 @@ function PatternCell({ caseNo, active }: { caseNo: CaseNo; active: boolean }) {
 // TourCanvas — the current tour with 3 removed / 3 added edges and a
 // CSS morph that makes the tour flow to its new shape on apply.
 // ---------------------------------------------------------------
-function TourCanvas({ tour, pending, lastMove, phase, morph }: {
+function TourCanvas({
+  tour,
+  pending,
+  lastMove,
+  phase,
+  morph,
+}: {
   tour: number[]
   pending: MoveEvent | null
   lastMove: MoveEvent | null
@@ -103,25 +172,42 @@ function TourCanvas({ tour, pending, lastMove, phase, morph }: {
   }
 
   return (
-    <svg viewBox="0 0 300 300"
+    <svg
+      viewBox="0 0 300 300"
       className={`t3-canvas ${morph && showApplied ? 't3-morph' : ''}`}
-      role="img" aria-label="3-opt tour">
+      role="img"
+      aria-label="3-opt tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="t3-bg" />
       <g className="t3-tour">
         {edges.map(({ from, to, key }) => {
           let cls = 't3-edge'
-          if (addedSet.has(key)) cls += showCandidate ? ' t3-cand-new' : ' t3-new'
-          else if (removedSet.has(key)) cls += showCandidate ? ' t3-cand-removed' : ' t3-removed'
-          return <line key={key} className={cls}
-            x1={CITIES[from][0]} y1={CITIES[from][1]}
-            x2={CITIES[to][0]} y2={CITIES[to][1]} />
+          if (addedSet.has(key))
+            cls += showCandidate ? ' t3-cand-new' : ' t3-new'
+          else if (removedSet.has(key))
+            cls += showCandidate ? ' t3-cand-removed' : ' t3-removed'
+          return (
+            <line
+              key={key}
+              className={cls}
+              x1={CITIES[from][0]}
+              y1={CITIES[from][1]}
+              x2={CITIES[to][0]}
+              y2={CITIES[to][1]}
+            />
+          )
         })}
         {tour.map((id) => (
           <g key={id}>
-            <circle className="t3-city"
-              cx={CITIES[id][0]} cy={CITIES[id][1]} r={6} />
-            <text className="t3-label"
-              x={CITIES[id][0]} y={CITIES[id][1] + 16}>{id}</text>
+            <circle
+              className="t3-city"
+              cx={CITIES[id][0]}
+              cy={CITIES[id][1]}
+              r={6}
+            />
+            <text className="t3-label" x={CITIES[id][0]} y={CITIES[id][1] + 16}>
+              {id}
+            </text>
           </g>
         ))}
       </g>
@@ -134,7 +220,8 @@ function TourCanvas({ tour, pending, lastMove, phase, morph }: {
 // ---------------------------------------------------------------
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return null
-  const W = 300, H = 46
+  const W = 300,
+    H = 46
   const minV = Math.min(...values)
   const maxV = Math.max(...values)
   const range = maxV - minV || 1
@@ -144,10 +231,19 @@ function Sparkline({ values }: { values: number[] }) {
     return `${x.toFixed(1)},${y.toFixed(1)}`
   })
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="t3-spark" aria-label="cost over passes">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="t3-spark"
+      aria-label="cost over passes"
+    >
       <rect x={0} y={0} width={W} height={H} className="t3-bg" rx={4} />
-      <polyline points={pts.join(" ")} fill="none" stroke="#0d9488"
-        strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke="#0d9488"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -160,10 +256,14 @@ export default function ThreeOptExplainer() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [pass, setPass] = useState(0)
   const [swaps, setSwaps] = useState(0)
-  const [bestCost, setBestCost] = useState(() => tourLength(DEFAULT_SCENARIO.tour))
+  const [bestCost, setBestCost] = useState(() =>
+    tourLength(DEFAULT_SCENARIO.tour),
+  )
   const [pending, setPending] = useState<MoveEvent | null>(null)
   const [lastMove, setLastMove] = useState<MoveEvent | null>(null)
-  const [costHistory, setCostHistory] = useState<number[]>(() => [tourLength(DEFAULT_SCENARIO.tour)])
+  const [costHistory, setCostHistory] = useState<number[]>(() => [
+    tourLength(DEFAULT_SCENARIO.tour),
+  ])
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(2) // 3x default
@@ -242,18 +342,18 @@ export default function ThreeOptExplainer() {
   }
 
   // Status chip
-  let chipText = "Click Step to scan triples for the best 3-opt reconnection"
-  let chipClass = "t3-chip t3-chip-idle"
+  let chipText = 'Click Step to scan triples for the best 3-opt reconnection'
+  let chipClass = 't3-chip t3-chip-idle'
   if (phase === 'candidate' && pending) {
     const [[a, b], [c, d], [e, f]] = pending.removedEdges
     chipText = `Candidate — remove ${a}→${b} · ${c}→${d} · ${e}→${f}, case ${pending.caseNo} (${CASE_LABELS[pending.caseNo]})  (Δ=${pending.delta.toFixed(0)})`
-    chipClass = "t3-chip t3-chip-candidate"
+    chipClass = 't3-chip t3-chip-candidate'
   } else if (phase === 'swap_applied' && lastMove) {
     chipText = `Applied — case ${lastMove.caseNo} (${CASE_LABELS[lastMove.caseNo]})  (Δ=${lastMove.delta.toFixed(0)})`
-    chipClass = "t3-chip t3-chip-applied"
+    chipClass = 't3-chip t3-chip-applied'
   } else if (phase === 'local_optimum') {
     chipText = `Local optimum — no improving 3-opt move (${swaps} swaps, ${pass} passes)`
-    chipClass = "t3-chip t3-chip-done"
+    chipClass = 't3-chip t3-chip-done'
   }
 
   return (
@@ -264,17 +364,24 @@ export default function ThreeOptExplainer() {
         <div className="t3-eyebrow">teeline · algorithms/3opt</div>
         <h2 className="t3-title">3-opt Local Search</h2>
         <p className="t3-sub">
-          3-opt removes <strong>three edges</strong> and reconnects the three resulting segments in
-          one of <strong>seven ways</strong> (2-opt only has one). Cases 1–3 reverse segments; cases
-          4–7 <em>swap</em> segments — the moves 2-opt cannot express. Each pass scans all triples
-          and applies the single <strong>best-improving</strong> reconnection, repeating until no
-          triple yields an improvement.
+          3-opt removes <strong>three edges</strong> and reconnects the three
+          resulting segments in one of <strong>seven ways</strong> (2-opt only
+          has one). Cases 1–3 reverse segments; cases 4–7 <em>swap</em> segments
+          — the moves 2-opt cannot express. Each pass scans all triples and
+          applies the single <strong>best-improving</strong> reconnection,
+          repeating until no triple yields an improvement.
         </p>
       </header>
 
       <div className="t3-viz-row">
         <div className="t3-canvas-wrap">
-          <TourCanvas tour={tour} pending={pending} lastMove={lastMove} phase={phase} morph={morphOn} />
+          <TourCanvas
+            tour={tour}
+            pending={pending}
+            lastMove={lastMove}
+            phase={phase}
+            morph={morphOn}
+          />
         </div>
         <div className="t3-pattern-wrap">
           <div className="t3-section-label">Reconnection patterns</div>
@@ -287,10 +394,18 @@ export default function ThreeOptExplainer() {
       </div>
 
       <div className="t3-legend">
-        <span><span className="t3-swatch t3-swatch-normal" /> tour edge</span>
-        <span><span className="t3-swatch t3-swatch-removed" /> removed</span>
-        <span><span className="t3-swatch t3-swatch-new" /> new edge</span>
-        <span><span className="t3-swatch t3-swatch-pattern" /> chosen pattern</span>
+        <span>
+          <span className="t3-swatch t3-swatch-normal" /> tour edge
+        </span>
+        <span>
+          <span className="t3-swatch t3-swatch-removed" /> removed
+        </span>
+        <span>
+          <span className="t3-swatch t3-swatch-new" /> new edge
+        </span>
+        <span>
+          <span className="t3-swatch t3-swatch-pattern" /> chosen pattern
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -317,7 +432,12 @@ export default function ThreeOptExplainer() {
         </div>
         <div>
           <div className="t3-statlabel">last Δ</div>
-          <div className="t3-mono" style={{ color: lastMove && lastMove.delta < 0 ? '#16a34a' : 'inherit' }}>
+          <div
+            className="t3-mono"
+            style={{
+              color: lastMove && lastMove.delta < 0 ? '#16a34a' : 'inherit',
+            }}
+          >
             {lastMove ? lastMove.delta.toFixed(0) : '—'}
           </div>
         </div>
@@ -332,9 +452,12 @@ export default function ThreeOptExplainer() {
           <label className="t3-label">Speed</label>
           <div className="t3-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l}
+              <button
+                key={l}
                 className={`t3-speed-btn ${i === speedIdx ? 't3-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
                 {l}
               </button>
             ))}
@@ -343,24 +466,47 @@ export default function ThreeOptExplainer() {
       </div>
 
       <div className="t3-controls">
-        <button className="t3-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>
+        <button
+          className="t3-btn"
+          onClick={stepBack}
+          disabled={running || historyRef.current.length === 0}
+        >
           ⏴ Back
         </button>
-        <button className="t3-btn" onClick={stepForward} disabled={running || phase === 'local_optimum'}>
+        <button
+          className="t3-btn"
+          onClick={stepForward}
+          disabled={running || phase === 'local_optimum'}
+        >
           ⏵ Step
         </button>
-        <button className="t3-btn" onClick={() => setRunning(!running)} disabled={phase === 'local_optimum'}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="t3-btn"
+          onClick={() => setRunning(!running)}
+          disabled={phase === 'local_optimum'}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
         </button>
-        <button className="t3-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
+        <button
+          className="t3-btn"
+          onClick={() => reinit(scenarioRef.current)}
+          disabled={running}
+        >
+          ↺ Reset
+        </button>
       </div>
 
       <div className="t3-scenarios">
         <div className="t3-section-label">Scenarios</div>
         <div className="t3-scenario-row">
           {Object.entries(SCENARIOS).map(([key, s]) => (
-            <button key={key} className="t3-scenario-btn" title={s.desc}
-              onClick={() => reinit(s)} disabled={running}>
+            <button
+              key={key}
+              className="t3-scenario-btn"
+              title={s.desc}
+              onClick={() => reinit(s)}
+              disabled={running}
+            >
               {s.label}
             </button>
           ))}
@@ -369,7 +515,9 @@ export default function ThreeOptExplainer() {
 
       <footer className="t3-footer">
         <span className="t3-mono">cities: {N_CITIES}</span>
-        <span className="t3-mono">O(n³) triple scan · 7 reconnections · best-improvement</span>
+        <span className="t3-mono">
+          O(n³) triple scan · 7 reconnections · best-improvement
+        </span>
       </footer>
     </div>
   )

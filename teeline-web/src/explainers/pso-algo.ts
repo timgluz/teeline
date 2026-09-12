@@ -1,5 +1,9 @@
 // Fixed 12-city demo (same layout as SA / CS / FPA / GA explainers)
-import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, tourLength12 as tourLength } from './explainer-cities'
+import {
+  CITIES_12 as CITIES,
+  N_CITIES_12 as N_CITIES,
+  tourLength12 as tourLength,
+} from './explainer-cities'
 export { CITIES, N_CITIES, tourLength }
 
 // PSO constants (mirrors particle_swarm.rs)
@@ -25,10 +29,10 @@ export type Particle = {
 }
 
 export type VelocityBreakdown = {
-  inertia: number    // total inertia swaps kept across all particles this epoch
-  cognitive: number  // total cognitive swaps added (toward pbest)
-  social: number     // total social swaps added (toward gbest)
-  applied: number    // total swaps applied after v_max cap
+  inertia: number // total inertia swaps kept across all particles this epoch
+  cognitive: number // total cognitive swaps added (toward pbest)
+  social: number // total social swaps added (toward gbest)
+  applied: number // total swaps applied after v_max cap
 }
 
 export type SimState = {
@@ -86,9 +90,18 @@ export function makeInitState(nParticles: number): SimState {
   const particles: Particle[] = Array.from({ length: nParticles }, () => {
     const position = shuffle(N_CITIES)
     const cost = tourLength(position)
-    return { position, velocity: [], pbest: position.slice(), pbest_cost: cost, cost }
+    return {
+      position,
+      velocity: [],
+      pbest: position.slice(),
+      pbest_cost: cost,
+      cost,
+    }
   })
-  const gbestIdx = particles.reduce((b, p, i) => p.cost < particles[b].cost ? i : b, 0)
+  const gbestIdx = particles.reduce(
+    (b, p, i) => (p.cost < particles[b].cost ? i : b),
+    0,
+  )
   return {
     particles,
     gbest: particles[gbestIdx].position.slice(),
@@ -110,9 +123,12 @@ export function stepEpoch(s: SimState): SimState {
   let gbest_cost = s.gbest_cost
   let newGbest = false
 
-  let totalInertia = 0, totalCognitive = 0, totalSocial = 0, totalApplied = 0
+  let totalInertia = 0,
+    totalCognitive = 0,
+    totalSocial = 0,
+    totalApplied = 0
 
-  const particles: Particle[] = s.particles.map(p => {
+  const particles: Particle[] = s.particles.map((p) => {
     const r1 = Math.random()
     const r2 = Math.random()
 
@@ -153,8 +169,17 @@ export function stepEpoch(s: SimState): SimState {
   })
 
   return {
-    particles, gbest, gbest_cost, epoch, w,
-    lastBreakdown: { inertia: totalInertia, cognitive: totalCognitive, social: totalSocial, applied: totalApplied },
+    particles,
+    gbest,
+    gbest_cost,
+    epoch,
+    w,
+    lastBreakdown: {
+      inertia: totalInertia,
+      cognitive: totalCognitive,
+      social: totalSocial,
+      applied: totalApplied,
+    },
     newGbest,
   }
 }

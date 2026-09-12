@@ -51,7 +51,8 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
   },
   lk: {
     title: 'Lin-Kernighan ILS — Interactive Explainer — Teeline',
-    description: 'Watch simplified 2-opt local search and double-bridge perturbation run step-by-step in your browser.',
+    description:
+      'Watch simplified 2-opt local search and double-bridge perturbation run step-by-step in your browser.',
     backLabel: 'LK',
   },
   sa: {

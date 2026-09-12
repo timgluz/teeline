@@ -49,4 +49,11 @@ export const FAMILY_LABELS: Record<Family, string> = {
 }
 
 // Solver ids to label explicitly on the chart (notable points).
-export const LABELED_IDS = new Set(['hk', 'nn', 'christofides', '2opt', 'lk', 'cs'])
+export const LABELED_IDS = new Set([
+  'hk',
+  'nn',
+  'christofides',
+  '2opt',
+  'lk',
+  'cs',
+])

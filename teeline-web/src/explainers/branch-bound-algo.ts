@@ -21,11 +21,11 @@ export type NodeStatus = 'open' | 'explored' | 'pruned' | 'leaf' | 'best'
 export interface BnBNode {
   id: number
   parent: number | null
-  depth: number          // path length (k)
-  path: number[]         // partial tour (visited city ids in order)
-  cost: number           // running cost of the partial tour
+  depth: number // path length (k)
+  path: number[] // partial tour (visited city ids in order)
+  cost: number // running cost of the partial tour
   unvisited: number[]
-  lb: number             // cost + MST({start} ∪ unvisited)
+  lb: number // cost + MST({start} ∪ unvisited)
   status: NodeStatus
 }
 
@@ -36,15 +36,15 @@ export interface SimState {
   cities: [number, number][]
   n: number
   startCity: number
-  dm: number[][]          // distance matrix (plain numbers — cloneable)
+  dm: number[][] // distance matrix (plain numbers — cloneable)
   nodes: BnBNode[]
-  stack: number[]         // DFS stack (node ids)
-  current: number | null  // node being expanded (top of stack)
+  stack: number[] // DFS stack (node ids)
+  current: number | null // node being expanded (top of stack)
   bestCost: number | null
   bestTour: number[] | null
-  explored: number        // nodes pushed onto the stack
-  pruned: number          // children filtered by LB ≥ best
-  leaves: number          // complete tours evaluated
+  explored: number // nodes pushed onto the stack
+  pruned: number // children filtered by LB ≥ best
+  leaves: number // complete tours evaluated
   lastEvent: string | null
   step: number
 }
@@ -94,22 +94,50 @@ export const SCENARIOS: Record<string, Scenario> = {
   small_grid: {
     label: 'Small grid',
     desc: 'A compact 6-city instance — the tree completes quickly and shows the full search',
-    cities: [[60, 60], [240, 60], [240, 240], [60, 240], [150, 60], [150, 240]],
+    cities: [
+      [60, 60],
+      [240, 60],
+      [240, 240],
+      [60, 240],
+      [150, 60],
+      [150, 240],
+    ],
   },
   good_bound: {
     label: 'Good bound',
     desc: 'A layout where the MST bound is tight — pruning cuts the tree to a couple of dozen nodes',
-    cities: [[36, 189], [238, 108], [166, 57], [235, 123], [159, 67], [172, 178]],
+    cities: [
+      [36, 189],
+      [238, 108],
+      [166, 57],
+      [235, 123],
+      [159, 67],
+      [172, 178],
+    ],
   },
   worst_case: {
     label: 'Worst case',
     desc: 'A scattered layout with a weak bound — the search nearly enumerates the whole tree',
-    cities: [[221, 167], [83, 178], [184, 162], [197, 243], [263, 44], [188, 171]],
+    cities: [
+      [221, 167],
+      [83, 178],
+      [184, 162],
+      [197, 243],
+      [263, 44],
+      [188, 171],
+    ],
   },
   early_best: {
     label: 'Early best',
     desc: 'Cities on a circle — the first complete tour is already optimal, so almost everything prunes away',
-    cities: [[270, 150], [210, 254], [90, 254], [30, 150], [90, 46], [210, 46]],
+    cities: [
+      [270, 150],
+      [210, 254],
+      [90, 254],
+      [30, 150],
+      [90, 46],
+      [210, 46],
+    ],
   },
 }
 
@@ -121,7 +149,9 @@ export function makeInitState(scenario: Scenario): SimState {
   const n = cities.length
   const dm = makeDm(cities)
   const startCity = 0
-  const unvisited = Array.from({ length: n }, (_, i) => i).filter((i) => i !== startCity)
+  const unvisited = Array.from({ length: n }, (_, i) => i).filter(
+    (i) => i !== startCity,
+  )
   const root: BnBNode = {
     id: 0,
     parent: null,
@@ -157,7 +187,13 @@ export function stepOnce(state: SimState): SimState {
   if (state.phase === 'done') return { ...state, step: state.step + 1 }
 
   if (state.stack.length === 0) {
-    return { ...state, phase: 'done', current: null, lastEvent: 'Search complete — optimal tour found', step: state.step + 1 }
+    return {
+      ...state,
+      phase: 'done',
+      current: null,
+      lastEvent: 'Search complete — optimal tour found',
+      step: state.step + 1,
+    }
   }
 
   const topId = state.stack[state.stack.length - 1]
@@ -166,7 +202,9 @@ export function stepOnce(state: SimState): SimState {
 
   // Candidates not yet branched: unvisited sorted by distance from prev
   const childCount = state.nodes.filter((nd) => nd.parent === topId).length
-  const candidates = [...top.unvisited].sort((a, b) => state.dm[prev][a] - state.dm[prev][b])
+  const candidates = [...top.unvisited].sort(
+    (a, b) => state.dm[prev][a] - state.dm[prev][b],
+  )
 
   if (childCount < candidates.length) {
     const c = candidates[childCount]
@@ -182,7 +220,12 @@ export function stepOnce(state: SimState): SimState {
       const isBest = state.bestCost === null || tourCost < state.bestCost
       const closed = [...path, state.startCity].join('→')
       const node: BnBNode = {
-        id, parent: topId, depth: path.length, path, cost, unvisited,
+        id,
+        parent: topId,
+        depth: path.length,
+        path,
+        cost,
+        unvisited,
         lb: tourCost,
         status: isBest ? 'best' : 'leaf',
       }
@@ -204,7 +247,14 @@ export function stepOnce(state: SimState): SimState {
     if (state.bestCost !== null && lb >= state.bestCost) {
       // Pruned immediately — cannot beat the best tour
       const node: BnBNode = {
-        id, parent: topId, depth: path.length, path, cost, unvisited, lb, status: 'pruned',
+        id,
+        parent: topId,
+        depth: path.length,
+        path,
+        cost,
+        unvisited,
+        lb,
+        status: 'pruned',
       }
       return {
         ...state,
@@ -216,7 +266,14 @@ export function stepOnce(state: SimState): SimState {
     }
 
     const node: BnBNode = {
-      id, parent: topId, depth: path.length, path, cost, unvisited, lb, status: 'open',
+      id,
+      parent: topId,
+      depth: path.length,
+      path,
+      cost,
+      unvisited,
+      lb,
+      status: 'open',
     }
     return {
       ...state,
@@ -237,7 +294,9 @@ export function stepOnce(state: SimState): SimState {
     stack: rest,
     current: parent,
     // mark this node explored (it stays in the tree, but no longer frontier)
-    nodes: state.nodes.map((nd) => (nd.id === topId ? { ...nd, status: 'explored' as NodeStatus } : nd)),
+    nodes: state.nodes.map((nd) =>
+      nd.id === topId ? { ...nd, status: 'explored' as NodeStatus } : nd,
+    ),
     lastEvent: `Backtracked — no better branch under ${top.path.join('→')}`,
     step: state.step + 1,
   }

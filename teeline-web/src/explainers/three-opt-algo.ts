@@ -33,13 +33,13 @@ export const CASE_LABELS: Record<CaseNo, string> = {
 }
 
 export interface MoveEvent {
-  i: number             // A = path[i]
-  j: number             // C = path[j]
-  k: number             // E = path[k]
+  i: number // A = path[i]
+  j: number // C = path[j]
+  k: number // E = path[k]
   caseNo: CaseNo
-  delta: number         // new tour length − old tour length (negative = improvement)
-  removedEdges: [number, number][]  // [A,B], [C,D], [E,F] — the three cut edges
-  addedEdges: [number, number][]    // the three reconnection edges for this case
+  delta: number // new tour length − old tour length (negative = improvement)
+  removedEdges: [number, number][] // [A,B], [C,D], [E,F] — the three cut edges
+  addedEdges: [number, number][] // the three reconnection edges for this case
 }
 
 export interface SimState {
@@ -47,8 +47,8 @@ export interface SimState {
   tour: number[]
   bestTour: number[]
   bestCost: number
-  pass: number          // completed scans (one per applied swap + final scan)
-  swaps: number         // applied 3-opt moves
+  pass: number // completed scans (one per applied swap + final scan)
+  swaps: number // applied 3-opt moves
   pending: MoveEvent | null
   lastMove: MoveEvent | null
   costHistory: number[] // best cost after each pass (sparkline)
@@ -56,15 +56,58 @@ export interface SimState {
 }
 
 // New edge sets for the 7 reconnection cases (Rust reconnection_costs table).
-function addedEdgesForCase(a: number, b: number, c: number, d: number, e: number, f: number, caseNo: CaseNo): [number, number][] {
+function addedEdgesForCase(
+  a: number,
+  b: number,
+  c: number,
+  d: number,
+  e: number,
+  f: number,
+  caseNo: CaseNo,
+): [number, number][] {
   switch (caseNo) {
-    case 1: return [[a, c], [b, d], [e, f]]
-    case 2: return [[a, b], [c, e], [d, f]]
-    case 3: return [[a, c], [b, e], [d, f]]
-    case 4: return [[a, d], [e, b], [c, f]]
-    case 5: return [[a, d], [e, c], [b, f]]
-    case 6: return [[a, e], [d, b], [c, f]]
-    case 7: return [[a, e], [d, c], [b, f]]
+    case 1:
+      return [
+        [a, c],
+        [b, d],
+        [e, f],
+      ]
+    case 2:
+      return [
+        [a, b],
+        [c, e],
+        [d, f],
+      ]
+    case 3:
+      return [
+        [a, c],
+        [b, e],
+        [d, f],
+      ]
+    case 4:
+      return [
+        [a, d],
+        [e, b],
+        [c, f],
+      ]
+    case 5:
+      return [
+        [a, d],
+        [e, c],
+        [b, f],
+      ]
+    case 6:
+      return [
+        [a, e],
+        [d, b],
+        [c, f],
+      ]
+    case 7:
+      return [
+        [a, e],
+        [d, c],
+        [b, f],
+      ]
   }
 }
 
@@ -73,7 +116,13 @@ function addedEdgesForCase(a: number, b: number, c: number, d: number, e: number
 // lowest-index best case; overall the first move with the max savings.
 export function scanBestMove(tour: number[]): MoveEvent | null {
   const n = tour.length
-  let bestMove: { i: number; j: number; k: number; caseNo: CaseNo; delta: number } | null = null
+  let bestMove: {
+    i: number
+    j: number
+    k: number
+    caseNo: CaseNo
+    delta: number
+  } | null = null
   let bestSavings = 0
 
   for (let i = 0; i < n - 2; i++) {
@@ -132,28 +181,49 @@ export function scanBestMove(tour: number[]): MoveEvent | null {
   const e = tour[k]
   const f = tour[(k + 1) % n]
   return {
-    i, j, k, caseNo, delta,
-    removedEdges: [[a, b], [c, dt], [e, f]],
+    i,
+    j,
+    k,
+    caseNo,
+    delta,
+    removedEdges: [
+      [a, b],
+      [c, dt],
+      [e, f],
+    ],
     addedEdges: addedEdgesForCase(a, b, c, dt, e, f, caseNo),
   }
 }
 
 // Rust apply_3opt: cases 1–3 reverse segments, cases 4–7 swap/reverse the two
 // middle segments into [i+1..=k].
-export function apply3Opt(tour: number[], i: number, j: number, k: number, caseNo: CaseNo): number[] {
+export function apply3Opt(
+  tour: number[],
+  i: number,
+  j: number,
+  k: number,
+  caseNo: CaseNo,
+): number[] {
   const rev = (arr: number[]) => [...arr].reverse()
   const s1 = tour.slice(i + 1, j + 1) // [i+1..=j]
   const s2 = tour.slice(j + 1, k + 1) // [j+1..=k]
   const head = tour.slice(0, i + 1)
   const tail = tour.slice(k + 1)
   switch (caseNo) {
-    case 1: return [...head, ...rev(s1), ...s2, ...tail]
-    case 2: return [...head, ...s1, ...rev(s2), ...tail]
-    case 3: return [...head, ...rev(s1), ...rev(s2), ...tail]
-    case 4: return [...head, ...s2, ...s1, ...tail]
-    case 5: return [...head, ...s2, ...rev(s1), ...tail]
-    case 6: return [...head, ...rev(s2), ...s1, ...tail]
-    case 7: return [...head, ...rev(s2), ...rev(s1), ...tail]
+    case 1:
+      return [...head, ...rev(s1), ...s2, ...tail]
+    case 2:
+      return [...head, ...s1, ...rev(s2), ...tail]
+    case 3:
+      return [...head, ...rev(s1), ...rev(s2), ...tail]
+    case 4:
+      return [...head, ...s2, ...s1, ...tail]
+    case 5:
+      return [...head, ...s2, ...rev(s1), ...tail]
+    case 6:
+      return [...head, ...rev(s2), ...s1, ...tail]
+    case 7:
+      return [...head, ...rev(s2), ...rev(s1), ...tail]
   }
 }
 

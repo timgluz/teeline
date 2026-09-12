@@ -1,16 +1,36 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, SCENARIOS,
-  dist, tourLength, makeRng, nextRand, seededShuffle,
-  reverseSegment, randomSuccessor, makeInitState, stepOnce,
+  N_CITIES,
+  SCENARIOS,
+  dist,
+  tourLength,
+  makeRng,
+  nextRand,
+  seededShuffle,
+  reverseSegment,
+  randomSuccessor,
+  makeInitState,
+  stepOnce,
 } from './stochastic-hill-algo'
 import type { SimState } from './stochastic-hill-algo'
 
 // True optimum for the shared 8-city layout (brute-forced; verified below).
 const OPT = 827.774076596031
 
-function runToDone(seed: number, epochs: number, patience: number, initTour?: number[]): SimState {
-  let s = makeInitState({ label: '', desc: '', seed, epochs, patience, initTour })
+function runToDone(
+  seed: number,
+  epochs: number,
+  patience: number,
+  initTour?: number[],
+): SimState {
+  let s = makeInitState({
+    label: '',
+    desc: '',
+    seed,
+    epochs,
+    patience,
+    initTour,
+  })
   let guard = epochs + 1000
   while (s.phase !== 'done' && guard-- > 0) s = stepOnce(s)
   expect(s.phase, 'runToDone must reach done').toBe('done')
@@ -51,7 +71,10 @@ describe('tourLength', () => {
   })
 
   it('matches the known length of the crafted quick-start tour', () => {
-    expect(tourLength(SCENARIOS.quick_convergence.initTour!)).toBeCloseTo(1128.8, 1)
+    expect(tourLength(SCENARIOS.quick_convergence.initTour!)).toBeCloseTo(
+      1128.8,
+      1,
+    )
   })
 })
 
@@ -174,12 +197,16 @@ describe('randomSuccessor', () => {
   it('handles the (0, n−1) full-tour reversal with a single wrap edge (no self-loops)', () => {
     const tour = [0, 1, 2, 3, 4, 5, 6, 7]
     const n = tour.length
-    let hit: { removed: [number, number][]; added: [number, number][] } | null = null
+    let hit: { removed: [number, number][]; added: [number, number][] } | null =
+      null
     for (let seed = 1; seed <= 5000 && !hit; seed++) {
       const { i, j, removed, added } = randomSuccessor(tour, makeRng(seed))
       if (i === 0 && j === n - 1) hit = { removed, added }
     }
-    expect(hit, 'expected a seed producing the (0, n−1) full-tour reversal').not.toBeNull()
+    expect(
+      hit,
+      'expected a seed producing the (0, n−1) full-tour reversal',
+    ).not.toBeNull()
     expect(hit!.removed).toEqual([[tour[n - 1], tour[0]]])
     expect(hit!.added).toEqual([[tour[n - 1], tour[0]]])
   })
@@ -190,9 +217,15 @@ describe('SCENARIOS', () => {
   it('every tour (init or shuffle) is a valid permutation', () => {
     for (const [key, s] of Object.entries(SCENARIOS)) {
       const init = makeInitState(s)
-      expect(isPermutation(init.tour), `${key} tour must be a permutation`).toBe(true)
+      expect(
+        isPermutation(init.tour),
+        `${key} tour must be a permutation`,
+      ).toBe(true)
       if (s.initTour) {
-        expect(isPermutation(s.initTour), `${key} initTour must be a permutation`).toBe(true)
+        expect(
+          isPermutation(s.initTour),
+          `${key} initTour must be a permutation`,
+        ).toBe(true)
       }
     }
   })
@@ -274,7 +307,12 @@ describe('stepOnce phase machine', () => {
     let guard = 200
     while (guard-- > 0 && s.phase !== 'done') {
       const next = stepOnce(s)
-      if (next.phase !== 'propose' && next.pending && !next.pending.accepted && !next.pending.restart) {
+      if (
+        next.phase !== 'propose' &&
+        next.pending &&
+        !next.pending.accepted &&
+        !next.pending.restart
+      ) {
         expect(next.tour).toEqual(s.tour)
         expect(next.bestCost).toBe(s.bestCost)
         expect(next.nStale).toBe(s.nStale + 1)
@@ -286,7 +324,12 @@ describe('stepOnce phase machine', () => {
   })
 
   it('done is a no-op apart from the step counter', () => {
-    const done = runToDone(SCENARIOS.quick_convergence.seed, 10, 5, SCENARIOS.quick_convergence.initTour)
+    const done = runToDone(
+      SCENARIOS.quick_convergence.seed,
+      10,
+      5,
+      SCENARIOS.quick_convergence.initTour,
+    )
     const again = stepOnce(done)
     expect(again.phase).toBe('done')
     expect(again.epoch).toBe(done.epoch)
@@ -326,7 +369,10 @@ describe('Rust-faithful acceptance (candidate must beat best-so-far)', () => {
       s = next
     }
     expect(sawRestart).toBe(true)
-    expect(sawQuirk, 'expected a delta<0-but-rejected candidate after a restart').toBe(true)
+    expect(
+      sawQuirk,
+      'expected a delta<0-but-rejected candidate after a restart',
+    ).toBe(true)
   })
 
   it('acceptedCount + rejectedCount + restarts == epoch (verdicts partition)', () => {
@@ -387,7 +433,12 @@ describe('cost bookkeeping', () => {
 // ---------------------------------------------------------------
 describe('pinned scenario behaviour', () => {
   it('quick_convergence: reaches the optimum with no restarts, first improvement at epoch 1', () => {
-    const s = runToDone(SCENARIOS.quick_convergence.seed, SCENARIOS.quick_convergence.epochs, SCENARIOS.quick_convergence.patience, SCENARIOS.quick_convergence.initTour)
+    const s = runToDone(
+      SCENARIOS.quick_convergence.seed,
+      SCENARIOS.quick_convergence.epochs,
+      SCENARIOS.quick_convergence.patience,
+      SCENARIOS.quick_convergence.initTour,
+    )
     expect(s.restarts).toBeLessThanOrEqual(1)
     expect(s.bestCost).toBeCloseTo(OPT, 3)
     // ≥ 2 accepts — was 3 before dist moved to the shared Math.hypot helper;
@@ -397,7 +448,11 @@ describe('pinned scenario behaviour', () => {
   })
 
   it('rugged_landscape: many restarts and a poor final result', () => {
-    const s = runToDone(SCENARIOS.rugged_landscape.seed, SCENARIOS.rugged_landscape.epochs, SCENARIOS.rugged_landscape.patience)
+    const s = runToDone(
+      SCENARIOS.rugged_landscape.seed,
+      SCENARIOS.rugged_landscape.epochs,
+      SCENARIOS.rugged_landscape.patience,
+    )
     expect(s.restarts).toBeGreaterThanOrEqual(6)
     expect(s.bestCost).toBeGreaterThanOrEqual(OPT * 1.2)
   })
@@ -411,7 +466,11 @@ describe('pinned scenario behaviour', () => {
     while (s.phase !== 'done' && guard-- > 0) {
       const before = s
       s = stepOnce(s)
-      if (before.phase === 'propose' && s.phase !== 'propose' && s.bestCost < before.bestCost) {
+      if (
+        before.phase === 'propose' &&
+        s.phase !== 'propose' &&
+        s.bestCost < before.bestCost
+      ) {
         finalBestEpoch = s.epoch
         restartsBeforeFinal = s.restarts
       }

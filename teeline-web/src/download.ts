@@ -37,8 +37,13 @@ export function serializeSvg(svgEl: SVGSVGElement): Blob {
   return new Blob([svg], { type: 'image/svg+xml' })
 }
 
-export function triggerDownload(content: string | Blob, filename: string, mime: string): void {
-  const blob = typeof content === 'string' ? new Blob([content], { type: mime }) : content
+export function triggerDownload(
+  content: string | Blob,
+  filename: string,
+  mime: string,
+): void {
+  const blob =
+    typeof content === 'string' ? new Blob([content], { type: mime }) : content
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

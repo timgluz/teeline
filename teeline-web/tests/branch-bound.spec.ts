@@ -21,7 +21,9 @@ test.describe('branch & bound explainer', () => {
     await waitHydrated(page)
   })
 
-  test('renders the search tree, city map, stats and scenarios', async ({ page }) => {
+  test('renders the search tree, city map, stats and scenarios', async ({
+    page,
+  }) => {
     await expect(page.locator('.bb-title')).toContainText('Branch & Bound')
     await expect(page.locator('.bb-tree')).toBeVisible()
     await expect(page.locator('.bb-map')).toBeVisible()
@@ -33,14 +35,22 @@ test.describe('branch & bound explainer', () => {
     await expect(stats).toContainText('leaves')
     await expect(stats).toContainText('best')
 
-    for (const label of ['Small grid', 'Good bound', 'Worst case', 'Early best']) {
+    for (const label of [
+      'Small grid',
+      'Good bound',
+      'Worst case',
+      'Early best',
+    ]) {
       await expect(page.getByRole('button', { name: label })).toBeVisible()
     }
   })
 
   test('Step expands the search tree one node at a time', async ({ page }) => {
     const chip = page.locator('.bb-chip')
-    const nodes = page.locator('.bb-statgrid').locator('div', { hasText: /^nodes/ }).locator('.bb-mono')
+    const nodes = page
+      .locator('.bb-statgrid')
+      .locator('div', { hasText: /^nodes/ })
+      .locator('.bb-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     await expect(chip).toContainText('Expanded')
@@ -50,7 +60,9 @@ test.describe('branch & bound explainer', () => {
     await expect(chip).toContainText(/Expanded|Leaf|Pruned|Backtracked/)
   })
 
-  test('Run completes the search with the optimal tour; Reset restores', async ({ page }) => {
+  test('Run completes the search with the optimal tour; Reset restores', async ({
+    page,
+  }) => {
     const chip = page.locator('.bb-chip')
 
     await page.getByRole('button', { name: 'Run' }).click()
@@ -61,7 +73,10 @@ test.describe('branch & bound explainer', () => {
   })
 
   test('Back restores the previous step', async ({ page }) => {
-    const step = page.locator('.bb-statgrid').locator('div', { hasText: /^step/ }).locator('.bb-mono')
+    const step = page
+      .locator('.bb-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.bb-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     await page.getByRole('button', { name: 'Step' }).click()
@@ -72,7 +87,10 @@ test.describe('branch & bound explainer', () => {
   })
 
   test('Pause stops the animation mid-run', async ({ page }) => {
-    const step = page.locator('.bb-statgrid').locator('div', { hasText: /^step/ }).locator('.bb-mono')
+    const step = page
+      .locator('.bb-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.bb-mono')
 
     await page.getByRole('button', { name: 'Run' }).click()
     await page.getByRole('button', { name: 'Pause' }).click()
@@ -82,7 +100,10 @@ test.describe('branch & bound explainer', () => {
   })
 
   test('scenario buttons restart the run', async ({ page }) => {
-    const step = page.locator('.bb-statgrid').locator('div', { hasText: /^step/ }).locator('.bb-mono')
+    const step = page
+      .locator('.bb-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.bb-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     await expect(step).not.toHaveText('0')

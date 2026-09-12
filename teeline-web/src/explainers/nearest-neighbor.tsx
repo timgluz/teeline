@@ -1,19 +1,28 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES, SCENARIOS,
-  tourLength, makeInitState, stepOnce,
-} from "./nearest-neighbor-algo"
-import type { EventMode, Candidate } from "./nearest-neighbor-algo"
+  CITIES,
+  N_CITIES,
+  SCENARIOS,
+  tourLength,
+  makeInitState,
+  stepOnce,
+} from './nearest-neighbor-algo'
+import type { EventMode, Candidate } from './nearest-neighbor-algo'
 
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 
 const DEFAULT_START = SCENARIOS.balanced.startCity
 
 // ---------------------------------------------------------------
 // NNCanvas — tour edges, visited/unvisited cities, candidate edges
 // ---------------------------------------------------------------
-function NNCanvas({ tour, candidateDists, done, lastEvent }: {
+function NNCanvas({
+  tour,
+  candidateDists,
+  done,
+  lastEvent,
+}: {
   tour: number[]
   candidateDists: Candidate[] | null
   done: boolean
@@ -40,39 +49,62 @@ function NNCanvas({ tour, candidateDists, done, lastEvent }: {
   const showCandidates = !done && candidateDists && candidateDists.length > 0
 
   return (
-    <svg viewBox="0 0 300 300" className="nn-canvas" role="img" aria-label="Nearest Neighbor tour">
+    <svg
+      viewBox="0 0 300 300"
+      className="nn-canvas"
+      role="img"
+      aria-label="Nearest Neighbor tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="nn-bg" />
 
       {/* candidate edges — faint dashed from current to all unvisited */}
-      {showCandidates && candidateDists!.map((c) => (
-        <line key={c.city}
-          className={c === candidateDists![0] ? "nn-cand-best" : "nn-cand-edge"}
-          x1={CITIES[current][0]} y1={CITIES[current][1]}
-          x2={CITIES[c.city][0]} y2={CITIES[c.city][1]} />
-      ))}
+      {showCandidates &&
+        candidateDists!.map((c) => (
+          <line
+            key={c.city}
+            className={
+              c === candidateDists![0] ? 'nn-cand-best' : 'nn-cand-edge'
+            }
+            x1={CITIES[current][0]}
+            y1={CITIES[current][1]}
+            x2={CITIES[c.city][0]}
+            y2={CITIES[c.city][1]}
+          />
+        ))}
 
       {/* tour edges — solid green for visited path */}
       {edges.map(([a, b], i) => {
-        const isLast = !done && i === edges.length - 1 && lastEvent === 'visited'
+        const isLast =
+          !done && i === edges.length - 1 && lastEvent === 'visited'
         return (
-          <line key={`${a}-${b}`}
-            className={isLast ? "nn-edge-last" : "nn-edge"}
-            x1={CITIES[a][0]} y1={CITIES[a][1]}
-            x2={CITIES[b][0]} y2={CITIES[b][1]} />
+          <line
+            key={`${a}-${b}`}
+            className={isLast ? 'nn-edge-last' : 'nn-edge'}
+            x1={CITIES[a][0]}
+            y1={CITIES[a][1]}
+            x2={CITIES[b][0]}
+            y2={CITIES[b][1]}
+          />
         )
       })}
 
       {/* closing edge */}
-      {done && tour.length >= 2 && (() => {
-        const last = tour[tour.length - 1]
-        const prev = tour[tour.length - 2]
-        return (
-          <line key="closing"
-            className="nn-edge-closing"
-            x1={CITIES[prev][0]} y1={CITIES[prev][1]}
-            x2={CITIES[last][0]} y2={CITIES[last][1]} />
-        )
-      })()}
+      {done &&
+        tour.length >= 2 &&
+        (() => {
+          const last = tour[tour.length - 1]
+          const prev = tour[tour.length - 2]
+          return (
+            <line
+              key="closing"
+              className="nn-edge-closing"
+              x1={CITIES[prev][0]}
+              y1={CITIES[prev][1]}
+              x2={CITIES[last][0]}
+              y2={CITIES[last][1]}
+            />
+          )
+        })()}
 
       {/* cities */}
       {Array.from({ length: N_CITIES }, (_, i) => {
@@ -80,19 +112,21 @@ function NNCanvas({ tour, candidateDists, done, lastEvent }: {
         const isCurrent = i === current && !done
         const order = orderMap.get(i)
 
-        let cls = "nn-city"
-        if (isCurrent) cls += " nn-city-current"
-        else if (isVisited) cls += " nn-city-visited"
-        else cls += " nn-city-unvisited"
+        let cls = 'nn-city'
+        if (isCurrent) cls += ' nn-city-current'
+        else if (isVisited) cls += ' nn-city-visited'
+        else cls += ' nn-city-unvisited'
 
         return (
           <g key={i}>
             <circle className={cls} cx={CITIES[i][0]} cy={CITIES[i][1]} r={6} />
-            <text className="nn-label"
-              x={CITIES[i][0]} y={CITIES[i][1] + 16}>{i}</text>
+            <text className="nn-label" x={CITIES[i][0]} y={CITIES[i][1] + 16}>
+              {i}
+            </text>
             {order && (
-              <text className="nn-order"
-                x={CITIES[i][0]} y={CITIES[i][1] + 3}>{order}</text>
+              <text className="nn-order" x={CITIES[i][0]} y={CITIES[i][1] + 3}>
+                {order}
+              </text>
             )}
           </g>
         )
@@ -106,7 +140,8 @@ function NNCanvas({ tour, candidateDists, done, lastEvent }: {
 // ---------------------------------------------------------------
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return null
-  const W = 300, H = 46
+  const W = 300,
+    H = 46
   const minV = Math.min(...values)
   const maxV = Math.max(...values)
   const range = maxV - minV || 1
@@ -118,8 +153,13 @@ function Sparkline({ values }: { values: number[] }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="nn-spark">
       <rect x={0} y={0} width={W} height={H} className="nn-bg" rx={4} />
-      <polyline points={pts.join(" ")} fill="none" stroke="#0d9488"
-        strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke="#0d9488"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -175,7 +215,7 @@ export default function NNExplainer() {
     setCandidateDists(next.candidateDists ? [...next.candidateDists] : null)
     setStep(next.step)
     if (next.lastEvent === 'visited' || next.lastEvent === 'closing') {
-      setCostHistory(h => [...h, tourLength(next.tour)])
+      setCostHistory((h) => [...h, tourLength(next.tour)])
     }
     if (next.done) setRunning(false)
   }, [])
@@ -203,18 +243,27 @@ export default function NNExplainer() {
 
   const currentDist = tour.length >= 2 ? tourLength(tour) : 0
 
-  let chipText = "Click Step to start — NN picks the closest unvisited city"
-  let chipClass = "nn-chip nn-chip-idle"
-  if (lastEvent === 'visited' && lastCity !== null && candidateDists && candidateDists.length > 0) {
+  let chipText = 'Click Step to start — NN picks the closest unvisited city'
+  let chipClass = 'nn-chip nn-chip-idle'
+  if (
+    lastEvent === 'visited' &&
+    lastCity !== null &&
+    candidateDists &&
+    candidateDists.length > 0
+  ) {
     const next = candidateDists[0]
     chipText = `NN picks city ${lastCity} (dist=${lastDist.toFixed(0)}) — next closest: ${next.city} at ${next.dist.toFixed(0)}`
-    chipClass = "nn-chip nn-chip-visit"
-  } else if (lastEvent === 'visited' && lastCity !== null && (!candidateDists || candidateDists.length === 0)) {
+    chipClass = 'nn-chip nn-chip-visit'
+  } else if (
+    lastEvent === 'visited' &&
+    lastCity !== null &&
+    (!candidateDists || candidateDists.length === 0)
+  ) {
     chipText = `Last city ${lastCity} visited (dist=${lastDist.toFixed(0)}) — closing to start`
-    chipClass = "nn-chip nn-chip-visit"
+    chipClass = 'nn-chip nn-chip-visit'
   } else if (lastEvent === 'closing') {
     chipText = `Tour closed — final edge  ${lastDist.toFixed(0)}  — total distance  ${currentDist.toFixed(0)}`
-    chipClass = "nn-chip nn-chip-done"
+    chipClass = 'nn-chip nn-chip-done'
   }
 
   return (
@@ -225,10 +274,10 @@ export default function NNExplainer() {
         <div className="nn-eyebrow">teeline · algorithms/nn</div>
         <h2 className="nn-title">Nearest Neighbor Construction</h2>
         <p className="nn-sub">
-          The simplest constructive TSP heuristic: start from a chosen city, repeatedly
-          move to the <strong>closest unvisited city</strong>, then close the tour back to
-          the start. Each step is a single greedy decision — easy to follow, but the
-          final tour can be far from optimal.
+          The simplest constructive TSP heuristic: start from a chosen city,
+          repeatedly move to the <strong>closest unvisited city</strong>, then
+          close the tour back to the start. Each step is a single greedy
+          decision — easy to follow, but the final tour can be far from optimal.
         </p>
       </header>
 
@@ -236,17 +285,29 @@ export default function NNExplainer() {
         <div className="nn-canvas-wrap">
           <NNCanvas
             tour={tour}
-            candidateDists={candidateDists} done={done} lastEvent={lastEvent}
+            candidateDists={candidateDists}
+            done={done}
+            lastEvent={lastEvent}
           />
         </div>
       </div>
 
       <div className="nn-legend">
-        <span><span className="nn-swatch nn-swatch-path" /> visited path</span>
-        <span><span className="nn-swatch nn-swatch-last" /> last edge</span>
-        <span><span className="nn-swatch nn-swatch-cand" /> candidate edge</span>
-        <span><span className="nn-swatch nn-swatch-best" /> nearest candidate</span>
-        <span><span className="nn-swatch nn-swatch-curr" /> current city</span>
+        <span>
+          <span className="nn-swatch nn-swatch-path" /> visited path
+        </span>
+        <span>
+          <span className="nn-swatch nn-swatch-last" /> last edge
+        </span>
+        <span>
+          <span className="nn-swatch nn-swatch-cand" /> candidate edge
+        </span>
+        <span>
+          <span className="nn-swatch nn-swatch-best" /> nearest candidate
+        </span>
+        <span>
+          <span className="nn-swatch nn-swatch-curr" /> current city
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -254,7 +315,9 @@ export default function NNExplainer() {
       <div className="nn-statgrid">
         <div>
           <div className="nn-statlabel">visited</div>
-          <div className="nn-mono">{new Set(tour).size - (done ? 1 : 0)}/{N_CITIES}</div>
+          <div className="nn-mono">
+            {new Set(tour).size - (done ? 1 : 0)}/{N_CITIES}
+          </div>
         </div>
         <div>
           <div className="nn-statlabel">remaining</div>
@@ -282,9 +345,12 @@ export default function NNExplainer() {
           <label className="nn-label">Speed</label>
           <div className="nn-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l}
+              <button
+                key={l}
                 className={`nn-speed-btn ${i === speedIdx ? 'nn-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
                 {l}
               </button>
             ))}
@@ -293,24 +359,38 @@ export default function NNExplainer() {
       </div>
 
       <div className="nn-controls">
-        <button className="nn-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>
+        <button
+          className="nn-btn"
+          onClick={stepBack}
+          disabled={running || historyRef.current.length === 0}
+        >
           ⏴ Back
         </button>
         <button className="nn-btn" onClick={step_fn} disabled={running || done}>
           ⏵ Step
         </button>
-        <button className="nn-btn" onClick={() => setRunning(!running)} disabled={done}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="nn-btn"
+          onClick={() => setRunning(!running)}
+          disabled={done}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
         </button>
-        <button className="nn-btn" onClick={() => reinit(tour[0])}>↺ Reset</button>
+        <button className="nn-btn" onClick={() => reinit(tour[0])}>
+          ↺ Reset
+        </button>
       </div>
 
       <div className="nn-scenarios">
         <div className="nn-section-label">Scenarios</div>
         <div className="nn-scenario-row">
           {Object.entries(SCENARIOS).map(([key, s]) => (
-            <button key={key} className="nn-scenario-btn" title={s.desc}
-              onClick={() => reinit(s.startCity)}>
+            <button
+              key={key}
+              className="nn-scenario-btn"
+              title={s.desc}
+              onClick={() => reinit(s.startCity)}
+            >
               {s.label}
             </button>
           ))}
@@ -319,7 +399,11 @@ export default function NNExplainer() {
 
       <footer className="nn-footer">
         <span className="nn-mono">cities: {N_CITIES}</span>
-        <span className="nn-mono">{done ? `total: ${currentDist.toFixed(0)}` : `partial: ${currentDist.toFixed(0)}`}</span>
+        <span className="nn-mono">
+          {done
+            ? `total: ${currentDist.toFixed(0)}`
+            : `partial: ${currentDist.toFixed(0)}`}
+        </span>
         <span className="nn-mono">greedy nearest neighbor</span>
       </footer>
     </div>

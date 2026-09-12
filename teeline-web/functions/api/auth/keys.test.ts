@@ -26,7 +26,12 @@ function req(path: string, init: RequestInit = {}): Request {
   const { headers, ...rest } = init
   return new Request(`http://localhost:8788${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:8788', 'CF-Connecting-IP': '1.2.3.4', ...(headers as Record<string, string>) },
+    headers: {
+      'Content-Type': 'application/json',
+      Origin: 'http://localhost:8788',
+      'CF-Connecting-IP': '1.2.3.4',
+      ...(headers as Record<string, string>),
+    },
     ...rest,
   })
 }
@@ -56,21 +61,37 @@ describe('key creation (show-once)', () => {
   it('mints a well-formed key, stores only the hash, and returns the secret once', async () => {
     await seedUser()
     const cookie = await sessionCookie('u1')
-    const res = await createKey(ctx(req('/api/auth/keys', { body: JSON.stringify({ name: 'my-laptop' }), headers: { Cookie: cookie } })))
+    const res = await createKey(
+      ctx(
+        req('/api/auth/keys', {
+          body: JSON.stringify({ name: 'my-laptop' }),
+          headers: { Cookie: cookie },
+        }),
+      ),
+    )
     expect(res.status).toBe(201)
-    const body = (await res.json()) as { id: string; name: string | null; secret: string }
+    const body = (await res.json()) as {
+      id: string
+      name: string | null
+      secret: string
+    }
     expect(body.id).toMatch(/^key_/)
     expect(body.name).toBe('my-laptop')
     expect(body.secret).toMatch(/^ak_[A-Za-z0-9_-]{43}$/)
 
     // only the hash is stored: looking up by the secret's hash finds it
-    const rows = await shim.prepare('SELECT id, secret_hash FROM api_keys').bind().all<{ id: string; secret_hash: string }>()
+    const rows = await shim
+      .prepare('SELECT id, secret_hash FROM api_keys')
+      .bind()
+      .all<{ id: string; secret_hash: string }>()
     expect(rows.results).toHaveLength(1)
     expect(rows.results[0].secret_hash).not.toBe(body.secret)
     expect(rows.results[0].secret_hash).toMatch(/^[0-9a-f]{64}$/)
 
     // second mint → different secret
-    const res2 = await createKey(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))
+    const res2 = await createKey(
+      ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })),
+    )
     const body2 = (await res2.json()) as { secret: string }
     expect(body2.secret).not.toBe(body.secret)
   })
@@ -80,12 +101,35 @@ describe('key listing', () => {
   it('returns metadata only — never the secret or hash', async () => {
     await seedUser()
     const cookie = await sessionCookie('u1')
-    await createKey(ctx(req('/api/auth/keys', { body: JSON.stringify({ name: 'a' }), headers: { Cookie: cookie } })))
-    await createKey(ctx(req('/api/auth/keys', { body: JSON.stringify({ name: 'b' }), headers: { Cookie: cookie } })))
+    await createKey(
+      ctx(
+        req('/api/auth/keys', {
+          body: JSON.stringify({ name: 'a' }),
+          headers: { Cookie: cookie },
+        }),
+      ),
+    )
+    await createKey(
+      ctx(
+        req('/api/auth/keys', {
+          body: JSON.stringify({ name: 'b' }),
+          headers: { Cookie: cookie },
+        }),
+      ),
+    )
 
-    const res = await listKeys(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))
+    const res = await listKeys(
+      ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })),
+    )
     expect(res.status).toBe(200)
-    const { keys } = (await res.json()) as { keys: { id: string; name: string | null; secret?: string; secret_hash?: string }[] }
+    const { keys } = (await res.json()) as {
+      keys: {
+        id: string
+        name: string | null
+        secret?: string
+        secret_hash?: string
+      }[]
+    }
     expect(keys).toHaveLength(2)
     for (const k of keys) {
       expect(k.secret).toBeUndefined()
@@ -104,77 +148,204 @@ describe('key revocation', () => {
     await seedUser()
     await seedUser('u2')
     const cookie = await sessionCookie('u1')
-    const minted = (await createKey(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))).json() as unknown as Promise<{ id: string; secret: string }>
+    const minted = (
+      await createKey(
+        ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })),
+      )
+    ).json() as unknown as Promise<{ id: string; secret: string }>
     const { id, secret } = await minted
 
     // verify works before revocation
-    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(200)
+    expect(
+      (
+        await verifyKey(
+          ctx(
+            req('/api/auth/keys/verify', {
+              body: JSON.stringify({ secret }),
+              headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+            }),
+          ),
+        )
+      ).status,
+    ).toBe(200)
 
     // non-owner cannot revoke
     const nonOwner = await revokeKey(ctx(req('/api/auth/keys'), { id }), { id })
     expect((nonOwner as Response).status).toBe(401) // no session
     const otherCookie = await sessionCookie('u2')
-    const asOther = await revokeKey(ctx(req('/api/auth/keys', { headers: { Cookie: otherCookie } }), { id }), { id })
+    const asOther = await revokeKey(
+      ctx(req('/api/auth/keys', { headers: { Cookie: otherCookie } }), { id }),
+      { id },
+    )
     expect((asOther as Response).status).toBe(400) // 'Key not found' (scoped)
 
     // owner revokes → verify now 404
-    const revoked = await revokeKey(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } }), { id }), { id })
+    const revoked = await revokeKey(
+      ctx(req('/api/auth/keys', { headers: { Cookie: cookie } }), { id }),
+      { id },
+    )
     expect((revoked as Response).status).toBe(200)
-    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(404)
+    expect(
+      (
+        await verifyKey(
+          ctx(
+            req('/api/auth/keys/verify', {
+              body: JSON.stringify({ secret }),
+              headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+            }),
+          ),
+        )
+      ).status,
+    ).toBe(404)
   })
 })
 
 describe('internal verify endpoint', () => {
   it('rejects missing or wrong shared secret', async () => {
     const body = JSON.stringify({ secret: 'ak_anything' })
-    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body })))).status).toBe(401)
-    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body, headers: { 'X-Auth-Secret': 'wrong' } })))).status).toBe(401)
+    expect(
+      (await verifyKey(ctx(req('/api/auth/keys/verify', { body })))).status,
+    ).toBe(401)
+    expect(
+      (
+        await verifyKey(
+          ctx(
+            req('/api/auth/keys/verify', {
+              body,
+              headers: { 'X-Auth-Secret': 'wrong' },
+            }),
+          ),
+        )
+      ).status,
+    ).toBe(401)
   })
 
   it('returns the Clerk-shaped contract for a valid key', async () => {
     await seedUser()
     const cookie = await sessionCookie('u1')
-    const minted = (await createKey(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))).json() as unknown as Promise<{ secret: string }>
+    const minted = (
+      await createKey(
+        ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })),
+      )
+    ).json() as unknown as Promise<{ secret: string }>
     const { secret } = await minted
 
-    const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
+    const res = await verifyKey(
+      ctx(
+        req('/api/auth/keys/verify', {
+          body: JSON.stringify({ secret }),
+          headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+        }),
+      ),
+    )
     expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ subject: 'u1', revoked: false, expired: false })
+    expect(await res.json()).toMatchObject({
+      subject: 'u1',
+      revoked: false,
+      expired: false,
+    })
   })
 
   it('404s for a key owned by a banned user (ban kills existing keys)', async () => {
     await seedUser()
     const cookie = await sessionCookie('u1')
-    const minted = (await createKey(ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })))).json() as unknown as Promise<{ secret: string }>
+    const minted = (
+      await createKey(
+        ctx(req('/api/auth/keys', { headers: { Cookie: cookie } })),
+      )
+    ).json() as unknown as Promise<{ secret: string }>
     const { secret } = await minted
-    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(200)
+    expect(
+      (
+        await verifyKey(
+          ctx(
+            req('/api/auth/keys/verify', {
+              body: JSON.stringify({ secret }),
+              headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+            }),
+          ),
+        )
+      ).status,
+    ).toBe(200)
 
     // operator bans the account → the key stops verifying immediately
     await setUserBanned(shim, 'u1', true)
-    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(404)
+    expect(
+      (
+        await verifyKey(
+          ctx(
+            req('/api/auth/keys/verify', {
+              body: JSON.stringify({ secret }),
+              headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+            }),
+          ),
+        )
+      ).status,
+    ).toBe(404)
 
     // unban restores it (flag is a toggle, not a deletion)
     await setUserBanned(shim, 'u1', false)
-    expect((await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))).status).toBe(200)
+    expect(
+      (
+        await verifyKey(
+          ctx(
+            req('/api/auth/keys/verify', {
+              body: JSON.stringify({ secret }),
+              headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+            }),
+          ),
+        )
+      ).status,
+    ).toBe(200)
   })
 
   it('404s for an unknown key', async () => {
-    const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret: 'ak_doesnotexist123456789012345678901234' }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
+    const res = await verifyKey(
+      ctx(
+        req('/api/auth/keys/verify', {
+          body: JSON.stringify({
+            secret: 'ak_doesnotexist123456789012345678901234',
+          }),
+          headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+        }),
+      ),
+    )
     expect(res.status).toBe(404)
   })
 
   it('rejects a missing secret field', async () => {
-    const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: '{}', headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
+    const res = await verifyKey(
+      ctx(
+        req('/api/auth/keys/verify', {
+          body: '{}',
+          headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+        }),
+      ),
+    )
     expect(res.status).toBe(400)
   })
 
   it('handles a literal null body without crashing', async () => {
-    const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: 'null', headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
+    const res = await verifyKey(
+      ctx(
+        req('/api/auth/keys/verify', {
+          body: 'null',
+          headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+        }),
+      ),
+    )
     expect(res.status).toBe(400)
   })
 
   it('rejects malformed secrets early (shape check)', async () => {
-    const res = await verifyKey(ctx(req('/api/auth/keys/verify', { body: JSON.stringify({ secret: 'not-a-key' }), headers: { 'X-Auth-Secret': 'verify-shared-secret' } })))
+    const res = await verifyKey(
+      ctx(
+        req('/api/auth/keys/verify', {
+          body: JSON.stringify({ secret: 'not-a-key' }),
+          headers: { 'X-Auth-Secret': 'verify-shared-secret' },
+        }),
+      ),
+    )
     expect(res.status).toBe(404)
   })
 })

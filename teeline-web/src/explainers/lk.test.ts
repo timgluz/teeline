@@ -1,8 +1,16 @@
 // teeline-web/src/explainers/lk.test.ts
 import { describe, it, expect } from 'vitest'
 import {
-  CITIES, euclidDist, buildDistMatrix, tourDist, DIST, INIT_TOUR,
-  doubleBridge, lcgRand, computeLocalSearchFrames, computeILSFrames,
+  CITIES,
+  euclidDist,
+  buildDistMatrix,
+  tourDist,
+  DIST,
+  INIT_TOUR,
+  doubleBridge,
+  lcgRand,
+  computeLocalSearchFrames,
+  computeILSFrames,
 } from './lk'
 
 describe('euclidDist', () => {
@@ -15,7 +23,11 @@ describe('euclidDist', () => {
 })
 
 describe('buildDistMatrix', () => {
-  const cities: [number, number][] = [[0, 0], [3, 4], [6, 8]]
+  const cities: [number, number][] = [
+    [0, 0],
+    [3, 4],
+    [6, 8],
+  ]
   const m = buildDistMatrix(cities)
   it('is symmetric', () => {
     expect(m[0][1]).toBeCloseTo(m[1][0])
@@ -32,7 +44,11 @@ describe('buildDistMatrix', () => {
 
 describe('tourDist', () => {
   it('sums edges correctly for 3-city tour', () => {
-    const cities: [number, number][] = [[0, 0], [3, 0], [3, 4]]
+    const cities: [number, number][] = [
+      [0, 0],
+      [3, 0],
+      [3, 4],
+    ]
     const dist = buildDistMatrix(cities)
     // tour [0,1,2]: 0→1=3, 1→2=4, 2→0=5 → total 12
     expect(tourDist([0, 1, 2], dist)).toBeCloseTo(12)
@@ -121,13 +137,13 @@ describe('computeLocalSearchFrames', () => {
   })
 
   it('swap frames have isScan = false', () => {
-    const swapFrames = frames.filter(f => f.swapEdges !== null)
-    expect(swapFrames.every(f => !f.isScan)).toBe(true)
+    const swapFrames = frames.filter((f) => f.swapEdges !== null)
+    expect(swapFrames.every((f) => !f.isScan)).toBe(true)
   })
 
   it('scan frames have isScan = true', () => {
-    const scanFrames = frames.filter(f => f.scanEdges !== null)
-    expect(scanFrames.every(f => f.isScan)).toBe(true)
+    const scanFrames = frames.filter((f) => f.scanEdges !== null)
+    expect(scanFrames.every((f) => f.isScan)).toBe(true)
   })
 
   it('final tour distance is no worse than initial', () => {
@@ -137,7 +153,7 @@ describe('computeLocalSearchFrames', () => {
   })
 
   it('all swap frames have improving dist (each swap reduces distance)', () => {
-    const swapFrames = frames.filter(f => f.swapEdges !== null)
+    const swapFrames = frames.filter((f) => f.swapEdges !== null)
     expect(swapFrames.length).toBeGreaterThan(0) // NN tour should have crossings
     for (let i = 1; i < swapFrames.length; i++) {
       expect(swapFrames[i].dist).toBeLessThan(swapFrames[i - 1].dist + 1e-9)
@@ -154,7 +170,7 @@ describe('computeILSFrames', () => {
   })
 
   it('has at least one bridge_cut frame (highlight === "bridge")', () => {
-    expect(frames.some(f => f.highlight === 'bridge')).toBe(true)
+    expect(frames.some((f) => f.highlight === 'bridge')).toBe(true)
   })
 
   it('bestDist is non-increasing across frames', () => {
@@ -171,6 +187,6 @@ describe('computeILSFrames', () => {
   })
 
   it('all tour arrays have length 15', () => {
-    expect(frames.every(f => f.tour.length === 15)).toBe(true)
+    expect(frames.every((f) => f.tour.length === 15)).toBe(true)
   })
 })

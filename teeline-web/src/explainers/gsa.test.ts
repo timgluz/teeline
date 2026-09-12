@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import {
-  N_CITIES, tourLength, swapSequence, applySwaps,
-  makeInitState, stepAgent,
+  N_CITIES,
+  tourLength,
+  swapSequence,
+  applySwaps,
+  makeInitState,
+  stepAgent,
 } from './gsa-algo'
 
 describe('tourLength', () => {
   it('is positive for a multi-city tour', () => {
-    expect(tourLength(Array.from({ length: N_CITIES }, (_, i) => i))).toBeGreaterThan(0)
+    expect(
+      tourLength(Array.from({ length: N_CITIES }, (_, i) => i)),
+    ).toBeGreaterThan(0)
   })
   it('returns 0 for a single-city tour', () => {
     expect(tourLength([0])).toBe(0)
@@ -18,14 +24,18 @@ describe('swapSequence', () => {
     expect(swapSequence([0, 1, 2, 3], [0, 1, 2, 3])).toEqual([])
   })
   it('applying result of swapSequence(a, b) to a yields b', () => {
-    const a = [0, 3, 1, 2]; const b = [0, 1, 2, 3]
-    expect(applySwaps(a, swapSequence(a, b), swapSequence(a, b).length)).toEqual(b)
+    const a = [0, 3, 1, 2]
+    const b = [0, 1, 2, 3]
+    expect(
+      applySwaps(a, swapSequence(a, b), swapSequence(a, b).length),
+    ).toEqual(b)
   })
 })
 
 describe('applySwaps', () => {
   it('does not mutate input', () => {
-    const t = [0, 1, 2, 3]; applySwaps(t, [[0, 1]], 1)
+    const t = [0, 1, 2, 3]
+    applySwaps(t, [[0, 1]], 1)
     expect(t).toEqual([0, 1, 2, 3])
   })
   it('clamps to swaps.length', () => {
@@ -38,7 +48,9 @@ describe('makeInitState', () => {
     expect(makeInitState(5).agents).toHaveLength(5)
   })
   it('each agent position is a valid permutation', () => {
-    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort((a, b) => a - b)
+    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort(
+      (a, b) => a - b,
+    )
     for (const ag of makeInitState(4).agents)
       expect(ag.position.slice().sort((a, b) => a - b)).toEqual(expected)
   })
@@ -49,7 +61,10 @@ describe('makeInitState', () => {
   })
   it('gbest_cost equals minimum agent cost', () => {
     const s = makeInitState(6)
-    expect(s.gbest_cost).toBeCloseTo(Math.min(...s.agents.map(a => a.cost)), 1)
+    expect(s.gbest_cost).toBeCloseTo(
+      Math.min(...s.agents.map((a) => a.cost)),
+      1,
+    )
   })
   it('masses sum to ~1', () => {
     const s = makeInitState(4)
@@ -76,7 +91,9 @@ describe('stepAgent', () => {
     }
   })
   it('each agent position remains a valid permutation', () => {
-    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort((a, b) => a - b)
+    const expected = Array.from({ length: N_CITIES }, (_, i) => i).sort(
+      (a, b) => a - b,
+    )
     let s = makeInitState(4)
     s = stepAgent(s)
     for (const ag of s.agents)

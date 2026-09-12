@@ -1,12 +1,21 @@
-import { useState, useRef, useEffect, useCallback } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
 
 // ---------------------------------------------------------------
 // Fixed demo instance: 18 cities on a 300×300 canvas.
 // ---------------------------------------------------------------
 const CITIES: [number, number][] = [
-  [45, 45], [155, 18], [265, 45], [285, 150],
-  [255, 265], [150, 285], [40, 260], [18, 150],
-  [110, 115], [200, 95], [220, 210], [95, 215],
+  [45, 45],
+  [155, 18],
+  [265, 45],
+  [285, 150],
+  [255, 265],
+  [150, 285],
+  [40, 260],
+  [18, 150],
+  [110, 115],
+  [200, 95],
+  [220, 210],
+  [95, 215],
 ]
 const N_CITIES = CITIES.length
 
@@ -54,7 +63,11 @@ function swapSequence(a: number[], b: number[]): [number, number][] {
   return swaps
 }
 
-function applySwaps(tour: number[], swaps: [number, number][], n: number): number[] {
+function applySwaps(
+  tour: number[],
+  swaps: [number, number][],
+  n: number,
+): number[] {
   const t = tour.slice()
   const lim = Math.min(n, swaps.length)
   for (let i = 0; i < lim; i++) {
@@ -74,7 +87,8 @@ function shuffle(n: number): number[] {
 }
 
 function centroid(tour: number[]): [number, number] {
-  let x = 0, y = 0
+  let x = 0,
+    y = 0
   for (const idx of tour) {
     x += CITIES[idx][0]
     y += CITIES[idx][1]
@@ -114,8 +128,10 @@ function makeInitState(nFlowers: number): SimState {
 // SVG helper
 // ---------------------------------------------------------------
 function polyPts(tour: number[]): string {
-  const pts = tour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
-  return tour.length > 0 ? pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}` : pts
+  const pts = tour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ')
+  return tour.length > 0
+    ? pts + ` ${CITIES[tour[0]][0]},${CITIES[tour[0]][1]}`
+    : pts
 }
 
 // ---------------------------------------------------------------
@@ -141,18 +157,24 @@ function FlowerHeatmap({ costs, activeIdx, gbestIdx }: FlowerHeatmapProps) {
         const hue = Math.round(norm * 120)
         const bg = `hsl(${hue},55%,42%)`
         const border =
-          i === activeIdx ? "2px solid #3b82f6" :
-          i === gbestIdx  ? "2px solid #16a34a" : "2px solid transparent"
+          i === activeIdx
+            ? '2px solid #3b82f6'
+            : i === gbestIdx
+              ? '2px solid #16a34a'
+              : '2px solid transparent'
         const status =
-          i === activeIdx && i === gbestIdx ? "active · best" :
-          i === activeIdx ? "active flower" :
-          i === gbestIdx  ? "global best" :
-          `quality ${Math.round(norm * 100)}%`
+          i === activeIdx && i === gbestIdx
+            ? 'active · best'
+            : i === activeIdx
+              ? 'active flower'
+              : i === gbestIdx
+                ? 'global best'
+                : `quality ${Math.round(norm * 100)}%`
         return (
           <div
             key={i}
             className="fp-heatmap-cell"
-            style={{ background: bg, outline: border, outlineOffset: "1px" }}
+            style={{ background: bg, outline: border, outlineOffset: '1px' }}
           >
             <span className="fp-heatmap-idx">{i}</span>
             <span className="fp-heatmap-cost">{c.toFixed(0)}</span>
@@ -177,18 +199,27 @@ function TourSVG({ flowers, gbest, activeIdx }: TourSVGProps) {
   const ghosts = flowers.filter((_, i) => i !== activeIdx).slice(0, 5)
   const active = flowers[activeIdx]
   return (
-    <svg viewBox="0 0 300 300" className="fp-canvas" role="img" aria-label="FPA tour population">
+    <svg
+      viewBox="0 0 300 300"
+      className="fp-canvas"
+      role="img"
+      aria-label="FPA tour population"
+    >
       <rect x={0} y={0} width={300} height={300} className="fp-bg" />
       {ghosts.map((tour, i) => (
         <polyline key={i} className="fp-ghost" points={polyPts(tour)} />
       ))}
       {active && <polyline className="fp-active" points={polyPts(active)} />}
-      {gbest.length > 0 && <polyline className="fp-gbest" points={polyPts(gbest)} />}
+      {gbest.length > 0 && (
+        <polyline className="fp-gbest" points={polyPts(gbest)} />
+      )}
       {CITIES.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r={4} className="fp-city" />
       ))}
       {CITIES.map(([x, y], i) => (
-        <text key={i} x={x + 6} y={y - 5} className="fp-city-label">{i}</text>
+        <text key={i} x={x + 6} y={y - 5} className="fp-city-label">
+          {i}
+        </text>
       ))}
     </svg>
   )
@@ -197,15 +228,16 @@ function TourSVG({ flowers, gbest, activeIdx }: TourSVGProps) {
 // ---------------------------------------------------------------
 // Lévy sparkline: bar chart of last 30 step sizes
 // ---------------------------------------------------------------
-type SparkEntry = { value: number; mode: "global" | "local" }
+type SparkEntry = { value: number; mode: 'global' | 'local' }
 
 function LevySparkline({ history }: { history: SparkEntry[] }) {
-  const W = 180, H = 54
+  const W = 180,
+    H = 54
   const visible = history.slice(-30)
   if (!visible.length) {
     return <svg viewBox={`0 0 ${W} ${H}`} className="fp-spark" />
   }
-  const maxVal = Math.min(Math.max(...visible.map(h => h.value), 0.5), 4)
+  const maxVal = Math.min(Math.max(...visible.map((h) => h.value), 0.5), 4)
   const slotW = W / 30
   const barW = Math.max(1, slotW - 1)
   return (
@@ -219,7 +251,7 @@ function LevySparkline({ history }: { history: SparkEntry[] }) {
             y={H - bh - 2}
             width={barW}
             height={bh}
-            fill={h.mode === "global" ? "#3b82f6" : "#d97706"}
+            fill={h.mode === 'global' ? '#3b82f6' : '#d97706'}
             opacity={0.85}
           />
         )
@@ -242,7 +274,9 @@ export default function FPAExplainer() {
   const simRef = useRef<SimState>(makeInitState(8))
 
   // Display state — mirrors simRef for rendering
-  const [flowers, setFlowers] = useState<number[][]>(() => simRef.current.flowers)
+  const [flowers, setFlowers] = useState<number[][]>(
+    () => simRef.current.flowers,
+  )
   const [costs, setCosts] = useState<number[]>(() => simRef.current.costs)
   const [gbest, setGbest] = useState<number[]>(() => simRef.current.gbest)
   const [gbestCost, setGbestCost] = useState(() => simRef.current.gbestCost)
@@ -251,11 +285,15 @@ export default function FPAExplainer() {
   const [localCount, setLocalCount] = useState(0)
 
   // Per-step annotation state
-  const [mode, setMode] = useState<"global" | "local" | null>(null)
+  const [mode, setMode] = useState<'global' | 'local' | null>(null)
   const [activeIdx, setActiveIdx] = useState(0)
   const [levyHistory, setLevyHistory] = useState<SparkEntry[]>([])
   const [lastLevy, setLastLevy] = useState<number | null>(null)
-  const [iconPos, setIconPos] = useState<{ icon: string; x: number; y: number } | null>(null)
+  const [iconPos, setIconPos] = useState<{
+    icon: string
+    x: number
+    y: number
+  } | null>(null)
 
   const [running, setRunning] = useState(false)
 
@@ -287,14 +325,14 @@ export default function FPAExplainer() {
 
     const i = Math.floor(Math.random() * n)
     let newTour: number[]
-    let stepMode: "global" | "local"
+    let stepMode: 'global' | 'local'
     let stepLevy: number
     let localJ = -1
     let localK = -1
 
     if (Math.random() < sp) {
       // Global pollination: Lévy-flight toward gbest
-      stepMode = "global"
+      stepMode = 'global'
       const lv = levyStep()
       stepLevy = lv
       const seq = swapSequence(sim.flowers[i], sim.gbest)
@@ -302,25 +340,35 @@ export default function FPAExplainer() {
         newTour = sim.flowers[i].slice()
       } else {
         // * 0.5 matches the Rust implementation: never jump more than halfway to gbest
-        const nSwaps = Math.min(seq.length, Math.max(1, Math.ceil(lv * seq.length * 0.5)))
+        const nSwaps = Math.min(
+          seq.length,
+          Math.max(1, Math.ceil(lv * seq.length * 0.5)),
+        )
         newTour = applySwaps(sim.flowers[i], seq, nSwaps)
       }
     } else {
       // Local pollination: ε-scaled cross-pollination between two random flowers
-      stepMode = "local"
+      stepMode = 'local'
       if (n < 3) {
         newTour = sim.flowers[i].slice()
         stepLevy = 0
       } else {
-        do { localJ = Math.floor(Math.random() * n) } while (localJ === i)
-        do { localK = Math.floor(Math.random() * n) } while (localK === i || localK === localJ)
+        do {
+          localJ = Math.floor(Math.random() * n)
+        } while (localJ === i)
+        do {
+          localK = Math.floor(Math.random() * n)
+        } while (localK === i || localK === localJ)
         const epsilon = Math.random()
         stepLevy = epsilon
         const seq = swapSequence(sim.flowers[localJ], sim.flowers[localK])
         if (seq.length === 0) {
           newTour = sim.flowers[i].slice()
         } else {
-          const nSwaps = Math.min(seq.length, Math.max(1, Math.ceil(epsilon * seq.length)))
+          const nSwaps = Math.min(
+            seq.length,
+            Math.max(1, Math.ceil(epsilon * seq.length)),
+          )
           newTour = applySwaps(sim.flowers[i], seq, nSwaps)
         }
       }
@@ -343,8 +391,8 @@ export default function FPAExplainer() {
       newGbestCost = newCost
     }
 
-    const newGlobalCount = sim.globalCount + (stepMode === "global" ? 1 : 0)
-    const newLocalCount = sim.localCount + (stepMode === "local" ? 1 : 0)
+    const newGlobalCount = sim.globalCount + (stepMode === 'global' ? 1 : 0)
+    const newLocalCount = sim.localCount + (stepMode === 'local' ? 1 : 0)
     const newIter = sim.iter + 1
 
     simRef.current = {
@@ -367,17 +415,28 @@ export default function FPAExplainer() {
     setMode(stepMode)
     setActiveIdx(i)
     setLastLevy(stepLevy)
-    setLevyHistory(h => [...h.slice(-99), { value: stepLevy, mode: stepMode }])
+    setLevyHistory((h) => [
+      ...h.slice(-99),
+      { value: stepLevy, mode: stepMode },
+    ])
 
     // Position the icon at the midpoint of the relevant move
-    if (stepMode === "global") {
+    if (stepMode === 'global') {
       const [ax, ay] = centroid(sim.flowers[i])
       const [gx, gy] = centroid(sim.gbest)
-      setIconPos({ icon: "🐝", x: ((ax + gx) / 2 / 300) * 100, y: ((ay + gy) / 2 / 300) * 100 })
+      setIconPos({
+        icon: '🐝',
+        x: ((ax + gx) / 2 / 300) * 100,
+        y: ((ay + gy) / 2 / 300) * 100,
+      })
     } else if (localJ !== -1 && localK !== -1) {
       const [jx, jy] = centroid(sim.flowers[localJ])
       const [kx, ky] = centroid(sim.flowers[localK])
-      setIconPos({ icon: "🌬️", x: ((jx + kx) / 2 / 300) * 100, y: ((jy + ky) / 2 / 300) * 100 })
+      setIconPos({
+        icon: '🌬️',
+        x: ((jx + kx) / 2 / 300) * 100,
+        y: ((jy + ky) / 2 / 300) * 100,
+      })
     }
   }, [])
 
@@ -390,11 +449,11 @@ export default function FPAExplainer() {
   }, [running, stepOnce, delay])
 
   const modeLabel =
-    mode === "global"
-      ? "🌍 Global pollination — Lévy flight toward gbest"
-      : mode === "local"
-        ? "🌸 Local pollination — ε cross-pollination"
-        : "Press Step or Run to begin"
+    mode === 'global'
+      ? '🌍 Global pollination — Lévy flight toward gbest'
+      : mode === 'local'
+        ? '🌸 Local pollination — ε cross-pollination'
+        : 'Press Step or Run to begin'
 
   return (
     <div className="fp-root">
@@ -404,10 +463,12 @@ export default function FPAExplainer() {
         <div className="fp-eyebrow">teeline · algorithms/fpa</div>
         <h2 className="fp-title">Flower Pollination Algorithm</h2>
         <p className="fp-sub">
-          A population of candidate tours (flowers) evolves each step: with probability{" "}
-          <code>p</code> a flower makes a long-range <strong>Lévy flight</strong> toward the
-          global best; otherwise it <strong>cross-pollinates</strong> with two random flowers
-          nearby. Drag the sliders to see how <code>p</code> and population size shape search.
+          A population of candidate tours (flowers) evolves each step: with
+          probability <code>p</code> a flower makes a long-range{' '}
+          <strong>Lévy flight</strong> toward the global best; otherwise it{' '}
+          <strong>cross-pollinates</strong> with two random flowers nearby. Drag
+          the sliders to see how <code>p</code> and population size shape
+          search.
         </p>
       </header>
 
@@ -416,7 +477,10 @@ export default function FPAExplainer() {
         <div className="fp-canvas-wrap">
           <TourSVG flowers={flowers} gbest={gbest} activeIdx={activeIdx} />
           {iconPos && (
-            <span className="fp-icon" style={{ left: `${iconPos.x}%`, top: `${iconPos.y}%` }}>
+            <span
+              className="fp-icon"
+              style={{ left: `${iconPos.x}%`, top: `${iconPos.y}%` }}
+            >
               {iconPos.icon}
             </span>
           )}
@@ -430,37 +494,52 @@ export default function FPAExplainer() {
 
       {/* Canvas legend */}
       <div className="fp-legend">
-        <span><span className="fp-dot fp-dot-gbest">●</span> gbest tour</span>
-        <span><span className="fp-dot fp-dot-active">●</span> active flower</span>
-        <span><span className="fp-dot fp-dot-ghost">●</span> population</span>
-        <span><span className="fp-dot fp-dot-city">●</span> city</span>
-        <span><span style={{ color: "#3b82f6", fontWeight: 700 }}>▌</span> active flower</span>
-        <span><span style={{ color: "#16a34a", fontWeight: 700 }}>▌</span> global best</span>
+        <span>
+          <span className="fp-dot fp-dot-gbest">●</span> gbest tour
+        </span>
+        <span>
+          <span className="fp-dot fp-dot-active">●</span> active flower
+        </span>
+        <span>
+          <span className="fp-dot fp-dot-ghost">●</span> population
+        </span>
+        <span>
+          <span className="fp-dot fp-dot-city">●</span> city
+        </span>
+        <span>
+          <span style={{ color: '#3b82f6', fontWeight: 700 }}>▌</span> active
+          flower
+        </span>
+        <span>
+          <span style={{ color: '#16a34a', fontWeight: 700 }}>▌</span> global
+          best
+        </span>
       </div>
 
       {/* Mode chip */}
-      <div className={`fp-mode fp-mode-${mode ?? "idle"}`}>{modeLabel}</div>
+      <div className={`fp-mode fp-mode-${mode ?? 'idle'}`}>{modeLabel}</div>
 
       {/* Lévy sparkline + step size */}
       <div className="fp-spark-row">
         <div className="fp-spark-wrap">
           <LevySparkline history={levyHistory} />
           <div className="fp-spark-caption">
-            <span className="fp-swatch fp-swatch-global">■</span> global Lévy step &nbsp;
+            <span className="fp-swatch fp-swatch-global">■</span> global Lévy
+            step &nbsp;
             <span className="fp-swatch fp-swatch-local">■</span> local ε step
           </div>
         </div>
         <div className="fp-stepval-wrap">
           <div className="fp-statlabel">step size</div>
           <div className="fp-mono fp-stepval">
-            {lastLevy !== null ? lastLevy.toFixed(3) : "—"}
+            {lastLevy !== null ? lastLevy.toFixed(3) : '—'}
           </div>
-          <div className="fp-statlabel" style={{ marginTop: "4px" }}>
-            {mode === "global"
-              ? "Lévy draw"
-              : mode === "local"
-                ? "ε (uniform)"
-                : ""}
+          <div className="fp-statlabel" style={{ marginTop: '4px' }}>
+            {mode === 'global'
+              ? 'Lévy draw'
+              : mode === 'local'
+                ? 'ε (uniform)'
+                : ''}
           </div>
         </div>
       </div>
@@ -489,10 +568,14 @@ export default function FPAExplainer() {
       <div className="fp-config">
         <div className="fp-config-row">
           <label className="fp-config-label">
-            Switch prob <code>p</code> = <strong>{switchProb.toFixed(2)}</strong>
+            Switch prob <code>p</code> ={' '}
+            <strong>{switchProb.toFixed(2)}</strong>
           </label>
           <input
-            type="range" min={0} max={1} step={0.05}
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
             value={switchProb}
             className="fp-slider"
             onInput={(e) => {
@@ -503,9 +586,9 @@ export default function FPAExplainer() {
           />
           <div className="fp-hint">
             {switchProb >= 0.9
-              ? "Mostly global — fast but risks premature convergence"
+              ? 'Mostly global — fast but risks premature convergence'
               : switchProb <= 0.1
-                ? "Mostly local — slow diffuse search, global rarely fires"
+                ? 'Mostly local — slow diffuse search, global rarely fires'
                 : `~${Math.round(switchProb * 100)}% global / ${Math.round((1 - switchProb) * 100)}% local`}
           </div>
         </div>
@@ -515,7 +598,10 @@ export default function FPAExplainer() {
             Flowers (population) = <strong>{nFlowers}</strong>
           </label>
           <input
-            type="range" min={3} max={15} step={1}
+            type="range"
+            min={3}
+            max={15}
+            step={1}
             value={nFlowers}
             className="fp-slider"
             onInput={(e) => {
@@ -526,20 +612,25 @@ export default function FPAExplainer() {
           />
           <div className="fp-hint">
             {nFlowers <= 4
-              ? "Small swarm: fast per-step but low diversity"
+              ? 'Small swarm: fast per-step but low diversity'
               : nFlowers >= 12
-                ? "Large swarm: more diversity, slower per step"
-                : "Balanced population size"}
+                ? 'Large swarm: more diversity, slower per step'
+                : 'Balanced population size'}
           </div>
         </div>
 
         <div className="fp-config-row">
           <label className="fp-config-label">Speed</label>
           <input
-            type="range" min={1} max={10} step={1}
+            type="range"
+            min={1}
+            max={10}
+            step={1}
             value={speed}
             className="fp-slider"
-            onInput={(e) => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
         </div>
       </div>
@@ -550,10 +641,10 @@ export default function FPAExplainer() {
           ◀ Step
         </button>
         <button
-          className={`fp-btn ${!running ? "fp-btn-primary" : ""}`}
-          onClick={() => setRunning(r => !r)}
+          className={`fp-btn ${!running ? 'fp-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
         >
-          {running ? "⏸ Pause" : "▶ Run"}
+          {running ? '⏸ Pause' : '▶ Run'}
         </button>
         <button className="fp-btn" onClick={() => reinit(nFlowers)}>
           ↺ Reset

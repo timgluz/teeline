@@ -8,6 +8,8 @@
     "build": "astro check && tsc --noEmit && astro build && node scripts/copy-wasm.mjs",
     "build:check": "astro check && tsc --noEmit && astro build",
     "preview": "astro preview",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:auth": "playwright test --config playwright.auth.config.ts",
@@ -36,6 +38,7 @@
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
     "better-sqlite3": "13.0.3",
+    "prettier": "^3.9.6",
     "typescript": "6.0.3",
     "vitest": "5.0.0",
     "wrangler": "4.129.0"

@@ -23,8 +23,12 @@ test.describe('christofides explainer', () => {
     await waitHydrated(page)
   })
 
-  test('renders the canvas, pipeline stepper, ratio meter, proof and compare panels', async ({ page }) => {
-    await expect(page.locator('.chr-title')).toHaveText('Christofides — a ≤1.5× Approximation')
+  test('renders the canvas, pipeline stepper, ratio meter, proof and compare panels', async ({
+    page,
+  }) => {
+    await expect(page.locator('.chr-title')).toHaveText(
+      'Christofides — a ≤1.5× Approximation',
+    )
     await expect(page.locator('.chr-canvas')).toBeVisible()
 
     // six pipeline phases
@@ -41,7 +45,13 @@ test.describe('christofides explainer', () => {
     await expect(stats).toContainText('tour cost')
     await expect(stats).toContainText('ratio')
 
-    for (const label of ['Balanced', 'Near-optimal', 'Matching-heavy', 'Clustered', 'Worst case']) {
+    for (const label of [
+      'Balanced',
+      'Near-optimal',
+      'Matching-heavy',
+      'Clustered',
+      'Worst case',
+    ]) {
       await expect(page.getByRole('button', { name: label })).toBeVisible()
     }
   })
@@ -69,9 +79,14 @@ test.describe('christofides explainer', () => {
     await expect(page.locator('.chr-meter-value')).toContainText('× optimal')
   })
 
-  test('Run animates through the whole pipeline to Done; Reset restores idle', async ({ page }) => {
+  test('Run animates through the whole pipeline to Done; Reset restores idle', async ({
+    page,
+  }) => {
     const chip = page.locator('.chr-chip')
-    const step = page.locator('.chr-statgrid').locator('div', { hasText: /^step/ }).locator('.chr-mono')
+    const step = page
+      .locator('.chr-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.chr-mono')
 
     await page.getByRole('button', { name: 'Run' }).click()
     await expect(chip).toContainText('Done —', { timeout: 20_000 })
@@ -83,7 +98,10 @@ test.describe('christofides explainer', () => {
   })
 
   test('Pause stops the animation mid-run', async ({ page }) => {
-    const step = page.locator('.chr-statgrid').locator('div', { hasText: /^step/ }).locator('.chr-mono')
+    const step = page
+      .locator('.chr-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.chr-mono')
 
     await page.getByRole('button', { name: 'Run' }).click()
     await page.getByRole('button', { name: 'Pause' }).click()
@@ -93,7 +111,10 @@ test.describe('christofides explainer', () => {
   })
 
   test('Back restores the previous step', async ({ page }) => {
-    const step = page.locator('.chr-statgrid').locator('div', { hasText: /^step/ }).locator('.chr-mono')
+    const step = page
+      .locator('.chr-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.chr-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     await page.getByRole('button', { name: 'Step' }).click()
@@ -103,11 +124,16 @@ test.describe('christofides explainer', () => {
     await expect(step).toHaveText('1')
   })
 
-  test('scenario buttons restart the run with their own ratio', async ({ page }) => {
+  test('scenario buttons restart the run with their own ratio', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: 'Worst case' }).click()
     await page.getByRole('button', { name: 'Done' }).click()
     // worst_case is pinned at ~1.39× — the ratio stat reflects it
-    const ratio = page.locator('.chr-statgrid').locator('div', { hasText: /^ratio/ }).locator('.chr-mono')
+    const ratio = page
+      .locator('.chr-statgrid')
+      .locator('div', { hasText: /^ratio/ })
+      .locator('.chr-mono')
     await expect(ratio).toHaveText('1.39×')
   })
 })

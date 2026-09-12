@@ -1,20 +1,28 @@
-import { useState, useRef, useEffect, useCallback } from "preact/hooks"
-import type { SomState, Phase } from "./som-algo"
+import { useState, useRef, useEffect, useCallback } from 'preact/hooks'
+import type { SomState, Phase } from './som-algo'
 import {
-  CITIES, ALPHA0, SIGMA0, MAX_STEPS, N_CITIES, N_NEURONS,
-  makeInitState, stepOnce, neighbourRadiusPx, phaseLabel,
-} from "./som-algo"
+  CITIES,
+  ALPHA0,
+  SIGMA0,
+  MAX_STEPS,
+  N_CITIES,
+  N_NEURONS,
+  makeInitState,
+  stepOnce,
+  neighbourRadiusPx,
+  phaseLabel,
+} from './som-algo'
 
 function polyPts(pts: [number, number][]): string {
   return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')
 }
 
 const PHASE_COLOR: Record<Phase, string> = {
-  'init':        '#6b7280',
-  'expanding':   '#7c3aed',
-  'converging':  '#a855f7',
+  init: '#6b7280',
+  expanding: '#7c3aed',
+  converging: '#a855f7',
   'fine-tuning': '#c084fc',
-  'done':        '#16a34a',
+  done: '#16a34a',
 }
 
 export default function SomExplainer() {
@@ -71,9 +79,10 @@ export default function SomExplainer() {
   const nbRadiusPx = bmuPos ? neighbourRadiusPx(sigma, neurons) : 0
 
   // Tour polyline: cities in ring order, closed
-  const tourPts = tour !== null
-    ? polyPts([...tour.map(i => CITIES[i]), CITIES[tour[0]]])
-    : null
+  const tourPts =
+    tour !== null
+      ? polyPts([...tour.map((i) => CITIES[i]), CITIES[tour[0]]])
+      : null
 
   // Neuron ring polyline: close the ring back to first neuron
   const neuronRingPts = polyPts([...neurons, neurons[0]])
@@ -88,18 +97,21 @@ export default function SomExplainer() {
         <span class="som-emoji">🧠</span>
         <div>
           <h2 class="som-title">Kohonen SOM</h2>
-          <p class="som-subtitle">Self-Organising Map — topology-preserving TSP heuristic</p>
+          <p class="som-subtitle">
+            Self-Organising Map — topology-preserving TSP heuristic
+          </p>
         </div>
       </header>
 
       <div class="som-viz-row">
         {/* 300×300 SVG canvas */}
-        <svg class="som-canvas" viewBox="0 0 300 300" aria-label="SOM visualisation">
-
+        <svg
+          class="som-canvas"
+          viewBox="0 0 300 300"
+          aria-label="SOM visualisation"
+        >
           {/* 1. Tour overlay (only when done) */}
-          {tourPts && (
-            <polyline points={tourPts} class="som-tour" />
-          )}
+          {tourPts && <polyline points={tourPts} class="som-tour" />}
 
           {/* 2. Neuron ring polyline */}
           <polyline points={neuronRingPts} class="som-neuron-ring" />
@@ -126,15 +138,16 @@ export default function SomExplainer() {
           )}
 
           {/* 5. Active neighbour circles */}
-          {!isDone && neighbors.map(ni => (
-            <circle
-              key={ni}
-              cx={neurons[ni][0].toFixed(1)}
-              cy={neurons[ni][1].toFixed(1)}
-              r="5.5"
-              class="som-nb-neuron"
-            />
-          ))}
+          {!isDone &&
+            neighbors.map((ni) => (
+              <circle
+                key={ni}
+                cx={neurons[ni][0].toFixed(1)}
+                cy={neurons[ni][1].toFixed(1)}
+                r="5.5"
+                class="som-nb-neuron"
+              />
+            ))}
 
           {/* 6. All neuron circles (BMU rendered larger) */}
           {neurons.map(([nx, ny], ni) => (
@@ -142,7 +155,7 @@ export default function SomExplainer() {
               key={ni}
               cx={nx.toFixed(1)}
               cy={ny.toFixed(1)}
-              r={ni === bmu ? "8" : "4"}
+              r={ni === bmu ? '8' : '4'}
               class={ni === bmu ? 'som-neuron som-neuron-bmu' : 'som-neuron'}
             />
           ))}
@@ -154,31 +167,66 @@ export default function SomExplainer() {
               cx={cx.toFixed(1)}
               cy={cy.toFixed(1)}
               r="7"
-              class={ci === lastCityIdx && !isDone ? 'som-city som-city-active' : 'som-city'}
+              class={
+                ci === lastCityIdx && !isDone
+                  ? 'som-city som-city-active'
+                  : 'som-city'
+              }
             />
           ))}
         </svg>
 
         {/* Right panel */}
         <div class="som-panel">
-
           {/* Phase chip */}
-          <div class="som-phase-chip" style={`border-color: ${PHASE_COLOR[phase]}`}>
-            <span class="som-phase-dot" style={`background: ${PHASE_COLOR[phase]}`} />
-            <span class="som-phase-text">{phaseLabel(phase, lastTourLength)}</span>
+          <div
+            class="som-phase-chip"
+            style={`border-color: ${PHASE_COLOR[phase]}`}
+          >
+            <span
+              class="som-phase-dot"
+              style={`background: ${PHASE_COLOR[phase]}`}
+            />
+            <span class="som-phase-text">
+              {phaseLabel(phase, lastTourLength)}
+            </span>
           </div>
 
           {/* Stats grid */}
           <div class="som-statgrid">
-            <div class="som-stat"><span>Step</span><strong>{step}/{MAX_STEPS}</strong></div>
-            <div class="som-stat"><span>α</span><strong>{alpha.toFixed(3)}</strong></div>
-            <div class="som-stat"><span>σ</span><strong>{sigma.toFixed(2)}</strong></div>
-            <div class="som-stat"><span>Tour</span><strong>{lastTourLength !== null ? lastTourLength.toFixed(0) : '—'}</strong></div>
+            <div class="som-stat">
+              <span>Step</span>
+              <strong>
+                {step}/{MAX_STEPS}
+              </strong>
+            </div>
+            <div class="som-stat">
+              <span>α</span>
+              <strong>{alpha.toFixed(3)}</strong>
+            </div>
+            <div class="som-stat">
+              <span>σ</span>
+              <strong>{sigma.toFixed(2)}</strong>
+            </div>
+            <div class="som-stat">
+              <span>Tour</span>
+              <strong>
+                {lastTourLength !== null ? lastTourLength.toFixed(0) : '—'}
+              </strong>
+            </div>
           </div>
 
           {/* Progress bar */}
-          <div class="som-progress-track" role="progressbar" aria-valuenow={step} aria-valuemax={MAX_STEPS}>
-            <div class="som-progress-bar" style={`width: ${(Math.min(step, MAX_STEPS) / MAX_STEPS * 100).toFixed(1)}%`} />
+          <div
+            class="som-progress-track"
+            role="progressbar"
+            aria-valuenow={step}
+            aria-valuemax={MAX_STEPS}
+          >
+            <div
+              class="som-progress-bar"
+              style={`width: ${((Math.min(step, MAX_STEPS) / MAX_STEPS) * 100).toFixed(1)}%`}
+            />
           </div>
 
           {/* Speed slider */}
@@ -186,8 +234,13 @@ export default function SomExplainer() {
             <label class="som-label">
               Speed
               <input
-                type="range" min="1" max="10" value={speed}
-                onInput={e => setSpeed(Number((e.target as HTMLInputElement).value))}
+                type="range"
+                min="1"
+                max="10"
+                value={speed}
+                onInput={(e) =>
+                  setSpeed(Number((e.target as HTMLInputElement).value))
+                }
               />
               <span>{speed}</span>
             </label>
@@ -199,13 +252,19 @@ export default function SomExplainer() {
               class="som-btn som-btn-step"
               onClick={stepFn}
               disabled={running || isDone}
-            >Step</button>
+            >
+              Step
+            </button>
             <button
               class="som-btn som-btn-run"
-              onClick={() => setRunning(r => !r)}
+              onClick={() => setRunning((r) => !r)}
               disabled={isDone}
-            >{running ? 'Pause' : 'Run'}</button>
-            <button class="som-btn som-btn-reset" onClick={reinit}>Reset</button>
+            >
+              {running ? 'Pause' : 'Run'}
+            </button>
+            <button class="som-btn som-btn-reset" onClick={reinit}>
+              Reset
+            </button>
           </div>
         </div>
       </div>
@@ -213,33 +272,69 @@ export default function SomExplainer() {
       {/* Legend */}
       <div class="som-legend">
         <span class="som-leg-item">
-          <svg width="14" height="14"><circle cx="7" cy="7" r="6" fill="#f97316" /></svg>
+          <svg width="14" height="14">
+            <circle cx="7" cy="7" r="6" fill="#f97316" />
+          </svg>
           City
         </span>
         <span class="som-leg-item">
-          <svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#7c3aed" /></svg>
+          <svg width="14" height="14">
+            <circle cx="7" cy="7" r="5" fill="#7c3aed" />
+          </svg>
           Neuron
         </span>
         <span class="som-leg-item">
-          <svg width="14" height="14"><circle cx="7" cy="7" r="6" fill="#4f46e5" /></svg>
+          <svg width="14" height="14">
+            <circle cx="7" cy="7" r="6" fill="#4f46e5" />
+          </svg>
           BMU
         </span>
         <span class="som-leg-item">
-          <svg width="14" height="14"><circle cx="7" cy="7" r="6" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="3,2" /></svg>
+          <svg width="14" height="14">
+            <circle
+              cx="7"
+              cy="7"
+              r="6"
+              fill="none"
+              stroke="#7c3aed"
+              stroke-width="1.5"
+              stroke-dasharray="3,2"
+            />
+          </svg>
           σ radius
         </span>
         <span class="som-leg-item">
-          <svg width="18" height="4"><line x1="0" y1="2" x2="18" y2="2" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4,2" /></svg>
+          <svg width="18" height="4">
+            <line
+              x1="0"
+              y1="2"
+              x2="18"
+              y2="2"
+              stroke="#f97316"
+              stroke-width="1.5"
+              stroke-dasharray="4,2"
+            />
+          </svg>
           Attraction
         </span>
         <span class="som-leg-item">
-          <svg width="18" height="4"><line x1="0" y1="2" x2="18" y2="2" stroke="#16a34a" stroke-width="2" /></svg>
+          <svg width="18" height="4">
+            <line
+              x1="0"
+              y1="2"
+              x2="18"
+              y2="2"
+              stroke="#16a34a"
+              stroke-width="2"
+            />
+          </svg>
           Tour
         </span>
       </div>
 
       <footer class="som-footer">
-        {N_CITIES} cities · {N_NEURONS} neurons · η₀={ALPHA0} · σ₀={SIGMA0} · {MAX_STEPS} steps
+        {N_CITIES} cities · {N_NEURONS} neurons · η₀={ALPHA0} · σ₀={SIGMA0} ·{' '}
+        {MAX_STEPS} steps
       </footer>
     </div>
   )

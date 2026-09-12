@@ -28,7 +28,10 @@ export interface SimState {
 }
 
 // Predefined scenario tours
-export const SCENARIOS: Record<string, { label: string; desc: string; tour: number[] }> = {
+export const SCENARIOS: Record<
+  string,
+  { label: string; desc: string; tour: number[] }
+> = {
   single_crossing: {
     label: 'Single crossing',
     desc: 'One pair of edges cross — one swap fixes it',
@@ -115,8 +118,7 @@ export function applySwap(tour: number[], i: number, j: number): number[] {
 // One step: if in candidate phase, apply the pending swap.
 // Otherwise scan for the best improving swap and show it as a candidate.
 export function stepOnce(state: SimState): SimState {
-  if (state.phase === 'local_optimum')
-    return { ...state, step: state.step + 1 }
+  if (state.phase === 'local_optimum') return { ...state, step: state.step + 1 }
 
   // Second click — apply the candidate swap
   if (state.phase === 'candidate' && state.lastSwap) {

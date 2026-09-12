@@ -48,10 +48,14 @@ export default defineConfig({
       {
         name: 'force-preview2-shim-browser',
         resolveId(id) {
-          if (!id.startsWith('@bytecodealliance/preview2-shim')) return undefined
+          if (!id.startsWith('@bytecodealliance/preview2-shim'))
+            return undefined
           const sub = id.slice('@bytecodealliance/preview2-shim'.length)
           const name = sub.replace(/^\//, '') || 'index'
-          return resolvePath(configDir, `node_modules/@bytecodealliance/preview2-shim/lib/browser/${name}.js`)
+          return resolvePath(
+            configDir,
+            `node_modules/@bytecodealliance/preview2-shim/lib/browser/${name}.js`,
+          )
         },
       },
       sentryVitePlugin({ org: 'timo-sulg', project: 'javascript' }),

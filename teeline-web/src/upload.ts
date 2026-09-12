@@ -31,7 +31,10 @@ export function parseOptTour(text: string): number[] {
   const route: number[] = []
   for (const raw of lines) {
     const line = raw.trim()
-    if (line === 'TOUR_SECTION') { inSection = true; continue }
+    if (line === 'TOUR_SECTION') {
+      inSection = true
+      continue
+    }
     if (!inSection) continue
     const n = parseInt(line, 10)
     if (isNaN(n) || n < 0) break
@@ -52,27 +55,29 @@ export function initUpload(
   onOptTourLoaded?: (route: number[]) => void,
 ): void {
   // DOM elements — all pre-built in index.html
-  const zoneTsp       = document.getElementById('zone-tsp')!
-  const tspIdle       = document.getElementById('zone-tsp-idle')!
-  const tspChip       = document.getElementById('zone-tsp-chip') as HTMLElement
-  const tspChipName   = document.getElementById('tsp-chip-name')!
-  const btnBrowse     = document.getElementById('btn-browse-tsp')!
-  const inputTsp      = document.getElementById('input-tsp') as HTMLInputElement
+  const zoneTsp = document.getElementById('zone-tsp')!
+  const tspIdle = document.getElementById('zone-tsp-idle')!
+  const tspChip = document.getElementById('zone-tsp-chip') as HTMLElement
+  const tspChipName = document.getElementById('tsp-chip-name')!
+  const btnBrowse = document.getElementById('btn-browse-tsp')!
+  const inputTsp = document.getElementById('input-tsp') as HTMLInputElement
   const btnReplaceTsp = document.getElementById('btn-replace-tsp')!
 
-  const zoneOpt       = document.getElementById('zone-opt')!
-  const optIdle       = document.getElementById('zone-opt-idle')!
-  const optChip       = document.getElementById('zone-opt-chip') as HTMLElement
-  const optChipName   = document.getElementById('opt-chip-name')!
-  const btnBrowseOpt  = document.getElementById('btn-browse-opt')!
-  const inputOpt      = document.getElementById('input-opt') as HTMLInputElement
+  const zoneOpt = document.getElementById('zone-opt')!
+  const optIdle = document.getElementById('zone-opt-idle')!
+  const optChip = document.getElementById('zone-opt-chip') as HTMLElement
+  const optChipName = document.getElementById('opt-chip-name')!
+  const btnBrowseOpt = document.getElementById('btn-browse-opt')!
+  const inputOpt = document.getElementById('input-opt') as HTMLInputElement
   const btnReplaceOpt = document.getElementById('btn-replace-opt')!
 
-  const metaLine   = document.getElementById('metadata-line') as HTMLElement
-  const errorLine  = document.getElementById('error-line') as HTMLElement
-  const btnContinue = document.getElementById('btn-continue') as HTMLButtonElement
-  const step01     = document.getElementById('step-01') as HTMLElement
-  const step02     = document.getElementById('step-02') as HTMLElement
+  const metaLine = document.getElementById('metadata-line') as HTMLElement
+  const errorLine = document.getElementById('error-line') as HTMLElement
+  const btnContinue = document.getElementById(
+    'btn-continue',
+  ) as HTMLButtonElement
+  const step01 = document.getElementById('step-01') as HTMLElement
+  const step02 = document.getElementById('step-02') as HTMLElement
 
   // ---- TSP zone state transitions ----
 
@@ -83,7 +88,8 @@ export function initUpload(
     zoneTsp.classList.add('drop-zone--loaded')
     let meta = formatMetadata(parsed)
     const optCost = (window as any).__teelineOptCost as number | undefined
-    if (optCost && optCost > 0) meta += ` · optimal: ${optCost.toLocaleString()}`
+    if (optCost && optCost > 0)
+      meta += ` · optimal: ${optCost.toLocaleString()}`
     metaLine.textContent = meta
     metaLine.hidden = false
     errorLine.hidden = true
@@ -135,7 +141,9 @@ export function initUpload(
       e.preventDefault()
       zone.classList.add('drop-zone--dragover')
     })
-    zone.addEventListener('dragleave', () => zone.classList.remove('drop-zone--dragover'))
+    zone.addEventListener('dragleave', () =>
+      zone.classList.remove('drop-zone--dragover'),
+    )
     zone.addEventListener('drop', (e) => {
       e.preventDefault()
       zone.classList.remove('drop-zone--dragover')
@@ -199,23 +207,28 @@ export function initUpload(
   btnReplaceOpt.addEventListener('click', showOptIdle)
 
   // ---- Register module-level reset ----
-  _resetFn = () => { showTspIdle(); showOptIdle() }
+  _resetFn = () => {
+    showTspIdle()
+    showOptIdle()
+  }
 
   // ---- Wire example dataset buttons ----
 
-  document.querySelectorAll<HTMLButtonElement>('[data-example]').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      const name = btn.dataset.example!
-      try {
-        const resp = await fetch(exampleUrl(name))
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-        const text = await resp.text()
-        await loadTspText(`${name}.tsp`, text)
-      } catch (err) {
-        showError(err instanceof Error ? err.message : String(err))
-      }
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-example]')
+    .forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.example!
+        try {
+          const resp = await fetch(exampleUrl(name))
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+          const text = await resp.text()
+          await loadTspText(`${name}.tsp`, text)
+        } catch (err) {
+          showError(err instanceof Error ? err.message : String(err))
+        }
+      })
     })
-  })
 
   // ---- Auto-load dataset from ?dataset= query param ----
   const params = new URLSearchParams(window.location.search)
@@ -244,11 +257,15 @@ export function initUpload(
             const route = parseOptTour(optText)
             onOptTourLoaded?.(route)
           }
-        } catch { /* opt tour not available, ignore */ }
+        } catch {
+          /* opt tour not available, ignore */
+        }
 
         // Auto-navigate to step 2 (configure solver)
         setTimeout(() => {
-          const btnContinue = document.getElementById('btn-continue') as HTMLButtonElement | null
+          const btnContinue = document.getElementById(
+            'btn-continue',
+          ) as HTMLButtonElement | null
           btnContinue?.click()
         }, 100)
       } catch (err) {

@@ -18,18 +18,27 @@ async function setupVirtualAuthenticator(page: Page): Promise<void> {
   })
 }
 
-test('register → mint → show-once → refresh wipes → login → revoke → verify', async ({ page, request }) => {
+test('register → mint → show-once → refresh wipes → login → revoke → verify', async ({
+  page,
+  request,
+}) => {
   await setupVirtualAuthenticator(page)
 
   // ---- anonymous state ----
   await page.goto('/api-key/')
-  await expect(page.getByRole('button', { name: 'Create a passkey' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Sign in with passkey' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Create a passkey' }),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Sign in with passkey' }),
+  ).toBeVisible()
 
   // ---- register (open registration: first passkey becomes the account) ----
   await page.getByRole('button', { name: 'Create a passkey' }).click()
   await expect(page.getByRole('heading', { name: 'API keys' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Generate API key' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Generate API key' }),
+  ).toBeVisible()
 
   // ---- mint an API key ----
   await page.getByRole('button', { name: 'Generate API key' }).click()
@@ -41,7 +50,9 @@ test('register → mint → show-once → refresh wipes → login → revoke →
   // ---- show-once: a refresh destroys the secret (not persisted) ----
   await page.reload()
   await expect(page.getByTestId('fresh-secret')).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Generate API key' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Generate API key' }),
+  ).toBeVisible()
 
   // the key is listed (metadata only)
   await expect(page.locator('tbody tr')).toHaveCount(1)
@@ -52,7 +63,11 @@ test('register → mint → show-once → refresh wipes → login → revoke →
     data: { secret },
   })
   expect(verify.status()).toBe(200)
-  const body = (await verify.json()) as { subject: string; revoked: boolean; expired: boolean }
+  const body = (await verify.json()) as {
+    subject: string
+    revoked: boolean
+    expired: boolean
+  }
   expect(body).toMatchObject({ revoked: false, expired: false })
   expect(typeof body.subject).toBe('string')
 
@@ -65,9 +80,13 @@ test('register → mint → show-once → refresh wipes → login → revoke →
 
   // ---- sign out, sign back in with the same passkey ----
   await page.getByRole('button', { name: 'Sign out' }).click()
-  await expect(page.getByRole('button', { name: 'Sign in with passkey' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Sign in with passkey' }),
+  ).toBeVisible()
   await page.getByRole('button', { name: 'Sign in with passkey' }).click()
-  await expect(page.getByRole('button', { name: 'Generate API key' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Generate API key' }),
+  ).toBeVisible()
   await expect(page.locator('tbody tr')).toHaveCount(1)
 
   // ---- revoke (destructive → confirm dialog) ----

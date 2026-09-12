@@ -45,11 +45,16 @@ test.describe('bhk explainer', () => {
   test('clicking a cell explains its computation', async ({ page }) => {
     // the first size-2 cell (mask 00011, row 0) exists after one step
     await page.getByRole('button', { name: 'Step' }).click()
-    await page.locator('.bhk-cell', { hasText: /^[0-9]/ }).first().click()
+    await page
+      .locator('.bhk-cell', { hasText: /^[0-9]/ })
+      .first()
+      .click()
     await expect(page.locator('.bhk-cellinfo')).toContainText('dp[')
   })
 
-  test('Run completes the whole DP, then read-back reveals the optimal route', async ({ page }) => {
+  test('Run completes the whole DP, then read-back reveals the optimal route', async ({
+    page,
+  }) => {
     const chip = page.locator('.bhk-chip')
 
     // Run goes all the way through the table and the read-back to Done
@@ -74,7 +79,10 @@ test.describe('bhk explainer', () => {
   })
 
   test('Back restores the previous step', async ({ page }) => {
-    const step = page.locator('.bhk-statgrid').locator('div', { hasText: /^step/ }).locator('.bhk-mono')
+    const step = page
+      .locator('.bhk-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.bhk-mono')
     const back = page.getByRole('button', { name: '⏴ Back' })
 
     await page.getByRole('button', { name: 'Step' }).click()
@@ -86,7 +94,10 @@ test.describe('bhk explainer', () => {
   })
 
   test('scenario buttons restart the run', async ({ page }) => {
-    const step = page.locator('.bhk-statgrid').locator('div', { hasText: /^step/ }).locator('.bhk-mono')
+    const step = page
+      .locator('.bhk-statgrid')
+      .locator('div', { hasText: /^step/ })
+      .locator('.bhk-mono')
 
     await page.getByRole('button', { name: 'Step' }).click()
     await expect(step).not.toHaveText('0')

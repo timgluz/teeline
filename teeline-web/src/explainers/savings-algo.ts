@@ -5,27 +5,32 @@
 // instead of raw distance (ascending). A hub city (nearest the centroid) is
 // computed and highlighted but visited like every other city.
 
-import { CITIES_12 as CITIES, N_CITIES_12 as N_CITIES, dist12 as dist } from './explainer-cities'
+import {
+  CITIES_12 as CITIES,
+  N_CITIES_12 as N_CITIES,
+  dist12 as dist,
+} from './explainer-cities'
 export { CITIES, N_CITIES, dist }
 
 export type Edge = { u: number; v: number; dist: number; val: number }
 
 export type RejectReason = 'degree' | 'cycle'
-export type EventMode = 'accepted' | 'closing' | 'rejected-degree' | 'rejected-cycle' | 'done'
+export type EventMode =
+  'accepted' | 'closing' | 'rejected-degree' | 'rejected-cycle' | 'done'
 
 export type SimState = {
-  sortedEdges: Edge[]        // all n(n-1)/2 pairs, descending by savings
-  hubIndex: number           // city nearest the coordinate centroid
-  scanIndex: number          // next edge to evaluate
-  parent: number[]           // union-find: parent[i]
-  degree: number[]           // degree[i]
-  accepted: Edge[]           // accepted edges, in scan order
+  sortedEdges: Edge[] // all n(n-1)/2 pairs, descending by savings
+  hubIndex: number // city nearest the coordinate centroid
+  scanIndex: number // next edge to evaluate
+  parent: number[] // union-find: parent[i]
+  degree: number[] // degree[i]
+  accepted: Edge[] // accepted edges, in scan order
   rejected: Array<{ edge: Edge; reason: RejectReason }>
   step: number
-  lastEdge: Edge | null      // edge evaluated on the most recent step
+  lastEdge: Edge | null // edge evaluated on the most recent step
   lastEvent: EventMode | null
   done: boolean
-  tour: number[] | null      // ordered path once the cycle closes (null until done)
+  tour: number[] | null // ordered path once the cycle closes (null until done)
 }
 
 // Savings for edge (i, j) relative to hub h: s(i,j) = d(h,i) + d(h,j) - d(i,j).
@@ -37,14 +42,23 @@ function savings(i: number, j: number, hub: number): number {
 
 // City nearest the coordinate centroid — matches the Rust `hub_position`.
 export function hubIndex(): number {
-  let cx = 0, cy = 0
-  for (const [x, y] of CITIES) { cx += x; cy += y }
-  cx /= N_CITIES; cy /= N_CITIES
-  let best = 0, bestD2 = Infinity
+  let cx = 0,
+    cy = 0
+  for (const [x, y] of CITIES) {
+    cx += x
+    cy += y
+  }
+  cx /= N_CITIES
+  cy /= N_CITIES
+  let best = 0,
+    bestD2 = Infinity
   for (let i = 0; i < N_CITIES; i++) {
     const [x, y] = CITIES[i]
     const d2 = (x - cx) ** 2 + (y - cy) ** 2
-    if (d2 < bestD2) { bestD2 = d2; best = i }
+    if (d2 < bestD2) {
+      bestD2 = d2
+      best = i
+    }
   }
   return best
 }
@@ -93,7 +107,7 @@ export function components(parent: number[]): number[][] {
     const r = find(parent, i)
     ;(groups[r] ??= []).push(i)
   }
-  return Object.values(groups).map(g => g.sort((a, b) => a - b))
+  return Object.values(groups).map((g) => g.sort((a, b) => a - b))
 }
 
 export function makeInitState(): SimState {
@@ -128,7 +142,7 @@ function walkCycle(accepted: Edge[]): number[] {
   for (let i = 0; i < n; i++) {
     path.push(cur)
     seen[cur] = true
-    const next = adj[cur].find(x => x !== prev && !seen[x]) ?? adj[cur][0]
+    const next = adj[cur].find((x) => x !== prev && !seen[x]) ?? adj[cur][0]
     prev = cur
     cur = next
   }

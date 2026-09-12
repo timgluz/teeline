@@ -20,17 +20,17 @@ export type Phase = 'idle' | 'candidate' | 'move_applied' | 'local_optimum'
 // The candidate move (Rust find_best_move + apply_relocation port)
 // ---------------------------------------------------------------
 export interface MoveEvent {
-  i: number             // segment start index (original tour indexing)
+  i: number // segment start index (original tour indexing)
   segLen: 1 | 2 | 3
-  j: number             // insert after original position j
-  reversed: boolean     // reversed insertion (Or-2 / Or-3 only)
-  delta: number         // new tour length − old tour length (negative = improvement)
-  segCities: number[]   // cities in the segment, in tour order
-  insertAfter: number   // city the segment lands after (path[j])
-  insertBefore: number  // city the segment lands before (path[(j+1) % n])
-  cutEdges: [number, number][]   // edges removed: prev→first, last→after, x→y
+  j: number // insert after original position j
+  reversed: boolean // reversed insertion (Or-2 / Or-3 only)
+  delta: number // new tour length − old tour length (negative = improvement)
+  segCities: number[] // cities in the segment, in tour order
+  insertAfter: number // city the segment lands after (path[j])
+  insertBefore: number // city the segment lands before (path[(j+1) % n])
+  cutEdges: [number, number][] // edges removed: prev→first, last→after, x→y
   pasteEdges: [number, number][] // edges added: prev→after, x→first, last→y (or reversed)
-  improvingGaps: number[]        // original positions j with any improving move (scan ticks)
+  improvingGaps: number[] // original positions j with any improving move (scan ticks)
 }
 
 export interface SimState {
@@ -38,8 +38,8 @@ export interface SimState {
   tour: number[]
   bestTour: number[]
   bestCost: number
-  pass: number          // completed scans (one per applied move + final local-optimum scan)
-  moves: number         // applied relocations
+  pass: number // completed scans (one per applied move + final local-optimum scan)
+  moves: number // applied relocations
   pending: MoveEvent | null // candidate awaiting its apply phase
   lastMove: MoveEvent | null // most recently applied move (for the flash)
   costHistory: number[] // best cost after each pass (sparkline)
@@ -81,7 +81,8 @@ export function scanBestMove(tour: number[]): MoveEvent | null {
         const y = tour[(j + 1) % n]
         const edgeXY = dist(x, y)
 
-        const fwdDelta = -removeGain + dist(x, firstSeg) + dist(lastSeg, y) - edgeXY
+        const fwdDelta =
+          -removeGain + dist(x, firstSeg) + dist(lastSeg, y) - edgeXY
         if (fwdDelta < bestDelta) {
           bestDelta = fwdDelta
           best = { i, segLen, j, reversed: false, delta: fwdDelta }
@@ -89,7 +90,8 @@ export function scanBestMove(tour: number[]): MoveEvent | null {
         if (fwdDelta < -1e-3) improvingGaps.add(j)
 
         if (segLen > 1) {
-          const revDelta = -removeGain + dist(x, lastSeg) + dist(firstSeg, y) - edgeXY
+          const revDelta =
+            -removeGain + dist(x, lastSeg) + dist(firstSeg, y) - edgeXY
           if (revDelta < bestDelta) {
             bestDelta = revDelta
             best = { i, segLen, j, reversed: true, delta: revDelta }
@@ -126,7 +128,11 @@ export function scanBestMove(tour: number[]): MoveEvent | null {
       ]
 
   return {
-    i, segLen, j, reversed, delta,
+    i,
+    segLen,
+    j,
+    reversed,
+    delta,
     segCities,
     insertAfter: x,
     insertBefore: y,

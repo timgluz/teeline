@@ -61,7 +61,10 @@ export function setTourSolverName(name: string): void {
   if (el) el.textContent = name
 }
 
-function setTourStatus(status: string, state: 'accent' | 'positive' = 'accent'): void {
+function setTourStatus(
+  status: string,
+  state: 'accent' | 'positive' = 'accent',
+): void {
   const el = document.getElementById('tour-status')
   if (!el) return
   el.textContent = status
@@ -92,11 +95,20 @@ export function showResult(record: RunRecord): void {
   }
 
   const svgEl = document.getElementById('tour-svg') as unknown as SVGSVGElement
-  renderTour(svgEl, citiesRef, record.route, record.comparison !== undefined ? optRouteRef : undefined)
+  renderTour(
+    svgEl,
+    citiesRef,
+    record.route,
+    record.comparison !== undefined ? optRouteRef : undefined,
+  )
 
   document.getElementById('result-total')!.textContent = record.total.toFixed(1)
-  document.getElementById('result-gap')!.textContent = formatGapPct(record.comparison)
-  document.getElementById('result-runtime')!.textContent = formatRuntime(record.runtime)
+  document.getElementById('result-gap')!.textContent = formatGapPct(
+    record.comparison,
+  )
+  document.getElementById('result-runtime')!.textContent = formatRuntime(
+    record.runtime,
+  )
   applyComparisonCells(record.comparison)
 
   runHistory.unshift(record)
@@ -107,7 +119,7 @@ export function showResult(record: RunRecord): void {
 export function showGapFromOptCost(solverCost: number): void {
   const optCost = (window as any).__teelineOptCost as number | undefined
   if (optCost && optCost > 0) {
-    const gap = ((solverCost - optCost) / optCost * 100)
+    const gap = ((solverCost - optCost) / optCost) * 100
     document.getElementById('result-gap')!.textContent = `${gap.toFixed(1)}%`
     const gapMetric = document.getElementById('result-gap-metric')
     if (gapMetric) {
@@ -117,7 +129,10 @@ export function showGapFromOptCost(solverCost: number): void {
   }
 }
 
-export function patchComparison(record: RunRecord, stats: ComparisonStats): void {
+export function patchComparison(
+  record: RunRecord,
+  stats: ComparisonStats,
+): void {
   record.comparison = stats
   document.getElementById('result-gap')!.textContent = formatGapPct(stats)
   applyComparisonCells(stats)
@@ -132,9 +147,12 @@ export function patchComparison(record: RunRecord, stats: ComparisonStats): void
 
 function applyComparisonCells(c: ComparisonStats | undefined): void {
   const dash = '—'
-  document.getElementById('result-shared-edges')!.textContent = c !== undefined ? String(c.sharedEdges) : dash
-  document.getElementById('result-solver-only-edges')!.textContent = c !== undefined ? String(c.solverOnlyEdges) : dash
-  document.getElementById('result-optimal-only-edges')!.textContent = c !== undefined ? String(c.optimalOnlyEdges) : dash
+  document.getElementById('result-shared-edges')!.textContent =
+    c !== undefined ? String(c.sharedEdges) : dash
+  document.getElementById('result-solver-only-edges')!.textContent =
+    c !== undefined ? String(c.solverOnlyEdges) : dash
+  document.getElementById('result-optimal-only-edges')!.textContent =
+    c !== undefined ? String(c.optimalOnlyEdges) : dash
 }
 
 function renderHistoryRow(record: RunRecord): void {
@@ -145,17 +163,28 @@ function renderHistoryRow(record: RunRecord): void {
   li.setAttribute('role', 'button')
   li.setAttribute('tabindex', '0')
   li.addEventListener('click', () => replayRecord(record))
-  li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') replayRecord(record) })
+  li.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') replayRecord(record)
+  })
   list.prepend(li)
 }
 
 function replayRecord(record: RunRecord): void {
   const svgEl = document.getElementById('tour-svg') as unknown as SVGSVGElement
-  renderTour(svgEl, citiesRef, record.route, record.comparison !== undefined ? optRouteRef : undefined)
+  renderTour(
+    svgEl,
+    citiesRef,
+    record.route,
+    record.comparison !== undefined ? optRouteRef : undefined,
+  )
 
   document.getElementById('result-total')!.textContent = record.total.toFixed(1)
-  document.getElementById('result-gap')!.textContent = formatGapPct(record.comparison)
-  document.getElementById('result-runtime')!.textContent = formatRuntime(record.runtime)
+  document.getElementById('result-gap')!.textContent = formatGapPct(
+    record.comparison,
+  )
+  document.getElementById('result-runtime')!.textContent = formatRuntime(
+    record.runtime,
+  )
   applyComparisonCells(record.comparison)
 }
 

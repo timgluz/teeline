@@ -17,7 +17,11 @@ describe('session tokens', () => {
   it('round-trips a token', async () => {
     const token = await createSessionToken(SECRET, 'u1', NOW)
     const payload = await readSessionToken(SECRET, token)
-    expect(payload).toMatchObject({ sub: 'u1', iat: NOW, exp: NOW + 30 * 24 * 3600 * 1000 })
+    expect(payload).toMatchObject({
+      sub: 'u1',
+      iat: NOW,
+      exp: NOW + 30 * 24 * 3600 * 1000,
+    })
   })
 
   it('rejects a tampered token', async () => {

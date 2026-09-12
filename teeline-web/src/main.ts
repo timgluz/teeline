@@ -1,15 +1,40 @@
 import type { ParsedProblem } from 'teeline-wasm'
 import { type SolveOptions } from './solver-options'
-import type { SolveResult, SolveError, ParseResult, AlgorithmsResult, VersionResult, WorkerReadyMessage, CompareToursResult } from './worker'
+import type {
+  SolveResult,
+  SolveError,
+  ParseResult,
+  AlgorithmsResult,
+  VersionResult,
+  WorkerReadyMessage,
+  CompareToursResult,
+} from './worker'
 import { initUpload, resetUpload } from './upload'
 import { initSolverConfig } from './solver-form'
 import { initWebMCP } from './webmcp'
-import { initResults, updateOptRoute, showRunning, showResult, showGapFromOptCost, patchComparison, setTourProblemName, setTourSolverName } from './results'
-import { buildTourText, buildCsvText, buildJsonText, serializeSvg, triggerDownload } from './download'
+import {
+  initResults,
+  updateOptRoute,
+  showRunning,
+  showResult,
+  showGapFromOptCost,
+  patchComparison,
+  setTourProblemName,
+  setTourSolverName,
+} from './results'
+import {
+  buildTourText,
+  buildCsvText,
+  buildJsonText,
+  serializeSvg,
+  triggerDownload,
+} from './download'
 
 window.addEventListener('load', () => import('./sentry'), { once: true })
 
-const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+const worker = new Worker(new URL('./worker.ts', import.meta.url), {
+  type: 'module',
+})
 
 export function runSolver(
   solver: string,
@@ -22,13 +47,19 @@ export function runSolver(
       if (e.data.type === 'result') {
         resolve(e.data.solution)
         document.dispatchEvent(
-          new CustomEvent('solver:result', { detail: e.data.solution, bubbles: true }),
+          new CustomEvent('solver:result', {
+            detail: e.data.solution,
+            bubbles: true,
+          }),
         )
       } else {
         const err = new Error(e.data.message)
         reject(err)
         document.dispatchEvent(
-          new CustomEvent('solver:error', { detail: e.data.message, bubbles: true }),
+          new CustomEvent('solver:error', {
+            detail: e.data.message,
+            bubbles: true,
+          }),
         )
       }
     }
@@ -80,7 +111,7 @@ function setWasmStatus(state: 'loading' | 'ready' | 'error'): void {
 // ---- Results (init before solver config so showRunning is ready) ----
 
 initResults(
-  [],          // cities injected per-run via showResult; updated below
+  [], // cities injected per-run via showResult; updated below
   () => optTourRoute,
   () => {
     // "try another solver" — solver-form re-shows step-02 via its own stepper logic
@@ -95,122 +126,144 @@ if (versionEl) versionEl.textContent = 'Connecting…'
 
 worker.addEventListener('error', () => {
   setWasmStatus('error')
-  if (versionEl) versionEl.textContent = 'WASM failed to load — try refreshing the page'
+  if (versionEl)
+    versionEl.textContent = 'WASM failed to load — try refreshing the page'
 })
 
 let gotAlgorithms = false
 let gotVersion = false
 
-worker.addEventListener('message', function onInit(e: MessageEvent<WorkerReadyMessage | AlgorithmsResult | VersionResult>) {
-  const data = e.data
+worker.addEventListener(
+  'message',
+  function onInit(
+    e: MessageEvent<WorkerReadyMessage | AlgorithmsResult | VersionResult>,
+  ) {
+    const data = e.data
 
-  if (data.type === 'worker-ready') {
-    // WASM is fully initialised — safe to call listAlgorithms / getVersion now
-    worker.postMessage({ type: 'list-algorithms' })
-    worker.postMessage({ type: 'get-version' })
-    return
-  }
+    if (data.type === 'worker-ready') {
+      // WASM is fully initialised — safe to call listAlgorithms / getVersion now
+      worker.postMessage({ type: 'list-algorithms' })
+      worker.postMessage({ type: 'get-version' })
+      return
+    }
 
-  if (data.type === 'algorithms') {
-    solverConfig = initSolverConfig(
-      data.algorithms,
-      () => parsedProblem !== null,
-      (solver, options) => {
-        if (!parsedProblem) return
+    if (data.type === 'algorithms') {
+      solverConfig = initSolverConfig(
+        data.algorithms,
+        () => parsedProblem !== null,
+        (solver, options) => {
+          if (!parsedProblem) return
 
-        // Re-init results with current cities so renderTour has the right data
-        initResults(
-          parsedProblem.cities,
-          () => optTourRoute,
-          () => {
-            const step04 = document.getElementById('step-04') as HTMLElement
-            const step02 = document.getElementById('step-02') as HTMLElement
-            step04.hidden = true
-            step02.hidden = false
-            ;(document.getElementById('download-actions') as HTMLElement).hidden = true
-          },
-        )
+          // Re-init results with current cities so renderTour has the right data
+          initResults(
+            parsedProblem.cities,
+            () => optTourRoute,
+            () => {
+              const step04 = document.getElementById('step-04') as HTMLElement
+              const step02 = document.getElementById('step-02') as HTMLElement
+              step04.hidden = true
+              step02.hidden = false
+              ;(
+                document.getElementById('download-actions') as HTMLElement
+              ).hidden = true
+            },
+          )
 
-        setTourSolverName(solver)
-        showRunning()
+          setTourSolverName(solver)
+          showRunning()
 
-        const start = Date.now()
-        runSolver(solver, parsedProblem.cities, options)
-          .then((result) => {
-            const runtime = Date.now() - start
-            const record = { solver, total: result.total, runtime, route: result.route }
-            showResult(record)
-            showDownloadButtons(record, parsedProblem!)
-            clearCompareError()
+          const start = Date.now()
+          runSolver(solver, parsedProblem.cities, options)
+            .then((result) => {
+              const runtime = Date.now() - start
+              const record = {
+                solver,
+                total: result.total,
+                runtime,
+                route: result.route,
+              }
+              showResult(record)
+              showDownloadButtons(record, parsedProblem!)
+              clearCompareError()
 
-            // Show gap from ?opt= query param if we have optimal cost but no route
-            showGapFromOptCost(record.total)
+              // Show gap from ?opt= query param if we have optimal cost but no route
+              showGapFromOptCost(record.total)
 
-            if (optTourRoute) {
-              const compareId = crypto.randomUUID()
-              const compareHandler = (e: MessageEvent<CompareToursResult>) => {
-                if (e.data.type !== 'compare-tours-result') return
-                if (e.data.id !== compareId) return
-                worker.removeEventListener('message', compareHandler)
-                if (e.data.stats) {
-                  patchComparison(record, e.data.stats)
+              if (optTourRoute) {
+                const compareId = crypto.randomUUID()
+                const compareHandler = (
+                  e: MessageEvent<CompareToursResult>,
+                ) => {
+                  if (e.data.type !== 'compare-tours-result') return
+                  if (e.data.id !== compareId) return
+                  worker.removeEventListener('message', compareHandler)
+                  if (e.data.stats) {
+                    patchComparison(record, e.data.stats)
+                  } else {
+                    showCompareError(e.data.error ?? 'Comparison failed')
+                  }
+                }
+                worker.addEventListener('message', compareHandler)
+                if (rawInput) {
+                  worker.postMessage({
+                    type: 'compare-tours-from-input',
+                    id: compareId,
+                    solverRoute: result.route,
+                    optRoute: optTourRoute,
+                    input: rawInput,
+                  })
                 } else {
-                  showCompareError(e.data.error ?? 'Comparison failed')
+                  worker.postMessage({
+                    type: 'compare-tours',
+                    id: compareId,
+                    solverRoute: result.route,
+                    optRoute: optTourRoute,
+                    cities: parsedProblem!.cities,
+                  })
                 }
               }
-              worker.addEventListener('message', compareHandler)
-              if (rawInput) {
-                worker.postMessage({
-                  type: 'compare-tours-from-input',
-                  id: compareId,
-                  solverRoute: result.route,
-                  optRoute: optTourRoute,
-                  input: rawInput,
-                })
-              } else {
-                worker.postMessage({
-                  type: 'compare-tours',
-                  id: compareId,
-                  solverRoute: result.route,
-                  optRoute: optTourRoute,
-                  cities: parsedProblem!.cities,
-                })
-              }
-            }
-          })
-          .catch((err: Error) => {
-            const overlay = document.getElementById('solving-overlay') as HTMLElement
-            overlay.hidden = true
-            console.error('Solver error:', err)
-          })
-      },
-    )
+            })
+            .catch((err: Error) => {
+              const overlay = document.getElementById(
+                'solving-overlay',
+              ) as HTMLElement
+              overlay.hidden = true
+              console.error('Solver error:', err)
+            })
+        },
+      )
 
-    // Upload depends on solverConfig.refresh — must be wired after solverConfig exists
-    initUpload(
-      parseFile,
-      (p, input) => { parsedProblem = p; rawInput = input; solverConfig!.refresh(); setTourProblemName(p.name || 'unnamed') },
-      (route) => {
-        optTourRoute = route.length > 0 ? route : null
-        updateOptRoute(optTourRoute)
-      },
-    )
+      // Upload depends on solverConfig.refresh — must be wired after solverConfig exists
+      initUpload(
+        parseFile,
+        (p, input) => {
+          parsedProblem = p
+          rawInput = input
+          solverConfig!.refresh()
+          setTourProblemName(p.name || 'unnamed')
+        },
+        (route) => {
+          optTourRoute = route.length > 0 ? route : null
+          updateOptRoute(optTourRoute)
+        },
+      )
 
-    initWebMCP(worker)
-    setWasmStatus('ready')
-    gotAlgorithms = true
-  }
+      initWebMCP(worker)
+      setWasmStatus('ready')
+      gotAlgorithms = true
+    }
 
-  if (data.type === 'version') {
-    const versionEl = document.getElementById('wasm-version')
-    if (versionEl) versionEl.textContent = `teeline-solver ${data.version}`
-    gotVersion = true
-  }
+    if (data.type === 'version') {
+      const versionEl = document.getElementById('wasm-version')
+      if (versionEl) versionEl.textContent = `teeline-solver ${data.version}`
+      gotVersion = true
+    }
 
-  if (gotAlgorithms && gotVersion) {
-    worker.removeEventListener('message', onInit)
-  }
-})
+    if (gotAlgorithms && gotVersion) {
+      worker.removeEventListener('message', onInit)
+    }
+  },
+)
 
 // ---- Comparison error banner ----
 
@@ -223,7 +276,10 @@ function showCompareError(msg: string): void {
 
 function clearCompareError(): void {
   const el = document.getElementById('comparison-error') as HTMLElement | null
-  if (el) { el.hidden = true; el.textContent = '' }
+  if (el) {
+    el.hidden = true
+    el.textContent = ''
+  }
 }
 
 // ---- Reset / new dataset ----
@@ -240,19 +296,29 @@ function resetToStep01(): void {
   const gapM = document.getElementById('result-gap-metric')
   if (lenM) lenM.textContent = '—'
   if (rtM) rtM.textContent = '—'
-  if (gapM) { gapM.textContent = '—'; gapM.className = 'mt-0.5 font-mono text-lg text-positive' }
+  if (gapM) {
+    gapM.textContent = '—'
+    gapM.className = 'mt-0.5 font-mono text-lg text-positive'
+  }
   ;(document.getElementById('step-01') as HTMLElement).hidden = false
   ;(document.getElementById('step-02') as HTMLElement).hidden = true
   ;(document.getElementById('step-04') as HTMLElement).hidden = true
   ;(document.getElementById('download-actions') as HTMLElement).hidden = true
 }
 
-document.getElementById('btn-change-file')!.addEventListener('click', resetToStep01)
-document.getElementById('btn-new-dataset')!.addEventListener('click', resetToStep01)
+document
+  .getElementById('btn-change-file')!
+  .addEventListener('click', resetToStep01)
+document
+  .getElementById('btn-new-dataset')!
+  .addEventListener('click', resetToStep01)
 
 // ---- Download wiring ----
 
-function showDownloadButtons(record: import('./results').RunRecord, problem: ParsedProblem): void {
+function showDownloadButtons(
+  record: import('./results').RunRecord,
+  problem: ParsedProblem,
+): void {
   const actions = document.getElementById('download-actions') as HTMLElement
   actions.hidden = false
 
@@ -263,13 +329,21 @@ function showDownloadButtons(record: import('./results').RunRecord, problem: Par
   const sessionId = crypto.randomUUID()
 
   document.getElementById('btn-download-tour')!.onclick = () =>
-    triggerDownload(buildTourText(name, route), `${sessionId}.tour`, 'text/plain')
+    triggerDownload(
+      buildTourText(name, route),
+      `${sessionId}.tour`,
+      'text/plain',
+    )
 
   document.getElementById('btn-download-csv')!.onclick = () =>
     triggerDownload(buildCsvText(route, cities), `${sessionId}.csv`, 'text/csv')
 
   document.getElementById('btn-download-json')!.onclick = () =>
-    triggerDownload(buildJsonText(name, record, cities, ts), `${sessionId}.json`, 'application/json')
+    triggerDownload(
+      buildJsonText(name, record, cities, ts),
+      `${sessionId}.json`,
+      'application/json',
+    )
 
   document.getElementById('btn-download-svg')!.onclick = () =>
     triggerDownload(serializeSvg(svgEl), `${sessionId}.svg`, 'image/svg+xml')

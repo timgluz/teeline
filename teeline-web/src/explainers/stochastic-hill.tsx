@@ -1,13 +1,17 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES, SCENARIOS,
-  tourLength, makeInitState, stepOnce,
-} from "./stochastic-hill-algo"
-import type { Phase, CandidateEvent, Scenario } from "./stochastic-hill-algo"
+  CITIES,
+  N_CITIES,
+  SCENARIOS,
+  tourLength,
+  makeInitState,
+  stepOnce,
+} from './stochastic-hill-algo'
+import type { Phase, CandidateEvent, Scenario } from './stochastic-hill-algo'
 
 const DEFAULT_SCENARIO = SCENARIOS.quick_convergence
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 
 function sameTour(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false
@@ -22,7 +26,12 @@ function edgeKey(a: number, b: number): string {
 // TourCanvas — ghost best tour behind the current tour, with
 // candidate/verdict edge highlighting and a restart fade.
 // ---------------------------------------------------------------
-function TourCanvas({ tour, bestTour, pending, phase }: {
+function TourCanvas({
+  tour,
+  bestTour,
+  pending,
+  phase,
+}: {
   tour: number[]
   bestTour: number[]
   pending: CandidateEvent | null
@@ -52,8 +61,12 @@ function TourCanvas({ tour, bestTour, pending, phase }: {
   const isRestarting = phase === 'restart'
 
   return (
-    <svg viewBox="0 0 300 300" className={`shc-canvas ${isAccepted ? 'shc-glow' : ''}`}
-      role="img" aria-label="Stochastic hill climbing tour">
+    <svg
+      viewBox="0 0 300 300"
+      className={`shc-canvas ${isAccepted ? 'shc-glow' : ''}`}
+      role="img"
+      aria-label="Stochastic hill climbing tour"
+    >
       <rect x={0} y={0} width={300} height={300} className="shc-bg" />
 
       {/* Ghost of the best tour found so far (visible when it differs — i.e. after a restart) */}
@@ -62,9 +75,16 @@ function TourCanvas({ tour, bestTour, pending, phase }: {
           {bestTour.map((_id, k) => {
             const a = bestTour[k]
             const b = bestTour[(k + 1) % bestTour.length]
-            return <line key={`g${edgeKey(a, b)}`} className="shc-edge-ghost"
-              x1={CITIES[a][0]} y1={CITIES[a][1]}
-              x2={CITIES[b][0]} y2={CITIES[b][1]} />
+            return (
+              <line
+                key={`g${edgeKey(a, b)}`}
+                className="shc-edge-ghost"
+                x1={CITIES[a][0]}
+                y1={CITIES[a][1]}
+                x2={CITIES[b][0]}
+                y2={CITIES[b][1]}
+              />
+            )
           })}
         </g>
       )}
@@ -81,16 +101,32 @@ function TourCanvas({ tour, bestTour, pending, phase }: {
           } else if (isRejected) {
             if (removedSet.has(key)) cls += ' shc-rejected'
           }
-          return <line key={key} className={cls}
-            x1={CITIES[from][0]} y1={CITIES[from][1]}
-            x2={CITIES[to][0]} y2={CITIES[to][1]} />
+          return (
+            <line
+              key={key}
+              className={cls}
+              x1={CITIES[from][0]}
+              y1={CITIES[from][1]}
+              x2={CITIES[to][0]}
+              y2={CITIES[to][1]}
+            />
+          )
         })}
         {tour.map((id) => (
           <g key={id}>
-            <circle className="shc-city"
-              cx={CITIES[id][0]} cy={CITIES[id][1]} r={6} />
-            <text className="shc-label"
-              x={CITIES[id][0]} y={CITIES[id][1] + 16}>{id}</text>
+            <circle
+              className="shc-city"
+              cx={CITIES[id][0]}
+              cy={CITIES[id][1]}
+              r={6}
+            />
+            <text
+              className="shc-label"
+              x={CITIES[id][0]}
+              y={CITIES[id][1] + 16}
+            >
+              {id}
+            </text>
           </g>
         ))}
       </g>
@@ -103,7 +139,8 @@ function TourCanvas({ tour, bestTour, pending, phase }: {
 // ---------------------------------------------------------------
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return null
-  const W = 300, H = 46
+  const W = 300,
+    H = 46
   const minV = Math.min(...values)
   const maxV = Math.max(...values)
   const range = maxV - minV || 1
@@ -113,10 +150,19 @@ function Sparkline({ values }: { values: number[] }) {
     return `${x.toFixed(1)},${y.toFixed(1)}`
   })
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="shc-spark" aria-label="best cost over epochs">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="shc-spark"
+      aria-label="best cost over epochs"
+    >
       <rect x={0} y={0} width={W} height={H} className="shc-bg" rx={4} />
-      <polyline points={pts.join(" ")} fill="none" stroke="#0d9488"
-        strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke="#0d9488"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -125,18 +171,28 @@ function Sparkline({ values }: { values: number[] }) {
 // Root component
 // ---------------------------------------------------------------
 export default function StochasticHillExplainer() {
-  const [tour, setTour] = useState<number[]>(() => [...DEFAULT_SCENARIO.initTour!])
-  const [bestTour, setBestTour] = useState<number[]>(() => [...DEFAULT_SCENARIO.initTour!])
+  const [tour, setTour] = useState<number[]>(() => [
+    ...DEFAULT_SCENARIO.initTour!,
+  ])
+  const [bestTour, setBestTour] = useState<number[]>(() => [
+    ...DEFAULT_SCENARIO.initTour!,
+  ])
   const [phase, setPhase] = useState<Phase>('idle')
   const [epoch, setEpoch] = useState(0)
   const [nStale, setNStale] = useState(0)
   const [restarts, setRestarts] = useState(0)
-  const [bestCost, setBestCost] = useState(() => tourLength(DEFAULT_SCENARIO.initTour!))
-  const [currentCost, setCurrentCost] = useState(() => tourLength(DEFAULT_SCENARIO.initTour!))
+  const [bestCost, setBestCost] = useState(() =>
+    tourLength(DEFAULT_SCENARIO.initTour!),
+  )
+  const [currentCost, setCurrentCost] = useState(() =>
+    tourLength(DEFAULT_SCENARIO.initTour!),
+  )
   const [acceptedCount, setAcceptedCount] = useState(0)
   const [rejectedCount, setRejectedCount] = useState(0)
   const [pending, setPending] = useState<CandidateEvent | null>(null)
-  const [costHistory, setCostHistory] = useState<number[]>(() => [tourLength(DEFAULT_SCENARIO.initTour!)])
+  const [costHistory, setCostHistory] = useState<number[]>(() => [
+    tourLength(DEFAULT_SCENARIO.initTour!),
+  ])
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(3) // 4x default — 8-city runs are short; keep them snappy
@@ -221,40 +277,48 @@ export default function StochasticHillExplainer() {
 
   // Restart-pace params are per-scenario defaults, user-adjustable; changing
   // them restarts the run with the new values (keeps the current scenario).
-  const applyParams = useCallback((epochs: number, patience: number) => {
-    const sc = scenarioRef.current
-    // Math.floor(x) || 1 guards against NaN (a partially-typed number input
-    // like "-" or ".") and 0 — either would otherwise break the epoch cap /
-    // restart threshold (e.g. maxEpochs: NaN never triggers 'done').
-    const clampedEpochs = Math.max(1, Math.min(500, Math.floor(epochs) || 1))
-    const clampedPatience = Math.max(1, Math.min(100, Math.floor(patience) || 1))
-    setEpochsInput(clampedEpochs)
-    setPatienceInput(clampedPatience)
-    reinit({ ...sc, epochs: clampedEpochs, patience: clampedPatience })
-  }, [reinit])
+  const applyParams = useCallback(
+    (epochs: number, patience: number) => {
+      const sc = scenarioRef.current
+      // Math.floor(x) || 1 guards against NaN (a partially-typed number input
+      // like "-" or ".") and 0 — either would otherwise break the epoch cap /
+      // restart threshold (e.g. maxEpochs: NaN never triggers 'done').
+      const clampedEpochs = Math.max(1, Math.min(500, Math.floor(epochs) || 1))
+      const clampedPatience = Math.max(
+        1,
+        Math.min(100, Math.floor(patience) || 1),
+      )
+      setEpochsInput(clampedEpochs)
+      setPatienceInput(clampedPatience)
+      reinit({ ...sc, epochs: clampedEpochs, patience: clampedPatience })
+    },
+    [reinit],
+  )
 
-  const acceptRate = acceptedCount + rejectedCount > 0
-    ? Math.round((acceptedCount / (acceptedCount + rejectedCount)) * 100)
-    : null
+  const acceptRate =
+    acceptedCount + rejectedCount > 0
+      ? Math.round((acceptedCount / (acceptedCount + rejectedCount)) * 100)
+      : null
 
   // Status chip
-  let chipText = "Click Step to draw a random 2-opt candidate"
-  let chipClass = "shc-chip shc-chip-idle"
+  let chipText = 'Click Step to draw a random 2-opt candidate'
+  let chipClass = 'shc-chip shc-chip-idle'
   if (phase === 'propose' && pending) {
     chipText = `Candidate — reverse ${pending.i}…${pending.j}  (Δ=${pending.delta.toFixed(0)}, ${pending.accepted ? 'beats best' : 'won’t beat best'})`
-    chipClass = "shc-chip shc-chip-candidate"
+    chipClass = 'shc-chip shc-chip-candidate'
   } else if (phase === 'accepted' && pending) {
     chipText = `Accepted — new best ${bestCost.toFixed(0)}  (Δ=${pending.delta.toFixed(0)})`
-    chipClass = "shc-chip shc-chip-accepted"
+    chipClass = 'shc-chip shc-chip-accepted'
   } else if (phase === 'rejected' && pending) {
     chipText = `Rejected — Δ=${pending.delta.toFixed(0)}, candidate ${pending.candidateCost.toFixed(0)} ≥ best ${bestCost.toFixed(0)}  (${nStale} stale)`
-    chipClass = "shc-chip shc-chip-rejected"
+    chipClass = 'shc-chip shc-chip-rejected'
   } else if (phase === 'restart') {
-    chipText = "Restarting… search went stale — fresh random tour appears (best survives)"
-    chipClass = "shc-chip shc-chip-restart"
+    chipText =
+      'Restarting… search went stale — fresh random tour appears (best survives)'
+    chipClass = 'shc-chip shc-chip-restart'
   } else if (phase === 'done') {
     chipText = `Done — ${epoch} epochs · ${restarts} restarts · best ${bestCost.toFixed(0)}`
-    chipClass = "shc-chip shc-chip-done"
+    chipClass = 'shc-chip shc-chip-done'
   }
 
   return (
@@ -265,27 +329,47 @@ export default function StochasticHillExplainer() {
         <div className="shc-eyebrow">teeline · algorithms/stochastic_hill</div>
         <h2 className="shc-title">Stochastic Hill Climbing</h2>
         <p className="shc-sub">
-          Each step draws a <strong>random 2-opt candidate</strong> — a random segment reversal.
-          The candidate is accepted only if it <strong>beats the best tour found so far</strong>;
-          otherwise it is rejected and the tour stays. When the search goes stale (too many
-          rejections in a row), it <strong>restarts from a fresh random tour</strong> — the best
-          tour survives. Random restarts are what rescue the search from mediocre local optima.
+          Each step draws a <strong>random 2-opt candidate</strong> — a random
+          segment reversal. The candidate is accepted only if it{' '}
+          <strong>beats the best tour found so far</strong>; otherwise it is
+          rejected and the tour stays. When the search goes stale (too many
+          rejections in a row), it{' '}
+          <strong>restarts from a fresh random tour</strong> — the best tour
+          survives. Random restarts are what rescue the search from mediocre
+          local optima.
         </p>
       </header>
 
       <div className="shc-viz-row">
         <div className="shc-canvas-wrap">
-          <TourCanvas tour={tour} bestTour={bestTour} pending={pending} phase={phase} />
+          <TourCanvas
+            tour={tour}
+            bestTour={bestTour}
+            pending={pending}
+            phase={phase}
+          />
         </div>
       </div>
 
       <div className="shc-legend">
-        <span><span className="shc-swatch shc-swatch-normal" /> tour edge</span>
-        <span><span className="shc-swatch shc-swatch-ghost" /> best tour (ghost)</span>
-        <span><span className="shc-swatch shc-swatch-cand-rm" /> candidate (remove)</span>
-        <span><span className="shc-swatch shc-swatch-cand-ad" /> candidate (add)</span>
-        <span><span className="shc-swatch shc-swatch-removed" /> removed</span>
-        <span><span className="shc-swatch shc-swatch-added" /> new edge</span>
+        <span>
+          <span className="shc-swatch shc-swatch-normal" /> tour edge
+        </span>
+        <span>
+          <span className="shc-swatch shc-swatch-ghost" /> best tour (ghost)
+        </span>
+        <span>
+          <span className="shc-swatch shc-swatch-cand-rm" /> candidate (remove)
+        </span>
+        <span>
+          <span className="shc-swatch shc-swatch-cand-ad" /> candidate (add)
+        </span>
+        <span>
+          <span className="shc-swatch shc-swatch-removed" /> removed
+        </span>
+        <span>
+          <span className="shc-swatch shc-swatch-added" /> new edge
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -312,7 +396,9 @@ export default function StochasticHillExplainer() {
         </div>
         <div>
           <div className="shc-statlabel">accept rate</div>
-          <div className="shc-mono">{acceptRate === null ? '—' : `${acceptRate}%`}</div>
+          <div className="shc-mono">
+            {acceptRate === null ? '—' : `${acceptRate}%`}
+          </div>
         </div>
         <div>
           <div className="shc-statlabel">step</div>
@@ -322,24 +408,47 @@ export default function StochasticHillExplainer() {
 
       <div className="shc-config">
         <div className="shc-config-row">
-          <label className="shc-label" htmlFor="shc-epochs">Epochs</label>
-          <input id="shc-epochs" className="shc-input" type="number" min={1} max={500}
+          <label className="shc-label" htmlFor="shc-epochs">
+            Epochs
+          </label>
+          <input
+            id="shc-epochs"
+            className="shc-input"
+            type="number"
+            min={1}
+            max={500}
             value={epochsInput}
-            onInput={(e) => setEpochsInput(Number((e.target as HTMLInputElement).value))}
-            onBlur={() => applyParams(epochsInput, patienceInput)} />
-          <label className="shc-label" htmlFor="shc-patience">Restart patience</label>
-          <input id="shc-patience" className="shc-input" type="number" min={1} max={100}
+            onInput={(e) =>
+              setEpochsInput(Number((e.target as HTMLInputElement).value))
+            }
+            onBlur={() => applyParams(epochsInput, patienceInput)}
+          />
+          <label className="shc-label" htmlFor="shc-patience">
+            Restart patience
+          </label>
+          <input
+            id="shc-patience"
+            className="shc-input"
+            type="number"
+            min={1}
+            max={100}
             value={patienceInput}
-            onInput={(e) => setPatienceInput(Number((e.target as HTMLInputElement).value))}
-            onBlur={() => applyParams(epochsInput, patienceInput)} />
+            onInput={(e) =>
+              setPatienceInput(Number((e.target as HTMLInputElement).value))
+            }
+            onBlur={() => applyParams(epochsInput, patienceInput)}
+          />
         </div>
         <div className="shc-config-row">
           <label className="shc-label">Speed</label>
           <div className="shc-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l}
+              <button
+                key={l}
                 className={`shc-speed-btn ${i === speedIdx ? 'shc-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
                 {l}
               </button>
             ))}
@@ -348,24 +457,47 @@ export default function StochasticHillExplainer() {
       </div>
 
       <div className="shc-controls">
-        <button className="shc-btn" onClick={stepBack} disabled={running || historyRef.current.length === 0}>
+        <button
+          className="shc-btn"
+          onClick={stepBack}
+          disabled={running || historyRef.current.length === 0}
+        >
           ⏴ Back
         </button>
-        <button className="shc-btn" onClick={stepForward} disabled={running || phase === 'done'}>
+        <button
+          className="shc-btn"
+          onClick={stepForward}
+          disabled={running || phase === 'done'}
+        >
           ⏵ Step
         </button>
-        <button className="shc-btn" onClick={() => setRunning(!running)} disabled={phase === 'done'}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="shc-btn"
+          onClick={() => setRunning(!running)}
+          disabled={phase === 'done'}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
         </button>
-        <button className="shc-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
+        <button
+          className="shc-btn"
+          onClick={() => reinit(scenarioRef.current)}
+          disabled={running}
+        >
+          ↺ Reset
+        </button>
       </div>
 
       <div className="shc-scenarios">
         <div className="shc-section-label">Scenarios</div>
         <div className="shc-scenario-row">
           {Object.entries(SCENARIOS).map(([key, s]) => (
-            <button key={key} className="shc-scenario-btn" title={s.desc}
-              onClick={() => reinit(s)} disabled={running}>
+            <button
+              key={key}
+              className="shc-scenario-btn"
+              title={s.desc}
+              onClick={() => reinit(s)}
+              disabled={running}
+            >
               {s.label}
             </button>
           ))}
@@ -374,7 +506,9 @@ export default function StochasticHillExplainer() {
 
       <footer className="shc-footer">
         <span className="shc-mono">cities: {N_CITIES}</span>
-        <span className="shc-mono">random 2-opt · accept only if &lt; best · random restart</span>
+        <span className="shc-mono">
+          random 2-opt · accept only if &lt; best · random restart
+        </span>
       </footer>
     </div>
   )

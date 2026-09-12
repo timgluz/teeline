@@ -1,19 +1,21 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
-import {
-  SCENARIOS, makeInitState, stepOnce,
-} from "./branch-bound-algo"
-import type { Scenario, SimState, BnBNode } from "./branch-bound-algo"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
+import { SCENARIOS, makeInitState, stepOnce } from './branch-bound-algo'
+import type { Scenario, SimState, BnBNode } from './branch-bound-algo'
 
 const DEFAULT_SCENARIO = SCENARIOS.small_grid
 const SPEEDS = [600, 420, 280, 180, 100, 50, 25]
-const SPEED_LABELS = ["1x", "2x", "3x", "4x", "5x", "6x", "7x"]
+const SPEED_LABELS = ['1x', '2x', '3x', '4x', '5x', '6x', '7x']
 
 // ---------------------------------------------------------------
 // SearchTree — horizontal tree: root on the left, children to the
 // right. Pruned nodes red with a strike, best leaf gold, the active
 // path green; clicking a node pins it in the info panel.
 // ---------------------------------------------------------------
-function SearchTree({ sim, selectedId, onSelect }: {
+function SearchTree({
+  sim,
+  selectedId,
+  onSelect,
+}: {
   sim: SimState
   selectedId: number | null
   onSelect: (id: number) => void
@@ -23,13 +25,21 @@ function SearchTree({ sim, selectedId, onSelect }: {
 
   const { nodes, stack } = sim
   const onStack = useMemo(() => new Set(stack), [stack])
-  const maxDepth = useMemo(() => nodes.reduce((m, nd) => Math.max(m, nd.depth), 1), [nodes])
+  const maxDepth = useMemo(
+    () => nodes.reduce((m, nd) => Math.max(m, nd.depth), 1),
+    [nodes],
+  )
   const width = maxDepth * X + 70
   const height = Math.max(40, nodes.length * Y + 24)
 
   return (
     <div className="bb-tree-scroll">
-      <svg viewBox={`0 0 ${width} ${height}`} className="bb-tree" role="img" aria-label="Branch and bound search tree">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="bb-tree"
+        role="img"
+        aria-label="Branch and bound search tree"
+      >
         {/* edges */}
         {nodes.map((nd) => {
           if (nd.parent === null) return null
@@ -39,7 +49,16 @@ function SearchTree({ sim, selectedId, onSelect }: {
           const x2 = nd.depth * X - 6
           const y2 = nd.id * Y + Y / 2
           const cls = `bb-edge ${onStack.has(nd.id) ? 'bb-edge-active' : ''}`
-          return <line key={`e${nd.id}`} className={cls} x1={x1} y1={y1} x2={x2} y2={y2} />
+          return (
+            <line
+              key={`e${nd.id}`}
+              className={cls}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+            />
+          )
         })}
         {/* nodes */}
         {nodes.map((nd) => {
@@ -53,14 +72,24 @@ function SearchTree({ sim, selectedId, onSelect }: {
             onStack.has(nd.id) && nd.status === 'open' ? 'bb-node-open' : '',
             nd.id === sim.current ? 'bb-node-current' : '',
             selectedId === nd.id ? 'bb-node-selected' : '',
-          ].join(' ').trim()
+          ]
+            .join(' ')
+            .trim()
           const label = nd.path[nd.path.length - 1]
           return (
             <g key={nd.id} className={cls} onClick={() => onSelect(nd.id)}>
               <rect x={x - 24} y={y} width={48} height={Y - 3} rx={3} />
-              <text x={x} y={y + 11} className="bb-node-city">{label}</text>
-              <text x={x + 6} y={y + 11} className="bb-node-lb">{nd.lb.toFixed(0)}</text>
-              {nd.status === 'pruned' && <text x={x + 22} y={y + 8} className="bb-node-x">✕</text>}
+              <text x={x} y={y + 11} className="bb-node-city">
+                {label}
+              </text>
+              <text x={x + 6} y={y + 11} className="bb-node-lb">
+                {nd.lb.toFixed(0)}
+              </text>
+              {nd.status === 'pruned' && (
+                <text x={x + 22} y={y + 8} className="bb-node-x">
+                  ✕
+                </text>
+              )}
               <title>{`path ${nd.path.join('→')} · bound ${nd.lb.toFixed(0)} · ${nd.status}`}</title>
             </g>
           )
@@ -74,19 +103,29 @@ function SearchTree({ sim, selectedId, onSelect }: {
 // CityMap — partial tour of the pinned/active node, unvisited gray
 // ---------------------------------------------------------------
 function CityMap({ sim, node }: { sim: SimState; node: BnBNode | null }) {
-  const path = node ? node.path : sim.bestTour ?? []
+  const path = node ? node.path : (sim.bestTour ?? [])
   const unvisited = node ? new Set(node.unvisited) : new Set<number>()
   const n = sim.n
   const edges: Array<[number, number]> = []
   for (let k = 0; k < path.length - 1; k++) edges.push([path[k], path[k + 1]])
 
   return (
-    <svg viewBox="0 0 300 300" className="bb-map" role="img" aria-label="Partial tour at the selected node">
+    <svg
+      viewBox="0 0 300 300"
+      className="bb-map"
+      role="img"
+      aria-label="Partial tour at the selected node"
+    >
       <rect x={0} y={0} width={300} height={300} className="bb-bg" />
       {edges.map(([a, b]) => (
-        <line key={`${a}-${b}`} className="bb-map-edge"
-          x1={sim.cities[a][0]} y1={sim.cities[a][1]}
-          x2={sim.cities[b][0]} y2={sim.cities[b][1]} />
+        <line
+          key={`${a}-${b}`}
+          className="bb-map-edge"
+          x1={sim.cities[a][0]}
+          y1={sim.cities[a][1]}
+          x2={sim.cities[b][0]}
+          y2={sim.cities[b][1]}
+        />
       ))}
       {Array.from({ length: n }, (_, i) => i).map((i) => {
         const inPath = path.includes(i)
@@ -95,8 +134,19 @@ function CityMap({ sim, node }: { sim: SimState; node: BnBNode | null }) {
         else if (unvisited.has(i)) cls = 'bb-city-unvisited'
         return (
           <g key={i}>
-            <circle className={cls} cx={sim.cities[i][0]} cy={sim.cities[i][1]} r={7} />
-            <text className="bb-label" x={sim.cities[i][0]} y={sim.cities[i][1] + 16}>{i}</text>
+            <circle
+              className={cls}
+              cx={sim.cities[i][0]}
+              cy={sim.cities[i][1]}
+              r={7}
+            />
+            <text
+              className="bb-label"
+              x={sim.cities[i][0]}
+              y={sim.cities[i][1] + 16}
+            >
+              {i}
+            </text>
           </g>
         )
       })}
@@ -108,7 +158,9 @@ function CityMap({ sim, node }: { sim: SimState; node: BnBNode | null }) {
 // Root component
 // ---------------------------------------------------------------
 export default function BranchBoundExplainer() {
-  const [sim, setSim] = useState<SimState>(() => makeInitState(DEFAULT_SCENARIO))
+  const [sim, setSim] = useState<SimState>(() =>
+    makeInitState(DEFAULT_SCENARIO),
+  )
   const [running, setRunning] = useState(false)
   const [speedIdx, setSpeedIdx] = useState(2)
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -122,13 +174,16 @@ export default function BranchBoundExplainer() {
     setSim(next)
   }, [])
 
-  const reinit = useCallback((scenario: Scenario) => {
-    scenarioRef.current = scenario
-    historyRef.current = []
-    setSelectedId(null)
-    commit(makeInitState(scenario))
-    setRunning(false)
-  }, [commit])
+  const reinit = useCallback(
+    (scenario: Scenario) => {
+      scenarioRef.current = scenario
+      historyRef.current = []
+      setSelectedId(null)
+      commit(makeInitState(scenario))
+      setRunning(false)
+    },
+    [commit],
+  )
 
   const stepForward = useCallback(() => {
     const cur = simRef.current
@@ -152,24 +207,28 @@ export default function BranchBoundExplainer() {
   }, [running, speedIdx, stepForward])
 
   const s = sim
-  const selectedNode = selectedId !== null ? s.nodes.find((nd) => nd.id === selectedId) ?? null : null
+  const selectedNode =
+    selectedId !== null
+      ? (s.nodes.find((nd) => nd.id === selectedId) ?? null)
+      : null
   const activeNode = s.current !== null ? s.nodes[s.current] : null
   const infoNode = selectedNode ?? activeNode
 
   // Status chip
-  let chipText = s.lastEvent ?? 'Branch & Bound — the search tree grows as we step'
-  let chipClass = "bb-chip bb-chip-idle"
+  let chipText =
+    s.lastEvent ?? 'Branch & Bound — the search tree grows as we step'
+  let chipClass = 'bb-chip bb-chip-idle'
   if (s.phase === 'done') {
     chipText = `Done — optimal tour ${s.bestTour?.join('→') ?? '—'} costs ${s.bestCost?.toFixed(0) ?? '—'} (${s.nodes.length} nodes, ${s.pruned} pruned)`
-    chipClass = "bb-chip bb-chip-done"
+    chipClass = 'bb-chip bb-chip-done'
   } else if (chipText.startsWith('New best')) {
-    chipClass = "bb-chip bb-chip-best"
+    chipClass = 'bb-chip bb-chip-best'
   } else if (chipText.startsWith('Pruned')) {
-    chipClass = "bb-chip bb-chip-pruned"
+    chipClass = 'bb-chip bb-chip-pruned'
   } else if (chipText.startsWith('Expanded')) {
-    chipClass = "bb-chip bb-chip-open"
+    chipClass = 'bb-chip bb-chip-open'
   } else if (chipText.startsWith('Leaf')) {
-    chipClass = "bb-chip bb-chip-leaf"
+    chipClass = 'bb-chip bb-chip-leaf'
   }
 
   return (
@@ -178,19 +237,26 @@ export default function BranchBoundExplainer() {
 
       <header className="bb-header">
         <div className="bb-eyebrow">teeline · algorithms/branch_bound</div>
-        <h2 className="bb-title">Branch &amp; Bound — exact search with pruning</h2>
+        <h2 className="bb-title">
+          Branch &amp; Bound — exact search with pruning
+        </h2>
         <p className="bb-sub">
-          B&amp;B explores the tree of partial tours. At every node the <strong>lower bound</strong>
-          ({'partial cost + MST(start ∪ remaining)'}) is compared with the <strong>best complete
-          tour</strong> found so far — any branch whose bound cannot beat it is <strong>pruned</strong>.
-          The bound is valid, so the surviving leaf is the exact optimum.
+          B&amp;B explores the tree of partial tours. At every node the{' '}
+          <strong>lower bound</strong>({'partial cost + MST(start ∪ remaining)'}
+          ) is compared with the <strong>best complete tour</strong> found so
+          far — any branch whose bound cannot beat it is <strong>pruned</strong>
+          . The bound is valid, so the surviving leaf is the exact optimum.
         </p>
       </header>
 
       <div className="bb-viz-row">
         <div className="bb-side">
           <div className="bb-section-label">Search tree</div>
-          <SearchTree sim={s} selectedId={selectedId} onSelect={setSelectedId} />
+          <SearchTree
+            sim={s}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
         </div>
         <div className="bb-panel">
           <div className="bb-section-label">Tour at selected node</div>
@@ -201,44 +267,98 @@ export default function BranchBoundExplainer() {
           <div className="bb-nodeinfo">
             {infoNode ? (
               <>
-                <div className="bb-nodeinfo-row"><span>path</span><span className="bb-mono">{infoNode.path.join(' → ')}</span></div>
-                <div className="bb-nodeinfo-row"><span>bound</span><span className="bb-mono">{infoNode.lb.toFixed(1)}</span></div>
-                <div className="bb-nodeinfo-row"><span>status</span><span className="bb-mono">{infoNode.status}</span></div>
+                <div className="bb-nodeinfo-row">
+                  <span>path</span>
+                  <span className="bb-mono">{infoNode.path.join(' → ')}</span>
+                </div>
+                <div className="bb-nodeinfo-row">
+                  <span>bound</span>
+                  <span className="bb-mono">{infoNode.lb.toFixed(1)}</span>
+                </div>
+                <div className="bb-nodeinfo-row">
+                  <span>status</span>
+                  <span className="bb-mono">{infoNode.status}</span>
+                </div>
                 <div className="bb-nodeinfo-note">
-                  bound = partial {infoNode.cost.toFixed(1)} + MST(start ∪ {infoNode.unvisited.join(',')})
+                  bound = partial {infoNode.cost.toFixed(1)} + MST(start ∪{' '}
+                  {infoNode.unvisited.join(',')})
                 </div>
                 {infoNode.status === 'pruned' && selectedId === infoNode.id && (
-                  <div className="bb-nodeinfo-why">Pruned because {infoNode.lb.toFixed(1)} ≥ best {s.bestCost?.toFixed(1) ?? '—'} — no tour below this branch can win.</div>
+                  <div className="bb-nodeinfo-why">
+                    Pruned because {infoNode.lb.toFixed(1)} ≥ best{' '}
+                    {s.bestCost?.toFixed(1) ?? '—'} — no tour below this branch
+                    can win.
+                  </div>
                 )}
               </>
             ) : (
-              <div className="bb-nodeinfo-row">click a tree node to inspect it</div>
+              <div className="bb-nodeinfo-row">
+                click a tree node to inspect it
+              </div>
             )}
           </div>
 
-          <div className="bb-section-label" style={{ marginTop: 10 }}>Best tour</div>
+          <div className="bb-section-label" style={{ marginTop: 10 }}>
+            Best tour
+          </div>
           <div className="bb-best">
-            <span className="bb-mono">{s.bestCost === null ? '— (none yet)' : s.bestTour!.join(' → ') + ' = ' + s.bestCost.toFixed(1)}</span>
+            <span className="bb-mono">
+              {s.bestCost === null
+                ? '— (none yet)'
+                : s.bestTour!.join(' → ') + ' = ' + s.bestCost.toFixed(1)}
+            </span>
           </div>
 
-          <div className="bb-section-label" style={{ marginTop: 10 }}>Stats</div>
+          <div className="bb-section-label" style={{ marginTop: 10 }}>
+            Stats
+          </div>
           <div className="bb-statgrid">
-            <div><div className="bb-statlabel">nodes</div><div className="bb-mono">{s.nodes.length}</div></div>
-            <div><div className="bb-statlabel">explored</div><div className="bb-mono">{s.explored}</div></div>
-            <div><div className="bb-statlabel">pruned</div><div className="bb-mono">{s.pruned}</div></div>
-            <div><div className="bb-statlabel">leaves</div><div className="bb-mono">{s.leaves}</div></div>
-            <div><div className="bb-statlabel">best</div><div className="bb-mono">{s.bestCost === null ? '—' : s.bestCost.toFixed(0)}</div></div>
-            <div><div className="bb-statlabel">step</div><div className="bb-mono">{s.step}</div></div>
+            <div>
+              <div className="bb-statlabel">nodes</div>
+              <div className="bb-mono">{s.nodes.length}</div>
+            </div>
+            <div>
+              <div className="bb-statlabel">explored</div>
+              <div className="bb-mono">{s.explored}</div>
+            </div>
+            <div>
+              <div className="bb-statlabel">pruned</div>
+              <div className="bb-mono">{s.pruned}</div>
+            </div>
+            <div>
+              <div className="bb-statlabel">leaves</div>
+              <div className="bb-mono">{s.leaves}</div>
+            </div>
+            <div>
+              <div className="bb-statlabel">best</div>
+              <div className="bb-mono">
+                {s.bestCost === null ? '—' : s.bestCost.toFixed(0)}
+              </div>
+            </div>
+            <div>
+              <div className="bb-statlabel">step</div>
+              <div className="bb-mono">{s.step}</div>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="bb-legend">
-        <span><span className="bb-swatch bb-swatch-open" /> open</span>
-        <span><span className="bb-swatch bb-swatch-active" /> active path</span>
-        <span><span className="bb-swatch bb-swatch-pruned" /> pruned</span>
-        <span><span className="bb-swatch bb-swatch-leaf" /> leaf</span>
-        <span><span className="bb-swatch bb-swatch-best" /> new best</span>
+        <span>
+          <span className="bb-swatch bb-swatch-open" /> open
+        </span>
+        <span>
+          <span className="bb-swatch bb-swatch-active" /> active path
+        </span>
+        <span>
+          <span className="bb-swatch bb-swatch-pruned" /> pruned
+        </span>
+        <span>
+          <span className="bb-swatch bb-swatch-leaf" /> leaf
+        </span>
+        <span>
+          <span className="bb-swatch bb-swatch-best" /> new best
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -248,28 +368,61 @@ export default function BranchBoundExplainer() {
           <span className="bb-label">Speed</span>
           <div className="bb-speed-btns">
             {SPEED_LABELS.map((l, i) => (
-              <button key={l} className={`bb-speed-btn ${i === speedIdx ? 'bb-speed-btn-sel' : ''}`}
-                onClick={() => setSpeedIdx(i)} disabled={running}>{l}</button>
+              <button
+                key={l}
+                className={`bb-speed-btn ${i === speedIdx ? 'bb-speed-btn-sel' : ''}`}
+                onClick={() => setSpeedIdx(i)}
+                disabled={running}
+              >
+                {l}
+              </button>
             ))}
           </div>
         </div>
       </div>
 
       <div className="bb-controls">
-        <button className="bb-btn" onClick={stepBack} disabled={running || s.step === 0}>⏴ Back</button>
-        <button className="bb-btn" onClick={stepForward} disabled={running || s.phase === 'done'}>⏵ Step</button>
-        <button className="bb-btn" onClick={() => setRunning(!running)} disabled={s.phase === 'done'}>
-          {running ? "⏸ Pause" : "▶ Run"}
+        <button
+          className="bb-btn"
+          onClick={stepBack}
+          disabled={running || s.step === 0}
+        >
+          ⏴ Back
         </button>
-        <button className="bb-btn" onClick={() => reinit(scenarioRef.current)} disabled={running}>↺ Reset</button>
+        <button
+          className="bb-btn"
+          onClick={stepForward}
+          disabled={running || s.phase === 'done'}
+        >
+          ⏵ Step
+        </button>
+        <button
+          className="bb-btn"
+          onClick={() => setRunning(!running)}
+          disabled={s.phase === 'done'}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button
+          className="bb-btn"
+          onClick={() => reinit(scenarioRef.current)}
+          disabled={running}
+        >
+          ↺ Reset
+        </button>
       </div>
 
       <div className="bb-scenarios">
         <div className="bb-section-label">Scenarios</div>
         <div className="bb-scenario-row">
           {Object.entries(SCENARIOS).map(([key, sc]) => (
-            <button key={key} className="bb-scenario-btn" title={sc.desc}
-              onClick={() => reinit(sc)} disabled={running}>
+            <button
+              key={key}
+              className="bb-scenario-btn"
+              title={sc.desc}
+              onClick={() => reinit(sc)}
+              disabled={running}
+            >
               {sc.label}
             </button>
           ))}
@@ -278,7 +431,9 @@ export default function BranchBoundExplainer() {
 
       <footer className="bb-footer">
         <span className="bb-mono">cities: {s.n}</span>
-        <span className="bb-mono">bound = partial + MST(start ∪ remaining) · prune when bound ≥ best</span>
+        <span className="bb-mono">
+          bound = partial + MST(start ∪ remaining) · prune when bound ≥ best
+        </span>
       </footer>
     </div>
   )

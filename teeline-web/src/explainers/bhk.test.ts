@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  SCENARIOS, makeInitState, stepOnce, makeDm, popcount, computeFillOrder,
+  SCENARIOS,
+  makeInitState,
+  stepOnce,
+  makeDm,
+  popcount,
+  computeFillOrder,
 } from './bhk-algo'
 import type { SimState } from './bhk-algo'
 
@@ -113,10 +118,14 @@ describe('correctness', () => {
   it('every scenario finds the exact optimum and a valid route', () => {
     for (const [key, sc] of Object.entries(SCENARIOS)) {
       const s = runToDone(sc)
-      expect(s.optCost, `${key} must match brute force`).toBeCloseTo(bruteForce(sc.cities), 6)
-      expect([...s.route!].sort((a, b) => a - b), `${key} route must be a permutation`).toEqual(
-        Array.from({ length: sc.cities.length }, (_, i) => i),
+      expect(s.optCost, `${key} must match brute force`).toBeCloseTo(
+        bruteForce(sc.cities),
+        6,
       )
+      expect(
+        [...s.route!].sort((a, b) => a - b),
+        `${key} route must be a permutation`,
+      ).toEqual(Array.from({ length: sc.cities.length }, (_, i) => i))
     }
   })
 
@@ -125,7 +134,8 @@ describe('correctness', () => {
     const dm = s.dm
     const route = s.route!
     let d = 0
-    for (let k = 0; k < route.length; k++) d += dm[route[k]][route[(k + 1) % route.length]]
+    for (let k = 0; k < route.length; k++)
+      d += dm[route[k]][route[(k + 1) % route.length]]
     expect(d).toBeCloseTo(s.optCost!, 6)
   })
 })

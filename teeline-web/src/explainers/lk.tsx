@@ -2,8 +2,11 @@
 import { useState, useCallback, useMemo } from 'preact/hooks'
 import type { LSFrame, ILSFrame } from './lk'
 import {
-  CITIES, DIST, INIT_TOUR,
-  computeLocalSearchFrames, computeILSFrames,
+  CITIES,
+  DIST,
+  INIT_TOUR,
+  computeLocalSearchFrames,
+  computeILSFrames,
   lcgRand,
 } from './lk'
 
@@ -20,8 +23,13 @@ interface TourSVGProps {
 }
 
 function TourSVG({
-  tour, scanEdges = null, swapEdges = null,
-  bestTour = null, bridgePoints = null, highlight = null, overlay = null,
+  tour,
+  scanEdges = null,
+  swapEdges = null,
+  bestTour = null,
+  bridgePoints = null,
+  highlight = null,
+  overlay = null,
 }: TourSVGProps) {
   const cities = CITIES
 
@@ -47,39 +55,83 @@ function TourSVG({
   const tourColor = highlight === 'best' ? '#e8a000' : '#e0626b'
 
   return (
-    <svg viewBox="0 0 300 300" className="lk-canvas" role="img" aria-label="TSP tour visualisation">
+    <svg
+      viewBox="0 0 300 300"
+      className="lk-canvas"
+      role="img"
+      aria-label="TSP tour visualisation"
+    >
       <rect x="0" y="0" width="300" height="300" className="lk-bg" />
 
       {/* Best-tour underlay (thin dashed) */}
-      {bestEdges.map(e => (
-        <line key={e.key} x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2} className="lk-best-edge" />
+      {bestEdges.map((e) => (
+        <line
+          key={e.key}
+          x1={e.x1}
+          y1={e.y1}
+          x2={e.x2}
+          y2={e.y2}
+          className="lk-best-edge"
+        />
       ))}
 
       {/* Current tour */}
-      {tourEdges.map(e => (
-        <line key={e.key} x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
+      {tourEdges.map((e) => (
+        <line
+          key={e.key}
+          x1={e.x1}
+          y1={e.y1}
+          x2={e.x2}
+          y2={e.y2}
           className="lk-tour-edge"
-          style={{ stroke: tourColor, transition: 'stroke 0.25s ease' }} />
+          style={{ stroke: tourColor, transition: 'stroke 0.25s ease' }}
+        />
       ))}
 
       {/* Scan edges (gray dashed — shown in Step mode) */}
       {scanEdges?.map(([a, b], idx) => {
         const [x1, y1] = cities[a]
         const [x2, y2] = cities[b]
-        return <line key={idx} x1={x1} y1={y1} x2={x2} y2={y2} className="lk-scan-edge" />
+        return (
+          <line
+            key={idx}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            className="lk-scan-edge"
+          />
+        )
       })}
 
       {/* Swap edges (green — new edges accepted) */}
       {swapEdges?.map(([a, b], idx) => {
         const [x1, y1] = cities[a]
         const [x2, y2] = cities[b]
-        return <line key={idx} x1={x1} y1={y1} x2={x2} y2={y2} className="lk-swap-edge" />
+        return (
+          <line
+            key={idx}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            className="lk-swap-edge"
+          />
+        )
       })}
 
       {/* Bridge cut circles */}
       {bridgePoints?.map((cityId, idx) => {
         const [cx, cy] = cities[cityId]
-        return <circle key={idx} cx={cx} cy={cy} r="10" className="lk-bridge-circle" />
+        return (
+          <circle
+            key={idx}
+            cx={cx}
+            cy={cy}
+            r="10"
+            className="lk-bridge-circle"
+          />
+        )
       })}
 
       {/* City dots */}
@@ -89,7 +141,9 @@ function TourSVG({
 
       {/* Overlay label */}
       {overlay && (
-        <text x="150" y="155" className="lk-overlay">{overlay}</text>
+        <text x="150" y="155" className="lk-overlay">
+          {overlay}
+        </text>
       )}
     </svg>
   )
@@ -209,19 +263,38 @@ interface ControlsProps {
   onReset: () => void
 }
 
-function Controls({ done, canStepBack, onStepBack, onStep, onReset }: ControlsProps) {
+function Controls({
+  done,
+  canStepBack,
+  onStepBack,
+  onStep,
+  onReset,
+}: ControlsProps) {
   return (
     <div className="lk-controls">
-      <button className="lk-btn" onClick={onStepBack} disabled={!canStepBack}>◀ Back</button>
-      <button className="lk-btn lk-btn-primary" onClick={onStep} disabled={done}>Step ▶</button>
-      <button className="lk-btn" onClick={onReset}>↺ Reset</button>
+      <button className="lk-btn" onClick={onStepBack} disabled={!canStepBack}>
+        ◀ Back
+      </button>
+      <button
+        className="lk-btn lk-btn-primary"
+        onClick={onStep}
+        disabled={done}
+      >
+        Step ▶
+      </button>
+      <button className="lk-btn" onClick={onReset}>
+        ↺ Reset
+      </button>
     </div>
   )
 }
 
 // ── StatsPanel ────────────────────────────────────────────────────────────────
 
-interface StatEntry { label: string; value: string | number }
+interface StatEntry {
+  label: string
+  value: string | number
+}
 
 function StatsPanel({ stats }: { stats: StatEntry[] }) {
   return (
@@ -231,7 +304,9 @@ function StatsPanel({ stats }: { stats: StatEntry[] }) {
           <div className="lk-statlabel">{label}</div>
           <div className="lk-mono">
             {typeof value === 'number'
-              ? Number.isInteger(value) ? value : value.toFixed(1)
+              ? Number.isInteger(value)
+                ? value
+                : value.toFixed(1)
               : value}
           </div>
         </div>
@@ -243,10 +318,13 @@ function StatsPanel({ stats }: { stats: StatEntry[] }) {
 // ── PhaseIndicator ────────────────────────────────────────────────────────────
 
 function PhaseIndicator({ phase }: { phase: string }) {
-  const cls = phase.includes('bridge') ? 'lk-phase-bridge'
-    : phase.includes('best') || phase.includes('New') ? 'lk-phase-best'
-    : phase.includes('LK') ? 'lk-phase-pass'
-    : ''
+  const cls = phase.includes('bridge')
+    ? 'lk-phase-bridge'
+    : phase.includes('best') || phase.includes('New')
+      ? 'lk-phase-best'
+      : phase.includes('LK')
+        ? 'lk-phase-pass'
+        : ''
   return <div className={`lk-phase ${cls}`}>{phase}</div>
 }
 
@@ -256,27 +334,66 @@ function TourLegend({ mode }: { mode: 'ls' | 'ils' }) {
   return (
     <div className="lk-legend">
       <span className="lk-legend-item">
-        <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#e0626b" strokeWidth="2" /></svg>
+        <svg width="22" height="10">
+          <line x1="1" y1="5" x2="21" y2="5" stroke="#e0626b" strokeWidth="2" />
+        </svg>
         Tour
       </span>
       <span className="lk-legend-item">
-        <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#e8a000" strokeWidth="4" opacity="0.55" /></svg>
+        <svg width="22" height="10">
+          <line
+            x1="1"
+            y1="5"
+            x2="21"
+            y2="5"
+            stroke="#e8a000"
+            strokeWidth="4"
+            opacity="0.55"
+          />
+        </svg>
         Candidate pair
       </span>
       <span className="lk-legend-item">
-        <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#1a7f37" strokeWidth="2.5" /></svg>
+        <svg width="22" height="10">
+          <line
+            x1="1"
+            y1="5"
+            x2="21"
+            y2="5"
+            stroke="#1a7f37"
+            strokeWidth="2.5"
+          />
+        </svg>
         Accepted swap
       </span>
       {mode === 'ils' && (
         <span className="lk-legend-item">
-          <svg width="22" height="10"><line x1="1" y1="5" x2="21" y2="5" stroke="#aaa" strokeWidth="1" strokeDasharray="4 3" /></svg>
+          <svg width="22" height="10">
+            <line
+              x1="1"
+              y1="5"
+              x2="21"
+              y2="5"
+              stroke="#aaa"
+              strokeWidth="1"
+              strokeDasharray="4 3"
+            />
+          </svg>
           Best tour
         </span>
       )}
       {mode === 'ils' && (
         <span className="lk-legend-item">
           <svg width="16" height="16" style={{ marginRight: 2 }}>
-            <circle cx="8" cy="8" r="5" fill="none" stroke="#cf222e" strokeWidth="1.5" strokeDasharray="3 2" />
+            <circle
+              cx="8"
+              cy="8"
+              r="5"
+              fill="none"
+              stroke="#cf222e"
+              strokeWidth="1.5"
+              strokeDasharray="3 2"
+            />
           </svg>
           Bridge cut
         </span>
@@ -288,28 +405,42 @@ function TourLegend({ mode }: { mode: 'ls' | 'ils' }) {
 // ── Status lines ─────────────────────────────────────────────────────────────
 
 function LSStatusLine({ frame }: { frame: LSFrame }) {
-  const cls = frame.overlay ? 'lk-status-done'
-    : frame.swapEdges ? 'lk-status-swap'
-    : ''
-  const msg = frame.overlay
-    ?? (frame.swapEdges ? 'Improvement found — swapping edges ✓'
-    : 'Scanning candidate pair — no improvement yet, step further')
+  const cls = frame.overlay
+    ? 'lk-status-done'
+    : frame.swapEdges
+      ? 'lk-status-swap'
+      : ''
+  const msg =
+    frame.overlay ??
+    (frame.swapEdges
+      ? 'Improvement found — swapping edges ✓'
+      : 'Scanning candidate pair — no improvement yet, step further')
   return <div className={`lk-status ${cls}`}>{msg}</div>
 }
 
 function ILSStatusLine({ frame }: { frame: ILSFrame }) {
-  const cls = frame.overlay ? 'lk-status-done'
-    : frame.highlight === 'best' ? 'lk-status-best'
-    : frame.highlight === 'bridge' ? 'lk-status-bridge'
-    : frame.highlight === 'swap' ? 'lk-status-swap'
-    : ''
-  const msg = frame.overlay
-    ?? (frame.highlight === 'best' ? 'New best tour found! ✓'
-    : frame.highlight === 'bridge' ? 'Double-bridge kick applied — escaping local optimum'
-    : frame.highlight === 'swap' ? 'Improvement found — swapping edges ✓'
-    : frame.phase === 'Plateau' ? `Plateau ${frame.plateauCount} of 5 — no improvement, will kick again`
-    : frame.phase === 'Local optimum' ? 'Local optimum reached — comparing to best tour'
-    : 'Running 2-opt local search...')
+  const cls = frame.overlay
+    ? 'lk-status-done'
+    : frame.highlight === 'best'
+      ? 'lk-status-best'
+      : frame.highlight === 'bridge'
+        ? 'lk-status-bridge'
+        : frame.highlight === 'swap'
+          ? 'lk-status-swap'
+          : ''
+  const msg =
+    frame.overlay ??
+    (frame.highlight === 'best'
+      ? 'New best tour found! ✓'
+      : frame.highlight === 'bridge'
+        ? 'Double-bridge kick applied — escaping local optimum'
+        : frame.highlight === 'swap'
+          ? 'Improvement found — swapping edges ✓'
+          : frame.phase === 'Plateau'
+            ? `Plateau ${frame.plateauCount} of 5 — no improvement, will kick again`
+            : frame.phase === 'Local optimum'
+              ? 'Local optimum reached — comparing to best tour'
+              : 'Running 2-opt local search...')
   return <div className={`lk-status ${cls}`}>{msg}</div>
 }
 
@@ -323,12 +454,17 @@ function LocalSearchTab() {
   const done = idx >= frames.length - 1
 
   const handleStep = useCallback(() => {
-    setIdx(i => Math.min(i + 1, frames.length - 1))
+    setIdx((i) => Math.min(i + 1, frames.length - 1))
   }, [frames])
-  const handleStepBack = useCallback(() => setIdx(i => Math.max(0, i - 1)), [frames])
+  const handleStepBack = useCallback(
+    () => setIdx((i) => Math.max(0, i - 1)),
+    [frames],
+  )
   const handleReset = useCallback(() => setIdx(0), [])
 
-  const swapCount = frames.slice(0, idx + 1).filter(f => f.swapEdges !== null).length
+  const swapCount = frames
+    .slice(0, idx + 1)
+    .filter((f) => f.swapEdges !== null).length
 
   return (
     <div className="lk-tab">
@@ -343,19 +479,24 @@ function LocalSearchTab() {
       </div>
       <div className="lk-prose">
         <Controls
-          done={done} canStepBack={idx > 0}
-          onStepBack={handleStepBack} onStep={handleStep} onReset={handleReset}
+          done={done}
+          canStepBack={idx > 0}
+          onStepBack={handleStepBack}
+          onStep={handleStep}
+          onReset={handleReset}
         />
         <LSStatusLine frame={frame} />
-        <StatsPanel stats={[
-          { label: 'Distance', value: frame.dist },
-          { label: 'Swaps accepted', value: swapCount },
-          { label: 'Step', value: `${idx + 1} / ${frames.length}` },
-        ]} />
+        <StatsPanel
+          stats={[
+            { label: 'Distance', value: frame.dist },
+            { label: 'Swaps accepted', value: swapCount },
+            { label: 'Step', value: `${idx + 1} / ${frames.length}` },
+          ]}
+        />
         <p className="lk-note">
-          This shows simplified <strong>2-opt</strong> local search: scan candidate
-          pairs, swap when one improves the tour, repeat until no gain is found.{' '}
-          The actual LK solver chains deeper moves —{' '}
+          This shows simplified <strong>2-opt</strong> local search: scan
+          candidate pairs, swap when one improves the tour, repeat until no gain
+          is found. The actual LK solver chains deeper moves —{' '}
           <a href="/algorithms/lk/">see the docs</a>.
         </p>
       </div>
@@ -370,7 +511,7 @@ const ILS_RAND_SEED = 2026
 function ILSTab() {
   const frames = useMemo(
     () => computeILSFrames(INIT_TOUR, DIST, 30, 5, lcgRand(ILS_RAND_SEED)),
-    []
+    [],
   )
   const [idx, setIdx] = useState(0)
 
@@ -378,9 +519,12 @@ function ILSTab() {
   const done = idx >= frames.length - 1
 
   const handleStep = useCallback(() => {
-    setIdx(i => Math.min(i + 1, frames.length - 1))
+    setIdx((i) => Math.min(i + 1, frames.length - 1))
   }, [frames])
-  const handleStepBack = useCallback(() => setIdx(i => Math.max(0, i - 1)), [])
+  const handleStepBack = useCallback(
+    () => setIdx((i) => Math.max(0, i - 1)),
+    [],
+  )
   const handleReset = useCallback(() => setIdx(0), [])
 
   return (
@@ -399,19 +543,25 @@ function ILSTab() {
       <div className="lk-prose">
         <PhaseIndicator phase={frame.phase} />
         <Controls
-          done={done} canStepBack={idx > 0}
-          onStepBack={handleStepBack} onStep={handleStep} onReset={handleReset}
+          done={done}
+          canStepBack={idx > 0}
+          onStepBack={handleStepBack}
+          onStep={handleStep}
+          onReset={handleReset}
         />
         <ILSStatusLine frame={frame} />
-        <StatsPanel stats={[
-          { label: 'Current dist', value: frame.currentDist },
-          { label: 'Best dist', value: frame.bestDist },
-          { label: 'Epoch', value: frame.restarts },
-          { label: `Plateau (limit ${5})`, value: frame.plateauCount },
-          { label: 'Step', value: `${idx + 1} / ${frames.length}` },
-        ]} />
+        <StatsPanel
+          stats={[
+            { label: 'Current dist', value: frame.currentDist },
+            { label: 'Best dist', value: frame.bestDist },
+            { label: 'Epoch', value: frame.restarts },
+            { label: `Plateau (limit ${5})`, value: frame.plateauCount },
+            { label: 'Step', value: `${idx + 1} / ${frames.length}` },
+          ]}
+        />
         <p className="lk-note">
-          Gold tour = new best found. Red dashed circles mark the double-bridge cut points.
+          Gold tour = new best found. Red dashed circles mark the double-bridge
+          cut points.
         </p>
       </div>
     </div>
@@ -438,9 +588,16 @@ export default function LKExplainer() {
       </header>
 
       <nav className="lk-tabs" role="tablist">
-        {([['ls', 'Local Search'], ['ils', 'ILS']] as [TabId, string][]).map(([id, label]) => (
+        {(
+          [
+            ['ls', 'Local Search'],
+            ['ils', 'ILS'],
+          ] as [TabId, string][]
+        ).map(([id, label]) => (
           <button
-            key={id} role="tab" aria-selected={tab === id}
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
             className={'lk-tabbtn' + (tab === id ? ' lk-tabbtn-active' : '')}
             onClick={() => setTab(id)}
           >
@@ -450,8 +607,12 @@ export default function LKExplainer() {
       </nav>
 
       {/* Keep both tabs mounted so per-tab playback state is preserved on switch */}
-      <div style={{ display: tab === 'ls' ? 'block' : 'none' }}><LocalSearchTab /></div>
-      <div style={{ display: tab === 'ils' ? 'block' : 'none' }}><ILSTab /></div>
+      <div style={{ display: tab === 'ls' ? 'block' : 'none' }}>
+        <LocalSearchTab />
+      </div>
+      <div style={{ display: tab === 'ils' ? 'block' : 'none' }}>
+        <ILSTab />
+      </div>
 
       <footer className="lk-footer">
         <span className="lk-mono">cities: {CITIES.length}</span>

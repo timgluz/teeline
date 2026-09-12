@@ -1,20 +1,29 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "preact/hooks"
+import { useState, useRef, useEffect, useCallback, useMemo } from 'preact/hooks'
 import {
-  CITIES, N_CITIES,
-  tourLength, maxPheromone, makeInitState, stepOnce,
-} from "./aco-algo"
-import type { EventMode } from "./aco-algo"
+  CITIES,
+  N_CITIES,
+  tourLength,
+  maxPheromone,
+  makeInitState,
+  stepOnce,
+} from './aco-algo'
+import type { EventMode } from './aco-algo'
 
 const AXIS_COLORS = [
-  "#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c",
-  "#16a34a", "#0891b2",
+  '#0d9488',
+  '#2563eb',
+  '#7c3aed',
+  '#db2777',
+  '#ea580c',
+  '#16a34a',
+  '#0891b2',
 ]
 
 const DEFAULTS = { alpha: 1.0, beta: 2.0, evaporationRate: 0.5, numAnts: 10 }
 
 function cityColor(i: number, onBest: boolean, onLast: boolean): string {
-  if (onBest) return "#16a34a"
-  if (onLast) return "#ea580c"
+  if (onBest) return '#16a34a'
+  if (onLast) return '#ea580c'
   return AXIS_COLORS[i % AXIS_COLORS.length]
 }
 
@@ -29,15 +38,29 @@ interface CanvasProps {
   lastTour: number[] | null
   phase: string
 }
-function PheromoneCanvas({ pheromone, maxP, tau0, bestTour, lastTour, phase }: CanvasProps) {
+function PheromoneCanvas({
+  pheromone,
+  maxP,
+  tau0,
+  bestTour,
+  lastTour,
+  phase,
+}: CanvasProps) {
   const bestSet = useMemo(() => new Set(bestTour), [bestTour])
-  const lastSet = useMemo(() => lastTour ? new Set(lastTour) : new Set<number>(), [lastTour])
+  const lastSet = useMemo(
+    () => (lastTour ? new Set(lastTour) : new Set<number>()),
+    [lastTour],
+  )
 
-  const bestPts = bestTour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ")
-  const bestPtsClosed = bestPts + ` ${CITIES[bestTour[0]][0]},${CITIES[bestTour[0]][1]}`
+  const bestPts = bestTour
+    .map((i) => `${CITIES[i][0]},${CITIES[i][1]}`)
+    .join(' ')
+  const bestPtsClosed =
+    bestPts + ` ${CITIES[bestTour[0]][0]},${CITIES[bestTour[0]][1]}`
   const lastPts = lastTour
-    ? lastTour.map(i => `${CITIES[i][0]},${CITIES[i][1]}`).join(" ") + ` ${CITIES[lastTour[0]][0]},${CITIES[lastTour[0]][1]}`
-    : ""
+    ? lastTour.map((i) => `${CITIES[i][0]},${CITIES[i][1]}`).join(' ') +
+      ` ${CITIES[lastTour[0]][0]},${CITIES[lastTour[0]][1]}`
+    : ''
 
   const edges: Array<[number, number, number]> = []
   for (let i = 0; i < N_CITIES; i++) {
@@ -47,25 +70,33 @@ function PheromoneCanvas({ pheromone, maxP, tau0, bestTour, lastTour, phase }: C
   }
 
   return (
-    <svg viewBox="0 0 300 300" className="aco-canvas" role="img" aria-label="ACO pheromone map">
+    <svg
+      viewBox="0 0 300 300"
+      className="aco-canvas"
+      role="img"
+      aria-label="ACO pheromone map"
+    >
       <rect x={0} y={0} width={300} height={300} className="aco-bg" />
 
       {/* pheromone edges — only edges above baseline tau0 are visible;
           untouched edges stay invisible so the colony's emergent trails are
           the only thing on the canvas (no full-graph noise at the start) */}
       {edges.map(([i, j, p], k) => {
-        if (p <= tau0 * 1.0001) return null  // untouched, invisible
+        if (p <= tau0 * 1.0001) return null // untouched, invisible
         const ratio = maxP > 0 ? p / maxP : 0
         const amp = Math.pow(ratio, 0.35)
         return (
-          <line key={"p" + k}
-            x1={CITIES[i][0]} y1={CITIES[i][1]}
-            x2={CITIES[j][0]} y2={CITIES[j][1]}
+          <line
+            key={'p' + k}
+            x1={CITIES[i][0]}
+            y1={CITIES[i][1]}
+            x2={CITIES[j][0]}
+            y2={CITIES[j][1]}
             stroke="#0d9488"
             strokeWidth={0.3 + amp * 5.0}
             opacity={0.05 + amp * 0.75}
             strokeLinecap="round"
-            strokeDasharray={amp > 0.35 ? "5 3" : "3 5"}
+            strokeDasharray={amp > 0.35 ? '5 3' : '3 5'}
           />
         )
       })}
@@ -87,11 +118,16 @@ function PheromoneCanvas({ pheromone, maxP, tau0, bestTour, lastTour, phase }: C
         const onLast = lastSet.has(i)
         return (
           <g key={i}>
-            <circle cx={x} cy={y} r={onBest ? 7 : onLast ? 6.5 : 5}
+            <circle
+              cx={x}
+              cy={y}
+              r={onBest ? 7 : onLast ? 6.5 : 5}
               fill={cityColor(i, onBest, onLast)}
               className="aco-city"
             />
-            <text x={x + 8} y={y - 5} className="aco-city-label">{i}</text>
+            <text x={x + 8} y={y - 5} className="aco-city-label">
+              {i}
+            </text>
           </g>
         )
       })}
@@ -102,49 +138,88 @@ function PheromoneCanvas({ pheromone, maxP, tau0, bestTour, lastTour, phase }: C
 // ---------------------------------------------------------------
 // Side panel — epoch, ant progress, pheromone heatmap grid
 // ---------------------------------------------------------------
-function PheromoneHeatmap({ pheromone, maxP }: { pheromone: number[][]; maxP: number }) {
+function PheromoneHeatmap({
+  pheromone,
+  maxP,
+}: {
+  pheromone: number[][]
+  maxP: number
+}) {
   const n = pheromone.length
-  const w = 112, pad = 2, cell = Math.floor((w - pad * 2) / n)
+  const w = 112,
+    pad = 2,
+    cell = Math.floor((w - pad * 2) / n)
   const totalW = cell * n + pad * 2
 
   return (
     <svg viewBox={`0 0 ${totalW} ${totalW}`} className="aco-heatmap">
-      <rect x={0} y={0} width={totalW} height={totalW} className="aco-heatmap-bg" rx={3} />
+      <rect
+        x={0}
+        y={0}
+        width={totalW}
+        height={totalW}
+        className="aco-heatmap-bg"
+        rx={3}
+      />
       {/* separators every 4 cities — visually chunk the 12×12 matrix */}
-      {[4, 8].map(x => (
-        <line key={"v" + x} x1={pad + x * cell} y1={pad} x2={pad + x * cell} y2={pad + n * cell}
-          stroke="var(--line)" strokeWidth={1} />
+      {[4, 8].map((x) => (
+        <line
+          key={'v' + x}
+          x1={pad + x * cell}
+          y1={pad}
+          x2={pad + x * cell}
+          y2={pad + n * cell}
+          stroke="var(--line)"
+          strokeWidth={1}
+        />
       ))}
-      {[4, 8].map(y => (
-        <line key={"h" + y} x1={pad} y1={pad + y * cell} x2={pad + n * cell} y2={pad + y * cell}
-          stroke="var(--line)" strokeWidth={1} />
+      {[4, 8].map((y) => (
+        <line
+          key={'h' + y}
+          x1={pad}
+          y1={pad + y * cell}
+          x2={pad + n * cell}
+          y2={pad + y * cell}
+          stroke="var(--line)"
+          strokeWidth={1}
+        />
       ))}
       {Array.from({ length: n }, (_, i) =>
         Array.from({ length: n }, (_, j) => {
-          if (i >= j) return null  // lower triangle + diagonal
+          if (i >= j) return null // lower triangle + diagonal
           const ratio = maxP > 0 ? pheromone[i][j] / maxP : 0
           const r = Math.round(240 - ratio * 200)
           const g = Math.round(253 - ratio * 200)
           const b = Math.round(244 - ratio * 220)
           return (
-            <rect key={`${i}-${j}`}
-              x={pad + j * cell} y={pad + i * cell}
-              width={cell - 1.5} height={cell - 1.5}
+            <rect
+              key={`${i}-${j}`}
+              x={pad + j * cell}
+              y={pad + i * cell}
+              width={cell - 1.5}
+              height={cell - 1.5}
               fill={`rgb(${r},${g},${b})`}
               rx={1.5}
             >
-              <title>{i}–{j}  {(ratio * 100).toFixed(0)}%</title>
+              <title>
+                {i}–{j} {(ratio * 100).toFixed(0)}%
+              </title>
             </rect>
           )
-        })
+        }),
       )}
     </svg>
   )
 }
 
 function SidePanel(props: {
-  epoch: number; phase: string; antIdx: number; numAnts: number;
-  pheromone: number[][]; bestCost: number; maxP: number;
+  epoch: number
+  phase: string
+  antIdx: number
+  numAnts: number
+  pheromone: number[][]
+  bestCost: number
+  maxP: number
 }) {
   const { epoch, phase, antIdx, numAnts, pheromone, bestCost, maxP } = props
 
@@ -156,7 +231,11 @@ function SidePanel(props: {
       </div>
       <div className="aco-side-section">
         <div className="aco-side-label">phase</div>
-        <div className="aco-mono">{phase === 'building' ? `🐜 ant ${antIdx + 1}/${numAnts}` : '💨 deposit'}</div>
+        <div className="aco-mono">
+          {phase === 'building'
+            ? `🐜 ant ${antIdx + 1}/${numAnts}`
+            : '💨 deposit'}
+        </div>
       </div>
       <div className="aco-side-section">
         <div className="aco-side-label">best cost</div>
@@ -175,7 +254,10 @@ function SidePanel(props: {
 // ---------------------------------------------------------------
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) return null
-  const W = 300, H = 54, minC = Math.min(...values), maxC = Math.max(...values)
+  const W = 300,
+    H = 54,
+    minC = Math.min(...values),
+    maxC = Math.max(...values)
   const range = maxC - minC || 1
   const pts = values.map((v, i) => {
     const x = (i / (values.length - 1)) * W
@@ -185,7 +267,13 @@ function Sparkline({ values }: { values: number[] }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="aco-spark">
       <rect x={0} y={0} width={W} height={H} className="aco-bg" rx={4} />
-      <polyline points={pts.join(" ")} fill="none" stroke="#0d9488" strokeWidth={1.5} strokeLinejoin="round" />
+      <polyline
+        points={pts.join(' ')}
+        fill="none"
+        stroke="#0d9488"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -203,9 +291,13 @@ export default function AcoExplainer() {
   const simRef = useRef(makeInitState(alpha, beta, evapRate, numAnts))
   const [pheromone, setPheromone] = useState(() => simRef.current.pheromone)
   const [epoch, setEpoch] = useState(0)
-  const [phase, setPhase] = useState<"building" | "depositing">(() => simRef.current.phase)
+  const [phase, setPhase] = useState<'building' | 'depositing'>(
+    () => simRef.current.phase,
+  )
   const [antIdx, setAntIdx] = useState(0)
-  const [bestTour, setBestTour] = useState<number[]>(() => simRef.current.bestTour.slice())
+  const [bestTour, setBestTour] = useState<number[]>(() =>
+    simRef.current.bestTour.slice(),
+  )
   const [bestCost, setBestCost] = useState(() => simRef.current.bestCost)
   const [lastTour, setLastTour] = useState<number[] | null>(null)
   const [lastEvent, setLastEvent] = useState<EventMode | null>(null)
@@ -216,22 +308,33 @@ export default function AcoExplainer() {
 
   const reinit = useCallback((a: number, b: number, e: number, n: number) => {
     simRef.current = makeInitState(a, b, e, n)
-    setPheromone(simRef.current.pheromone); setEpoch(0)
-    setPhase('building'); setAntIdx(0)
-    setBestTour(simRef.current.bestTour.slice()); setBestCost(simRef.current.bestCost)
-    setLastTour(null); setLastEvent(null); setCostHistory([])
+    setPheromone(simRef.current.pheromone)
+    setEpoch(0)
+    setPhase('building')
+    setAntIdx(0)
+    setBestTour(simRef.current.bestTour.slice())
+    setBestCost(simRef.current.bestCost)
+    setLastTour(null)
+    setLastEvent(null)
+    setCostHistory([])
     setTau0(simRef.current.tau0)
-    setStep(0); setRunning(false)
+    setStep(0)
+    setRunning(false)
   }, [])
 
   const step_fn = useCallback(() => {
     const next = stepOnce(simRef.current)
     simRef.current = next
-    setPheromone(next.pheromone.map(r => r.slice()))
-    setEpoch(next.epoch); setPhase(next.phase); setAntIdx(next.antIdx)
-    setBestTour(next.bestTour.slice()); setBestCost(next.bestCost)
-    setLastTour(next.lastTour); setLastEvent(next.lastEvent)
-    setCostHistory(next.costHistory.slice()); setStep(next.step)
+    setPheromone(next.pheromone.map((r) => r.slice()))
+    setEpoch(next.epoch)
+    setPhase(next.phase)
+    setAntIdx(next.antIdx)
+    setBestTour(next.bestTour.slice())
+    setBestCost(next.bestCost)
+    setLastTour(next.lastTour)
+    setLastEvent(next.lastEvent)
+    setCostHistory(next.costHistory.slice())
+    setStep(next.step)
   }, [])
 
   useEffect(() => {
@@ -243,17 +346,17 @@ export default function AcoExplainer() {
 
   const maxP = useMemo(() => maxPheromone(simRef.current), [pheromone])
 
-  let chipText = "Press Step or Run to watch the colony evolve"
-  let chipClass = "aco-chip aco-chip-idle"
+  let chipText = 'Press Step or Run to watch the colony evolve'
+  let chipClass = 'aco-chip aco-chip-idle'
   if (lastEvent === 'ant-built') {
-    chipText = `🐜 ant built a tour — cost ${simRef.current.lastTours.length > 0 ? tourLength(simRef.current.lastTours[simRef.current.lastTours.length - 1]).toFixed(0) : "?"}`
-    chipClass = "aco-chip aco-chip-build"
+    chipText = `🐜 ant built a tour — cost ${simRef.current.lastTours.length > 0 ? tourLength(simRef.current.lastTours[simRef.current.lastTours.length - 1]).toFixed(0) : '?'}`
+    chipClass = 'aco-chip aco-chip-build'
   } else if (lastEvent === 'improved') {
     chipText = `⭐ new best! epoch ${epoch - 1}, cost ${bestCost.toFixed(0)}`
-    chipClass = "aco-chip aco-chip-improve"
+    chipClass = 'aco-chip aco-chip-improve'
   } else if (lastEvent === 'deposited') {
     chipText = `💨 evaporated + 📥 deposited ${numAnts} tours — advancing to epoch ${epoch}`
-    chipClass = "aco-chip aco-chip-deposit"
+    chipClass = 'aco-chip aco-chip-deposit'
   }
 
   return (
@@ -265,30 +368,46 @@ export default function AcoExplainer() {
         <h2 className="aco-title">Ant Colony Optimization</h2>
         <p className="aco-sub">
           A colony of ants independently constructs tours, each next city chosen
-          probabilistically by a <strong>pheromone trail</strong> (reinforced on short edges
-          and decaying over time) weighted by <strong>heuristic desirability</strong>
-          (1/distance). Watch the pheromone edges strengthen on good edges and fade on
-          bad ones as epochs advance.
+          probabilistically by a <strong>pheromone trail</strong> (reinforced on
+          short edges and decaying over time) weighted by{' '}
+          <strong>heuristic desirability</strong>
+          (1/distance). Watch the pheromone edges strengthen on good edges and
+          fade on bad ones as epochs advance.
         </p>
       </header>
 
       <div className="aco-viz-row">
         <div className="aco-canvas-wrap">
           <PheromoneCanvas
-            pheromone={pheromone} maxP={maxP} tau0={tau0} bestTour={bestTour}
-            lastTour={lastTour} phase={phase}
+            pheromone={pheromone}
+            maxP={maxP}
+            tau0={tau0}
+            bestTour={bestTour}
+            lastTour={lastTour}
+            phase={phase}
           />
         </div>
         <SidePanel
-          epoch={epoch} phase={phase} antIdx={antIdx} numAnts={numAnts}
-          pheromone={pheromone} bestCost={bestCost} maxP={maxP}
+          epoch={epoch}
+          phase={phase}
+          antIdx={antIdx}
+          numAnts={numAnts}
+          pheromone={pheromone}
+          bestCost={bestCost}
+          maxP={maxP}
         />
       </div>
 
       <div className="aco-legend">
-        <span><span className="aco-swatch aco-swatch-best" /> best tour</span>
-        <span><span className="aco-swatch aco-swatch-last" /> ant's last tour</span>
-        <span><span className="aco-swatch aco-swatch-phero" /> pheromone edge</span>
+        <span>
+          <span className="aco-swatch aco-swatch-best" /> best tour
+        </span>
+        <span>
+          <span className="aco-swatch aco-swatch-last" /> ant's last tour
+        </span>
+        <span>
+          <span className="aco-swatch aco-swatch-phero" /> pheromone edge
+        </span>
       </div>
 
       <div className={chipClass}>{chipText}</div>
@@ -317,72 +436,181 @@ export default function AcoExplainer() {
 
       <div className="aco-config">
         <div className="aco-config-row">
-          <label className="aco-config-label">α (pheromone influence) = <strong>{alpha.toFixed(1)}</strong></label>
-          <input type="range" min={0} max={10} step={0.1} value={alpha}
+          <label className="aco-config-label">
+            α (pheromone influence) = <strong>{alpha.toFixed(1)}</strong>
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={10}
+            step={0.1}
+            value={alpha}
             className="aco-slider"
-            onInput={e => { const v = Number((e.target as HTMLInputElement).value); setAlpha(v); reinit(v, beta, evapRate, numAnts) }}
+            onInput={(e) => {
+              const v = Number((e.target as HTMLInputElement).value)
+              setAlpha(v)
+              reinit(v, beta, evapRate, numAnts)
+            }}
           />
         </div>
         <div className="aco-config-row">
-          <label className="aco-config-label">β (heuristic influence) = <strong>{beta.toFixed(1)}</strong></label>
-          <input type="range" min={0} max={6} step={0.1} value={beta}
+          <label className="aco-config-label">
+            β (heuristic influence) = <strong>{beta.toFixed(1)}</strong>
+          </label>
+          <input
+            type="range"
+            min={0}
+            max={6}
+            step={0.1}
+            value={beta}
             className="aco-slider"
-            onInput={e => { const v = Number((e.target as HTMLInputElement).value); setBeta(v); reinit(alpha, v, evapRate, numAnts) }}
+            onInput={(e) => {
+              const v = Number((e.target as HTMLInputElement).value)
+              setBeta(v)
+              reinit(alpha, v, evapRate, numAnts)
+            }}
           />
         </div>
         <div className="aco-config-row">
-          <label className="aco-config-label">ρ (evaporation rate) = <strong>{evapRate.toFixed(2)}</strong></label>
-          <input type="range" min={0.01} max={0.99} step={0.01} value={evapRate}
+          <label className="aco-config-label">
+            ρ (evaporation rate) = <strong>{evapRate.toFixed(2)}</strong>
+          </label>
+          <input
+            type="range"
+            min={0.01}
+            max={0.99}
+            step={0.01}
+            value={evapRate}
             className="aco-slider"
-            onInput={e => { const v = Number((e.target as HTMLInputElement).value); setEvapRate(v); reinit(alpha, beta, v, numAnts) }}
+            onInput={(e) => {
+              const v = Number((e.target as HTMLInputElement).value)
+              setEvapRate(v)
+              reinit(alpha, beta, v, numAnts)
+            }}
           />
         </div>
         <div className="aco-config-row">
-          <label className="aco-config-label">Colony size = <strong>{numAnts}</strong></label>
-          <input type="range" min={2} max={30} step={1} value={numAnts}
+          <label className="aco-config-label">
+            Colony size = <strong>{numAnts}</strong>
+          </label>
+          <input
+            type="range"
+            min={2}
+            max={30}
+            step={1}
+            value={numAnts}
             className="aco-slider"
-            onInput={e => { const v = Number((e.target as HTMLInputElement).value); setNumAnts(v); reinit(alpha, beta, evapRate, v) }}
+            onInput={(e) => {
+              const v = Number((e.target as HTMLInputElement).value)
+              setNumAnts(v)
+              reinit(alpha, beta, evapRate, v)
+            }}
           />
         </div>
         <div className="aco-config-row">
           <label className="aco-config-label">Speed</label>
-          <input type="range" min={1} max={10} step={1} value={speed}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            step={1}
+            value={speed}
             className="aco-slider"
-            onInput={e => setSpeed(Number((e.target as HTMLInputElement).value))}
+            onInput={(e) =>
+              setSpeed(Number((e.target as HTMLInputElement).value))
+            }
           />
         </div>
       </div>
 
-       <div className="aco-controls">
-         <button className="aco-btn" onClick={step_fn} disabled={running}>◀ Step</button>
-         <button className={`aco-btn ${!running ? "aco-btn-primary" : ""}`}
-           onClick={() => setRunning(r => !r)}>
-           {running ? "⏸ Pause" : "▶ Run"}
-         </button>
-         <button className="aco-btn" onClick={() => reinit(alpha, beta, evapRate, numAnts)}>↺ Reset</button>
-       </div>
+      <div className="aco-controls">
+        <button className="aco-btn" onClick={step_fn} disabled={running}>
+          ◀ Step
+        </button>
+        <button
+          className={`aco-btn ${!running ? 'aco-btn-primary' : ''}`}
+          onClick={() => setRunning((r) => !r)}
+        >
+          {running ? '⏸ Pause' : '▶ Run'}
+        </button>
+        <button
+          className="aco-btn"
+          onClick={() => reinit(alpha, beta, evapRate, numAnts)}
+        >
+          ↺ Reset
+        </button>
+      </div>
 
-       <div className="aco-scenarios">
-         <div className="aco-section-label">Scenarios</div>
-         <div className="aco-scenario-row">
-           {([
-             { label: 'Default', desc: 'balanced α=1.0 β=2.0 ρ=0.50 ants=10', a: 1.0, b: 2.0, e: 0.50, n: 10 },
-             { label: 'Pheromone-heavy', desc: 'high α=3.0 β=1.0 — ants follow existing trails', a: 3.0, b: 1.0, e: 0.30, n: 10 },
-             { label: 'Distance-driven', desc: 'high β=5.0 — ants prioritise short edges', a: 0.5, b: 5.0, e: 0.50, n: 10 },
-             { label: 'Fast evaporation', desc: 'ρ=0.85 — trails fade quickly, more exploration', a: 1.0, b: 2.0, e: 0.85, n: 10 },
-             { label: 'Large colony', desc: 'ants=25 — more deposits per epoch', a: 1.0, b: 2.0, e: 0.50, n: 25 },
-           ] as const).map(s => (
-             <button key={s.label} className="aco-scenario-btn" title={s.desc}
-               onClick={() => { setAlpha(s.a); setBeta(s.b); setEvapRate(s.e); setNumAnts(s.n); reinit(s.a, s.b, s.e, s.n) }}>
-               {s.label}
-             </button>
-           ))}
-         </div>
-       </div>
+      <div className="aco-scenarios">
+        <div className="aco-section-label">Scenarios</div>
+        <div className="aco-scenario-row">
+          {(
+            [
+              {
+                label: 'Default',
+                desc: 'balanced α=1.0 β=2.0 ρ=0.50 ants=10',
+                a: 1.0,
+                b: 2.0,
+                e: 0.5,
+                n: 10,
+              },
+              {
+                label: 'Pheromone-heavy',
+                desc: 'high α=3.0 β=1.0 — ants follow existing trails',
+                a: 3.0,
+                b: 1.0,
+                e: 0.3,
+                n: 10,
+              },
+              {
+                label: 'Distance-driven',
+                desc: 'high β=5.0 — ants prioritise short edges',
+                a: 0.5,
+                b: 5.0,
+                e: 0.5,
+                n: 10,
+              },
+              {
+                label: 'Fast evaporation',
+                desc: 'ρ=0.85 — trails fade quickly, more exploration',
+                a: 1.0,
+                b: 2.0,
+                e: 0.85,
+                n: 10,
+              },
+              {
+                label: 'Large colony',
+                desc: 'ants=25 — more deposits per epoch',
+                a: 1.0,
+                b: 2.0,
+                e: 0.5,
+                n: 25,
+              },
+            ] as const
+          ).map((s) => (
+            <button
+              key={s.label}
+              className="aco-scenario-btn"
+              title={s.desc}
+              onClick={() => {
+                setAlpha(s.a)
+                setBeta(s.b)
+                setEvapRate(s.e)
+                setNumAnts(s.n)
+                reinit(s.a, s.b, s.e, s.n)
+              }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <footer className="aco-footer">
         <span className="aco-mono">cities: {N_CITIES}</span>
-        <span className="aco-mono">α={alpha.toFixed(1)} β={beta.toFixed(1)}</span>
+        <span className="aco-mono">
+          α={alpha.toFixed(1)} β={beta.toFixed(1)}
+        </span>
         <span className="aco-mono">ρ={evapRate.toFixed(2)}</span>
         <span className="aco-mono">ants: {numAnts}</span>
         <span className="aco-mono">classic AS</span>
