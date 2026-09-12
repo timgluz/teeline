@@ -10,6 +10,21 @@ export function exampleUrl(name: string): string {
   return `/examples/${name}.tsp`
 }
 
+// Base URL for the hosted TSPLIB dataset files. In dev, Vite proxies /tsplib/
+// → static.tspsolver.com/tsplib/ to avoid CORS; in production we fetch the
+// static host directly.
+export function datasetBaseUrl(dev: boolean): string {
+  return dev ? '/tsplib' : 'https://static.tspsolver.com/tsplib'
+}
+
+export function datasetTspUrl(name: string, dev: boolean): string {
+  return `${datasetBaseUrl(dev)}/${name}.tsp`
+}
+
+export function datasetOptTourUrl(name: string, dev: boolean): string {
+  return `${datasetBaseUrl(dev)}/${name}.opt.tour`
+}
+
 export function parseOptTour(text: string): number[] {
   const lines = text.split('\n')
   let inSection = false
@@ -212,9 +227,8 @@ export function initUpload(
 
   if (datasetParam) {
     // In dev, Vite proxies /tsplib/ → static.tspsolver.com/tsplib/ to avoid CORS
-    const tspUrl = import.meta.env.DEV
-      ? `/tsplib/${datasetParam}.tsp`
-      : `https://static.tspsolver.com/tsplib/${datasetParam}.tsp`
+    const tspUrl = datasetTspUrl(datasetParam, import.meta.env.DEV)
+    const optTourUrl = datasetOptTourUrl(datasetParam, import.meta.env.DEV)
     ;(async () => {
       try {
         const resp = await fetch(tspUrl)
@@ -224,7 +238,7 @@ export function initUpload(
 
         // Also try to load the .opt.tour if available
         try {
-          const optResp = await fetch(tspUrl.replace('.tsp', '.opt.tour')) 
+          const optResp = await fetch(optTourUrl)
           if (optResp.ok) {
             const optText = await optResp.text()
             const route = parseOptTour(optText)
