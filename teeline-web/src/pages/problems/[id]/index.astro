@@ -29,6 +29,12 @@ const jsonLd = {
   description: `${data.description} — ${data.cities} cities, ${data.edgeWeightType}. TSPLIB95 TSP instance.`,
   identifier: data.id,
   url: canonicalUrl,
+  creator: {
+    '@type': 'Organization',
+    name: data.creator,
+    url: data.sourceUrl,
+  },
+  license: data.license,
   size: data.cities,
   variableMeasured: data.edgeWeightType,
   ...(data.optimalCost !== null ? { measurementTechnique: `Optimal tour length: ${data.optimalCost}` } : {}),
@@ -77,6 +83,8 @@ const jsonLd = {
         <tr><td>Optimal tour</td><td><strong>{data.optimalCost.toLocaleString()}</strong></td></tr>
       )}
       <tr><td>Source</td><td><a href={data.sourceUrl} target="_blank" rel="noopener">{data.source}</a></td></tr>
+      <tr><td>Creator</td><td>{data.creator}</td></tr>
+      <tr><td>License</td><td><a href={data.license} target="_blank" rel="noopener">TSPLIB95 terms</a></td></tr>
     </tbody>
   </table>
 

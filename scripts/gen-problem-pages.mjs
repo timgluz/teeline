@@ -12,6 +12,9 @@ const DOCS_DIR = join(import.meta.dirname, '..', 'docs', 'problems')
 const DATA_BASE = 'https://static.tspsolver.com/tsplib'
 const SOURCE = 'TSPLIB95'
 const SOURCE_URL = 'https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/'
+// Dataset structured data (schema.org) needs an explicit creator and license.
+const CREATOR = 'TSPLIB — Gerhard Reinelt, University of Heidelberg'
+const LICENSE = SOURCE_URL
 
 mkdirSync(DOCS_DIR, { recursive: true })
 
@@ -159,6 +162,8 @@ optimalCost: ${optimalCost !== null ? optimalCost : 'null'}
 dataUrl: "${dataUrl}"
 source: "${SOURCE}"
 sourceUrl: "${SOURCE_URL}"
+creator: "${CREATOR}"
+license: "${LICENSE}"
 ---
 
 ${minimap}

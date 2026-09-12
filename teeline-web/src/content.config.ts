@@ -25,6 +25,8 @@ const problems = defineCollection({
     dataUrl: z.string(),
     source: z.string(),
     sourceUrl: z.string(),
+    creator: z.string(),
+    license: z.string(),
   }),
 })
 

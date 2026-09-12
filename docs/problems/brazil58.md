@@ -9,6 +9,8 @@ optimalCost: null
 dataUrl: "https://static.tspsolver.com/tsplib/brazil58.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
+creator: "TSPLIB — Gerhard Reinelt, University of Heidelberg"
+license: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
 
 
