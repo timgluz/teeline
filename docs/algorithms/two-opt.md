@@ -49,3 +49,4 @@ teeline solve 2opt --no-seed -i ./data/tsplib/berlin52.tsp
 
 - [Section 20.4: The 2-OPT Heuristic (YouTube)](https://youtu.be/dYEWqrp-mho)
 - [2-opt (Wikipedia)](https://en.wikipedia.org/wiki/2-opt)
+- Johnson, D. S. & McGeoch, L. A. (1997) — [*The Traveling Salesman Problem: A Case Study in Local Optimization*](https://www.cs.ubc.ca/~hutter/previous-earg/EmpAlgReadingGroup/TSP-JohMcg97.pdf)
