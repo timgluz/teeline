@@ -126,17 +126,6 @@ function TourCanvas({
         />
       ))}
 
-      {/* Best insertion gap marker */}
-      {showCandidate && pending && (
-        <line
-          className="or-gap-marker"
-          x1={CITIES[pending.insertAfter][0]}
-          y1={CITIES[pending.insertAfter][1]}
-          x2={CITIES[pending.insertBefore][0]}
-          y2={CITIES[pending.insertBefore][1]}
-        />
-      )}
-
       <g className="or-tour">
         {edges.map(({ from, to, key }) => {
           let cls = 'or-edge'
@@ -154,6 +143,20 @@ function TourCanvas({
             />
           )
         })}
+        {/* Proposed paste edges (the 3 new edges), drawn as a dashed overlay
+            during the candidate phase — the tour itself is still unchanged. */}
+        {showCandidate &&
+          pending &&
+          pending.pasteEdges.map(([a, b]) => (
+            <line
+              key={`paste-${edgeKey(a, b)}`}
+              className="or-cand-paste"
+              x1={CITIES[a][0]}
+              y1={CITIES[a][1]}
+              x2={CITIES[b][0]}
+              y2={CITIES[b][1]}
+            />
+          ))}
         {tour.map((id) => (
           <g key={id}>
             <circle
@@ -319,11 +322,13 @@ export default function OrOptExplainer() {
         <p className="or-sub">
           Or-opt relocates <strong>segments of 1–3 consecutive cities</strong>{' '}
           to a better position elsewhere in the tour — a <em>cut-and-paste</em>{' '}
-          move, unlike 2-opt's edge reversal. Each pass scans every segment size
-          (Or-1, Or-2, Or-3) and every insertion point, applying the single{' '}
-          <strong>best-improving</strong> relocation (reversed insertions are
-          also tried for Or-2/Or-3). Repeats until no relocation improves the
-          tour.
+          move, unlike 2-opt's edge reversal. Every relocation{' '}
+          <strong>cuts</strong> three edges (removed — dashed orange) and{' '}
+          <strong>pastes</strong> three new ones (added — green). Each pass
+          scans every segment size (Or-1, Or-2, Or-3) and every insertion point,
+          applying the single <strong>best-improving</strong> relocation
+          (reversed insertions are also tried for Or-2/Or-3). Repeats until no
+          relocation improves the tour.
         </p>
       </header>
 
@@ -351,9 +356,6 @@ export default function OrOptExplainer() {
         </span>
         <span>
           <span className="or-swatch or-swatch-paste" /> paste edge
-        </span>
-        <span>
-          <span className="or-swatch or-swatch-gap" /> insertion gap
         </span>
         <span>
           <span className="or-swatch or-swatch-tick" /> improving gap (scan)
@@ -522,7 +524,6 @@ const CSS = `
 .or-cut { stroke: #ef4444; stroke-width: 3.5; stroke-dasharray: 6 3; }
 .or-paste { stroke: #16a34a; stroke-width: 3.5; }
 .or-scan-tick { stroke: #f59e0b; stroke-width: 2; stroke-dasharray: 2 2; opacity: 0.5; }
-.or-gap-marker { stroke: #16a34a; stroke-width: 2.5; stroke-dasharray: 5 4; opacity: 0.55; }
 .or-city { fill: #1f2937; stroke: #fff; stroke-width: 1.5; transition: cx 0.35s ease, cy 0.35s ease; }
 .or-city-seg { fill: #ea580c; stroke: #fff7ed; }
 .or-label {
@@ -553,9 +554,8 @@ const CSS = `
 }
 .or-swatch-normal { background: #94a3b8; }
 .or-swatch-seg { background: #ea580c; }
-.or-swatch-cut { background: #ef4444; }
+.or-swatch-cut { background: #ea580c; }
 .or-swatch-paste { background: #16a34a; }
-.or-swatch-gap { background: #16a34a; }
 .or-swatch-tick { background: #f59e0b; }
 
 .or-chip {
