@@ -26,14 +26,14 @@
     "@sentry/vite-plugin": "^5.4.0",
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "14.0.2",
-    "astro": "^7.3.3",
+    "astro": "^7.3.5",
     "preact": "^10.29.8",
     "tailwindcss": "^4.3.3",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
-    "@cloudflare/workers-types": "5.20260918.1",
+    "@cloudflare/workers-types": "5.20260925.1",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
