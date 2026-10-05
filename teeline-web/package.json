@@ -27,7 +27,7 @@
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "14.0.2",
     "astro": "^7.3.5",
-    "preact": "^10.29.8",
+    "preact": "^11.0.0",
     "tailwindcss": "^4.3.3",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
