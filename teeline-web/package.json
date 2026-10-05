@@ -25,7 +25,7 @@
     "@sentry/browser": "^11.0.0",
     "@sentry/vite-plugin": "^5.4.0",
     "@simplewebauthn/browser": "13.3.0",
-    "@simplewebauthn/server": "14.0.2",
+    "@simplewebauthn/server": "14.0.3",
     "astro": "^7.3.5",
     "preact": "^10.29.8",
     "tailwindcss": "^4.3.3",
@@ -40,7 +40,7 @@
     "better-sqlite3": "13.0.3",
     "prettier": "^3.9.9",
     "typescript": "6.0.3",
-    "vitest": "5.0.1",
+    "vitest": "5.0.3",
     "wrangler": "4.141.0"
   },
   "overrides": {
