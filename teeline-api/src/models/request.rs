@@ -316,6 +316,7 @@ mod tests {
             sa: Some(SaConfig {
                 heuristic: Some(HeuristicConfig {
                     epochs: Some(5000),
+                    stagnation_epochs: None,
                     platoo_epochs: None,
                     n_nearest: None,
                 }),
@@ -380,6 +381,7 @@ mod tests {
                 sa: Some(SaConfig {
                     heuristic: Some(HeuristicConfig {
                         epochs: Some(1000),
+                        stagnation_epochs: None,
                         platoo_epochs: None,
                         n_nearest: None,
                     }),
@@ -413,6 +415,7 @@ mod tests {
                 aco: Some(AcoConfig {
                     heuristic: Some(HeuristicConfig {
                         epochs: Some(300),
+                        stagnation_epochs: None,
                         platoo_epochs: None,
                         n_nearest: None,
                     }),

@@ -232,7 +232,10 @@ fn tuning_args() -> Vec<Arg> {
             .required(false),
         Arg::new("stagnation_epochs")
             .long("stagnation_epochs")
-            .help("epochs without improvement before stopping (0 disables)")
+            .help(
+                "consecutive non-improving epochs before stopping early; 0 = never stop early \
+                 (honoured by: ga)",
+            )
             .required(false),
         // The misspelled spelling is kept as a hidden alias so existing scripts and CI keep
         // working; the correctly-spelled flag is what help documents.

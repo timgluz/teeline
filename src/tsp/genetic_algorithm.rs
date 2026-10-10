@@ -7,6 +7,12 @@ use std::sync::mpsc;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::plateau::Plateau;
+
+// Test-only epoch counter. Thread-local because tests run in parallel.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static EPOCHS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
 use super::probability::probability;
 use super::progress::ProgressMessage;
 use super::route::{Route, random_position_pair};
@@ -66,6 +72,9 @@ fn solve_ga(
     let mut best_length = f32::INFINITY;
 
     while epoch < ga.heuristic.epochs {
+        #[cfg(test)]
+        EPOCHS.with(|n| n.set(n.get() + 1));
+
         let mut new_population = TspPopulation::with_capacity(population_size);
 
         current_population.sort();
@@ -495,5 +504,40 @@ mod tests {
         let (child1, child2) = ordered_crossover_genes(parent1, parent2, 3, 5);
         assert_eq!(vec![5, 6, 7, 2, 3, 0, 1, 9, 8, 4], child1);
         assert_eq!(vec![2, 3, 0, 5, 6, 7, 9, 4, 8, 1], child2);
+    }
+
+    /// The plateau stop must actually end a run early, not merely be wired to a value nobody reads.
+    /// Counts epochs rather than timing the process: on a small instance the compute is swamped by
+    /// fixed startup cost, which is how an unhonoured bound went unnoticed elsewhere in this crate.
+    #[test]
+    fn ga_stops_early_on_stagnation() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![10.0, 0.0],
+            vec![20.0, 5.0],
+            vec![30.0, 1.0],
+            vec![40.0, 8.0],
+            vec![50.0, 3.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let problem = TspProblem::new(cities, dm);
+
+        let opts = GAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 100_000,
+                stagnation_epochs: 20,
+                ..HeuristicOptions::default()
+            },
+            ..GAOptions::default()
+        };
+
+        EPOCHS.with(|n| n.set(0));
+        let _ = solve(&problem, &opts, None, None);
+        let ran = EPOCHS.with(|n| n.get());
+
+        assert!(
+            ran < 100_000,
+            "a stagnation limit of 20 must stop the run well before the 100k epoch cap; ran {ran}"
+        );
     }
 }

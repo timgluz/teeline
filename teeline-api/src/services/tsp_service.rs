@@ -855,4 +855,27 @@ EOF
         };
         assert!(fpa.validate().is_err());
     }
+
+    /// The mapping must carry `stagnation_epochs` through and keep the solver's own default when the
+    /// caller omits it — a dropped field or a wrong base would silently disable the feature.
+    #[test]
+    fn map_heuristic_onto_carries_stagnation_epochs() {
+        let base = SAOptions::default().heuristic;
+        let defaulted = HeuristicConfig::default();
+        assert_eq!(
+            map_heuristic_onto(&defaulted, base.clone()).stagnation_epochs,
+            base.stagnation_epochs,
+            "omitting the field must preserve the solver-specific default"
+        );
+
+        let requested = HeuristicConfig {
+            stagnation_epochs: Some(7),
+            ..HeuristicConfig::default()
+        };
+        assert_eq!(
+            map_heuristic_onto(&requested, base).stagnation_epochs,
+            7,
+            "an explicit value must reach the solver options"
+        );
+    }
 }
