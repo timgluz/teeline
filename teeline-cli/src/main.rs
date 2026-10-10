@@ -230,9 +230,12 @@ fn tuning_args() -> Vec<Arg> {
             .long("epochs")
             .help("maximum iterations before stopping, 0 is forever")
             .required(false),
+        // The misspelled spelling is kept as a hidden alias so existing scripts and CI keep
+        // working; the correctly-spelled flag is what help documents.
         Arg::new("platoo_epochs")
-            .long("platoo_epochs")
-            .help("steps until stop searching on plateau")
+            .long("plateau_epochs")
+            .alias("platoo_epochs")
+            .help("steps without improvement before stopping (0 disables)")
             .required(false),
         Arg::new("n_nearest")
             .long("n_nearest")
@@ -803,6 +806,37 @@ mod tests {
         let args = options_cmd().get_matches_from(["test", "nn", "--platoo_epochs", "200"]);
         let opts = solver_options_from_args(&args, Solvers::NearestNeighbor);
         assert_eq!(opts.heuristic.unwrap_or_default().platoo_epochs, 200);
+    }
+
+    /// The correctly-spelled flag must work; it is the documented spelling.
+    #[test]
+    fn test_solver_options_plateau_epochs_parsed() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--plateau_epochs", "200"]);
+        let opts = solver_options_from_args(&args, Solvers::NearestNeighbor);
+        assert_eq!(opts.heuristic.unwrap_or_default().platoo_epochs, 200);
+    }
+
+    /// The misspelled flag stays accepted so existing scripts keep working.
+    #[test]
+    fn test_solver_options_plateau_epochs_old_spelling_still_accepted() {
+        let args = options_cmd().get_matches_from(["test", "nn", "--platoo_epochs", "200"]);
+        let opts = solver_options_from_args(&args, Solvers::NearestNeighbor);
+        assert_eq!(opts.heuristic.unwrap_or_default().platoo_epochs, 200);
+    }
+
+    /// Help text is the only place users learn the flag name, so it must render the spelling that
+    /// is actually accepted. A hyphenated form here would be a flag that does not parse.
+    #[test]
+    fn test_plateau_epochs_help_shows_an_accepted_spelling() {
+        let rendered = options_cmd().render_help().to_string();
+        assert!(
+            rendered.contains("--plateau_epochs"),
+            "help must document the accepted flag name:\n{rendered}"
+        );
+        assert!(
+            !rendered.contains("--platoo-epochs"),
+            "help must not document a hyphenated spelling the parser rejects"
+        );
     }
 
     #[test]
