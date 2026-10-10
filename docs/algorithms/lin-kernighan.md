@@ -40,7 +40,7 @@ procedure LinKernighan(cities, epochs):
 | Field | CLI flag | Default | Range | Description |
 | ------- | ------- | --------- | ------- | ------------- |
 | `epochs` | `--epochs` | 100 | ≥ 0 (unvalidated) | Number of ILS restarts |
-| `platoo_epochs` | `--platoo_epochs` | 10 | ≥ 0 (unvalidated) | Stop after this many consecutive non-improving restarts |
+| `platoo_epochs` | `--plateau_epochs` | 10 | ≥ 0 (unvalidated) | Stop after this many consecutive non-improving restarts |
 | `n_nearest` | `--n_nearest` | 5 | ≥ 1 | Candidate list size (k nearest neighbours per city) |
 | `max_depth` | `--max-depth` | 5 | ≥ 1 | LK chain-search depth; depth-1 ≈ 2-opt, depth-5 enables the full k-opt move space |
 
@@ -50,6 +50,9 @@ convention: `epochs=0` runs zero ILS restarts (only the initial pass), and
 `platoo_epochs=0` stops after the first non-improving restart — the opposite of
 "unlimited". All four fields are also reachable via the REST API's `configs.lk` or a
 `[lk]`/`[stage.lk]` TOML table (field names match the table above).
+
+The CLI flag is `--plateau_epochs`. The older misspelled `--platoo_epochs` is still accepted as a
+hidden alias so existing scripts keep working, and the config key is accepted spelled either way.
 
 ## Usage
 
