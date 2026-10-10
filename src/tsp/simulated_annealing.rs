@@ -7,27 +7,16 @@ use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{SAOptions, Solution, TspProblem};
 
-// Counts loop iterations on the current thread, for tests only. Compiled out of all non-test
-// builds.
-//
-// The epoch budget was previously unobservable without timing the process, which is how a bound
-// that never took effect went unnoticed: a timing assertion is swamped by fixed startup cost on
-// small instances. Counting iterations makes the bound directly assertable.
-//
-// Thread-local rather than a global, because `cargo test` runs tests in parallel and a shared
-// counter would mix iterations from concurrently-running tests.
+// Test-only iteration counter. Thread-local rather than global: tests run in parallel, so a shared
+// counter would mix counts across them.
 #[cfg(test)]
 thread_local! {
     pub(crate) static ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// Iterations the geometric cooling schedule needs to go from `max_temperature` to
-/// `min_temperature`: `ln(max/min) / -ln(1 - cooling_rate)`, matching the loop's
-/// `t <- t * (1 - cooling_rate)`.
+/// Iterations the cooling schedule needs to reach `min_temperature` from `max_temperature`.
 ///
-/// This is the effective run length for any non-zero `epochs`: the loop ends here on the
-/// temperature bound. It is a function of the cooling parameters, so it must be derived rather than
-/// hardcoded — at the defaults it is ~138,149, but `--cooling_rate=0.00001` needs ~1.4M.
+/// Derived rather than fixed because it scales with the cooling rate, which callers choose.
 pub(crate) fn schedule_length(opts: &SAOptions) -> usize {
     let rate = opts.cooling_rate as f64;
     let max_t = opts.max_temperature as f64;
@@ -44,25 +33,15 @@ pub(crate) fn schedule_length(opts: &SAOptions) -> usize {
 
 /// Resolves the epoch budget the loop actually applies.
 ///
-/// Precedence, highest first:
+/// - `epochs == 0` means unbounded.
+/// - A value below the schedule length is raised to it: stopping while the temperature is still high
+///   accepts nearly every move, so the run degenerates into a random walk rather than annealing.
+/// - Resolved at run time because the budget depends on the cooling parameters, and the CLI applies
+///   `--cooling_rate` after the options are built.
 ///
-/// 1. `epochs == 0` means **unbounded** — the temperature schedule alone decides. Zero must keep
-///    this meaning because the old `||` gave it that by accident, and a bare `&&` would otherwise
-///    read it as "zero iterations" and silently return the initial tour unchanged.
-/// 2. Any other `epochs` resolves to the schedule length, and the temperature bound ends the run
-///    there. A value above the schedule therefore has no practical effect — it cannot extend a
-///    run, because `temperature <= min_temperature` is reached first. A value below is raised, and
-///    reported at warn level, because truncating before the schedule finishes stops the run while
-///    the temperature is still high: nearly every move is accepted and it degenerates into a
-///    random walk.
-///
-/// The net effect is that `epochs` selects only "bounded at the schedule length" (any non-zero
-/// value) versus "unbounded" (zero). That is an honest description of the flag under `&&`, and it
-/// is why the docs describe the temperature schedule as the effective bound.
-///
-/// The schedule length depends on the cooling rate (`0.0001` needs ~138k iterations, `0.00001`
-/// needs ~1.38M), which is why no constant can serve here and why this is resolved at run time
-/// rather than stored in a constructor.
+/// Consequence: `--epochs` can bound a run at the schedule length or leave it uncapped, but cannot
+/// shorten it — an explicitly small budget is indistinguishable from an accepted default. Fixing
+/// that needs `Option<usize>` rather than overloading `0`.
 fn usable_epochs(opts: &SAOptions) -> usize {
     let epochs = opts.heuristic.epochs;
     if epochs == 0 {
@@ -93,8 +72,8 @@ pub fn solve(
     let cooling_rate = opts.cooling_rate;
     let mut epoch = 0;
 
-    // Resolved before logging so the log reports the budget actually used. Resolving it here,
-    // rather than in a constructor, is what makes CLI, TOML, wasm and API paths agree.
+    // Resolved here, not in a constructor, so the log reports the budget actually used and every
+    // constructor path agrees.
     let epoch_limit = usable_epochs(opts);
 
     tracing::info!(
@@ -118,15 +97,7 @@ pub fn solve(
     }
 
     let mut temperature = opts.max_temperature;
-    // `&&`, and the epoch bound is resolved by `usable_epochs` (any non-zero value resolves to the
-    // schedule length, so the temperature bound is what normally ends the run). With `||` the loop
-    // instead ran until the *last* bound expired, so `epochs` acted
-    // as a floor rather than a budget: at defaults the schedule needs ~138k iterations while the
-    // default was 10k, so `--epochs` could not shorten a run at all.
-    //
-    // `epochs == 0` means "no epoch cap" — the temperature schedule decides — which is what the
-    // previous `||` gave it by accident. With a bare `&&` it would instead mean *zero* iterations
-    // and silently return the initial tour unchanged.
+    // Both bounds are capping: whichever is reached first ends the run.
     while epoch < epoch_limit && temperature > opts.min_temperature {
         #[cfg(test)]
         ITERATIONS.with(|n| n.set(n.get() + 1));
@@ -216,17 +187,7 @@ mod tests {
         TspProblem::new(cities, dm)
     }
 
-    /// A budget below the schedule length is raised to it, so a run cannot be truncated while the
-    /// temperature is still high.
-    ///
-    /// Regression guard in both directions. Originally `||` made the loop run
-    /// `max(epochs, schedule)`, so the budget was ignored entirely — 10k, 50k and 138k all did
-    /// identical work — while a *low* value truncated the run into a random walk. A bare `&&` then
-    /// inverted the failure, making a low value a real truncation.
-    ///
-    /// The deliberate trade-off is that `--epochs` cannot shorten a run: the default budget is
-    /// itself small relative to the schedule, so "I want a short run" is indistinguishable from
-    /// "I accepted the default". Raising is the safe choice, and `epochs == 0` still means no cap.
+    /// A budget below the schedule length is raised to it rather than truncating the run.
     #[test]
     fn test_sa_epochs_below_the_schedule_is_raised_to_it() {
         let problem = tiny_problem();
@@ -258,9 +219,7 @@ mod tests {
         );
     }
 
-    /// `epochs == 0` means "no epoch cap": the temperature schedule decides. With a bare `&&` it
-    /// would instead mean zero iterations and silently return the initial tour unchanged, which
-    /// is a real regression because `||` previously made 0 unbounded by accident.
+    /// `epochs == 0` means no epoch cap, not zero iterations.
     #[test]
     fn test_sa_zero_epochs_means_unbounded_not_zero_iterations() {
         let problem = tiny_problem();
@@ -282,9 +241,7 @@ mod tests {
         );
     }
 
-    /// With a budget above the schedule length, the temperature bound still ends the run at the
-    /// schedule: the extra budget cannot extend it. This is the `||` defect in the other direction
-    /// — under `||` the loop ran until the *last* bound expired.
+    /// A budget above the schedule length cannot extend the run: the temperature bound ends it.
     #[test]
     fn test_sa_temperature_bound_ends_the_run_at_the_schedule() {
         let problem = tiny_problem();

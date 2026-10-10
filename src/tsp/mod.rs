@@ -697,18 +697,9 @@ pub struct SAOptions {
 impl Default for SAOptions {
     fn default() -> Self {
         SAOptions {
-            // The temperature schedule is the primary stopping rule, so the safety cap has to
-            // exceed the schedule length or it truncates the run while the temperature is still
-            // high — which accepts nearly every move and degenerates into a random walk. At the
-            // default cooling rate the schedule needs ~138,149 iterations, and a 10k cap measured
-            // ~32k tours on a280 versus ~3.4k when the schedule is allowed to finish.
-            //
-            // Any value at or below the schedule length is treated as "use the schedule length"
-            // by `usable_epochs`, so this number is a placeholder for the default cooling rate
-            // rather than a hard cap; slow rates get a correspondingly larger budget. It must be
-            // non-zero because a zero `epochs` means *unbounded* to the loop, and a directly
-            // constructed `SAOptions::default()` running forever would be a worse surprise than
-            // any truncation.
+            // A placeholder, not a cap: `usable_epochs` resolves any value at or below the cooling
+            // schedule length to the schedule length. Must be non-zero, because 0 means unbounded
+            // and `SAOptions::default()` running forever would be a worse surprise than truncation.
             heuristic: HeuristicOptions {
                 epochs: 150_000,
                 ..HeuristicOptions::default()
