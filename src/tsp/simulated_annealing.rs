@@ -75,7 +75,7 @@ fn usable_epochs(opts: &SAOptions) -> usize {
             schedule_length = schedule,
             "SA: epoch budget is below the cooling schedule length, so it is raised to the \
              schedule length; the run would otherwise stop while the temperature is still high. \
-             Pass a larger value to extend it, or 0 for no cap."
+             Any value at or above the schedule length gives the same run; 0 removes the epoch cap."
         );
         return schedule;
     }
