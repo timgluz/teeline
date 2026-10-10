@@ -431,6 +431,23 @@ if [[ "$(find "$STAGE/v1" -name '*.json' | wc -l)" -gt 40 ]]; then
   echo "    ... ($(find "$STAGE/v1" -name '*.json' | wc -l) files total)"
 fi
 
+# The solver-id <-> CLI-name mapping, emitted once here so the criteriondb mirror
+# reads it instead of re-deriving it. Two independent copies of this lookup would
+# drift silently, since nothing would enforce that they agree.
+python3 - "$STAGE" <<'PY'
+import json, sys
+from pathlib import Path
+stage = Path(sys.argv[1])
+index = json.loads((Path.cwd() / "bench" / "solvers.json").read_text(encoding="utf-8"))
+by_name = {}
+for s in index["solvers"]:
+    by_name[s["id"]] = s["id"]
+    by_name[s["cli"]] = s["id"]
+# Lives outside v1/ so it is never uploaded to R2.
+(stage / "_solvers.json").write_text(json.dumps(by_name, indent=2) + "\n", encoding="utf-8")
+print(f"    solver map: {len(index['solvers'])} solver(s)")
+PY
+
 # ---------------------------------------------------------------------------
 # Upload
 # ---------------------------------------------------------------------------
@@ -444,8 +461,18 @@ upload_r2() {
   fi
   echo "==> Uploading to R2 bucket '$CF_R2_BUCKET' prefix '$PREFIX' via $R2_CLIENT"
   local key file count=0
-  # index.json first, so a reader never sees shards advertised before they exist.
-  for file in "$STAGE/v1/index.json" $(find "$STAGE/v1" -name '*.json' ! -name index.json | sort); do
+  # Shards first, index.json LAST.
+  #
+  # index.json is the manifest that advertises every shard, so publishing it
+  # first opens a window in which a concurrent reader (read-benchmarks.sh list or
+  # check, or a page fetching on demand) sees a manifest listing shards that do
+  # not exist yet and 404s on them. Uploading the manifest last means it only
+  # ever points at objects that are already live. The reverse mistake — a
+  # manifest that briefly omits a newly published shard — is harmless, because
+  # that just means the old shard is still being served.
+  local shards
+  shards="$(find "$STAGE/v1" -name '*.json' ! -name index.json | sort)"
+  for file in $shards "$STAGE/v1/index.json"; do
     key="${file#"$STAGE/v1/"}"
     if [[ "$DRY_RUN" -eq 1 ]]; then
       echo "    [dry-run] would put ${PREFIX}/${key}"
@@ -464,6 +491,26 @@ mirror_criteriondb() {
     echo "WARN: CRITERIONDB_API_KEY is unset — skipping criteriondb mirror." >&2
     return 0
   fi
+
+  # Refuse to send a bearer token in cleartext. http:// is only acceptable for a
+  # loopback endpoint (local development); anything else must be https.
+  case "$CRITERIONDB_URL" in
+    https://*)
+      ;;
+    http://localhost*|http://127.0.0.1*|http://\[::1\]*)
+      echo "WARN: sending CRITERIONDB_API_KEY over plaintext http to a loopback host." >&2
+      ;;
+    http://*)
+      echo "ERROR: refusing to send CRITERIONDB_API_KEY in cleartext to '$CRITERIONDB_URL'." >&2
+      echo "Use an https:// endpoint, or a loopback http:// URL for local development." >&2
+      return 1
+      ;;
+    *)
+      echo "ERROR: CRITERIONDB_URL must start with https:// or http:// (got '$CRITERIONDB_URL')." >&2
+      return 1
+      ;;
+  esac
+
   echo "==> Mirroring runs into criteriondb"
   echo "    url:     $CRITERIONDB_URL"
   echo "    project: $CRITERIONDB_PROJECT"
@@ -471,29 +518,49 @@ mirror_criteriondb() {
     echo "    [dry-run] would POST one tspsolver-profile run per (solver, dataset, config) cell"
     return 0
   fi
-  python3 - "$TSV" "$CRITERIONDB_URL" "$CRITERIONDB_PROJECT" "$key" <<'PY'
+  python3 - "$TSV" "$CRITERIONDB_URL" "$CRITERIONDB_PROJECT" "$key" "$STAGE/_solvers.json" <<'PY'
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
 
-tsv_path, base_url, project, api_key = sys.argv[1:5]
+tsv_path, base_url, project, api_key, solver_map_path = sys.argv[1:6]
 ROOT = Path.cwd()
 
-index = json.loads((ROOT / "bench" / "solvers.json").read_text(encoding="utf-8"))
-by_name = {}
-for s in index["solvers"]:
-    by_name[s["id"]] = s["id"]
-    by_name[s["cli"]] = s["id"]
+# The solver-id <-> CLI-name map written by the transform above (single source,
+# so it cannot drift from the mapping that produced the R2 shards).
+try:
+    by_name = json.loads(Path(solver_map_path).read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError) as exc:
+    sys.exit(f"ERROR: cannot read solver map {solver_map_path}: {exc}")
+
+# Optional environment override for the archived run. Validated up front — an
+# unguarded json.loads inside the upload loop would abort midway with some runs
+# already POSTed and an opaque traceback.
+env_override = os.environ.get("CRITERIONDB_ENVIRONMENT")
+if env_override:
+    try:
+        environment = json.loads(env_override)
+    except json.JSONDecodeError as exc:
+        sys.exit(f"ERROR: CRITERIONDB_ENVIRONMENT is not valid JSON: {exc}")
+    if not isinstance(environment, dict):
+        sys.exit("ERROR: CRITERIONDB_ENVIRONMENT must be a JSON object.")
+else:
+    environment = {
+        "os": "linux", "cpu_name": "unknown", "n_threads": 1, "ram_gb": 0.0, "extra": {},
+    }
 
 optimal = {}
-import re
 for doc in (ROOT / "docs" / "problems").glob("*.md"):
-    m = re.search(r"^optimalCost:\s*(.+)$", doc.read_text(encoding="utf-8"), re.M)
+    m = re.search(r"^\s*optimalCost:\s*(.+)$", doc.read_text(encoding="utf-8"), re.M)
     if m and m.group(1).strip() not in ("null", "~", ""):
-        optimal[doc.stem] = float(m.group(1).strip())
+        try:
+            optimal[doc.stem] = float(m.group(1).strip())
+        except ValueError:
+            continue
 
 lines = [ln.rstrip("\n") for ln in open(tsv_path, encoding="utf-8") if ln.strip()]
 header = lines[0].split("\t")
@@ -542,10 +609,7 @@ for (sid, dataset, config), runs in sorted(cells.items()):
         })
 
     payload = {
-        "environment": json.loads(os.environ.get("CRITERIONDB_ENVIRONMENT", "null")) or {
-            "os": "linux", "cpu_name": "unknown", "n_threads": 1, "ram_gb": 0.0,
-            "extra": {},
-        },
+        "environment": environment,
         "git_commit": os.environ.get("GIT_COMMIT"),
         "git_branch": os.environ.get("GIT_BRANCH"),
         "tags": {"config_label": config, "tier": os.environ.get("BENCH_TIER", "")},

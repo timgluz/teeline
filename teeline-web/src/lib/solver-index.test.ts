@@ -1,6 +1,10 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+
+// `?raw` (a Vite feature, typed by vite/client) reads the canonical file as a
+// string without needing filesystem APIs — so this test adds no `node` types to
+// the project's tsconfig, which would otherwise let browser-targeted code under
+// src/ reference Node globals like `process` or `Buffer` without tsc complaining.
+import canonicalRaw from '../../../bench/solvers.json?raw'
 
 import { SOLVER_GROUPS, SOLVER_META } from '../nav-data'
 import { SOLVER_INDEX, isDeterministic, solverById } from './solver-index'
@@ -18,14 +22,17 @@ interface CanonicalSolver {
   family: string
   deterministic: boolean
   doc: string | null
+  determinism_evidence: {
+    instance: string
+    runs: number
+    outcome: string
+  } | null
 }
 
-const canonical = JSON.parse(
-  readFileSync(
-    fileURLToPath(new URL('../../../bench/solvers.json', import.meta.url)),
-    'utf8',
-  ),
-) as { schema_version: number; solvers: CanonicalSolver[] }
+const canonical = JSON.parse(canonicalRaw) as {
+  schema_version: number
+  solvers: CanonicalSolver[]
+}
 
 describe('solver-index vs bench/solvers.json', () => {
   it('covers exactly the same solver ids', () => {
@@ -101,6 +108,54 @@ describe('solver-index vs nav-data', () => {
   })
 })
 
+describe('determinism claims', () => {
+  it('requires evidence for every solver claimed deterministic', () => {
+    // A `deterministic: true` flag drives the UI to show one run as *the*
+    // result. That claim must never be inferred from reading the source — an
+    // earlier hand-checked guess marked 2opt deterministic because it happened
+    // to be stable on berlin52, while it actually varies on a280. Require that
+    // each claim carries a recorded measurement.
+    for (const solver of canonical.solvers) {
+      if (!solver.deterministic) continue
+      expect(
+        solver.determinism_evidence,
+        `${solver.id} claims determinism with no recorded evidence`,
+      ).not.toBeNull()
+      expect(solver.determinism_evidence?.outcome).toBe('identical')
+      expect(solver.determinism_evidence?.runs).toBeGreaterThanOrEqual(2)
+    }
+  })
+
+  it('never claims determinism from a single run', () => {
+    for (const solver of canonical.solvers) {
+      const evidence = solver.determinism_evidence
+      if (!evidence) continue
+      expect(
+        evidence.runs,
+        `${solver.id}'s evidence uses too few runs to distinguish stable from lucky`,
+      ).toBeGreaterThanOrEqual(2)
+    }
+  })
+
+  it('treats nn-seeded solvers as a coupled set', () => {
+    // 2opt/3opt/or_opt auto-seed from nn (main.rs:388). While nn is
+    // non-deterministic they cannot be deterministic, because their starting
+    // tour is not. Pin that coupling so fixing nn prompts a re-measurement of
+    // all three rather than silently leaving a stale claim behind.
+    const nn = canonical.solvers.find((s) => s.id === 'nn')
+    const seeded = ['2opt', '3opt', 'or_opt']
+    if (nn && !nn.deterministic) {
+      for (const id of seeded) {
+        const solver = canonical.solvers.find((s) => s.id === id)
+        expect(
+          solver?.deterministic,
+          `${id} is marked deterministic while its nn seed is not`,
+        ).toBe(false)
+      }
+    }
+  })
+})
+
 describe('solverById / isDeterministic', () => {
   it('looks up by doc id', () => {
     expect(solverById('som')?.cli).toBe('kohonen_som')
@@ -117,5 +172,11 @@ describe('solverById / isDeterministic', () => {
     // one authoritative number.
     expect(isDeterministic('bhk')).toBe(true)
     expect(isDeterministic('sa')).toBe(false)
+  })
+
+  it('does not claim determinism for nn-seeded local search', () => {
+    expect(isDeterministic('2opt')).toBe(false)
+    expect(isDeterministic('3opt')).toBe(false)
+    expect(isDeterministic('or_opt')).toBe(false)
   })
 })

@@ -3,12 +3,7 @@
     "target": "ES2022",
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    /* "node" is needed by tests that read repo files at runtime — currently
-       src/lib/solver-index.test.ts, which cross-checks the website's solver
-       index against the canonical bench/solvers.json the shell scripts read.
-       Without it, tsc rejects `node:fs`/`node:url` imports in that test and
-       `npm run build` fails. */
-    "types": ["vite/client", "node"],
+    "types": ["vite/client"],
     "skipLibCheck": true,
     "jsx": "react-jsx",
     "jsxImportSource": "preact",
