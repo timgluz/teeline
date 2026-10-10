@@ -792,6 +792,19 @@ impl SAOptions {
             heuristic: HeuristicOptions::from_cli(args)?,
             ..SAOptions::default()
         };
+        // The temperature schedule is the primary stopping rule (see
+        // docs/algorithms/simulated-annealing.md); `epochs` is the safety cap. At the default
+        // cooling rate the schedule needs ~138k iterations to cool 1000 -> 0.001, so the cap
+        // must exceed that. Left at the generic 10k default it truncates the run while the
+        // temperature is still high, which accepts almost every move and degenerates into a
+        // random walk: measured on a280 a 10k cap produced ~32k tours (T~368) versus ~3.4k
+        // when the schedule is allowed to finish.
+        //
+        // Applied here rather than in `Default`, because `HeuristicOptions::from_cli` always
+        // yields the generic default and would overwrite it.
+        if args.get_one::<String>("epochs").is_none() {
+            sa.heuristic.epochs = 150_000;
+        }
         if let Some(v) = args.get_one::<String>("cooling_rate") {
             sa.cooling_rate = v
                 .parse()

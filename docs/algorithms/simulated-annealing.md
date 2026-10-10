@@ -39,12 +39,20 @@ procedure SimulatedAnnealing(cities, T_start, T_end, cooling):
 
 ## Options
 
+Both stopping rules are strict caps: the run ends at whichever is reached first. The
+temperature schedule normally finishes first, so `--epochs` acts as a safety bound. Set it too
+low and the run stops while the temperature is still high, which accepts nearly every move and
+degenerates into a random walk rather than annealing.
+
 | Flag | Description | Default |
 | ------ | ------------- | --------- |
 | `--max_temperature` | Starting temperature | 1000.0 |
 | `--min_temperature` | Stopping temperature | 0.001 |
-| `--cooling_rate` | Fractional temperature drop per step | — |
-| `--epochs` | Maximum iterations | — |
+| `--cooling_rate` | Fractional temperature drop per step | 0.0001 |
+| `--epochs` | Maximum iterations (safety cap) | 150000 |
+
+At the default cooling rate the schedule needs roughly 138k iterations to cool 1000 → 0.001,
+which is why the cap defaults above that figure.
 
 ## Usage
 
