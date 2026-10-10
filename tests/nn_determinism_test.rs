@@ -22,14 +22,21 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use teeline::tsp::{HeuristicOptions, TspProblem, distance_matrix, nearest_neighbor, tsplib};
+use teeline::tsp::{HeuristicOptions, TspProblem, nearest_neighbor, tsplib};
 
 fn load(name: &str) -> TspProblem {
     let path = Path::new("tests/fixtures").join(name);
     let data =
         tsplib::read_from_file(&path).unwrap_or_else(|e| panic!("failed to read {name}: {e}"));
     let cities = data.cities().to_vec();
-    let dm = distance_matrix::from_cities(&cities);
+    // Must go through TspLibData::distance_matrix(): it honours the file's declared
+    // EDGE_WEIGHT_TYPE and uses raw_distances for EXPLICIT. `distance_matrix::from_cities`
+    // silently applies the default EUC_2D, which turns an EXPLICIT matrix instance into a
+    // coordinate one and yields a meaningless tour — gr17 scores 21.16 by Euclidean
+    // distance against 2187 by its declared matrix.
+    let dm = data
+        .distance_matrix()
+        .unwrap_or_else(|e| panic!("failed to build distance matrix for {name}: {e}"));
     TspProblem::new(cities, dm)
 }
 
@@ -166,5 +173,53 @@ fn every_greedy_step_chooses_a_nearest_unvisited_city() {
                  (d={other_dist} vs {chosen_dist}) — greedy choice was not nearest"
             );
         }
+    }
+}
+
+/// The fix must hold on every edge-weight code path, not just EUC_2D.
+///
+/// `nn` was only ever verified on EUC_2D instances, so a regression specific to another
+/// metric would have gone unnoticed. These fixtures cover the other types the corpus
+/// actually uses: EXPLICIT (a raw lower-diagonal matrix) and ATT (pseudo-Euclidean).
+///
+/// Costs are asserted as reproducible and plausible rather than pinned to exact
+/// constants, so a future algorithmic improvement does not fail the suite.
+#[test]
+fn nn_is_stable_and_sane_on_explicit_and_att_instances() {
+    for (fixture, optimum) in [("gr17.tsp", 2085.0_f32), ("att48.tsp", 33523.71_f32)] {
+        let problem = load(fixture);
+        let first = solve_nn(&problem);
+
+        // A valid tour over every city.
+        let mut seen = first.route().to_vec();
+        seen.sort_unstable();
+        let mut expected_ids: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
+        expected_ids.sort_unstable();
+        assert_eq!(seen, expected_ids, "{fixture}: tour is not a permutation");
+
+        // Matches the independent greedy reference under the *declared* metric.
+        assert_eq!(
+            first.route(),
+            reference_greedy_nn(&problem).as_slice(),
+            "{fixture}: diverged from the greedy reference"
+        );
+
+        // Reproducible across repeated solves.
+        for _ in 0..3 {
+            assert_eq!(
+                solve_nn(&problem).total,
+                first.total,
+                "{fixture}: unstable across repeated solves"
+            );
+        }
+
+        // Within the band a greedy construction can plausibly reach. This is the
+        // assertion that would catch the metric being wrong: under Euclid, gr17's
+        // tour costs 21.16 against an optimum of 2085, a nonsense -99% gap.
+        let gap_pct = (first.total - optimum) / optimum * 100.0;
+        assert!(
+            (0.0..=60.0).contains(&gap_pct),
+            "{fixture}: gap {gap_pct:.1}% is implausible for greedy NN (optimum {optimum})"
+        );
     }
 }
