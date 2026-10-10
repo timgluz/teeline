@@ -94,7 +94,7 @@ pub fn solve(
         if !budget.record(improved) {
             if budget.converged() {
                 tracing::info!(
-                    epoch = t,
+                    epoch = budget.epoch(),
                     stagnation_epochs = budget.stale_epochs(),
                     "SOM: converged, quantisation error stopped improving"
                 );
@@ -167,12 +167,10 @@ pub fn solve(
             let error = quantisation_error(&norm_cities, &neurons);
             improved = error < best_error;
             best_error = best_error.min(error);
-        } else {
-            // Unmeasured epochs report progress: the error falls monotonically as neurons move toward
-            // the cities, and counting samples rather than epochs would make `stagnation_epochs` mean
-            // something different here than in every other solver.
-            improved = true;
         }
+        // Unmeasured epochs inherit the last measured outcome. Reporting progress instead would reset
+        // the streak every `measure_interval` epochs, so a limit above 1 could never be reached — the
+        // plateau stop would silently never fire, which is worse than not sampling at all.
     }
 
     let tour = extract_tour(&norm_cities, &neurons, cities);

@@ -99,12 +99,15 @@ pub fn solve(
     let mut best_route = init_tour
         .map(Route::new)
         .unwrap_or_else(|| Route::from_cities(cities));
-    let mut best_distance = distances.tour_length(best_route.route());
+    let mut current_route = best_route.clone();
+    let mut current_distance = distances.tour_length(current_route.route());
+    // The incumbent, which the walk may leave behind but never loses.
+    let mut best_distance = current_distance;
 
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::PathUpdate(
-            best_route.clone(),
-            best_distance,
+            current_route.clone(),
+            current_distance,
         ));
     }
 
@@ -116,14 +119,25 @@ pub fn solve(
 
     while temperature > opts.min_temperature && budget.record(improved) {
         let epoch = budget.index();
+        // Reset first: only a new incumbent below sets this again, so an epoch that improves nothing
+        // is reported as such rather than inheriting the previous epoch's outcome.
+        improved = false;
 
-        let best_at_epoch_start = best_distance;
-        let candidate = best_route.random_successor();
+        let candidate = current_route.random_successor();
         let candidate_distance = distances.tour_length(candidate.route());
 
-        if is_acceptable(temperature, best_distance, candidate_distance) {
-            best_route = candidate;
-            best_distance = candidate_distance;
+        if is_acceptable(temperature, current_distance, candidate_distance) {
+            current_route = candidate;
+            current_distance = candidate_distance;
+        }
+
+        // The walk accepts worsening moves, so the current tour is not what a caller wants back. Track
+        // the best seen separately: it is what the run is for, and it is the only honest progress
+        // signal.
+        if current_distance < best_distance {
+            best_distance = current_distance;
+            best_route = current_route.clone();
+            improved = true;
 
             if let Some(tx) = progress_tx {
                 let _ = tx.send(ProgressMessage::PathUpdate(
@@ -136,11 +150,10 @@ pub fn solve(
 
         tracing::debug!(epoch, temperature, "SA: tick");
         temperature = cooling(temperature, cooling_rate);
-        // `best_route`/`best_distance` are the CURRENT tour, since an accepted uphill move replaces
-        // them. Progress is therefore "this epoch ended shorter than it started", which the snapshot
-        // taken before any candidate was drawn makes exact — not an acceptance count, which would
-        // treat the search's own worsening moves as advancement.
-        improved = best_distance < best_at_epoch_start;
+        // Progress means a new best was found, not merely that a move was accepted: SA accepts uphill
+        // moves by design, so an acceptance count would treat the search's own wandering as
+        // advancement and the plateau stop would rarely fire. `improved` is left false when this
+        // epoch's candidate was rejected, which is why nothing writes it here.
     }
 
     if budget.converged() {
@@ -290,13 +303,13 @@ mod tests {
 
     /// The plateau stop must bound a run independently of the cooling schedule.
     ///
-    /// SA has three bounds — the epoch budget, the temperature floor, and non-improvement — and the
-    /// test keeps the first two well out of the way (an unbounded budget, and a schedule far longer
-    /// than the run) so only sustained non-improvement can explain a run shorter than the schedule.
+    /// Started from the optimal tour so no improvement is available: with the honest signal — a new
+    /// *best* tour, not an accepted move — SA keeps improving for most of a long schedule on a small
+    /// problem, so a plateau has to be constructed deliberately rather than hoped for.
     ///
-    /// Scope: this covers the wiring, not which quantity counts as "progress". On a five-city problem
-    /// both a best-tour signal and an acceptance signal converge early, so this test cannot tell them
-    /// apart; the best-tour choice is argued at the assignment in `solve`.
+    /// Scope: this covers the wiring. It cannot discriminate a best-tour signal from an
+    /// acceptance-based one, since both eventually stop; the difference is argued at the assignment in
+    /// `solve`.
     #[test]
     fn test_sa_stops_on_stagnation() {
         let problem = tiny_problem();
@@ -314,7 +327,10 @@ mod tests {
             "test premise: the schedule must leave room for a plateau stop, got {schedule}"
         );
 
-        let (_, stats) = solve(&problem, &opts, None, None);
+        // The optimal tour of `tiny_problem`'s five points, found by brute force: starting anywhere
+        // else leaves an improvement available, and then no plateau forms at a 20-epoch limit.
+        let optimal = vec![0, 1, 3, 4, 2];
+        let (_, stats) = solve(&problem, &opts, None, Some(&optimal));
 
         assert!(stats.converged, "20 non-improving epochs must end the run");
         assert!(

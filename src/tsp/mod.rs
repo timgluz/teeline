@@ -1461,8 +1461,9 @@ pub struct FourierOptions {
     /// Consecutive non-improving harmonic stages before stopping early; 0 = never stop early.
     ///
     /// Counts *stages*, not epochs — the outer loop runs once per harmonic and `epochs` above is the
-    /// number of gradient steps within a stage. At or above `k_max` the plateau can never fire, since
-    /// the stage cap is reached first. Carried here because fourier has no `HeuristicOptions`.
+    /// number of gradient steps within a stage. At or above `k_max - 1` the plateau can never fire:
+    /// stage 1 always improves and the final stage's outcome is never recorded, leaving at most
+    /// `k_max - 2` consecutive stale stages. Carried here because fourier has no `HeuristicOptions`.
     pub stagnation_epochs: usize,
 }
 

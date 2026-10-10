@@ -297,3 +297,51 @@ fn fourier_warns_when_the_limit_cannot_fire() {
     let solution = fourier::solve(&problem, &opts, None, None);
     assert_complete_tour("fourier", &solution, problem.cities.len());
 }
+
+/// SOM samples its convergence signal only every `epochs / 1000` epochs, so this exercises the case
+/// where that interval exceeds one. Reporting progress on unmeasured epochs reset the stale counter
+/// before it could reach the limit, which silently disabled the stop for realistic epoch counts (the
+/// default is 100,000, an interval of 100) — a bug the 500-epoch test above cannot see, since its
+/// interval is 1.
+///
+/// `epochs` is set so the last checkpoint lands inside the cap: 1000 epochs is a tenth of the run, so
+/// the largest reported epoch reveals whether the run finished.
+#[test]
+fn som_converges_when_the_measurement_interval_exceeds_one() {
+    let problem = problem();
+    let epochs = 10_000;
+    assert!(
+        epochs / 1000 > 1,
+        "test premise: the measurement interval must exceed one epoch"
+    );
+
+    let last_epoch = |limit: usize| {
+        let opts = SOMOptions {
+            epochs,
+            stagnation_epochs: limit,
+            ..SOMOptions::default()
+        };
+        let (tx, rx) = mpsc::channel();
+        let _ = som::solve(&problem, &opts, Some(&tx), None);
+        drop(tx);
+        rx.try_iter()
+            .filter_map(|m| match m {
+                ProgressMessage::EpochUpdate(t) => Some(t),
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0)
+    };
+
+    let unlimited = last_epoch(0);
+    let limited = last_epoch(5);
+
+    assert_eq!(
+        unlimited, epochs,
+        "with the limit off the run must reach the final checkpoint"
+    );
+    assert!(
+        limited < unlimited,
+        "a limit of 5 must stop the run before the cap: last reported epoch {limited} of {unlimited}"
+    );
+}
