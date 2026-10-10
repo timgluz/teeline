@@ -7,6 +7,61 @@ use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{SAOptions, Solution, TspProblem};
 
+// Test-only iteration counter. Thread-local rather than global: tests run in parallel, so a shared
+// counter would mix counts across them.
+#[cfg(test)]
+thread_local! {
+    pub(crate) static ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Iterations the cooling schedule needs to reach `min_temperature` from `max_temperature`.
+///
+/// Derived rather than fixed because it scales with the cooling rate, which callers choose.
+pub(crate) fn schedule_length(opts: &SAOptions) -> usize {
+    let rate = opts.cooling_rate as f64;
+    let max_t = opts.max_temperature as f64;
+    let min_t = opts.min_temperature as f64;
+    if rate <= 0.0 || rate >= 1.0 || max_t <= 0.0 || min_t <= 0.0 || max_t <= min_t {
+        return 0;
+    }
+    let n = (max_t / min_t).ln() / -(1.0 - rate).ln();
+    if !n.is_finite() || n <= 0.0 {
+        return 0;
+    }
+    n.ceil() as usize
+}
+
+/// Resolves the epoch budget the loop actually applies.
+///
+/// - `epochs == 0` means unbounded.
+/// - A value below the schedule length is raised to it: stopping while the temperature is still high
+///   accepts nearly every move, so the run degenerates into a random walk rather than annealing.
+/// - Resolved at run time because the budget depends on the cooling parameters, whichever
+///   constructor supplied them; computing it in `solve` keeps CLI, TOML, wasm and API paths in
+///   agreement.
+///
+/// Consequence: `--epochs` can bound a run at the schedule length or leave it uncapped, but cannot
+/// shorten it — an explicitly small budget is indistinguishable from an accepted default. Fixing
+/// that needs `Option<usize>` rather than overloading `0`.
+fn usable_epochs(opts: &SAOptions) -> usize {
+    let epochs = opts.heuristic.epochs;
+    if epochs == 0 {
+        return usize::MAX;
+    }
+    let schedule = schedule_length(opts).max(1);
+    if epochs < schedule {
+        tracing::warn!(
+            requested_epochs = epochs,
+            schedule_length = schedule,
+            "SA: epoch budget is below the cooling schedule length, so it is raised to the \
+             schedule length; the run would otherwise stop while the temperature is still high. \
+             Any value at or above the schedule length gives the same run; 0 removes the epoch cap."
+        );
+        return schedule;
+    }
+    epochs
+}
+
 pub fn solve(
     problem: &TspProblem,
     opts: &SAOptions,
@@ -18,8 +73,13 @@ pub fn solve(
     let cooling_rate = opts.cooling_rate;
     let mut epoch = 0;
 
+    // Resolved here, not in a constructor, so the log reports the budget actually used and every
+    // constructor path agrees.
+    let epoch_limit = usable_epochs(opts);
+
     tracing::info!(
-        epochs = opts.heuristic.epochs,
+        epochs = epoch_limit,
+        requested_epochs = opts.heuristic.epochs,
         max_temp = opts.max_temperature,
         cooling_rate = opts.cooling_rate,
         "SA starting"
@@ -38,7 +98,11 @@ pub fn solve(
     }
 
     let mut temperature = opts.max_temperature;
-    while epoch < opts.heuristic.epochs || temperature > opts.min_temperature {
+    // Both bounds are capping: whichever is reached first ends the run.
+    while epoch < epoch_limit && temperature > opts.min_temperature {
+        #[cfg(test)]
+        ITERATIONS.with(|n| n.set(n.get() + 1));
+
         let candidate = best_route.random_successor();
         let candidate_distance = distances.tour_length(candidate.route());
 
@@ -110,6 +174,157 @@ mod tests {
         let problem = TspProblem::new(cities, dm);
         let result = solve(&problem, &opts, None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
+    }
+
+    fn tiny_problem() -> TspProblem {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![10.0, 0.0],
+            vec![20.0, 5.0],
+            vec![30.0, 1.0],
+            vec![40.0, 8.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        TspProblem::new(cities, dm)
+    }
+
+    /// A budget below the schedule length is raised to it rather than truncating the run.
+    #[test]
+    fn test_sa_epochs_below_the_schedule_is_raised_to_it() {
+        let problem = tiny_problem();
+        let schedule = schedule_length(&SAOptions::default());
+        assert!(
+            schedule > 1_000,
+            "test premise: the default schedule should exceed 1k iterations, got {schedule}"
+        );
+
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 1_000,
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+
+        ITERATIONS.with(|n| n.set(0));
+        let _ = solve(&problem, &opts, None, None);
+        let iterations = ITERATIONS.with(|n| n.get());
+
+        // Tolerance on both sides, not equality: `schedule_length` is computed in f64 from the
+        // analytic form, while the loop cools in f32 (`t - rate * t`) and accumulates rounding over
+        // ~138k steps. The real count can differ from the analytic figure by a few iterations in
+        // either direction, so an exact or one-sided assertion would be platform-dependent.
+        assert!(
+            iterations.abs_diff(schedule) <= schedule / 100,
+            "a budget below the schedule must be raised to it: ran {iterations}, schedule {schedule}"
+        );
+    }
+
+    /// `epochs == 0` means no epoch cap, not zero iterations.
+    #[test]
+    fn test_sa_zero_epochs_means_unbounded_not_zero_iterations() {
+        let problem = tiny_problem();
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 0,
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+
+        ITERATIONS.with(|n| n.set(0));
+        let _ = solve(&problem, &opts, None, None);
+        let iterations = ITERATIONS.with(|n| n.get());
+
+        assert!(
+            iterations > 1_000,
+            "epochs == 0 must mean unbounded, not zero iterations (ran {iterations})"
+        );
+    }
+
+    /// A budget above the schedule length cannot extend the run: the temperature bound ends it.
+    #[test]
+    fn test_sa_temperature_bound_ends_the_run_at_the_schedule() {
+        let problem = tiny_problem();
+        // The explicit budget exceeds the schedule, so `usable_epochs` leaves it as given and the
+        // temperature bound ends the run first. Kept deliberately fast: a slow cooling rate would
+        // derive a multi-million-iteration schedule, which is correct but slow to execute.
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 5_000,
+                ..HeuristicOptions::default()
+            },
+            cooling_rate: 0.01,
+            ..SAOptions::default()
+        };
+        let schedule = schedule_length(&opts);
+        assert!(
+            schedule < 5_000,
+            "test premise: schedule {schedule} should be below the explicit budget"
+        );
+
+        ITERATIONS.with(|n| n.set(0));
+        let _ = solve(&problem, &opts, None, None);
+        let iterations = ITERATIONS.with(|n| n.get());
+
+        // Same f32-vs-f64 reasoning as above: the epoch cap (5000) does not bind here, so the f32
+        // cooling loop alone decides the count and can land a few iterations either side of the
+        // analytic value. A one-sided bound would be platform-dependent.
+        assert!(
+            iterations.abs_diff(schedule) <= schedule / 100,
+            "the run should end at the schedule: ran {iterations}, schedule {schedule}"
+        );
+    }
+
+    /// `schedule_length` is derived from the cooling parameters rather than hardcoded, and a
+    /// degenerate schedule falls back to the explicit budget instead of clamping it to zero.
+    #[test]
+    fn test_sa_schedule_length_follows_the_cooling_rate() {
+        // The cap must be derived from the cooling parameters, not hardcoded: a slower rate needs
+        // far more iterations, and a fixed cap would silently truncate that run while still hot.
+        // A hardcoded 150k would cover rate 0.0001 but not 0.00001.
+        let with_rate = |rate: f32| SAOptions {
+            cooling_rate: rate,
+            ..SAOptions::default()
+        };
+
+        let fast = schedule_length(&with_rate(0.01));
+        let default = schedule_length(&with_rate(0.0001));
+        let slow = schedule_length(&with_rate(0.00001));
+
+        assert!(
+            (1_300..=1_500).contains(&fast),
+            "rate 0.01 should need ~1375 iterations, got {fast}"
+        );
+        assert_eq!(default, 138_149, "rate 0.0001 has a known schedule length");
+        assert!(
+            slow > 1_000_000,
+            "rate 0.00001 needs >1M iterations, so a fixed 150k cap cannot be correct: got {slow}"
+        );
+
+        // A degenerate schedule must not produce a cap of 0, which would run zero iterations.
+        let broken = SAOptions {
+            cooling_rate: 1.0,
+            ..SAOptions::default()
+        };
+        assert_eq!(
+            schedule_length(&broken),
+            0,
+            "invalid rate yields no schedule"
+        );
+        let opts = SAOptions {
+            cooling_rate: 1.0,
+            heuristic: HeuristicOptions {
+                epochs: 10,
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+        assert_eq!(
+            usable_epochs(&opts),
+            10,
+            "a degenerate schedule must fall back to the explicit budget, not clamp it to 0"
+        );
     }
 
     #[test]
