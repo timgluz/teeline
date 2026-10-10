@@ -27,11 +27,14 @@ impl Budget {
         }
     }
 
-    /// Records the epoch that just finished, and returns whether to run another.
+    /// Records whether the epoch about to run may proceed, and returns whether it should.
     ///
     /// The caller reports whether it *improved* on its own best, because only the caller knows what
     /// "best" means for its algorithm; what this decides is whether progress has stopped. The
     /// non-improving count resets on every improvement, so `limit` bounds *consecutive* stale epochs.
+    ///
+    /// Called at the top of the loop, so it only counts an epoch it has actually admitted — the count
+    /// is the number of epochs run, not the number requested.
     pub(crate) fn record(&mut self, improved: bool) -> bool {
         if self.epoch >= self.epochs {
             return false;
@@ -44,12 +47,22 @@ impl Budget {
             self.stale += 1;
         }
 
-        !(self.limit > 0 && self.stale >= self.limit)
+        // Checked after counting, so the epoch that reaches the limit is the last one admitted and
+        // the count stays exact — checking first would require an extra call to notice.
+        !self.converged()
     }
 
-    /// Epochs completed so far.
+    /// Epochs run so far.
     pub(crate) fn epoch(&self) -> usize {
         self.epoch
+    }
+
+    /// Whether convergence — not the epoch cap — is what ended the run.
+    ///
+    /// Callers report this rather than re-deriving it: a run can reach its cap while also having a
+    /// stale streak at the limit, and reporting that as convergence would misattribute the stop.
+    pub(crate) fn converged(&self) -> bool {
+        self.limit > 0 && self.stale >= self.limit
     }
 
     /// Consecutive non-improving epochs, for the convergence log line.
@@ -146,6 +159,48 @@ mod tests {
             assert!(b.record(false), "limit 0 must never stop early");
         }
         assert!(!b.record(false), "the epoch cap still applies");
+    }
+
+    /// Reaching the cap with a stale streak still at the limit must NOT be reported as convergence —
+    /// the run ended because it ran out of epochs, and logging it as convergence would misattribute
+    /// the stop.
+    #[test]
+    fn cap_reached_with_a_stale_streak_is_not_convergence() {
+        let mut b = Budget::new(5, 50);
+        for _ in 0..5 {
+            assert!(b.record(false), "5 epochs fit inside the cap and the limit");
+        }
+        assert!(!b.record(false), "the cap must end the run");
+        assert!(
+            !b.converged(),
+            "a stale streak below the limit is not convergence, even at the cap"
+        );
+        assert_eq!(b.epoch(), 5);
+    }
+
+    #[test]
+    fn convergence_is_reported_only_when_the_limit_ended_the_run() {
+        let mut b = Budget::new(1000, 3);
+        assert!(b.record(true));
+        assert!(b.record(false));
+        assert!(b.record(false));
+        assert!(!b.record(false), "the third stale epoch ends the run");
+        assert!(b.converged(), "the limit, not the cap, is what stopped it");
+        assert_eq!(
+            b.epoch(),
+            4,
+            "the count includes the epoch that reached the limit"
+        );
+    }
+
+    /// `epoch()` counts epochs admitted, so a run stopped by convergence reports the epochs it
+    /// actually ran rather than one more.
+    #[test]
+    fn epoch_counts_only_epochs_that_ran() {
+        let mut b = Budget::new(100, 2);
+        assert!(b.record(false));
+        assert!(!b.record(false), "the second stale epoch ends the run");
+        assert_eq!(b.epoch(), 2, "two epochs ran, not three");
     }
 
     /// A cap of zero runs nothing. Callers that treat `epochs: 0` as "no cap" must resolve that

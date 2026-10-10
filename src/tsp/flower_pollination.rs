@@ -121,7 +121,7 @@ pub fn solve(
     let mut improved = true;
 
     while budget.record(improved) {
-        let epoch = budget.epoch().saturating_sub(1);
+        let epoch = budget.epoch();
         let best_at_epoch_start = gbest_cost;
         for i in 0..n_flowers {
             let new_x = if bernoulli(&mut rng, switch_prob) {
@@ -156,11 +156,11 @@ pub fn solve(
         improved = gbest_cost < best_at_epoch_start;
     }
 
-    if budget.limit() > 0 && budget.stale_epochs() >= budget.limit() {
+    if budget.converged() {
         tracing::info!(
             epoch = budget.epoch(),
             stagnation_epochs = budget.stale_epochs(),
-            "converged, no improvement for the stagnation limit"
+            "FPA: converged, no improvement for the stagnation limit"
         );
     }
 

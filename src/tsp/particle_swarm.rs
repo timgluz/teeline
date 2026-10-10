@@ -81,7 +81,7 @@ pub fn solve(
     let mut improved = true;
 
     while budget.record(improved) {
-        let epoch = budget.epoch().saturating_sub(1);
+        let epoch = budget.epoch();
         let best_at_epoch_start = gbest_cost;
         #[allow(clippy::cast_precision_loss)]
         let w = W_MAX - (W_MAX - W_MIN) * (epoch as f64 / epochs.max(1) as f64);
@@ -132,6 +132,14 @@ pub fn solve(
         // A single comparison for the epoch, rather than a flag per improvement site: a solver
         // with several such sites would otherwise assign the same value more than once.
         improved = gbest_cost < best_at_epoch_start;
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "PSO: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {

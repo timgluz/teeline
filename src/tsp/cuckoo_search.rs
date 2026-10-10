@@ -81,7 +81,7 @@ pub fn solve(
     let mut improved = true;
 
     while budget.record(improved) {
-        let epoch = budget.epoch().saturating_sub(1);
+        let epoch = budget.epoch();
         let best_at_epoch_start = best_cost;
         for cuckoo_idx in 0..n_nests {
             let levy = levy_step(&mut rng).abs();
@@ -141,11 +141,11 @@ pub fn solve(
         improved = best_cost < best_at_epoch_start;
     }
 
-    if budget.limit() > 0 && budget.stale_epochs() >= budget.limit() {
+    if budget.converged() {
         tracing::info!(
             epoch = budget.epoch(),
             stagnation_epochs = budget.stale_epochs(),
-            "converged, no improvement for the stagnation limit"
+            "CS: converged, no improvement for the stagnation limit"
         );
     }
 
