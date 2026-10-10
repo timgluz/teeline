@@ -1,0 +1,333 @@
+{
+  "$comment": "Canonical benchmark solver index. Maps the algorithm doc id (the join key used by teeline-web's `docs` collection and nav-data.ts) to the solver's canonical CLI name (`teeline solvers` NAME column / `Solvers::variants()`). Consumers: scripts/bench-matrix.sh (CLI invocation), scripts/publish-benchmarks.sh (criteriondb `solver` field + R2 shard filename), teeline-web/src/lib/solver-index.ts (per-algorithm page lookup). `deterministic` MUST come from measurement, not from reading the source, and each claim carries `determinism_evidence` so it can be re-derived. An unmeasured solver MUST be left deterministic:false \u2014 the UI then shows a median/spread instead of one authoritative number, which is the safe default. NOTE: solvers that auto-seed from `nn` inherit nn's variance.",
+  "schema_version": 1,
+  "solvers": [
+    {
+      "id": "bhk",
+      "cli": "bellman_karp",
+      "name": "Bellman\u2013Held\u2013Karp",
+      "family": "exact",
+      "deterministic": true,
+      "doc": "bellman-held-karp",
+      "notes": "Exponential; only viable on very small instances (<= ~20 cities). Measured stable over 5-6 runs on a280 (n=280). Measured identical over 3 runs on burma14. Measured optimal on burma14/gr17/ulysses16.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "burma14",
+        "runs": 3,
+        "outcome": "identical"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "branch_bound",
+      "cli": "branch_bound",
+      "name": "Branch and Bound",
+      "family": "exact",
+      "deterministic": true,
+      "doc": "branch-bound",
+      "notes": "Default `n_nearest=3` restricts branching to the 3 nearest cities, which makes it INCOMPLETE as an exact solver: measured burma14 3651 / gr17 2187 / ulysses16 6909 against known optima 3323 / 2085 / 6859. With `--n_nearest 100` it returns all three optima. Benchmark both configs: `default` (n_nearest=3) and `exact` (--n_nearest 100).",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "burma14",
+        "runs": 3,
+        "outcome": "identical"
+      },
+      "default_configs": [
+        "default",
+        "exact"
+      ]
+    },
+    {
+      "id": "nn",
+      "cli": "nearest_neighbor",
+      "name": "Nearest Neighbour",
+      "family": "constructive",
+      "deterministic": false,
+      "doc": "nearest-neighbor",
+      "notes": "Non-deterministic today: `n_nearest` defaults to 3 and the frontier query is visited-blind, so the HashSet-iteration fallback in nearest_neighbor.rs picks a different city per process. Phase 1 of the plan fixes this.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "christofides",
+      "cli": "christofides",
+      "name": "Christofides",
+      "family": "constructive",
+      "deterministic": true,
+      "doc": "christofides",
+      "notes": "<= 1.5x approximation guarantee. Measured stable over 5-6 runs on a280 (n=280). Measured identical over 5 runs on a280.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 5,
+        "outcome": "identical"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "greedy_edge",
+      "cli": "greedy_edge",
+      "name": "Greedy Edge",
+      "family": "constructive",
+      "deterministic": true,
+      "doc": "greedy-edge",
+      "notes": "Kruskal-style edge insertion with degree and sub-tour guards. Measured stable over 5-6 runs on a280 (n=280). Measured identical over 5 runs on a280.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 5,
+        "outcome": "identical"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "savings",
+      "cli": "savings",
+      "name": "Savings",
+      "family": "constructive",
+      "deterministic": true,
+      "doc": "savings",
+      "notes": "Clarke-Wright style savings construction. Measured stable over 5-6 runs on a280 (n=280). Measured identical over 5 runs on a280.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 5,
+        "outcome": "identical"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "fourier",
+      "cli": "fourier",
+      "name": "Fourier",
+      "family": "constructive",
+      "deterministic": false,
+      "doc": "fourier",
+      "notes": "Measured: 2 runs on berlin52 agreed (8549.14), so treated as low-variance but not proven deterministic \u2014 repeat measurement required.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "som",
+      "cli": "kohonen_som",
+      "name": "Kohonen SOM",
+      "family": "constructive",
+      "deterministic": false,
+      "doc": "som",
+      "notes": "Self-organising map; CLI name is `kohonen_som`, doc id `som`.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "2opt",
+      "cli": "two_opt",
+      "name": "2-opt",
+      "family": "local",
+      "deterministic": false,
+      "doc": "two-opt",
+      "notes": "NON-DETERMINISTIC (measured). Auto-seeds from nn, so it inherits nn's variance: 6 runs on a280 gave 2814.92 / 3125.49 / 2797.03. Stable on berlin52 only by luck of that instance.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 6,
+        "outcome": "varied"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "3opt",
+      "cli": "three_opt",
+      "name": "3-opt",
+      "family": "local",
+      "deterministic": false,
+      "doc": "three-opt",
+      "notes": "NON-DETERMINISTIC (measured). Auto-seeds from nn: 2 runs on a280 gave 2690.56 / 2706.56.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 2,
+        "outcome": "varied"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "or_opt",
+      "cli": "or_opt",
+      "name": "Or-opt",
+      "family": "local",
+      "deterministic": false,
+      "doc": "or-opt",
+      "notes": "NON-DETERMINISTIC (measured). Auto-seeds from nn: 6 runs on a280 gave 2815.80 / 2886.48 / 2813.79 / 2884.47.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 6,
+        "outcome": "varied"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "lk",
+      "cli": "lin_kernighan",
+      "name": "Lin-Kernighan",
+      "family": "local",
+      "deterministic": false,
+      "doc": "lin-kernighan",
+      "notes": "Iterated local search with double-bridge kicks; reaches berlin52 optimum but varies run to run.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "stochastic_hill",
+      "cli": "stochastic_hill",
+      "name": "Stochastic Hill Climbing",
+      "family": "local",
+      "deterministic": false,
+      "doc": "stochastic-hill",
+      "notes": "No CLI alias (`stochastic_hill` is the only spelling).",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "sa",
+      "cli": "simulated_annealing",
+      "name": "Simulated Annealing",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "simulated-annealing",
+      "notes": "`--no-seed` switches from random shuffle to the input tour order.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "tabu",
+      "cli": "tabu_search",
+      "name": "Tabu Search",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "tabu-search",
+      "notes": "Measured: 2 runs on berlin52 agreed (8980.92); treat as low-variance, re-measure.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "ga",
+      "cli": "genetic_algorithm",
+      "name": "Genetic Algorithm",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "genetic-algorithm",
+      "notes": "",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "pso",
+      "cli": "particle_swarm",
+      "name": "Particle Swarm",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "particle-swarm",
+      "notes": "",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "cs",
+      "cli": "cuckoo_search",
+      "name": "Cuckoo Search",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "cuckoo-search",
+      "notes": "",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "fpa",
+      "cli": "flower_pollination",
+      "name": "Flower Pollination",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "flower-pollination",
+      "notes": "",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "gsa",
+      "cli": "gravitational_search",
+      "name": "Gravitational Search",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "gravitational-search",
+      "notes": "Education-oriented implementation; known to produce very large gaps.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "aco",
+      "cli": "ant_colony",
+      "name": "Ant Colony",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "ant-colony",
+      "notes": "Measured: 2 runs on berlin52 gave 7857.55 and 7549.29 \u2014 high variance.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
+      "id": "shuffle",
+      "cli": "random_shuffle",
+      "name": "Random Shuffle",
+      "family": "utility",
+      "deterministic": false,
+      "doc": null,
+      "notes": "Baseline random tour; no algorithm doc page. Benchmarked as a reference floor, never rendered on an algorithm page.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    }
+  ]
+}

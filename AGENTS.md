@@ -57,26 +57,26 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 **Solvers** (each in its own file under `src/tsp/`):
 
-| File | Algorithm | Alias |
-| --- | --- | --- |
-| `bellman_karp.rs` | Bellman–Held–Karp (exact, exponential) | `bhk` |
-| `branch_bound.rs` | Branch and bound (exact) | — |
-| `nearest_neighbor.rs` | Greedy nearest neighbor via KD-tree | `nn` |
-| `two_opt.rs` | 2-opt local search | `2opt` |
-| `stochastic_hill.rs` | Hill climbing with random restarts | — |
-| `simulated_annealing.rs` | Simulated annealing | `sa` |
-| `tabu_search.rs` | Tabu search | — |
-| `genetic_algorithm.rs` | Genetic algorithm | `ga` |
-| `particle_swarm.rs` | Discrete PSO (velocity-capped, linearly decaying inertia, NN-seeded) | `pso` |
-| `cuckoo_search.rs` | Cuckoo Search via Lévy flights (k random 2-opt reversals, Bernoulli nest abandonment) | `cs` |
-| `flower_pollination.rs` | Flower Pollination Algorithm (global Lévy-flight toward gbest; local ε-scaled cross-pollination) | `fpa` |
-| `lin_kernighan.rs` | Lin-Kernighan style ILS: candidate-list 2-opt + double-bridge kicks | `lk` |
-| `or_opt.rs` | Or-opt local search: relocates segments of 1–3 cities (best-improvement) | `or_opt` |
-| `christofides.rs` | Christofides ≤1.5× approximation: MST + greedy matching + Eulerian shortcut | `christofides` |
-| `gravitational_search.rs` | Gravitational Search Algorithm (Rashedi 2009): mass-weighted swap-velocity swarm (educational) | `gsa` |
-| `fourier.rs` | Fourier-basis constructive solver: closed-curve gradient descent + argsort decode | `fourier` |
-| `greedy_edge.rs` | Greedy edge construction: Kruskal-style, sorts all edges shortest-first and greedily accepts unless it creates degree 3+ or a premature sub-cycle (uses `graph.rs`'s union-find) | `gec` |
-| `ant_colony.rs` | Ant Colony Optimization (Ant System): pheromone- and heuristic-biased probabilistic tour construction; global evaporate + all-ants-deposit update per epoch | `aco` |
+| File                      | Algorithm                                                                                                                                                                        | Alias          |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| `bellman_karp.rs`         | Bellman–Held–Karp (exact, exponential)                                                                                                                                           | `bhk`          |
+| `branch_bound.rs`         | Branch and bound (exact)                                                                                                                                                         | —              |
+| `nearest_neighbor.rs`     | Greedy nearest neighbor via KD-tree                                                                                                                                              | `nn`           |
+| `two_opt.rs`              | 2-opt local search                                                                                                                                                               | `2opt`         |
+| `stochastic_hill.rs`      | Hill climbing with random restarts                                                                                                                                               | —              |
+| `simulated_annealing.rs`  | Simulated annealing                                                                                                                                                              | `sa`           |
+| `tabu_search.rs`          | Tabu search                                                                                                                                                                      | —              |
+| `genetic_algorithm.rs`    | Genetic algorithm                                                                                                                                                                | `ga`           |
+| `particle_swarm.rs`       | Discrete PSO (velocity-capped, linearly decaying inertia, NN-seeded)                                                                                                             | `pso`          |
+| `cuckoo_search.rs`        | Cuckoo Search via Lévy flights (k random 2-opt reversals, Bernoulli nest abandonment)                                                                                            | `cs`           |
+| `flower_pollination.rs`   | Flower Pollination Algorithm (global Lévy-flight toward gbest; local ε-scaled cross-pollination)                                                                                 | `fpa`          |
+| `lin_kernighan.rs`        | Lin-Kernighan style ILS: candidate-list 2-opt + double-bridge kicks                                                                                                              | `lk`           |
+| `or_opt.rs`               | Or-opt local search: relocates segments of 1–3 cities (best-improvement)                                                                                                         | `or_opt`       |
+| `christofides.rs`         | Christofides ≤1.5× approximation: MST + greedy matching + Eulerian shortcut                                                                                                      | `christofides` |
+| `gravitational_search.rs` | Gravitational Search Algorithm (Rashedi 2009): mass-weighted swap-velocity swarm (educational)                                                                                   | `gsa`          |
+| `fourier.rs`              | Fourier-basis constructive solver: closed-curve gradient descent + argsort decode                                                                                                | `fourier`      |
+| `greedy_edge.rs`          | Greedy edge construction: Kruskal-style, sorts all edges shortest-first and greedily accepts unless it creates degree 3+ or a premature sub-cycle (uses `graph.rs`'s union-find) | `gec`          |
+| `ant_colony.rs`           | Ant Colony Optimization (Ant System): pheromone- and heuristic-biased probabilistic tour construction; global evaporate + all-ants-deposit update per epoch                      | `aco`          |
 
 **Tests:**
 
@@ -116,3 +116,8 @@ After adding a new WIT export:
 This project uses GitKB for knowledge management.
 
 @.kb/AGENTS.md
+
+## Cloudflare
+
+When interacting with Cloudflare, use the `cf` CLI unless the project has a
+Wrangler configuration file.

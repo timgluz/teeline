@@ -30,6 +30,10 @@ node_modules/
 
 # benchmark output (raw TSV); baseline snapshots are force-added as needed
 bench/solvers-*.tsv
+# Raw benchmark sweeps (scripts/bench-matrix.sh) and the JSON staging directory
+# (scripts/publish-benchmarks.sh) — both are large and fully regenerable.
+bench/runs/
+/build/
 teeline-wasm/target/
 
 # Local cargo cache (sandbox CARGO_HOME)
