@@ -25,10 +25,9 @@ thread_local! {
 /// `min_temperature`: `ln(max/min) / -ln(1 - cooling_rate)`, matching the loop's
 /// `t <- t * (1 - cooling_rate)`.
 ///
-/// This is the bound a user's `epochs` has to exceed for the temperature schedule to be the
-/// rule that ends the run. It is a function of the cooling parameters, so it must be derived
-/// rather than hardcoded: at the defaults it is ~138,149, but `--cooling_rate=0.00001` needs
-/// ~1.4M, and a hardcoded cap would silently truncate that run while still hot.
+/// This is the effective run length for any non-zero `epochs`: the loop ends here on the
+/// temperature bound. It is a function of the cooling parameters, so it must be derived rather than
+/// hardcoded — at the defaults it is ~138,149, but `--cooling_rate=0.00001` needs ~1.4M.
 pub(crate) fn schedule_length(opts: &SAOptions) -> usize {
     let rate = opts.cooling_rate as f64;
     let max_t = opts.max_temperature as f64;
@@ -50,13 +49,16 @@ pub(crate) fn schedule_length(opts: &SAOptions) -> usize {
 /// 1. `epochs == 0` means **unbounded** — the temperature schedule alone decides. Zero must keep
 ///    this meaning because the old `||` gave it that by accident, and a bare `&&` would otherwise
 ///    read it as "zero iterations" and silently return the initial tour unchanged.
-/// 2. An `epochs` **above** the schedule length is a genuine cap and is honoured exactly, so a
-///    user can extend a run beyond the schedule.
-/// 3. Anything else — the generic default, or a value below the schedule — resolves to the
-///    schedule length. Truncating before the schedule finishes stops the run while the
-///    temperature is still high, which accepts nearly every move and degenerates into a random
-///    walk; that is a quality regression the user did not ask for and cannot see. A budget that
-///    asked for this is reported at warn level so the behaviour is not silent.
+/// 2. Any other `epochs` resolves to the schedule length, and the temperature bound ends the run
+///    there. A value above the schedule therefore has no practical effect — it cannot extend a
+///    run, because `temperature <= min_temperature` is reached first. A value below is raised, and
+///    reported at warn level, because truncating before the schedule finishes stops the run while
+///    the temperature is still high: nearly every move is accepted and it degenerates into a
+///    random walk.
+///
+/// The net effect is that `epochs` selects only "bounded at the schedule length" (any non-zero
+/// value) versus "unbounded" (zero). That is an honest description of the flag under `&&`, and it
+/// is why the docs describe the temperature schedule as the effective bound.
 ///
 /// The schedule length depends on the cooling rate (`0.0001` needs ~138k iterations, `0.00001`
 /// needs ~1.38M), which is why no constant can serve here and why this is resolved at run time
@@ -116,9 +118,9 @@ pub fn solve(
     }
 
     let mut temperature = opts.max_temperature;
-    // `&&`, and the epoch bound is resolved by `usable_epochs` (it is raised to the schedule
-    // length when smaller, which is why `epoch < epoch_limit` is not the bound that usually
-    // expires). With `||` the loop instead ran until the *last* bound expired, so `epochs` acted
+    // `&&`, and the epoch bound is resolved by `usable_epochs` (any non-zero value resolves to the
+    // schedule length, so the temperature bound is what normally ends the run). With `||` the loop
+    // instead ran until the *last* bound expired, so `epochs` acted
     // as a floor rather than a budget: at defaults the schedule needs ~138k iterations while the
     // default was 10k, so `--epochs` could not shorten a run at all.
     //
@@ -246,13 +248,12 @@ mod tests {
         let _ = solve(&problem, &opts, None, None);
         let iterations = ITERATIONS.with(|n| n.get());
 
-        // Tolerance, not equality: `schedule_length` is computed in f64 from the analytic form,
-        // while the loop cools in f32 (`t - rate * t`) and accumulates rounding over ~138k steps.
-        // The real count can therefore differ from the analytic figure by a few iterations, and an
-        // exact assertion would be platform-dependent.
-        let tolerance = schedule / 100;
+        // Tolerance on both sides, not equality: `schedule_length` is computed in f64 from the
+        // analytic form, while the loop cools in f32 (`t - rate * t`) and accumulates rounding over
+        // ~138k steps. The real count can differ from the analytic figure by a few iterations in
+        // either direction, so an exact or one-sided assertion would be platform-dependent.
         assert!(
-            iterations <= schedule && iterations + tolerance >= schedule,
+            iterations.abs_diff(schedule) <= schedule / 100,
             "a budget below the schedule must be raised to it: ran {iterations}, schedule {schedule}"
         );
     }
@@ -281,10 +282,11 @@ mod tests {
         );
     }
 
-    /// A run with an explicit budget above the schedule length is capped there, and never by the
-    /// schedule outlasting it — the `||` defect in the other direction.
+    /// With a budget above the schedule length, the temperature bound still ends the run at the
+    /// schedule: the extra budget cannot extend it. This is the `||` defect in the other direction
+    /// — under `||` the loop ran until the *last* bound expired.
     #[test]
-    fn test_sa_temperature_bound_ends_a_run_with_a_larger_budget() {
+    fn test_sa_temperature_bound_ends_the_run_at_the_schedule() {
         let problem = tiny_problem();
         // The explicit budget exceeds the schedule, so `usable_epochs` leaves it as given and the
         // temperature bound ends the run first. Kept deliberately fast: a slow cooling rate would
@@ -307,15 +309,12 @@ mod tests {
         let _ = solve(&problem, &opts, None, None);
         let iterations = ITERATIONS.with(|n| n.get());
 
-        // Same f32-vs-f64 reasoning as above, so a tolerance rather than equality.
+        // Same f32-vs-f64 reasoning as above: the epoch cap (5000) does not bind here, so the f32
+        // cooling loop alone decides the count and can land a few iterations either side of the
+        // analytic value. A one-sided bound would be platform-dependent.
         assert!(
-            iterations <= schedule,
-            "the run must not exceed the schedule: ran {iterations}, schedule {schedule}"
-        );
-        assert!(
-            schedule - iterations <= schedule / 100,
-            "the run should end at the schedule, not far short of it: \
-             ran {iterations}, schedule {schedule}"
+            iterations.abs_diff(schedule) <= schedule / 100,
+            "the run should end at the schedule: ran {iterations}, schedule {schedule}"
         );
     }
 
