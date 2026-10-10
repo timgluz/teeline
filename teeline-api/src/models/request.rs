@@ -6,7 +6,9 @@ use utoipa::ToSchema;
 pub struct HeuristicConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epochs: Option<usize>,
-    /// Stop after this many consecutive epochs without improvement; `0` disables the check.
+    /// Stop after this many consecutive epochs without improvement; `0` means never stop early (the
+    /// epoch cap still applies). Defaults to 0 (disabled), so omitting it changes nothing. Currently
+    /// honoured only by the `ga` solver — other solvers accept and ignore it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stagnation_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -860,7 +860,10 @@ EOF
     /// caller omits it — a dropped field or a wrong base would silently disable the feature.
     #[test]
     fn map_heuristic_onto_carries_stagnation_epochs() {
-        let base = SAOptions::default().heuristic;
+        // Deliberately not the generic default: if the mapping took the wrong base or hard-coded the
+        // default, both assertions would still pass with an all-500 setup.
+        let mut base = SAOptions::default().heuristic;
+        base.stagnation_epochs = 123;
         let defaulted = HeuristicConfig::default();
         assert_eq!(
             map_heuristic_onto(&defaulted, base.clone()).stagnation_epochs,

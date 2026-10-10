@@ -20,9 +20,13 @@ impl Plateau {
     /// Records whether this epoch improved the best-known result, and returns `true` once the run
     /// should stop.
     ///
+    /// The return value is the whole point; ignoring it silently disables the feature, so it is
+    /// marked `#[must_use]`.
+    ///
     /// The count resets on every improvement, so `limit` bounds *consecutive* non-improving
     /// epochs rather than the total — a solver that improves every 400th epoch is not converged at
     /// `limit = 500`.
+    #[must_use = "ignoring the result disables the stop condition"]
     pub(crate) fn record(&mut self, improved: bool) -> bool {
         if improved {
             self.stale = 0;

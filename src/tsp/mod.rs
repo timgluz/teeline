@@ -653,6 +653,8 @@ pub struct HeuristicOptions {
     pub epochs: usize,
     /// Stop after this many consecutive epochs without improvement; `0` disables the check.
     ///
+    /// Disabled by default, because early stopping changes results — a caller opts in explicitly.
+    ///
     /// Distinct from `platoo_epochs`, which some solvers use as a *restart* threshold rather than a
     /// stopping rule — conflating the two would change `stochastic_hill`'s search.
     pub stagnation_epochs: usize,
@@ -665,7 +667,9 @@ impl Default for HeuristicOptions {
     fn default() -> Self {
         HeuristicOptions {
             epochs: 10_000,
-            stagnation_epochs: 500,
+            // Disabled by default: the plateau stop changes results, so it is opt-in until the
+            // benchmark harness asks for it.
+            stagnation_epochs: 0,
             platoo_epochs: 500,
             n_nearest: 3,
             verbose: false,
@@ -685,9 +689,7 @@ impl HeuristicOptions {
                         as usize;
                 }
                 "stagnation_epochs" => {
-                    h.stagnation_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `stagnation_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    h.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
                 }
                 "platoo_epochs" | "plateau_epochs" => {
                     h.platoo_epochs = v.as_integer().ok_or_else(|| {
@@ -832,9 +834,7 @@ impl SAOptions {
                         as usize;
                 }
                 "stagnation_epochs" => {
-                    sa.heuristic.stagnation_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `stagnation_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    sa.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
                 }
                 "platoo_epochs" | "plateau_epochs" => {
                     sa.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
@@ -946,9 +946,7 @@ impl GAOptions {
                         as usize;
                 }
                 "stagnation_epochs" => {
-                    ga.heuristic.stagnation_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `stagnation_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    ga.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
                 }
                 "platoo_epochs" | "plateau_epochs" => {
                     ga.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
@@ -1046,9 +1044,7 @@ impl CSOptions {
                         as usize;
                 }
                 "stagnation_epochs" => {
-                    cs.heuristic.stagnation_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `stagnation_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    cs.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
                 }
                 "platoo_epochs" | "plateau_epochs" => {
                     cs.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
@@ -1136,9 +1132,7 @@ impl FPAOptions {
                         as usize;
                 }
                 "stagnation_epochs" => {
-                    fpa.heuristic.stagnation_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `stagnation_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    fpa.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
                 }
                 "platoo_epochs" | "plateau_epochs" => {
                     fpa.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
@@ -1205,7 +1199,7 @@ impl Default for AcoOptions {
             // override pattern).
             heuristic: HeuristicOptions {
                 epochs: 150,
-                stagnation_epochs: 500,
+                stagnation_epochs: 0,
                 platoo_epochs: 20,
                 n_nearest: 3,
                 verbose: false,
@@ -1267,9 +1261,7 @@ impl AcoOptions {
                     aco.heuristic.epochs = parse_nonneg_usize(v, "epochs")?;
                 }
                 "stagnation_epochs" => {
-                    aco.heuristic.stagnation_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `stagnation_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    aco.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
                 }
                 "platoo_epochs" | "plateau_epochs" => {
                     aco.heuristic.platoo_epochs = parse_nonneg_usize(v, "platoo_epochs")?;
@@ -1369,7 +1361,7 @@ impl Default for LKOptions {
         LKOptions {
             heuristic: HeuristicOptions {
                 epochs: 100,
-                stagnation_epochs: 500,
+                stagnation_epochs: 0,
                 platoo_epochs: 10,
                 n_nearest: 5,
                 verbose: false,
@@ -1399,9 +1391,7 @@ impl LKOptions {
                         as usize;
                 }
                 "stagnation_epochs" => {
-                    lk.heuristic.stagnation_epochs = v.as_integer().ok_or_else(|| {
-                        format!("config: `stagnation_epochs` must be an integer, got {v}")
-                    })? as usize;
+                    lk.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
                 }
                 "platoo_epochs" | "plateau_epochs" => {
                     lk.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {

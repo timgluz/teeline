@@ -115,10 +115,11 @@ fn solve_ga(
             "GA: generation"
         );
 
-        if distances.tour_length(best_candidate.genotype()) < best_length {
-            best_length = distances.tour_length(best_candidate.genotype());
-            let _ = plateau.record(true);
-        } else if plateau.record(false) {
+        let current_length = distances.tour_length(best_candidate.genotype());
+        let improved = current_length < best_length;
+        best_length = best_length.min(current_length);
+
+        if plateau.record(improved) {
             tracing::info!(
                 epoch,
                 stagnation_epochs = plateau.stale_epochs(),
