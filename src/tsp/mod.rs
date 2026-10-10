@@ -1312,6 +1312,11 @@ impl AcoOptions {
                 .parse()
                 .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
         }
+        if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            aco.heuristic.stagnation_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
+        }
         if let Some(v) = args.get_one::<String>("platoo_epochs") {
             aco.heuristic.platoo_epochs = v
                 .parse()

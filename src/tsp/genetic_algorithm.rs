@@ -7,16 +7,16 @@ use std::sync::mpsc;
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::plateau::Plateau;
+use super::probability::probability;
+use super::progress::ProgressMessage;
+use super::route::{Route, random_position_pair};
+use super::{GAOptions, Solution, TspProblem};
 
 // Test-only epoch counter. Thread-local because tests run in parallel.
 #[cfg(test)]
 thread_local! {
     pub(crate) static EPOCHS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
-use super::probability::probability;
-use super::progress::ProgressMessage;
-use super::route::{Route, random_position_pair};
-use super::{GAOptions, Solution, TspProblem};
 
 type FitnessFn = Rc<dyn Fn(&[usize]) -> f32>;
 
@@ -510,16 +510,18 @@ mod tests {
     /// The plateau stop must actually end a run early, not merely be wired to a value nobody reads.
     /// Counts epochs rather than timing the process: on a small instance the compute is swamped by
     /// fixed startup cost, which is how an unhonoured bound went unnoticed elsewhere in this crate.
+    ///
+    /// Deliberately more than `2 * n_elite` cities: `population_size == cities.len()` and the
+    /// crossover loop runs `elite_size..(population_size / 2)`, so a 6-city fixture with the default
+    /// 3 elites is an empty range. GA would then never produce children, and the run would stall at
+    /// ~20 epochs because nothing evolves rather than because it converged.
     #[test]
     fn ga_stops_early_on_stagnation() {
-        let cities = kdtree::build_points(&[
-            vec![0.0, 0.0],
-            vec![10.0, 0.0],
-            vec![20.0, 5.0],
-            vec![30.0, 1.0],
-            vec![40.0, 8.0],
-            vec![50.0, 3.0],
-        ]);
+        let cities = kdtree::build_points(
+            &(0..12)
+                .map(|i| vec![(i * 7 % 11) as f32, (i * 5 % 13) as f32])
+                .collect::<Vec<_>>(),
+        );
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
 
@@ -529,6 +531,7 @@ mod tests {
                 stagnation_epochs: 20,
                 ..HeuristicOptions::default()
             },
+            n_elite: 1,
             ..GAOptions::default()
         };
 
