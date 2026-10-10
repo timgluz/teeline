@@ -256,24 +256,58 @@ if missing:
     sys.exit(f"ERROR: {tsv_path} is missing required column(s): {', '.join(missing)}")
 idx = {name: header.index(name) for name in REQUIRED + [c for c in OPTIONAL if c in header]}
 
-def cell(parts, name, default=""):
-    return parts[idx[name]].strip() if name in idx and idx[name] < len(parts) else default
+def cell(parts, name, default="", required=False, numeric=False):
+    """Read one TSV cell.
 
-for line in lines[1:]:
+    `required=True` is a hard error when the column is absent from this row —
+    NOT a default. A row cut short by a crashed benchmark process must fail
+    loudly: defaulting `tour_cost`/`wall_s` to 0 would fabricate a measurement
+    that looks like a real (and implausible) result, which is precisely what this
+    module must never do.
+
+    `numeric=True` additionally rejects a present-but-empty cell. A blank
+    `tour_cost` is missing data, and coercing it to 0.0 would be worse than
+    useless: it yields a gap of -100%, i.e. "twice as good as optimal". A run
+    whose numbers were not captured must be recorded with a non-`ok` status
+    instead, so it counts against `errors` rather than entering the statistics.
+    Non-numeric columns keep the default, since a blank cell there is a genuine
+    "not recorded" marker rather than a corruption.
+    """
+    if name in idx and idx[name] < len(parts):
+        value = parts[idx[name]].strip()
+        if value == "" and numeric:
+            raise ValueError(f"required numeric column '{name}' is empty")
+        return value
+    if required:
+        raise ValueError(f"row is missing a value for required column '{name}'")
+    return default
+
+for lineno, line in enumerate(lines[1:], start=2):
     parts = line.split("\t")
+    # Catch a row truncated by an interrupted benchmark before per-cell reading,
+    # so the error names the line and the exact shortfall.
+    if len(parts) < len(header):
+        sys.exit(
+            f"ERROR: truncated row at {tsv_path}:{lineno}: expected {len(header)} "
+            f"tab-separated columns, found {len(parts)}: {line!r}"
+        )
     try:
         rows.append({
-            "solver": cell(parts, "solver"),
-            "dataset": cell(parts, "dataset"),
+            "solver": cell(parts, "solver", required=True),
+            "dataset": cell(parts, "dataset", required=True),
             "config": cell(parts, "config", "default") or "default",
-            "run": int(cell(parts, "run", "0") or 0),
-            "wall_s": float(cell(parts, "wall_s", "0") or 0),
-            "peak_rss_kb": float(cell(parts, "peak_rss_kb", "0") or 0),
-            "tour_cost": float(cell(parts, "tour_cost", "0") or 0),
+            "run": int(cell(parts, "run", "0", required=True, numeric=True)),
+            "wall_s": float(cell(parts, "wall_s", "0", required=True, numeric=True)),
+            "peak_rss_kb": float(
+                cell(parts, "peak_rss_kb", "0", required=True, numeric=True)
+            ),
+            "tour_cost": float(
+                cell(parts, "tour_cost", "0", required=True, numeric=True)
+            ),
             "status": (cell(parts, "status", "ok") or "ok").lower(),
         })
     except ValueError as exc:
-        sys.exit(f"ERROR: malformed row in {tsv_path}: {line!r} ({exc})")
+        sys.exit(f"ERROR: malformed row at {tsv_path}:{lineno}: {line!r} ({exc})")
 
 if not rows:
     sys.exit(f"ERROR: {tsv_path} has a header but no data rows")
@@ -511,9 +545,14 @@ upload_r2() {
   # ever points at objects that are already live. The reverse mistake — a
   # manifest that briefly omits a newly published shard — is harmless, because
   # that just means the old shard is still being served.
-  local shards
-  shards="$(find "$STAGE/v1" -name '*.json' ! -name index.json | sort)"
-  for file in $shards "$STAGE/v1/index.json"; do
+  #
+  # mapfile, not `for file in $(find ...)`: unquoted command substitution
+  # word-splits and glob-expands, so a staged path containing whitespace (or a
+  # `*`) would be silently mangled into several bogus "filenames".
+  local -a files=()
+  mapfile -t files < <(find "$STAGE/v1" -name '*.json' ! -name index.json | sort)
+  files+=("$STAGE/v1/index.json")
+  for file in "${files[@]}"; do
     key="${file#"$STAGE/v1/"}"
     if [[ "$DRY_RUN" -eq 1 ]]; then
       echo "    [dry-run] would put ${PREFIX}/${key}"

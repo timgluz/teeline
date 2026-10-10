@@ -169,9 +169,16 @@ case "$cmd" in
   check)
     manifest="$(fetch index.json)"
     failures=0
-    for key in $(echo "$manifest" | jq -r '.solvers[] | "algorithms/\(.id).json"') \
-               $(echo "$manifest" | jq -r '.problems[] | "problems/\(.id).json"'); do
-      if body="$(fetch "$key" 2>/dev/null)" && echo "$body" | jq -e '.schema_version' >/dev/null 2>&1; then
+    # mapfile, not `for key in $(jq ...)`: unquoted substitution word-splits and
+    # glob-expands, so an id containing whitespace or a `*` would be mangled into
+    # bogus keys and reported as spurious failures.
+    keys=()
+    mapfile -t keys < <(
+      jq -r '.solvers[] | "algorithms/\(.id).json"' <<<"$manifest"
+      jq -r '.problems[] | "problems/\(.id).json"' <<<"$manifest"
+    )
+    for key in "${keys[@]}"; do
+      if body="$(fetch "$key" 2>/dev/null)" && jq -e '.schema_version' >/dev/null 2>&1 <<<"$body"; then
         printf 'ok    %s\n' "$key"
       else
         printf 'FAIL  %s\n' "$key"
@@ -179,9 +186,10 @@ case "$cmd" in
       fi
     done
     echo
-    echo "manifest schema_version: $(echo "$manifest" | jq -r '.schema_version')"
-    echo "generated_at:            $(echo "$manifest" | jq -r '.generated_at')"
-    echo "commit:                  $(echo "$manifest" | jq -r '.git_commit')"
+    echo "manifest schema_version: $(jq -r '.schema_version' <<<"$manifest")"
+    echo "generated_at:            $(jq -r '.generated_at' <<<"$manifest")"
+    echo "commit:                  $(jq -r '.git_commit // "-"' <<<"$manifest")"
+    echo "commit_source:           $(jq -r '.git_commit_source // "unknown"' <<<"$manifest")"
     if [[ "$failures" -gt 0 ]]; then
       echo "FAILED: $failures shard(s) missing or unparseable" >&2
       exit 1
