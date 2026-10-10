@@ -32,12 +32,17 @@ pub fn solve(
 
     let mut u = best_route.clone();
     let mut best_distance = distances.tour_length(u.route());
-    // `opts.epochs == 0` means unbounded, which the old `update_terminate` encoded; Budget needs the
-    // resolved cap, so it is translated here rather than changing the option's meaning.
+    // Two translations of the old `update_terminate` convention, kept so that a caller who never asked
+    // for the plateau stop gets exactly the run they got before: `epochs == 0` meant unbounded, and
+    // `epoch > max_epochs` meant a budget of `epochs` admitted `epochs + 1` iterations. Both are
+    // surprising, but changing either here would silently alter those results.
+    //
+    // `epochs == 0` together with `stagnation_epochs == 0` therefore never terminates. That is
+    // pre-existing and left alone: unbounded is what the combination has always meant.
     let epoch_cap = if opts.epochs == 0 {
         usize::MAX
     } else {
-        opts.epochs
+        opts.epochs.saturating_add(1)
     };
     let mut budget = Budget::new(epoch_cap, opts.stagnation_epochs);
     let mut improved = true;

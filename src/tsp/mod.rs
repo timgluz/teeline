@@ -1458,8 +1458,11 @@ pub struct FourierOptions {
     pub lambda_decay: f64, // tension decay multiplier per k_active stage, default 0.5
     pub lr: f64,           // gradient learning rate, default 0.05
     pub epochs: usize,     // gradient steps per k_active stage, default 400
-    /// Consecutive non-improving stages before stopping early; 0 = never stop early. Carried here
-    /// because fourier has no `HeuristicOptions`; `epochs` is per-stage, not the whole run.
+    /// Consecutive non-improving harmonic stages before stopping early; 0 = never stop early.
+    ///
+    /// Counts *stages*, not epochs — the outer loop runs once per harmonic and `epochs` above is the
+    /// number of gradient steps within a stage. At or above `k_max` the plateau can never fire, since
+    /// the stage cap is reached first. Carried here because fourier has no `HeuristicOptions`.
     pub stagnation_epochs: usize,
 }
 

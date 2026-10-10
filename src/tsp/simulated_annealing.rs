@@ -56,14 +56,21 @@ fn usable_epochs(opts: &SAOptions) -> usize {
     epochs
 }
 
-/// What a run consumed, so tests and callers can observe it without instrumenting the loop.
+/// Which bound ended a run, and what it consumed, so tests and callers can observe a run without
+/// instrumenting the loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SolveStats {
     /// Epochs actually run.
     pub epochs: usize,
-    /// Whether sustained non-improvement ended the run.
+    /// Sustained non-improvement ended the run.
     pub converged: bool,
-    /// Whether the run used its whole epoch budget.
+    /// The temperature fell to its floor, ending the run.
+    pub cooled: bool,
+    /// The epoch budget was exhausted, ending the run.
+    ///
+    /// Derived rather than compared directly: `usable_epochs` can raise the budget to the cooling
+    /// schedule length, so reaching it does not by itself mean the budget was the binding bound, and
+    /// convergence can also fire on the final admitted epoch.
     pub epoch_capped: bool,
 }
 
@@ -129,8 +136,10 @@ pub fn solve(
 
         tracing::debug!(epoch, temperature, "SA: tick");
         temperature = cooling(temperature, cooling_rate);
-        // Updating the best is what counts as progress; accepting a worse tour is the search working,
-        // not the run advancing.
+        // `best_route`/`best_distance` are the CURRENT tour, since an accepted uphill move replaces
+        // them. Progress is therefore "this epoch ended shorter than it started", which the snapshot
+        // taken before any candidate was drawn makes exact — not an acceptance count, which would
+        // treat the search's own worsening moves as advancement.
         improved = best_distance < best_at_epoch_start;
     }
 
@@ -146,10 +155,13 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
+    let converged = budget.converged();
+    let cooled = temperature <= opts.min_temperature;
     let stats = SolveStats {
         epochs: budget.epoch(),
-        converged: budget.converged(),
-        epoch_capped: budget.epoch() >= epoch_limit,
+        converged,
+        cooled,
+        epoch_capped: !converged && !cooled && budget.epoch() >= epoch_limit,
     };
     (
         Solution::from_parts(best_route.route(), cities, distances),
@@ -213,6 +225,67 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         TspProblem::new(cities, dm)
+    }
+
+    /// `SolveStats` must not report convergence when the epoch budget is what ran out.
+    ///
+    /// The budget here equals the schedule length, which is the case that makes a bare
+    /// `epoch >= limit` comparison wrong: the cap and the temperature floor are reached together, so
+    /// only the derived `!converged && !cooled` form distinguishes them. For SA the two genuinely
+    /// coincide — `usable_epochs` raises any smaller budget to the schedule — so the useful guarantee
+    /// is that neither is ever misreported as convergence.
+    #[test]
+    fn test_sa_stats_do_not_call_a_budget_stop_convergence() {
+        let problem = tiny_problem();
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: schedule_length(&SAOptions::default()),
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+
+        let (_, stats) = solve(&problem, &opts, None, None);
+
+        assert!(
+            !stats.converged,
+            "the plateau stop is disabled, so convergence cannot be the reason it stopped"
+        );
+        assert!(
+            stats.cooled || stats.epoch_capped,
+            "one of the other two bounds must explain the stop (ran {})",
+            stats.epochs
+        );
+        // Which of the two wins is decided by f32 rounding in the cooling loop, so this pins only
+        // that the cap reports honestly when it is the one that applied.
+        if !stats.cooled {
+            assert!(
+                stats.epoch_capped,
+                "if the temperature floor was not reached, the budget must be why it stopped"
+            );
+        }
+    }
+
+    /// With the plateau stop on, `converged` is the reason and the other two bounds are not claimed.
+    #[test]
+    fn test_sa_stats_report_convergence_when_the_plateau_stops_the_run() {
+        let problem = tiny_problem();
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 0, // no epoch cap
+                stagnation_epochs: 20,
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+
+        let (_, stats) = solve(&problem, &opts, None, None);
+
+        assert!(stats.converged, "20 non-improving epochs must end the run");
+        assert!(
+            !stats.epoch_capped,
+            "the budget was unbounded, so it cannot have been the bound that applied"
+        );
     }
 
     /// The plateau stop must bound a run independently of the cooling schedule.

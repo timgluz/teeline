@@ -7,8 +7,9 @@ pub struct HeuristicConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epochs: Option<usize>,
     /// Stop after this many consecutive epochs without improvement; `0` means never stop early (the
-    /// epoch cap still applies). Defaults to 0 (disabled), so omitting it changes nothing. Currently
-    /// honoured only by the `ga` solver — other solvers accept and ignore it.
+    /// epoch cap still applies). Defaults to 0 (disabled), so omitting it changes nothing. Honoured by
+    /// every iterative solver: `ga`, `pso`, `cs`, `fpa`, `gsa`, `sa`, `aco`, `som`, `tabu`; fourier
+    /// uses its own `stagnation_epochs` and counts harmonic stages rather than epochs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stagnation_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -143,6 +144,7 @@ pub struct SomConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neuron_multiplier: Option<usize>,
     /// Consecutive non-improving epochs before stopping early; 0 = never stop early.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub stagnation_epochs: Option<usize>,
 }
 
@@ -161,7 +163,9 @@ pub struct FourierConfig {
     pub lambda_decay: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lr: Option<f64>,
-    /// Consecutive non-improving stages before stopping early; 0 = never stop early.
+    /// Consecutive non-improving stages before stopping early; 0 = never stop early. Counts harmonic
+    /// stages rather than epochs, so a value at or above `k_max` cannot fire.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub stagnation_epochs: Option<usize>,
 }
 

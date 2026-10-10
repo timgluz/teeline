@@ -75,14 +75,40 @@ pub fn solve(
 
     let mut rng = rand::rng();
 
-    // Training loop
     // SOM has no incumbent tour to watch — the map is only decoded at the end — so "progress" is the
     // quantisation error: how far the cities still sit from their best-matching neurons. That is the
     // standard convergence measure for a SOM, and it falls as the map fits the cities.
+    //
+    // Measuring it costs O(n * neurons), roughly n times an ordinary epoch, so it is sampled rather
+    // than taken every epoch, and skipped entirely when the plateau stop is off. The first and last
+    // epochs are always sampled so a short run still yields at least one comparison.
+    let tracking = opts.stagnation_epochs > 0;
+    let measure_interval = (epochs / 1000).max(1);
     let mut budget = Budget::new(epochs, opts.stagnation_epochs);
     let mut best_error = f64::INFINITY;
+    // The outcome consumed by `record` at the top of each epoch; true until the first measurement.
+    let mut improved = true;
 
+    // Training loop
     for t in 1..=epochs {
+        if !budget.record(improved) {
+            if budget.converged() {
+                tracing::info!(
+                    epoch = t,
+                    stagnation_epochs = budget.stale_epochs(),
+                    "SOM: converged, quantisation error stopped improving"
+                );
+            }
+            // The loop can stop between checkpoints, so publish the map as it stands rather than
+            // leaving the last reported state up to 10% of the run out of date.
+            if let Some(tx) = progress_tx {
+                let snapshot = extract_tour(&norm_cities, &neurons, cities);
+                let cost = problem.distances.tour_length(&snapshot);
+                let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&snapshot), cost));
+            }
+            break;
+        }
+
         let t_f = t as f64;
         let eta = eta0 * (-t_f / epochs as f64).exp();
         let sigma = (sigma0 * (-t_f / epochs as f64).exp()).max(sigma_floor);
@@ -137,18 +163,16 @@ pub fn solve(
             }
         }
 
-        let error = quantisation_error(&norm_cities, &neurons);
-        if !budget.record(error < best_error) {
-            if budget.converged() {
-                tracing::info!(
-                    epoch = t,
-                    stagnation_epochs = budget.stale_epochs(),
-                    "SOM: converged, quantisation error stopped improving"
-                );
-            }
-            break;
+        if tracking && (t == 1 || t == epochs || t % measure_interval == 0) {
+            let error = quantisation_error(&norm_cities, &neurons);
+            improved = error < best_error;
+            best_error = best_error.min(error);
+        } else {
+            // Unmeasured epochs report progress: the error falls monotonically as neurons move toward
+            // the cities, and counting samples rather than epochs would make `stagnation_epochs` mean
+            // something different here than in every other solver.
+            improved = true;
         }
-        best_error = best_error.min(error);
     }
 
     let tour = extract_tour(&norm_cities, &neurons, cities);
@@ -167,9 +191,6 @@ pub fn solve(
     Solution::new(&tour, problem)
 }
 
-/// Extract a tour from current neuron state.
-/// Assigns each city to its closest neuron, sorts by ring index.
-/// Collision tie-break: closer city wins; city array index as final tie-breaker.
 /// Mean distance from each city to its closest neuron — the standard SOM fit measure.
 fn quantisation_error(norm_cities: &[[f64; 2]], neurons: &[[f64; 2]]) -> f64 {
     if norm_cities.is_empty() {
@@ -188,6 +209,9 @@ fn quantisation_error(norm_cities: &[[f64; 2]], neurons: &[[f64; 2]]) -> f64 {
     total / norm_cities.len() as f64
 }
 
+/// Extract a tour from current neuron state.
+/// Assigns each city to its closest neuron, sorts by ring index.
+/// Collision tie-break: closer city wins; city array index as final tie-breaker.
 fn extract_tour(
     norm_cities: &[[f64; 2]],
     neurons: &[[f64; 2]],

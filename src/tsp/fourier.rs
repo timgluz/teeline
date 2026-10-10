@@ -35,12 +35,28 @@ pub fn solve(
     let basis = compute_basis(&ks, opts.m);
     let mut lambda = opts.lambda;
 
-    // One stage per harmonic. A stage is measured by the tour it currently decodes to, because the
-    // coefficients themselves are not comparable across stages — the tension weight changes, so a
-    // better-fitting curve is not necessarily a shorter tour.
+    // The plateau stop counts STAGES here, not epochs: the outer loop runs once per harmonic and
+    // `epochs` is the number of gradient steps within a stage. A stage is measured by the tour its
+    // coefficients decode to, because the coefficients are not comparable across stages — the tension
+    // weight changes, so a better-fitting curve is not necessarily a shorter tour.
+    //
+    // Decoding a stage costs a curve evaluation plus a sort, so it is only done when the plateau stop
+    // can use it; otherwise this loop is exactly as it was.
+    let tracking = opts.stagnation_epochs > 0;
+    if opts.stagnation_epochs >= opts.k_max {
+        tracing::warn!(
+            stagnation_epochs = opts.stagnation_epochs,
+            k_max = opts.k_max,
+            "fourier: the plateau stops on harmonic stages, so a limit at or above k_max can never \
+             fire; the run will use every stage"
+        );
+    }
     let mut budget = Budget::new(opts.k_max, opts.stagnation_epochs);
-    let mut best_length = f32::INFINITY;
     let mut improved = true;
+    let mut best_length = f32::INFINITY;
+    // Held so an early stop can return the best stage's tour rather than whichever stage happened to
+    // run last — trailing non-improving stages can decode worse.
+    let mut best_tour: Option<Vec<usize>> = None;
 
     for k_active in 1..=opts.k_max {
         if !budget.record(improved) {
@@ -51,22 +67,32 @@ pub fn solve(
         }
         lambda *= opts.lambda_decay;
 
-        let stage_tour = decode_tour(&eval_curve(&c, &ks, opts.m), cities);
-        let stage_length = problem.distances.tour_length(&stage_tour);
-        improved = stage_length < best_length;
-        best_length = best_length.min(stage_length);
+        if tracking {
+            let stage_tour = decode_tour(&eval_curve(&c, &ks, opts.m), cities);
+            let stage_length = problem.distances.tour_length(&stage_tour);
+            improved = stage_length < best_length;
+            if improved {
+                best_length = stage_length;
+                best_tour = Some(stage_tour);
+            }
+        }
     }
 
     if budget.converged() {
         tracing::info!(
             stages = budget.epoch(),
             stagnation_epochs = budget.stale_epochs(),
+            note = "stagnation_epochs counts harmonic stages for this solver",
             "fourier: converged, decoded tour stopped improving"
         );
     }
 
-    let gamma = eval_curve(&c, &ks, opts.m);
-    let tour = decode_tour(&gamma, cities);
+    // With tracking on, prefer the best stage's tour; without it there is nothing to compare against,
+    // so the final coefficients are the answer.
+    let tour = match best_tour {
+        Some(tour) => tour,
+        None => decode_tour(&eval_curve(&c, &ks, opts.m), cities),
+    };
     Solution::new(&tour, problem)
 }
 
