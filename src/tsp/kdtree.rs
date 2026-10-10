@@ -190,6 +190,16 @@ impl KDNode {
     //     ensuring we never prune before the buffer is full.
     //   - Once full, search_radius() == farthest_distance(), the standard
     //     k-d tree k-NN pruning condition.
+    // Kept as two copies rather than one parameterised traversal: unifying them cost ~6%
+    // on `nearest_k5` (cargo bench --bench kdtree), which is the crate's hottest path.
+    // Re-measure before unifying.
+
+    /// Unfiltered k-NN.
+    ///
+    /// Only guarantees no *strictly closer* point is missed — the guard and
+    /// `NearestResult::add` both use a strict comparison, so equidistant candidates may be
+    /// pruned and the point returned among a tie depends on traversal order. Callers
+    /// needing a stable tie-break must do it themselves.
     fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
         acc.add(self.point, self.point.distance(target_point));
 
@@ -208,6 +218,43 @@ impl KDNode {
             && let Some(branch) = further_branch
         {
             branch.nearest(target_point, acc);
+        }
+    }
+
+    /// `nearest` with a candidate predicate.
+    ///
+    /// The predicate must run *before* `acc.add`: an ineligible point that reaches the
+    /// accumulator would raise `search_radius()` and let the pruning below cut off branches
+    /// holding the true nearest eligible point.
+    ///
+    /// `cfg(test)` because nothing calls it: a tree-based variant cannot beat
+    /// `DistanceMatrix::nearest_unvisited` (both are O(n) once ties are resolved by id).
+    #[cfg(test)]
+    fn nearest_where(
+        &self,
+        target_point: &KDPoint,
+        acc: &mut NearestResult,
+        predicate: &mut dyn FnMut(&KDPoint) -> bool,
+    ) {
+        if self.point.id != target_point.id && predicate(&self.point) {
+            acc.add(self.point, self.point.distance(target_point));
+        }
+
+        let (closest_branch, further_branch) = match self.cmp_by_point(target_point) {
+            None => panic!("Dimension conflict in nearest function"),
+            Some(Ordering::Greater) => (self.left(), self.right()),
+            Some(_) => (self.right(), self.left()),
+        };
+
+        if let Some(branch) = closest_branch {
+            branch.nearest_where(target_point, acc, predicate);
+        }
+
+        let split_dist = self.point.split_distance(target_point, self.level_coord());
+        if acc.search_radius() > split_dist
+            && let Some(branch) = further_branch
+        {
+            branch.nearest_where(target_point, acc, predicate);
         }
     }
 
@@ -564,6 +611,45 @@ mod tests {
 
         let res5 = kd.nearest(&cities[4], 2);
         assert_eq!(cities[3].id, res5.closest_point().unwrap().id);
+    }
+
+    #[test]
+    fn nearest_where_skips_ineligible_points_without_distorting_pruning() {
+        // Four collinear points at x = 0, 10, 20, 30. Querying from x=1 for the
+        // nearest *eligible* point must return 10 even when 0 is excluded, and must
+        // not be fooled into returning 20 because 0 filled the result buffer.
+        let cities = build_points(&[
+            vec![0.0, 0.0],
+            vec![10.0, 0.0],
+            vec![20.0, 0.0],
+            vec![30.0, 0.0],
+        ]);
+        let tree = from_cities(&cities);
+        // Sentinel id, not `KDPoint::new` (which uses id 0): the query's id must not
+        // collide with a tree point's, or `NearestResult::add` drops that point by id and
+        // the predicate never gets the chance to decide — which would silently hollow out
+        // this test. `usize::MAX` keeps every exclusion the predicate's job.
+        let target = KDPoint::new_with_id(usize::MAX, &[1.0, 0.0]);
+
+        // Drives the gated `KDNode::nearest_where` directly through the tree root, since
+        // the `KDTree`-level wrapper was removed as dead code.
+        let root = tree.root.as_deref().expect("tree has a root");
+
+        // Exclude the two nearest (x=0 at 1.0 and x=10 at 9.0): expect x=20.
+        let excluded = [cities[0].id, cities[1].id];
+        let mut acc = NearestResult::new(target, 1);
+        root.nearest_where(&target, &mut acc, &mut |pt| !excluded.contains(&pt.id));
+        let pick = acc.nearest().first().copied().expect("two remain eligible");
+        assert_eq!(pick.point.id, cities[2].id);
+        assert_approx(19.0, pick.distance);
+
+        // Excluding everything yields an empty accumulator rather than a stale candidate.
+        let mut acc = NearestResult::new(target, 1);
+        root.nearest_where(&target, &mut acc, &mut |_| false);
+        assert!(
+            acc.nearest().is_empty(),
+            "an empty candidate set must yield no result"
+        );
     }
 
     #[test]

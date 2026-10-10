@@ -167,6 +167,58 @@ pub enum DistanceType {
     Euc2D,
     Explicit,
     Geo,
+    /// TSPLIB ATT (pseudo-Euclidean): `r = sqrt((dx^2 + dy^2) / 10)`, then `nint(r)`, plus
+    /// one when that rounding went down. Integer-valued.
+    Att,
+    /// TSPLIB CEIL_2D: Euclidean distance rounded up. Integer-valued.
+    Ceil2D,
+}
+
+impl DistanceType {
+    /// TSPLIB's canonical spelling, so the parser and every consumer reporting the type
+    /// back out agree. Shared because the per-consumer copies (api, wasm) drifted into
+    /// non-exhaustive matches as soon as a variant was added — and the wasm crate sits
+    /// outside the workspace, so `cargo clippy --workspace` never caught it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DistanceType::Euc2D => "EUC_2D",
+            DistanceType::Explicit => "EXPLICIT",
+            DistanceType::Geo => "GEO",
+            DistanceType::Att => "ATT",
+            DistanceType::Ceil2D => "CEIL_2D",
+        }
+    }
+}
+
+#[cfg(test)]
+mod distance_type_tests {
+    use super::*;
+
+    /// `as_str` is the single source of TSPLIB's spelling, consumed by teeline-api and
+    /// teeline-wasm. Both are outside this crate's coverage run (the wasm crate is not even
+    /// in the workspace), so without this test the arms are only exercised incidentally.
+    #[test]
+    fn as_str_covers_every_variant() {
+        assert_eq!(DistanceType::Euc2D.as_str(), "EUC_2D");
+        assert_eq!(DistanceType::Explicit.as_str(), "EXPLICIT");
+        assert_eq!(DistanceType::Geo.as_str(), "GEO");
+        assert_eq!(DistanceType::Att.as_str(), "ATT");
+        assert_eq!(DistanceType::Ceil2D.as_str(), "CEIL_2D");
+    }
+
+    /// Round-trip: every spelling `as_str` emits must parse back to the same variant.
+    #[test]
+    fn as_str_round_trips_through_from_str() {
+        for dt in [
+            DistanceType::Euc2D,
+            DistanceType::Explicit,
+            DistanceType::Geo,
+            DistanceType::Att,
+            DistanceType::Ceil2D,
+        ] {
+            assert_eq!(dt.as_str().parse::<DistanceType>().unwrap(), dt);
+        }
+    }
 }
 
 impl FromStr for DistanceType {
@@ -176,6 +228,8 @@ impl FromStr for DistanceType {
             "EUC_2D" | "EUC2D" => Ok(DistanceType::Euc2D),
             "EXPLICIT" => Ok(DistanceType::Explicit),
             "GEO" => Ok(DistanceType::Geo),
+            "ATT" => Ok(DistanceType::Att),
+            "CEIL_2D" | "CEIL2D" => Ok(DistanceType::Ceil2D),
             other => Err(format!("unsupported distance type: {other}")),
         }
     }
@@ -1889,7 +1943,7 @@ impl NearestResult {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct NearestResultItem {
     pub distance: f32,
     pub point: KDPoint,

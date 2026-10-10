@@ -54,9 +54,16 @@
 use std::collections::HashMap;
 
 use super::kdtree::KDPoint;
-use super::{CityTable, DistanceType, NearestResult};
+use super::{CityTable, DistanceType, NearestResult, NearestResultItem};
 
 pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    // Full-precision PI, deliberately, not TSPLIB's truncated `PI = 3.141592` from the
+    // FAQ. The two differ on 474 of the corpus's 517,680 GEO distances by exactly 1 unit,
+    // but produce identical tour lengths for every GEO instance with a published optimum
+    // (ulysses16/22, gr96/137/202/229/431/666), so the truncated constant buys no
+    // comparability that matters while introducing a real error of ~1e-7 relative. The
+    // FAQ's `deg = (int) x[i]` is matched: `trunc()` also rounds toward zero, which
+    // matters because 916 corpus coordinates are negative.
     use std::f64::consts::PI;
     fn to_rad(x: f32) -> f64 {
         let deg = x.trunc() as f64;
@@ -71,7 +78,34 @@ pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     let q2 = (lat1 - lat2).cos();
     let q3 = (lat1 + lat2).cos();
     const RRR: f64 = 6378.388;
-    (RRR * (0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)).acos() + 1.0).floor() as f32
+    // Clamped because rounding can nudge the argument just outside acos's domain, where
+    // it returns NaN and poisons the distance.
+    let cos_angle = (0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)).clamp(-1.0, 1.0);
+    (RRR * cos_angle.acos() + 1.0).floor() as f32
+}
+
+/// TSPLIB ATT ("pseudo-Euclidean"): round `r = sqrt((dx^2 + dy^2) / 10)` to the nearest
+/// integer, then add one when rounding went *down*, so the result is never below `r`.
+pub(crate) fn att_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    // Widened before subtracting: `(p1.x() - p2.x()) as f64` would round the difference in
+    // f32 first, and this result is compared against an integer boundary (`t < r`), so the
+    // reference semantics are worth keeping for fractional coordinates.
+    let dx = p1.x() as f64 - p2.x() as f64;
+    let dy = p1.y() as f64 - p2.y() as f64;
+    // Divided before the sqrt, matching the spec's `sqrt((dx^2 + dy^2) / 10)` and the
+    // reference implementations, rather than the algebraically-equal `sqrt(d2) / sqrt(10)`.
+    let r = ((dx * dx + dy * dy) / 10.0).sqrt();
+    let t = r.round();
+    (if t < r { t + 1.0 } else { t }) as f32
+}
+
+/// TSPLIB CEIL_2D: Euclidean distance rounded up.
+pub(crate) fn ceil_2d_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    // Widened before subtracting, for the same reason as `att_distance`: the `ceil` sits on
+    // an integer boundary that an f32-rounded difference could cross.
+    let dx = p1.x() as f64 - p2.x() as f64;
+    let dy = p1.y() as f64 - p2.y() as f64;
+    (dx * dx + dy * dy).sqrt().ceil() as f32
 }
 
 // to have similar builder as kdtree
@@ -137,6 +171,8 @@ impl DistanceMatrix {
                 let d = match distance_type {
                     DistanceType::Euc2D => pt1.distance(pt2),
                     DistanceType::Geo => geo_distance(pt1, pt2),
+                    DistanceType::Att => att_distance(pt1, pt2),
+                    DistanceType::Ceil2D => ceil_2d_distance(pt1, pt2),
                     DistanceType::Explicit => {
                         return Err(
                             "cannot build distance matrix from coordinates for EXPLICIT type — use DistanceMatrix::new() with precomputed distances",
@@ -279,6 +315,58 @@ impl DistanceMatrix {
         search_result
     }
 
+    /// Nearest city satisfying `is_candidate`, ties broken by lowest city id.
+    ///
+    /// A predicate rather than a visited/unvisited set: taking `&HashSet<usize> visited`
+    /// let a caller pass its `unvisited` set without the compiler noticing, inverting the
+    /// test and returning `None` for every query.
+    ///
+    /// `target` is excluded internally, so `|id| unvisited.contains(&id)` is already
+    /// correct and a caller's extra `id != current_id` is harmless.
+    ///
+    /// O(n): the whole row is scanned. Deterministic by the total order
+    /// `(distance, city_id)` rather than iteration order, which is what makes `nn`
+    /// reproducible.
+    pub fn nearest_unvisited(
+        &self,
+        target: &KDPoint,
+        is_candidate: impl Fn(usize) -> bool,
+    ) -> Option<NearestResultItem> {
+        let city_pos = self.city_id2pos(target.id)?;
+        let row = self.distances_from_index(city_pos);
+
+        let mut best: Option<NearestResultItem> = None;
+        for (pos, distance) in row.iter().enumerate() {
+            if pos == city_pos {
+                continue;
+            }
+            // Unreachable: `build()`/`new()` populate `cities` for every position 0..n.
+            // Skipped to match `nearest()` above rather than asserting.
+            let Some(pt) = self.cities.get(&pos) else {
+                continue;
+            };
+            if !is_candidate(pt.id) {
+                continue;
+            }
+            let better = match &best {
+                None => true,
+                // `total_cmp`, not `<`: the latter is false against NaN, so a non-finite
+                // distance reaching `best` would block every later candidate and win by
+                // default. `total_cmp` is a genuine total order, so the result stays
+                // deterministic even on malformed input.
+                Some(current) => distance
+                    .total_cmp(&current.distance)
+                    .then_with(|| pt.id.cmp(&current.point.id))
+                    .is_lt(),
+            };
+            if better {
+                best = Some(NearestResultItem::new(*pt, *distance));
+            }
+        }
+
+        best
+    }
+
     fn distances_from_index(&self, pos: usize) -> Vec<f32> {
         let mut distances = Vec::with_capacity(self.n);
         for i in 0..pos {
@@ -302,6 +390,229 @@ mod tests {
     use super::*;
     use crate::test::helpers::assert_approx;
     use crate::tsp::kdtree;
+
+    #[test]
+    fn nearest_unvisited_ignores_a_non_finite_distance() {
+        // Hand-built matrix: distance(0,1) = NaN, distance(0,2) = 5, distance(1,2) = 1.
+        // Packed lower triangle is [d(1,0), d(2,0), d(2,1)].
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
+        let table: crate::tsp::CityTable =
+            cities.iter().enumerate().map(|(i, c)| (i, *c)).collect();
+        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], table);
+
+        // City 1 must be skipped despite being "closest" only in the sense that NaN loses
+        // every ordinary comparison — a NaN in `best` would otherwise stick forever.
+        let pick = dm
+            .nearest_unvisited(&cities[0], |id| id != cities[0].id)
+            .expect("city 2 is reachable");
+        assert_eq!(pick.point.id, cities[2].id);
+        assert_approx(5.0, pick.distance);
+    }
+
+    #[test]
+    fn geo_distance_is_finite_and_correct() {
+        // burma14 declares EDGE_WEIGHT_TYPE: GEO, so this exercises the acos path that can
+        // round outside its domain. Unclamped, that yields NaN distances which then poison
+        // any comparison-based selection.
+        use crate::tsp::{DistanceType, tsplib};
+        let data = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/burma14.tsp"
+        )))
+        .expect("burma14 fixture must parse");
+        let cities = data.cities().to_vec();
+        let dm = DistanceMatrix::build(&cities, DistanceType::Geo).expect("geo matrix builds");
+
+        for a in &cities {
+            for b in &cities {
+                let d = dm.distance_between(a.id, b.id).unwrap();
+                assert!(d.is_finite(), "geo distance {} -> {} is {d}", a.id, b.id);
+                assert!(
+                    d >= 0.0,
+                    "geo distance {} -> {} is negative: {d}",
+                    a.id,
+                    b.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nearest_unvisited_takes_the_closest_candidate() {
+        // Collinear 5-city instance: ids 0..4 at x = 0,1,2,3,4. Starting from id 0,
+        // excluding 0, the nearest candidate is id 1.
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![2.0, 0.0],
+            vec![3.0, 0.0],
+            vec![4.0, 0.0],
+        ]);
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+        let start = cities[0].id;
+
+        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        assert_eq!(pick.point.id, cities[1].id);
+        assert_approx(1.0, pick.distance);
+
+        // Excluding the three nearest leaves id 4.
+        let excluded: Vec<usize> = vec![start, cities[1].id, cities[2].id, cities[3].id];
+        let pick = dm
+            .nearest_unvisited(&cities[0], |id| !excluded.contains(&id))
+            .unwrap();
+        assert_eq!(pick.point.id, cities[4].id);
+        assert_approx(4.0, pick.distance);
+    }
+
+    #[test]
+    fn nearest_unvisited_breaks_ties_by_lowest_city_id() {
+        // id 0 at origin; ids 1 and 2 are both exactly 1.0 away.
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![-1.0, 0.0]]);
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+        let start = cities[0].id;
+
+        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        assert_approx(1.0, pick.distance);
+        assert_eq!(
+            pick.point.id, cities[1].id,
+            "exact tie must resolve to the lowest city id, never iteration order"
+        );
+    }
+
+    #[test]
+    fn nearest_unvisited_returns_none_when_nothing_is_eligible() {
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0]]);
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+
+        assert!(
+            dm.nearest_unvisited(&cities[0], |_| false).is_none(),
+            "an empty candidate set must yield None rather than a bogus city"
+        );
+    }
+
+    /// The regression that the predicate API exists to prevent.
+    ///
+    /// A `HashSet`-based signature made it possible to pass `unvisited` where the
+    /// function expected `visited`, and every unit test above still passed because
+    /// their excluded sets were trivial. This test drives the real fixture with the
+    /// real polarity a caller uses, and checks the answer against an independent
+    /// reference built from the public id-based distance API.
+    #[test]
+    fn nearest_unvisited_matches_reference_on_real_a280_data() {
+        use crate::tsp::tsplib;
+
+        // tests/fixtures/, not data/tsplib/: the latter is git-ignored and only present
+        // after `download_data.sh`, so pointing at it would fail on a fresh checkout and
+        // in CI. tests/fixtures/a280.tsp is tracked.
+        let problem = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/a280.tsp"
+        )))
+        .expect("a280 fixture must parse");
+        let cities = problem.cities().to_vec();
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+
+        let start = cities[0].id;
+        let unvisited: std::collections::HashSet<usize> = cities
+            .iter()
+            .map(|c| c.id)
+            .filter(|id| *id != start)
+            .collect();
+        assert_eq!(unvisited.len(), cities.len() - 1);
+
+        let pick = dm
+            .nearest_unvisited(&cities[0], |id| id != start && unvisited.contains(&id))
+            .expect("279 cities are unvisited, so a nearest must exist");
+        assert!(
+            unvisited.contains(&pick.point.id),
+            "must not return an already-visited city"
+        );
+
+        // Independent reference: scan the same candidate set via the public
+        // id-addressed API and take the min by (distance, id).
+        let mut reference: Option<(f32, usize)> = None;
+        for &id in &unvisited {
+            let d = dm.distance_between(start, id).unwrap_or(f32::MAX);
+            let better = match reference {
+                None => true,
+                Some((bd, bi)) => (d, id) < (bd, bi),
+            };
+            if better {
+                reference = Some((d, id));
+            }
+        }
+        let (ref_dist, ref_id) = reference.unwrap();
+        assert_eq!(
+            pick.point.id, ref_id,
+            "predicate query disagreed with the id-based reference"
+        );
+        assert_approx(ref_dist, pick.distance);
+    }
+
+    #[test]
+    fn att_distance_follows_the_tsplib_definition() {
+        // TSPLIB ATT: r = sqrt((dx^2 + dy^2) / 10); t = nint(r); d = t, or t + 1 when the
+        // rounding went down.
+        let city = |id: usize, x: f32, y: f32| kdtree::KDPoint::new_with_id(id, &[x, y]);
+
+        // r = sqrt(100/10) = 3.16228 -> nint 3, and 3 < r -> 4.
+        assert_approx(4.0, att_distance(&city(0, 0.0, 0.0), &city(1, 0.0, 10.0)));
+        // r = sqrt(500/10) = 7.07107 -> 7 < r -> 8. The branch a plain `round` gets wrong.
+        assert_approx(8.0, att_distance(&city(0, 0.0, 0.0), &city(1, 10.0, 20.0)));
+        assert_approx(5.0, att_distance(&city(0, 0.0, 0.0), &city(1, 10.0, 10.0)));
+        // Exactly-integral r must not be nudged up by rounding: dx=10, dy=30 -> r = 10.
+        assert_approx(10.0, att_distance(&city(0, 0.0, 0.0), &city(1, 10.0, 30.0)));
+
+        // ATT is not Euclidean: the integer rounding distinguishes it.
+        let p = city(0, 0.0, 0.0);
+        let q = city(1, 3.0, 4.0);
+        assert_approx(5.0, p.distance(&q));
+        assert_approx(2.0, att_distance(&p, &q)); // sqrt(25/10) = 1.5811 -> 2
+    }
+
+    #[test]
+    fn ceil_2d_distance_rounds_up() {
+        let city = |id: usize, x: f32, y: f32| kdtree::KDPoint::new_with_id(id, &[x, y]);
+        assert_approx(
+            5.0,
+            ceil_2d_distance(&city(0, 0.0, 0.0), &city(1, 3.0, 4.0)),
+        );
+        assert_approx(
+            2.0,
+            ceil_2d_distance(&city(0, 0.0, 0.0), &city(1, 1.0, 1.0)),
+        ); // 1.4142
+        assert_approx(
+            4.0,
+            ceil_2d_distance(&city(0, 0.0, 0.0), &city(1, 3.0, 2.0)),
+        ); // 3.6056
+    }
+
+    #[test]
+    fn att_tour_length_matches_the_known_optimum() {
+        // External anchor: att48's published ATT optimum is 10628, and its tracked optimal
+        // tour must measure exactly that. (33523.71, often quoted for att48, is the
+        // *Euclidean* length of the same tour - a different metric.)
+        use crate::tsp::{DistanceType, opt_tour, tsplib};
+        let data = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/att48.tsp"
+        )))
+        .expect("att48 fixture must parse");
+        assert_eq!(
+            data.distance_type,
+            DistanceType::Att,
+            "att48 no longer declares ATT"
+        );
+        let cities = data.cities().to_vec();
+        let dm = DistanceMatrix::build(&cities, data.distance_type).expect("matrix builds");
+
+        let tour = opt_tour::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/att48.opt.tour"
+        )))
+        .expect("att48.opt.tour must parse; without it this test asserts nothing");
+        assert_approx(10628.0, dm.tour_length(&tour.route));
+    }
 
     #[test]
     fn test_build_distance_matrix_from_empty_list() {
@@ -452,6 +763,35 @@ mod tests {
 
         let res5 = dm.nearest(&cities[4], 2);
         assert_eq!(cities[0].id, res5.closest_point().unwrap().id);
+    }
+
+    #[test]
+    fn geo_distance_matches_a_published_optimum() {
+        // GEO had no fixture with a known optimum, so nothing in CI pinned the great-circle
+        // path to external truth — only a `> 100.0` range check on burma14. This anchors it:
+        // ulysses16's published optimum is 6859, and its optimal tour must measure exactly
+        // that.
+        //
+        // It also pins the PI choice. Full-precision PI and TSPLIB's truncated 3.141592
+        // disagree on individual distances (by 1) yet agree on this total, so this test
+        // alone does not force the constant — it is here so a GEO distance regression of
+        // any real size fails loudly.
+        use crate::tsp::{DistanceType, opt_tour, tsplib};
+        let data = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/ulysses16.tsp"
+        )))
+        .expect("ulysses16 fixture must parse");
+        assert_eq!(data.distance_type, DistanceType::Geo, "fixture is not GEO");
+
+        let dm = data.distance_matrix().expect("geo distance matrix builds");
+        let tour = opt_tour::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/ulysses16.opt.tour"
+        )))
+        .expect("ulysses16.opt.tour must parse; without it this test asserts nothing");
+
+        assert_approx(6859.0, dm.tour_length(&tour.route));
     }
 
     #[test]
