@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"49e2f642e56aa80a9a16cb33bc1827f8c6fb34f0e4ec184c91b970a0ff25d0f7","doc_type":"task","document_id":"019f98f1-f78b-7fc1-9708-2bcd7968894b","new_version":1,"previous_version":null,"slug":"tasks/teeline-web-astro7-migration","title":"Migrate teeline-web to Astro 7"}],"created_at":"2026-07-25T11:04:33.838236941Z","id":"019f98f2-c170-7190-821d-0f21ed9c14fc","message":"Add task for teeline-web Astro 7 migration\n\nImplements planning for [[tasks/teeline-web-astro7-migration]]"},
+  "content_hash": "0a92e357f8b0a74bdf0b74020c3cfd23eac7adf0b0c4b48500f7606538cc0c08",
+  "hash_version": 3
+}

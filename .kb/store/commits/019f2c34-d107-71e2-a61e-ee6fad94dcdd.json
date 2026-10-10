@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"ae6912038eef4f59f622a5d97047a5022796b08de14f1d555bd32d3c079972e9","doc_type":"incident","document_id":"019f2c32-1589-7803-825f-6212073de7f8","new_version":1,"previous_version":null,"slug":"task-api-serve-kills-backgrounded-server-on-task-e","title":"task api:serve kills backgrounded server on task exit"}],"created_at":"2026-07-04T08:18:06.691493850Z","id":"019f2c34-d107-71e2-a61e-ee6fad94dcdd","message":"Document api:serve backgrounding bug + fix"},
+  "content_hash": "88fb588687f3bfe8950264d5ca121f43ccc8f8952399f7c7a9f4b3e5dc84539e",
+  "hash_version": 3
+}

@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"a6f4d9f4e59eecbf0c61007d0298ef1a5b0392a127479bd747cbecaaaa1bb245","doc_type":"brief","document_id":"019e272b-7c4f-7e62-96bb-99c0d8880b8a","new_version":1,"previous_version":null,"slug":"decisions/adr-001-tracing","title":"ADR-001: Structured logging via tracing"}],"created_at":"2026-05-14T15:47:14.725205284Z","id":"019e272b-aee3-73b2-aa15-ac5f00bbec6a","message":"Add ADR-001: structured logging via tracing"},
+  "content_hash": "46dc658ba62fb240eedad564cad894d2babecaa725880e6741c904d6e0c5608b",
+  "hash_version": 3
+}

@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"a43a8451928eb70f8bd4d0fec083dace139bb38ea6f8ee6b3b232c96a03d99f8","doc_type":"task","document_id":"019e2c4c-ce2d-7533-a9b2-a559a5be3922","new_version":1,"previous_version":null,"slug":"tasks/gh-39-optimal-tour","title":"Add --optimal-tour flag with gap comparison and visualization overlay (GH #39)"}],"created_at":"2026-05-15T15:41:34.238828024Z","id":"019e2c4c-d8be-7372-992b-f307d4e23fbf","message":"Create task: --optimal-tour flag with gap comparison and viz overlay (GH #39)"},
+  "content_hash": "fc3e52d8b5a7182285fe443df91843a82d821aaa18c757b0cf13b97469729c92",
+  "hash_version": 3
+}

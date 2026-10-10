@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"fa021d08aad56ecb3a77bf2e09c6fa40a6df32f6c6e3b1d0c0209b532ec2d347","doc_type":"spec","document_id":"019e31aa-108a-7153-ab9e-e723a72c7045","new_version":1,"previous_version":null,"slug":"decisions/adr-wasm-component-model","title":"ADR: WASM Component Model for multi-language solver exposure"}],"created_at":"2026-05-16T16:41:57.295389111Z","id":"019e31aa-7d67-7f70-8f89-27292007e158","message":"Add ADR for WASM Component Model decision (GH #68)"},
+  "content_hash": "8d6c1ca5f425cbb3ae70d83e90544606acc27d5027ca0f19f9140b99c83e5b3c",
+  "hash_version": 3
+}

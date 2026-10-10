@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"27bcc4502ef8a5e30faff01ae53a110549253df62bd2d1926e284fb3789baa97","doc_type":"task","document_id":"019ea7f8-e660-7d02-b7e4-d16c34d43f28","new_version":1,"previous_version":null,"slug":"tasks/gh-177-dynamic-solver-list","title":"feat(teeline-web): dynamic solver list from WASM — GH #177"}],"created_at":"2026-06-08T16:02:51.371984881Z","id":"019ea7f8-f590-76e0-acd5-839c3e566f6d","message":"feat: create task gh-177-dynamic-solver-list"},
+  "content_hash": "5cf3897b3f479fb633c60e2caae9619288f393baeb035ee211c0d9c800df1078",
+  "hash_version": 3
+}
