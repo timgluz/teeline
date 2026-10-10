@@ -218,3 +218,82 @@ fn tabu_search_stops_on_stagnation() {
         tabu_search::solve(&problem, &opts, Some(tx), None)
     });
 }
+
+// --- Convergence actually firing -----------------------------------------------------------------
+//
+// The tests above use a loose limit to prove the run is *bounded*; these drive the limit low enough
+// that convergence is the reason the run stops, which is the path that logs and publishes its final
+// state. Without them those branches are never taken.
+
+/// Runs each solver with a limit of 1 and asserts it reports convergence, which is where the
+/// convergence log line and the final progress update live.
+#[test]
+fn a_tight_limit_makes_every_solver_converge() {
+    let problem = problem();
+    let (tx, rx) = mpsc::channel();
+
+    let heuristic = |limit: usize| HeuristicOptions {
+        epochs: CAP,
+        stagnation_epochs: limit,
+        ..HeuristicOptions::default()
+    };
+
+    // aco and tabu publish the epoch count, so their convergence is countable.
+    let count = |rx: &mpsc::Receiver<ProgressMessage>| {
+        rx.try_iter()
+            .filter(|m| matches!(m, ProgressMessage::EpochUpdate(_)))
+            .count()
+    };
+
+    let opts = AcoOptions {
+        heuristic: heuristic(1),
+        ..AcoOptions::default()
+    };
+    let _ = ant_colony::solve(&problem, &opts, Some(&tx), None);
+    drop(tx);
+    let aco_epochs = count(&rx);
+    assert!(
+        aco_epochs < CAP / 10,
+        "aco with a limit of 1 must stop early, ran {aco_epochs}"
+    );
+
+    let (tx, rx) = mpsc::channel();
+    let _ = tabu_search::solve(&problem, &heuristic(1), Some(&tx), None);
+    drop(tx);
+    let tabu_epochs = count(&rx);
+    assert!(
+        tabu_epochs < CAP / 10,
+        "tabu with a limit of 1 must stop early, ran {tabu_epochs}"
+    );
+
+    // som and fourier have no per-epoch message; assert the tour is still complete when they converge.
+    let som_opts = SOMOptions {
+        epochs: 500,
+        stagnation_epochs: 1,
+        ..SOMOptions::default()
+    };
+    let (tx, _rx) = mpsc::channel();
+    let solution = som::solve(&problem, &som_opts, Some(&tx), None);
+    assert_complete_tour("som", &solution, problem.cities.len());
+
+    let fourier_opts = FourierOptions {
+        stagnation_epochs: 1,
+        ..FourierOptions::default()
+    };
+    let solution = fourier::solve(&problem, &fourier_opts, None, None);
+    assert_complete_tour("fourier", &solution, problem.cities.len());
+}
+
+/// `fourier` counts stages, so a limit at or above `k_max` can never fire; the run must warn and then
+/// use every stage rather than stopping on the first.
+#[test]
+fn fourier_warns_when_the_limit_cannot_fire() {
+    let problem = problem();
+    let opts = FourierOptions {
+        k_max: 3,
+        stagnation_epochs: 3,
+        ..FourierOptions::default()
+    };
+    let solution = fourier::solve(&problem, &opts, None, None);
+    assert_complete_tour("fourier", &solution, problem.cities.len());
+}

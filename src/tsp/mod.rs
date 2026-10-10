@@ -2295,6 +2295,17 @@ mod tests {
             42,
             "[lk]"
         );
+        // `som` and `fourier` carry the option on their own struct, not in a `heuristic` sub-table.
+        assert_eq!(
+            SOMOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[som]"
+        );
+        assert_eq!(
+            FourierOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[fourier]"
+        );
     }
 
     /// The "valid fields" hints name the accepted keys, so they must mention the new option —
@@ -2308,12 +2319,48 @@ mod tests {
             ("[cs]", CSOptions::from_toml(&t).unwrap_err()),
             ("[fpa]", FPAOptions::from_toml(&t).unwrap_err()),
             ("[lk]", LKOptions::from_toml(&t).unwrap_err()),
+            ("[som]", SOMOptions::from_toml(&t).unwrap_err()),
+            ("[fourier]", FourierOptions::from_toml(&t).unwrap_err()),
         ] {
             assert!(
                 err.contains("stagnation_epochs"),
                 "{label} hint should list stagnation_epochs, got: {err}"
             );
         }
+    }
+
+    /// `fourier` and `som` build their options independently of `HeuristicOptions`, so each needs its
+    /// own check that a bad value is reported rather than quietly defaulted.
+    #[test]
+    fn test_fourier_and_som_cli_reject_bad_stagnation_epochs() {
+        use clap::{Arg, ArgAction, Command};
+        // Every argument either `from_cli` reads, since both are handed the same command.
+        let mk = || {
+            let mut cmd = Command::new("t").arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            );
+            for id in [
+                "epochs",
+                "k_max",
+                "m",
+                "learning_rate",
+                "radius_fraction",
+                "neuron_multiplier",
+            ] {
+                cmd = cmd.arg(Arg::new(id).long(id).action(ArgAction::Set));
+            }
+            cmd
+        };
+
+        let fourier = mk().get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = FourierOptions::from_cli(&fourier).unwrap_err();
+        assert!(err.contains("--stagnation_epochs"), "fourier: got {err}");
+
+        let som = mk().get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = SOMOptions::from_cli(&som).unwrap_err();
+        assert!(err.contains("--stagnation_epochs"), "som: got {err}");
     }
 
     /// A non-numeric value must be rejected with a message naming the flag, rather than silently
