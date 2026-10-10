@@ -92,6 +92,23 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - `teeline convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
 - `download_data.sh` fetches benchmark datasets.
 
+## Code Comments
+
+Comments explain **why**, not **what**. The code already says what it does — a reader can see
+that. A comment earns its place only by adding something the code cannot express:
+
+- **Good**: a non-obvious invariant, a deliberate trade-off, a workaround with its cause, why a
+  constant has its value, why an approach was rejected, a surprising edge case.
+- **Bad**: restating the line below it, narrating a sequence ("first we loop, then we return"),
+  describing the signature, or repeating what a well-named function or test already conveys.
+
+Prefer expressing intent through naming and structure over prose. Keep comments short; delete any
+sentence that would still be obvious to someone reading the surrounding code. When a comment is
+needed, put it next to the code it explains and point at the specific thing that is surprising.
+
+Historical narrative does not belong in source comments — if a bug's story matters, the task,
+PR description or commit message is the place for it.
+
 ## teeline-web WASM Development Gotcha
 
 `teeline-web/src/teeline-wasm.d.ts` is an **ambient module declaration** that TypeScript uses as the sole source of truth for `'teeline-wasm'` imports — it completely shadows `node_modules/teeline-wasm/teeline_wasm.d.ts`. **Any new WIT export must be added to this ambient file**, or tsc will fail with "Module 'teeline-wasm' has no exported member '...'".
