@@ -321,11 +321,7 @@ impl Guest for Component {
             })
         } else {
             let data = teeline::tsp::tsplib::read_from_str(&input)?;
-            let dt = match data.distance_type {
-                teeline::tsp::DistanceType::Euc2D => "EUC_2D",
-                teeline::tsp::DistanceType::Explicit => "EXPLICIT",
-                teeline::tsp::DistanceType::Geo => "GEO",
-            };
+            let dt = data.distance_type.as_str();
             Ok(ParsedProblem {
                 name: data.name.clone(),
                 comment: data.comment.clone(),
