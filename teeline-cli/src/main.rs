@@ -230,6 +230,10 @@ fn tuning_args() -> Vec<Arg> {
             .long("epochs")
             .help("maximum iterations before stopping, 0 is forever")
             .required(false),
+        Arg::new("stagnation_epochs")
+            .long("stagnation_epochs")
+            .help("epochs without improvement before stopping (0 disables)")
+            .required(false),
         // The misspelled spelling is kept as a hidden alias so existing scripts and CI keep
         // working; the correctly-spelled flag is what help documents.
         Arg::new("platoo_epochs")

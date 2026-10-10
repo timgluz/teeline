@@ -6,6 +6,9 @@ use utoipa::ToSchema;
 pub struct HeuristicConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epochs: Option<usize>,
+    /// Stop after this many consecutive epochs without improvement; `0` disables the check.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stagnation_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub platoo_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -30,6 +30,7 @@ pub struct TspService;
 fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicOptions {
     HeuristicOptions {
         epochs: h.epochs.unwrap_or(base.epochs),
+        stagnation_epochs: h.stagnation_epochs.unwrap_or(base.stagnation_epochs),
         platoo_epochs: h.platoo_epochs.unwrap_or(base.platoo_epochs),
         n_nearest: h.n_nearest.unwrap_or(base.n_nearest),
         verbose: false,

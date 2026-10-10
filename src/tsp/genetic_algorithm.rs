@@ -6,6 +6,7 @@ use std::sync::mpsc;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
+use super::plateau::Plateau;
 use super::probability::probability;
 use super::progress::ProgressMessage;
 use super::route::{Route, random_position_pair};
@@ -61,6 +62,8 @@ fn solve_ga(
 
     let mut epoch = 0;
     let mut current_population = population.clone();
+    let mut plateau = Plateau::new(ga.heuristic.stagnation_epochs);
+    let mut best_length = f32::INFINITY;
 
     while epoch < ga.heuristic.epochs {
         let mut new_population = TspPopulation::with_capacity(population_size);
@@ -102,6 +105,18 @@ fn solve_ga(
             fitness = current_population.best().fitness(),
             "GA: generation"
         );
+
+        if distances.tour_length(best_candidate.genotype()) < best_length {
+            best_length = distances.tour_length(best_candidate.genotype());
+            let _ = plateau.record(true);
+        } else if plateau.record(false) {
+            tracing::info!(
+                epoch,
+                stagnation_epochs = plateau.stale_epochs(),
+                "GA: converged, no improvement for the stagnation limit"
+            );
+            break;
+        }
 
         epoch += 1;
     }
