@@ -2208,11 +2208,120 @@ mod tests {
     }
 
     /// The new stop knob must be settable from a solver config table, not only from the CLI.
+    ///
+    /// Every solver that owns a `[name]` table has its own match arm, so this walks them all: an arm
+    /// that silently forgot the key would leave that solver unable to opt in.
     #[test]
-    fn test_stagnation_epochs_config_key_parses() {
+    fn test_stagnation_epochs_config_key_parses_for_every_solver() {
         let t: toml::Table = toml::from_str("stagnation_epochs=42").unwrap();
-        let ga = GAOptions::from_toml(&t).unwrap();
-        assert_eq!(ga.heuristic.stagnation_epochs, 42);
+        assert_eq!(
+            HeuristicOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[heuristic]"
+        );
+        assert_eq!(
+            GAOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[ga]"
+        );
+        assert_eq!(
+            SAOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[sa]"
+        );
+        assert_eq!(
+            CSOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[cs]"
+        );
+        assert_eq!(
+            FPAOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[fpa]"
+        );
+        assert_eq!(
+            AcoOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[aco]"
+        );
+        assert_eq!(
+            LKOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[lk]"
+        );
+    }
+
+    /// The "valid fields" hints name the accepted keys, so they must mention the new option —
+    /// otherwise a user who typos it is told a list that omits the key they wanted.
+    #[test]
+    fn test_unknown_field_hint_lists_stagnation_epochs() {
+        let t: toml::Table = toml::from_str("bogus=1").unwrap();
+        for (label, err) in [
+            ("[heuristic]", HeuristicOptions::from_toml(&t).unwrap_err()),
+            ("[ga]", GAOptions::from_toml(&t).unwrap_err()),
+            ("[cs]", CSOptions::from_toml(&t).unwrap_err()),
+            ("[fpa]", FPAOptions::from_toml(&t).unwrap_err()),
+            ("[lk]", LKOptions::from_toml(&t).unwrap_err()),
+        ] {
+            assert!(
+                err.contains("stagnation_epochs"),
+                "{label} hint should list stagnation_epochs, got: {err}"
+            );
+        }
+    }
+
+    /// A non-numeric value must be rejected with a message naming the flag, rather than silently
+    /// falling back to the default — the error path is the only thing standing between a typo and a
+    /// run that quietly ignores what the caller asked for.
+    #[test]
+    fn test_stagnation_epochs_cli_rejects_non_numeric() {
+        use clap::{Arg, ArgAction, Command};
+        let cmd = Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(
+                Arg::new("platoo_epochs")
+                    .long("platoo_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("n_nearest")
+                    .long("n_nearest")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("verbose")
+                    .long("verbose")
+                    .action(ArgAction::SetTrue),
+            );
+        let args = cmd.get_matches_from(["t", "--stagnation_epochs", "abc"]);
+        let err = HeuristicOptions::from_cli(&args).unwrap_err();
+        assert!(
+            err.contains("--stagnation_epochs"),
+            "the error should name the flag, got: {err}"
+        );
     }
 
     /// Both spellings must parse as config keys: the misspelled `platoo_epochs` is retained so
@@ -2581,7 +2690,7 @@ mod tests {
                     .action(ArgAction::Set),
             )
             .arg(Arg::new("num_ants").long("num-ants").action(ArgAction::Set));
-        let args = cmd.get_matches_from([
+        let args = cmd.clone().get_matches_from([
             "t",
             "--alpha",
             "2.0",
@@ -2596,6 +2705,18 @@ mod tests {
         assert!((opts.alpha - 2.0).abs() < 1e-6);
         assert!((opts.beta - 4.0).abs() < 1e-6);
         assert!((opts.evaporation_rate - 0.3).abs() < 1e-6);
+
+        // ACO builds `heuristic` field by field rather than delegating to
+        // `HeuristicOptions::from_cli`, so it needs its own error path for the new flag: a bad value
+        // must be reported rather than silently falling back to the default.
+        let bad = cmd
+            .clone()
+            .get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = AcoOptions::from_cli(&bad).unwrap_err();
+        assert!(
+            err.contains("--stagnation_epochs"),
+            "the error should name the flag, got: {err}"
+        );
         assert_eq!(opts.num_ants, 12);
     }
 
