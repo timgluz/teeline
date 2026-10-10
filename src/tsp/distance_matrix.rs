@@ -288,9 +288,11 @@ impl DistanceMatrix {
     /// state the membership test explicitly (`!unvisited.contains(&id)`), so the set's
     /// polarity cannot be silently inverted.
     ///
-    /// The predicate must not match `target` itself; pass a closure that excludes it
-    /// (`id != current_id`), since a city is always at distance 0 from itself and would
-    /// otherwise be selected immediately.
+    /// `target` is excluded internally, so the predicate only ever sees other cities and
+    /// `|id| unvisited.contains(&id)` is already correct. A caller that also writes
+    /// `id != current_id` is harmless, not required — the guard runs before the predicate
+    /// is consulted. (Stated explicitly because a caller relying on the predicate for
+    /// self-exclusion would be broken by any future reordering of that loop.)
     ///
     /// Cost is O(n) per call — the whole row is scanned, because a distance matrix can
     /// reach every city and therefore cannot miss the true nearest the way a k-limited
@@ -315,6 +317,12 @@ impl DistanceMatrix {
             if pos == city_pos {
                 continue;
             }
+            // Unreachable for any matrix built through `build()`/`new()`, which populate
+            // `cities` for every position in `0..n` (and `new()` additionally asserts
+            // `city_idx.len() == n`). Skipped rather than asserted to match `nearest()`
+            // immediately above, which handles a gap the same way; the difference is that
+            // a gap here would narrow the candidate scan rather than the k-NN buffer, so
+            // the two are at least consistent instead of one panicking and one not.
             let Some(pt) = self.cities.get(&pos) else {
                 continue;
             };

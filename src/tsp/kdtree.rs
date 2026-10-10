@@ -29,6 +29,8 @@ pub fn from_cities(points: &[KDPoint]) -> KDTree {
         tree.size = n_points;
         tree.root = Some(root);
     }
+    // Independent copy: `tree_points` was consumed by the recursive build.
+    tree.points = points.to_vec();
 
     tree
 }
@@ -76,12 +78,22 @@ fn partition_points(
 pub struct KDTree {
     size: usize,
     root: KDSubTree,
+    /// The exact points this tree was built from.
+    ///
+    /// Retained so `nearest_unvisited` can resolve an exact-distance tie by lowest id
+    /// without asking the caller for a second, separately-maintained copy of the same
+    /// point set. An earlier revision took `cities: &[KDPoint]` as a parameter, which
+    /// nothing enforced: a filtered, stale or reordered slice would silently produce the
+    /// wrong tie-break. Owning the data removes that failure mode instead of documenting
+    /// it, and costs one `Vec` of `KDPoint` copies (which are `Copy`).
+    points: Vec<KDPoint>,
 }
 
 impl KDTree {
     #[cfg(test)]
     pub(crate) fn new(root: KDNode) -> Self {
         KDTree {
+            points: vec![root.point],
             root: Some(Box::new(root)),
             size: 1,
         }
@@ -91,6 +103,7 @@ impl KDTree {
         KDTree {
             root: None,
             size: 0,
+            points: Vec::new(),
         }
     }
 
@@ -150,38 +163,35 @@ impl KDTree {
 
     /// Nearest point satisfying `is_candidate`, ties broken by **lowest id**.
     ///
-    /// The pruned counterpart of `DistanceMatrix::nearest_unvisited`, and the same
-    /// contract: a predicate rather than a visited/unvisited set, so the caller states
-    /// the membership test explicitly instead of relying on a parameter name to convey
-    /// polarity.
+    /// The pruned counterpart of `DistanceMatrix::nearest_unvisited`, with the same
+    /// contract: a predicate rather than a visited/unvisited set, so the caller states the
+    /// membership test instead of relying on a parameter name for polarity. `target` is
+    /// excluded internally, so the predicate need only describe the *other* points — a
+    /// caller writing `|id| unvisited.contains(&id)` is already correct.
     ///
-    /// Deterministic in distance and identity: `nearest_where` fixes the minimum
-    /// distance without letting skipped points distort pruning, then the lowest id among
-    /// exact-distance ties is chosen explicitly rather than left to traversal order.
+    /// Deterministic in distance and identity: the pruned traversal fixes the minimum
+    /// distance, then the lowest id among exact-distance ties is chosen from the tree's own
+    /// point set rather than left to traversal order.
     ///
-    /// **Cost is O(n), not sublinear.** Resolving the tie group requires inspecting the
-    /// points at that distance, so this scans the whole `cities` slice on every call even
-    /// when no tie exists. That makes it no cheaper than
-    /// `DistanceMatrix::nearest_unvisited` in the worst case, despite the pruned
-    /// traversal underneath it; `nn` therefore uses the matrix path.
-    /// `cities` **must be exactly the point set this tree was built from** — the same ids
-    /// and coordinates, in any order. Nothing enforces that, so a caller passing a
-    /// filtered, stale or reordered slice silently gets a wrong tie-break rather than an
-    /// error.
+    /// **Cost is O(n), not sublinear.** Resolving a tie group means inspecting the points at
+    /// that distance, so this scans every retained point on each call, even when no tie
+    /// exists. That makes it no cheaper in the worst case than
+    /// `DistanceMatrix::nearest_unvisited` despite the pruned traversal underneath, which is
+    /// why `nn` uses the matrix path.
     pub fn nearest_unvisited(
         &self,
         target: &KDPoint,
-        cities: &[KDPoint],
         is_candidate: impl Fn(usize) -> bool,
     ) -> Option<NearestResultItem> {
         let best = {
-            let mut predicate = |pt: &KDPoint| pt.id != target.id && is_candidate(pt.id);
+            let mut predicate = |pt: &KDPoint| is_candidate(pt.id);
             self.nearest_where(target, &mut predicate)?
         };
 
-        // Exact float equality is deliberate: this asks whether another candidate is
-        // the same distance away, which is exactly when traversal order decides.
-        let tied_lower = cities
+        // Exact float equality is deliberate: this asks whether another candidate is the
+        // same distance away, which is exactly when traversal order decides.
+        let tied_lower = self
+            .points
             .iter()
             .filter(|pt| {
                 pt.id < best.point.id
@@ -194,7 +204,7 @@ impl KDTree {
 
         match tied_lower {
             Some(id) => {
-                let pt = cities.iter().find(|c| c.id == id)?;
+                let pt = self.points.iter().find(|c| c.id == id)?;
                 Some(NearestResultItem::new(*pt, best.distance))
             }
             None => Some(best),
@@ -270,8 +280,29 @@ impl KDNode {
     //     ensuring we never prune before the buffer is full.
     //   - Once full, search_radius() == farthest_distance(), the standard
     //     k-d tree k-NN pruning condition.
+    // NOTE: `nearest` and `nearest_where` are deliberately two near-identical copies of
+    // the same branch-selection and pruning recursion, rather than one function taking an
+    // `Option<&mut dyn FnMut>` predicate.
+    //
+    // They were unified, and `cargo bench --bench kdtree` measured the unfiltered
+    // `nearest_k5` path at ~20.5us vs ~19.2us for the same query with the duplication
+    // (berlin52, 40 samples, non-overlapping intervals) — roughly 6% slower on the
+    // hottest path in the crate, which `lin_kernighan` and `branch_bound` both sit on.
+    // The DRY win is not worth that: the two differ by a single guard, and the shared
+    // invariant is documented on both so a pruning change has to be applied twice,
+    // visibly, rather than silently missed. Re-measure before re-unifying.
+
+    /// Unfiltered k-NN. Every point but `target` itself is eligible.
+    ///
+    /// The guard is a strict `>`: a branch exactly `search_radius()` away is still
+    /// visited, so points tied at the current best distance stay reachable and cannot be
+    /// missed because of where the tree happened to split.
     fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
-        acc.add(self.point, self.point.distance(target_point));
+        // `NearestResult::add` already refuses `pt.id == target.id`; kept here too so the
+        // self-exclusion is explicit at the traversal level.
+        if self.point.id != target_point.id {
+            acc.add(self.point, self.point.distance(target_point));
+        }
 
         let (closest_branch, further_branch) = match self.cmp_by_point(target_point) {
             None => panic!("Dimension conflict in nearest function"),
@@ -291,21 +322,21 @@ impl KDNode {
         }
     }
 
-    /// `nearest` with a candidate predicate: ineligible points are skipped entirely,
-    /// so they neither fill a result slot nor raise `search_radius()`.
+    /// `nearest` with a candidate predicate.
     ///
-    /// The pruning guard is unchanged, and deliberately uses a strict `>`: a branch
-    /// exactly `search_radius()` away is still visited, so points tied at the current
-    /// best distance are always reachable and cannot be missed because of where the
-    /// tree happened to split. Skipping ineligible points here — rather than
-    /// filtering `nearest`'s output — is what keeps the pruning radius honest.
+    /// The predicate runs *before* `acc.add`, so an ineligible point never occupies a
+    /// result slot nor raises `search_radius()`. That ordering is the point: a skipped
+    /// point allowed to raise the radius would let the pruning below cut off branches
+    /// holding the true nearest eligible point, silently returning a farther one.
+    ///
+    /// Same strict-`>` pruning guard as `nearest`, for the same tie-reachability reason.
     fn nearest_where(
         &self,
         target_point: &KDPoint,
         acc: &mut NearestResult,
         predicate: &mut dyn FnMut(&KDPoint) -> bool,
     ) {
-        if predicate(&self.point) {
+        if self.point.id != target_point.id && predicate(&self.point) {
             acc.add(self.point, self.point.distance(target_point));
         }
 
@@ -719,7 +750,7 @@ mod tests {
         let target = cities[0];
 
         let pick = tree
-            .nearest_unvisited(&target, &cities, |id| id != target.id)
+            .nearest_unvisited(&target, |id| id != target.id)
             .expect("two candidates exist");
         assert_approx(1.0, pick.distance);
         assert_eq!(
@@ -743,7 +774,7 @@ mod tests {
         let is_candidate = |id: usize| id != target.id && !excluded.contains(&id);
 
         let pick = tree
-            .nearest_unvisited(&target, &cities, is_candidate)
+            .nearest_unvisited(&target, is_candidate)
             .expect("candidates remain");
 
         let mut expected: Option<(f32, usize)> = None;
