@@ -1,3 +1,4 @@
+use crate::tsp::budget::Budget;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::route::Route;
 use crate::tsp::{SOMOptions, Solution, TspProblem};
@@ -75,6 +76,12 @@ pub fn solve(
     let mut rng = rand::rng();
 
     // Training loop
+    // SOM has no incumbent tour to watch — the map is only decoded at the end — so "progress" is the
+    // quantisation error: how far the cities still sit from their best-matching neurons. That is the
+    // standard convergence measure for a SOM, and it falls as the map fits the cities.
+    let mut budget = Budget::new(epochs, opts.stagnation_epochs);
+    let mut best_error = f64::INFINITY;
+
     for t in 1..=epochs {
         let t_f = t as f64;
         let eta = eta0 * (-t_f / epochs as f64).exp();
@@ -129,6 +136,19 @@ pub fn solve(
                 let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&snapshot), cost));
             }
         }
+
+        let error = quantisation_error(&norm_cities, &neurons);
+        if !budget.record(error < best_error) {
+            if budget.converged() {
+                tracing::info!(
+                    epoch = t,
+                    stagnation_epochs = budget.stale_epochs(),
+                    "SOM: converged, quantisation error stopped improving"
+                );
+            }
+            break;
+        }
+        best_error = best_error.min(error);
     }
 
     let tour = extract_tour(&norm_cities, &neurons, cities);
@@ -150,6 +170,24 @@ pub fn solve(
 /// Extract a tour from current neuron state.
 /// Assigns each city to its closest neuron, sorts by ring index.
 /// Collision tie-break: closer city wins; city array index as final tie-breaker.
+/// Mean distance from each city to its closest neuron — the standard SOM fit measure.
+fn quantisation_error(norm_cities: &[[f64; 2]], neurons: &[[f64; 2]]) -> f64 {
+    if norm_cities.is_empty() {
+        return 0.0;
+    }
+    let total: f64 = norm_cities
+        .iter()
+        .map(|city| {
+            neurons
+                .iter()
+                .map(|neuron| sq_dist(neuron, city))
+                .fold(f64::INFINITY, f64::min)
+                .sqrt()
+        })
+        .sum();
+    total / norm_cities.len() as f64
+}
+
 fn extract_tour(
     norm_cities: &[[f64; 2]],
     neurons: &[[f64; 2]],

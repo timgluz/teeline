@@ -10,8 +10,9 @@ use std::sync::mpsc;
 
 use teeline::tsp::progress::ProgressMessage;
 use teeline::tsp::{
-    CSOptions, FPAOptions, HeuristicOptions, TspProblem, cuckoo_search, distance_matrix,
-    flower_pollination, gravitational_search, kdtree, particle_swarm,
+    AcoOptions, CSOptions, FPAOptions, FourierOptions, HeuristicOptions, SOMOptions, TspProblem,
+    ant_colony, cuckoo_search, distance_matrix, flower_pollination, fourier, gravitational_search,
+    kdtree, particle_swarm, som, tabu_search,
 };
 
 fn problem() -> TspProblem {
@@ -122,3 +123,98 @@ plateau_test!(
     HeuristicOptions,
     |h| h
 );
+
+// --- Solvers whose epoch count is not on the progress seam --------------------------------------
+//
+// `som` reports only at 10% checkpoints and `fourier` takes no progress channel at all, so neither
+// exposes its epoch count the way the four above do. They are held to the property that is
+// independent of counting: a run with a limit still returns a complete tour, and the limit does not
+// change the *shape* of the answer. Their stopping behaviour is pinned by unit tests in the modules
+// (`fourier` measures its decoded tour per stage, `som` its quantisation error), where the signal
+// being measured is directly observable.
+
+fn assert_complete_tour(solver: &str, solution: &teeline::tsp::Solution, expected: usize) {
+    let mut ids = solution.route().to_vec();
+    ids.sort_unstable();
+    ids.dedup();
+    assert_eq!(
+        ids.len(),
+        expected,
+        "{solver}: a stopped run must still visit every city exactly once"
+    );
+}
+
+#[test]
+fn som_honours_a_stagnation_limit_without_truncating_the_tour() {
+    let problem = problem();
+    let expected = problem.cities.len();
+    let opts = SOMOptions {
+        epochs: 500,
+        stagnation_epochs: LIMIT,
+        ..SOMOptions::default()
+    };
+    let (tx, _rx) = mpsc::channel();
+    let solution = som::solve(&problem, &opts, Some(&tx), None);
+    assert_complete_tour("som", &solution, expected);
+}
+
+#[test]
+fn fourier_honours_a_stagnation_limit_without_truncating_the_tour() {
+    let problem = problem();
+    let expected = problem.cities.len();
+    let opts = FourierOptions {
+        stagnation_epochs: LIMIT,
+        ..FourierOptions::default()
+    };
+    let solution = fourier::solve(&problem, &opts, None, None);
+    assert_complete_tour("fourier", &solution, expected);
+}
+
+/// ACO and tabu both report one `EpochUpdate` per epoch, so the limit's effect is countable: a run
+/// with a limit must stop before a cap it would otherwise reach.
+fn assert_limit_bounds_epochs<F>(solver: &str, run: F)
+where
+    F: Fn(&mpsc::Sender<ProgressMessage>, usize) -> teeline::tsp::Solution,
+{
+    let (tx, rx) = mpsc::channel();
+    let _ = run(&tx, LIMIT);
+    drop(tx);
+    let limited = rx
+        .try_iter()
+        .filter(|m| matches!(m, ProgressMessage::EpochUpdate(_)))
+        .count();
+
+    assert!(
+        limited < CAP / 10,
+        "{solver}: a limit of {LIMIT} should stop the run far short of the {CAP} cap; ran {limited}"
+    );
+}
+
+#[test]
+fn ant_colony_stops_on_stagnation() {
+    let problem = problem();
+    assert_limit_bounds_epochs("aco", |tx, limit| {
+        let opts = AcoOptions {
+            heuristic: HeuristicOptions {
+                epochs: CAP,
+                stagnation_epochs: limit,
+                ..HeuristicOptions::default()
+            },
+            ..AcoOptions::default()
+        };
+        ant_colony::solve(&problem, &opts, Some(tx), None)
+    });
+}
+
+#[test]
+fn tabu_search_stops_on_stagnation() {
+    let problem = problem();
+    assert_limit_bounds_epochs("tabu", |tx, limit| {
+        let opts = HeuristicOptions {
+            epochs: CAP,
+            stagnation_epochs: limit,
+            ..HeuristicOptions::default()
+        };
+        tabu_search::solve(&problem, &opts, Some(tx), None)
+    });
+}

@@ -3,6 +3,7 @@ use std::sync::mpsc;
 use rand::RngExt;
 use rand::seq::SliceRandom;
 
+use super::budget::Budget;
 use super::probability::roulette_select;
 use super::progress::ProgressMessage;
 use super::route::Route;
@@ -175,7 +176,12 @@ pub fn solve(
         deposit_tour(&mut pheromone, n, &best_pos_seed, best_cost);
     }
 
-    for epoch in 0..opts.heuristic.epochs {
+    let mut budget = Budget::new(opts.heuristic.epochs, opts.heuristic.stagnation_epochs);
+    let mut improved = true;
+
+    while budget.record(improved) {
+        let epoch = budget.index();
+        let best_at_epoch_start = best_cost;
         // Precomputed once per epoch, not once per ant-step: with num_ants ants each
         // scanning up to n unvisited cities per step, per-step powf would cost roughly
         // num_ants * n^2 / 2 evaluations vs n^2 here.
@@ -241,6 +247,16 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
         }
+
+        improved = best_cost < best_at_epoch_start;
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "ACO: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {

@@ -1,3 +1,4 @@
+use crate::tsp::budget::Budget;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
     FourierOptions, Solution, TspProblem,
@@ -34,11 +35,34 @@ pub fn solve(
     let basis = compute_basis(&ks, opts.m);
     let mut lambda = opts.lambda;
 
+    // One stage per harmonic. A stage is measured by the tour it currently decodes to, because the
+    // coefficients themselves are not comparable across stages — the tension weight changes, so a
+    // better-fitting curve is not necessarily a shorter tour.
+    let mut budget = Budget::new(opts.k_max, opts.stagnation_epochs);
+    let mut best_length = f32::INFINITY;
+    let mut improved = true;
+
     for k_active in 1..=opts.k_max {
+        if !budget.record(improved) {
+            break;
+        }
         for _ in 0..opts.epochs {
             gradient_step(&mut c, &ks, &basis, &cities_cx, lambda, opts.lr, k_active);
         }
         lambda *= opts.lambda_decay;
+
+        let stage_tour = decode_tour(&eval_curve(&c, &ks, opts.m), cities);
+        let stage_length = problem.distances.tour_length(&stage_tour);
+        improved = stage_length < best_length;
+        best_length = best_length.min(stage_length);
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            stages = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "fourier: converged, decoded tour stopped improving"
+        );
     }
 
     let gamma = eval_curve(&c, &ks, opts.m);

@@ -2,17 +2,11 @@ use std::sync::mpsc;
 
 use rand::RngExt;
 
+use super::budget::Budget;
 use super::probability::{cooling, metropolis};
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{SAOptions, Solution, TspProblem};
-
-// Test-only iteration counter. Thread-local rather than global: tests run in parallel, so a shared
-// counter would mix counts across them.
-#[cfg(test)]
-thread_local! {
-    pub(crate) static ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
 
 /// Iterations the cooling schedule needs to reach `min_temperature` from `max_temperature`.
 ///
@@ -62,16 +56,26 @@ fn usable_epochs(opts: &SAOptions) -> usize {
     epochs
 }
 
+/// What a run consumed, so tests and callers can observe it without instrumenting the loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SolveStats {
+    /// Epochs actually run.
+    pub epochs: usize,
+    /// Whether sustained non-improvement ended the run.
+    pub converged: bool,
+    /// Whether the run used its whole epoch budget.
+    pub epoch_capped: bool,
+}
+
 pub fn solve(
     problem: &TspProblem,
     opts: &SAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
-) -> Solution {
+) -> (Solution, SolveStats) {
     let cities = &problem.cities;
     let distances = &problem.distances;
     let cooling_rate = opts.cooling_rate;
-    let mut epoch = 0;
 
     // Resolved here, not in a constructor, so the log reports the budget actually used and every
     // constructor path agrees.
@@ -98,11 +102,15 @@ pub fn solve(
     }
 
     let mut temperature = opts.max_temperature;
-    // Both bounds are capping: whichever is reached first ends the run.
-    while epoch < epoch_limit && temperature > opts.min_temperature {
-        #[cfg(test)]
-        ITERATIONS.with(|n| n.set(n.get() + 1));
+    // Three bounds are capping, and whichever is reached first ends the run: the epoch budget, the
+    // cooling schedule (the temperature falling to its floor), and sustained non-improvement.
+    let mut budget = Budget::new(epoch_limit, opts.heuristic.stagnation_epochs);
+    let mut improved = true;
 
+    while temperature > opts.min_temperature && budget.record(improved) {
+        let epoch = budget.index();
+
+        let best_at_epoch_start = best_distance;
         let candidate = best_route.random_successor();
         let candidate_distance = distances.tour_length(candidate.route());
 
@@ -121,13 +129,32 @@ pub fn solve(
 
         tracing::debug!(epoch, temperature, "SA: tick");
         temperature = cooling(temperature, cooling_rate);
-        epoch += 1;
+        // Updating the best is what counts as progress; accepting a worse tour is the search working,
+        // not the run advancing.
+        improved = best_distance < best_at_epoch_start;
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "SA: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(best_route.route(), cities, distances)
+
+    let stats = SolveStats {
+        epochs: budget.epoch(),
+        converged: budget.converged(),
+        epoch_capped: budget.epoch() >= epoch_limit,
+    };
+    (
+        Solution::from_parts(best_route.route(), cities, distances),
+        stats,
+    )
 }
 
 fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool {
@@ -172,7 +199,7 @@ mod tests {
             ..SAOptions::default()
         };
         let problem = TspProblem::new(cities, dm);
-        let result = solve(&problem, &opts, None, Some(&optimal));
+        let (result, _) = solve(&problem, &opts, None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -186,6 +213,47 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         TspProblem::new(cities, dm)
+    }
+
+    /// The plateau stop must bound a run independently of the cooling schedule.
+    ///
+    /// SA has three bounds — the epoch budget, the temperature floor, and non-improvement — and the
+    /// test keeps the first two well out of the way (an unbounded budget, and a schedule far longer
+    /// than the run) so only sustained non-improvement can explain a run shorter than the schedule.
+    ///
+    /// Scope: this covers the wiring, not which quantity counts as "progress". On a five-city problem
+    /// both a best-tour signal and an acceptance signal converge early, so this test cannot tell them
+    /// apart; the best-tour choice is argued at the assignment in `solve`.
+    #[test]
+    fn test_sa_stops_on_stagnation() {
+        let problem = tiny_problem();
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 0, // no epoch cap
+                stagnation_epochs: 20,
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+        let schedule = schedule_length(&opts);
+        assert!(
+            schedule > 100,
+            "test premise: the schedule must leave room for a plateau stop, got {schedule}"
+        );
+
+        let (_, stats) = solve(&problem, &opts, None, None);
+
+        assert!(stats.converged, "20 non-improving epochs must end the run");
+        assert!(
+            !stats.epoch_capped,
+            "the epoch budget was unbounded, so it cannot be the bound that applied"
+        );
+        assert!(
+            stats.epochs < schedule,
+            "the plateau stop must end the run before the cooling schedule does: \
+             ran {} of {schedule}",
+            stats.epochs
+        );
     }
 
     /// A budget below the schedule length is raised to it rather than truncating the run.
@@ -206,9 +274,8 @@ mod tests {
             ..SAOptions::default()
         };
 
-        ITERATIONS.with(|n| n.set(0));
-        let _ = solve(&problem, &opts, None, None);
-        let iterations = ITERATIONS.with(|n| n.get());
+        let (_, stats) = solve(&problem, &opts, None, None);
+        let iterations = stats.epochs;
 
         // Tolerance on both sides, not equality: `schedule_length` is computed in f64 from the
         // analytic form, while the loop cools in f32 (`t - rate * t`) and accumulates rounding over
@@ -232,9 +299,8 @@ mod tests {
             ..SAOptions::default()
         };
 
-        ITERATIONS.with(|n| n.set(0));
-        let _ = solve(&problem, &opts, None, None);
-        let iterations = ITERATIONS.with(|n| n.get());
+        let (_, stats) = solve(&problem, &opts, None, None);
+        let iterations = stats.epochs;
 
         assert!(
             iterations > 1_000,
@@ -263,9 +329,8 @@ mod tests {
             "test premise: schedule {schedule} should be below the explicit budget"
         );
 
-        ITERATIONS.with(|n| n.set(0));
-        let _ = solve(&problem, &opts, None, None);
-        let iterations = ITERATIONS.with(|n| n.get());
+        let (_, stats) = solve(&problem, &opts, None, None);
+        let iterations = stats.epochs;
 
         // Same f32-vs-f64 reasoning as above: the epoch cap (5000) does not bind here, so the f32
         // cooling loop alone decides the count and can land a few iterations either side of the

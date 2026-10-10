@@ -174,7 +174,7 @@ fn simulated_annealing_valid_tour_berlin52() {
         },
         ..SAOptions::default()
     };
-    let tour = simulated_annealing::solve(&make_problem(&cities), &opts, None, None);
+    let (tour, _) = simulated_annealing::solve(&make_problem(&cities), &opts, None, None);
 
     assert!(
         is_valid_tour(tour.route(), &cities),

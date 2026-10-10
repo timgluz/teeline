@@ -195,6 +195,7 @@ fn make_app_options(
             lambda_decay: c.lambda_decay.unwrap_or(d.lambda_decay),
             lr: c.lr.unwrap_or(d.lr),
             epochs: c.epochs.unwrap_or(d.epochs),
+            stagnation_epochs: c.stagnation_epochs.unwrap_or(d.stagnation_epochs),
         }
     });
     if let Some(ref fr) = fourier {
@@ -208,6 +209,7 @@ fn make_app_options(
             learning_rate: c.learning_rate.unwrap_or(d.learning_rate),
             radius_fraction: c.radius_fraction.unwrap_or(d.radius_fraction),
             neuron_multiplier: c.neuron_multiplier.unwrap_or(d.neuron_multiplier),
+            stagnation_epochs: c.stagnation_epochs.unwrap_or(d.stagnation_epochs),
         }
     });
     if let Some(ref sm) = som {

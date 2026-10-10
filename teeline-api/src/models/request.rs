@@ -142,6 +142,8 @@ pub struct SomConfig {
     pub radius_fraction: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neuron_multiplier: Option<usize>,
+    /// Consecutive non-improving epochs before stopping early; 0 = never stop early.
+    pub stagnation_epochs: Option<usize>,
 }
 
 /// Fourier constructive solver. Mirrors `FourierOptions` (f64 fields match the lib).
@@ -159,6 +161,8 @@ pub struct FourierConfig {
     pub lambda_decay: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lr: Option<f64>,
+    /// Consecutive non-improving stages before stopping early; 0 = never stop early.
+    pub stagnation_epochs: Option<usize>,
 }
 
 /// Per-solver optional configuration. Pass only the field matching your chosen solver.
