@@ -231,7 +231,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn tour_cost_with_type_att_and_ceil_2d() {
         // Covers the ATT / CEIL_2D arms of `tour_cost_with_type` — their own code paths in
         // this function, which the api and CLI route tour-cost reporting through.
@@ -274,6 +273,7 @@ mod tests {
         }
     }
 
+    #[test]
     fn tour_cost_with_type_geo_burma14_pair() {
         // Two cities from burma14 at positions that should produce the known
         // GEO distance from the distance_matrix tests: 837.
