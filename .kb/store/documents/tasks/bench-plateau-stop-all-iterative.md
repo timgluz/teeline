@@ -3,7 +3,7 @@ id: 01a12651-55d5-7f71-84c7-360c3a0086fa
 slug: tasks/bench-plateau-stop-all-iterative
 title: "feat(tsp): shared plateau stop for all iterative solvers"
 type: task
-status: active
+status: completed
 priority: high
 tags: [solver, benchmarks, convergence]
 blocked_by: [tasks/bench-sa-honours-epoch-budget]
@@ -77,3 +77,34 @@ solver with several such sites (`cuckoo_search` has two) — `clippy`'s `unused_
 **Still to do beyond wiring:** per-solver convergence tests, migrating `lin_kernighan` off
 `platoo_epochs`, removing `simulated_annealing`'s test-only `ITERATIONS` counter, and updating the
 solver docs.
+
+### 2026-10-10 (later)
+
+- **All ten iterative solvers wired.** [#567](https://github.com/timgluz/teeline/pull/567) (merge
+  `12d5ed2b`) added `pso`, `cs`, `fpa`, `gsa`; [#568](https://github.com/timgluz/teeline/pull/568)
+  (merge `9d6fdae6`) added `sa`, `aco`, `som`, `fourier`, `tabu_search`. Every one now goes through
+  the shared `Budget`, and `stagnation_epochs` defaults to 0 (disabled) everywhere.
+- **`simulated_annealing`'s test-only `ITERATIONS` counter is gone**, replaced by a returned
+  `SolveStats`. That was the last test-only global in the solvers.
+- **Five open-code-review passes on #568** (9 → 4 → 7 → 2 → 2 findings, all addressed). Worth
+  remembering: most later findings were defects introduced by the previous round's fixes, including
+  two cases where the plateau stop silently never fired while appearing to work — SOM reported
+  progress on unmeasured epochs (stale counter peaked at 1, so any limit above 1 was ignored at the
+  default 100k epochs) and SA never reset `improved` to false. Both now have tests that fail against
+  the old behaviour.
+
+#### Deliberate design decisions worth carrying forward
+
+- `sa` **returns a different tour than before**: the honest incumbent, not the last accepted move
+  (which could be worse than one already seen). Documented in the PR body as a behaviour change.
+- `fourier`'s option counts **harmonic stages**, not epochs, and shares the `--stagnation_epochs`
+  name for consistency. Doc, CLI help and a warning state it; a limit at or above `k_max - 1` cannot
+  fire.
+- `som` samples a noisy signal (one random city per epoch), so detection can lag by one interval. The
+  interval scales with `n` and is capped so the stop can always fire.
+
+#### Split out
+
+The `lin_kernighan` migration moved to `tasks/bench-lk-use-shared-plateau-option`: it is not wiring but
+a change to a delivered default (`platoo_epochs` defaults to 10 where `stagnation_epochs` defaults to
+0), so it needs its own compatibility decision rather than riding along with this work.

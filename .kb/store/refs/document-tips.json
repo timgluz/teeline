@@ -279,7 +279,7 @@
     {
       "document_id": "01a12651-55d5-7f71-84c7-360c3a0086fa",
       "slug": "tasks/bench-plateau-stop-all-iterative",
-      "tip_commit_id": "01a126e7-51b9-7de1-92aa-17f13dfa6aea"
+      "tip_commit_id": "01a1273b-0227-7112-b968-39df2ba0ad09"
     },
     {
       "document_id": "01a12651-55eb-7e41-9ab3-08235b16bfab",
@@ -325,6 +325,11 @@
       "document_id": "01a126de-0734-7a40-b552-369ed5f2960b",
       "slug": "tasks/solver-progress-listener",
       "tip_commit_id": "01a126de-176b-74a1-8d6a-b773ab3c08bb"
+    },
+    {
+      "document_id": "01a1273a-ef08-7462-b2da-bdef1659b8ba",
+      "slug": "tasks/bench-lk-use-shared-plateau-option",
+      "tip_commit_id": "01a1273b-010a-7d73-b30d-430172dc5719"
     }
   ]
 }
