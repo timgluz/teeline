@@ -167,6 +167,11 @@ pub enum DistanceType {
     Euc2D,
     Explicit,
     Geo,
+    /// TSPLIB ATT (pseudo-Euclidean): `r = sqrt((dx^2 + dy^2) / 10)`, then `nint(r)`, plus
+    /// one when that rounding went down. Integer-valued.
+    Att,
+    /// TSPLIB CEIL_2D: Euclidean distance rounded up. Integer-valued.
+    Ceil2D,
 }
 
 impl FromStr for DistanceType {
@@ -176,6 +181,8 @@ impl FromStr for DistanceType {
             "EUC_2D" | "EUC2D" => Ok(DistanceType::Euc2D),
             "EXPLICIT" => Ok(DistanceType::Explicit),
             "GEO" => Ok(DistanceType::Geo),
+            "ATT" => Ok(DistanceType::Att),
+            "CEIL_2D" | "CEIL2D" => Ok(DistanceType::Ceil2D),
             other => Err(format!("unsupported distance type: {other}")),
         }
     }

@@ -617,11 +617,29 @@ mod tests {
 
     #[test]
     fn test_process_lines_unknown_type_falls_back_to_euc2d() {
-        let cursor = "NAME: att_case\nEDGE_WEIGHT_TYPE: ATT\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n".as_bytes();
+        // A genuinely unrecognised type. This test used ATT as its example, which is how
+        // the silent ATT->EUC_2D fallback went unnoticed: it asserted the fallback as
+        // intended behaviour.
+        let cursor = "NAME: bogus_case\nEDGE_WEIGHT_TYPE: MAN_2D\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n".as_bytes();
         let reader = BufReader::new(cursor);
         let res = process_lines(reader);
         assert!(res.is_ok());
         assert_eq!(res.unwrap().distance_type, DistanceType::Euc2D);
+    }
+
+    #[test]
+    fn test_process_lines_parses_att_and_ceil_2d() {
+        for (declared, expected) in [
+            ("ATT", DistanceType::Att),
+            ("CEIL_2D", DistanceType::Ceil2D),
+        ] {
+            let cursor = format!(
+                "NAME: t\nEDGE_WEIGHT_TYPE: {declared}\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n"
+            );
+            let res = process_lines(BufReader::new(cursor.as_bytes()));
+            assert!(res.is_ok(), "{declared} should parse");
+            assert_eq!(res.unwrap().distance_type, expected);
+        }
     }
 
     #[test]

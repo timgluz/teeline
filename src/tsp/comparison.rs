@@ -34,6 +34,8 @@ pub fn tour_cost_with_type(route: &[usize], cities: &[KDPoint], dt: DistanceType
                     (dx * dx + dy * dy).sqrt()
                 }
                 DistanceType::Geo => distance_matrix::geo_distance(a, b),
+                DistanceType::Att => distance_matrix::att_distance(a, b),
+                DistanceType::Ceil2D => distance_matrix::ceil_2d_distance(a, b),
                 DistanceType::Explicit => {
                     panic!("tour_cost_with_type requires DistanceMatrix for EXPLICIT; use tour_cost_from_matrix instead")
                 }
