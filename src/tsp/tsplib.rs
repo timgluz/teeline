@@ -196,10 +196,17 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
         return Err("ATSP (asymmetric TSP) is not supported".to_string());
     }
 
-    let distance_type: DistanceType = metadata
-        .get("EDGE_WEIGHT_TYPE")
-        .and_then(|v| v.trim().parse::<DistanceType>().ok())
-        .unwrap_or_default();
+    // An absent key defaults to EUC_2D (nothing was declared); a *declared* but unsupported
+    // type is an error. The previous `.ok().unwrap_or_default()` silently measured MAN_2D,
+    // MAX_2D, EUC_3D and friends as planar Euclidean — the same silent-wrong-answer class
+    // the ATT/CEIL_2D support above exists to remove.
+    let distance_type: DistanceType = match metadata.get("EDGE_WEIGHT_TYPE") {
+        None => DistanceType::default(),
+        Some(v) => v
+            .trim()
+            .parse::<DistanceType>()
+            .map_err(|e| e.to_string())?,
+    };
 
     let dimension: usize = metadata
         .get("DIMENSION")
@@ -616,12 +623,48 @@ mod tests {
     }
 
     #[test]
-    fn test_process_lines_unknown_type_falls_back_to_euc2d() {
-        let cursor = "NAME: att_case\nEDGE_WEIGHT_TYPE: ATT\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n".as_bytes();
-        let reader = BufReader::new(cursor);
-        let res = process_lines(reader);
-        assert!(res.is_ok());
+    fn test_process_lines_rejects_an_unsupported_declared_type() {
+        // This test previously asserted that an unrecognised type silently became EUC_2D,
+        // using ATT as its example — which is how the ATT mis-measurement survived: the
+        // behaviour was asserted as intended. A declared type we cannot honour is now an
+        // error, because measuring it as planar Euclidean yields plausible wrong answers.
+        let cursor = "NAME: bogus_case\nEDGE_WEIGHT_TYPE: MAN_2D\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n".as_bytes();
+        let res = process_lines(BufReader::new(cursor));
+        assert!(
+            res.is_err(),
+            "MAN_2D must not be silently measured as EUC_2D"
+        );
+        assert!(
+            res.unwrap_err().contains("MAN_2D"),
+            "the error should name the unsupported type"
+        );
+    }
+
+    #[test]
+    fn test_process_lines_defaults_to_euc2d_when_type_absent() {
+        // Absent is not the same as unsupported: a missing key still defaults.
+        let cursor = "NAME: untyped\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n".as_bytes();
+        let res = process_lines(BufReader::new(cursor));
+        assert!(
+            res.is_ok(),
+            "an absent EDGE_WEIGHT_TYPE should still default"
+        );
         assert_eq!(res.unwrap().distance_type, DistanceType::Euc2D);
+    }
+
+    #[test]
+    fn test_process_lines_parses_att_and_ceil_2d() {
+        for (declared, expected) in [
+            ("ATT", DistanceType::Att),
+            ("CEIL_2D", DistanceType::Ceil2D),
+        ] {
+            let cursor = format!(
+                "NAME: t\nEDGE_WEIGHT_TYPE: {declared}\nNODE_COORD_SECTION\n1 2.0 3.0\n2 4.0 5.0\nEOF\n"
+            );
+            let res = process_lines(BufReader::new(cursor.as_bytes()));
+            assert!(res.is_ok(), "{declared} should parse");
+            assert_eq!(res.unwrap().distance_type, expected);
+        }
     }
 
     #[test]
