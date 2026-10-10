@@ -63,6 +63,7 @@ fn is_valid_tour(tour_route: &[usize], cities: &[kdtree::KDPoint]) -> bool {
 fn stochastic_options(epochs: usize) -> HeuristicOptions {
     HeuristicOptions {
         epochs,
+        stagnation_epochs: 500,
         platoo_epochs: epochs / 5,
         ..HeuristicOptions::default()
     }

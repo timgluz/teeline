@@ -17,6 +17,9 @@ struct Component;
 fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
     let heuristic = HeuristicOptions {
         epochs: o.epochs as usize,
+        // Not exposed through the WASM interface yet; 0 keeps the plateau stop off, matching the
+        // option's default.
+        stagnation_epochs: 0,
         platoo_epochs: o.platoo_epochs as usize,
         n_nearest: o.n_nearest as usize,
         verbose: false,

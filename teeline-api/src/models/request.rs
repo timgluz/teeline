@@ -6,6 +6,11 @@ use utoipa::ToSchema;
 pub struct HeuristicConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epochs: Option<usize>,
+    /// Stop after this many consecutive epochs without improvement; `0` means never stop early (the
+    /// epoch cap still applies). Defaults to 0 (disabled), so omitting it changes nothing. Currently
+    /// honoured only by the `ga` solver — other solvers accept and ignore it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stagnation_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub platoo_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -313,6 +318,7 @@ mod tests {
             sa: Some(SaConfig {
                 heuristic: Some(HeuristicConfig {
                     epochs: Some(5000),
+                    stagnation_epochs: None,
                     platoo_epochs: None,
                     n_nearest: None,
                 }),
@@ -377,6 +383,7 @@ mod tests {
                 sa: Some(SaConfig {
                     heuristic: Some(HeuristicConfig {
                         epochs: Some(1000),
+                        stagnation_epochs: None,
                         platoo_epochs: None,
                         n_nearest: None,
                     }),
@@ -410,6 +417,7 @@ mod tests {
                 aco: Some(AcoConfig {
                     heuristic: Some(HeuristicConfig {
                         epochs: Some(300),
+                        stagnation_epochs: None,
                         platoo_epochs: None,
                         n_nearest: None,
                     }),

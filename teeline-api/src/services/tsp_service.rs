@@ -30,6 +30,7 @@ pub struct TspService;
 fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicOptions {
     HeuristicOptions {
         epochs: h.epochs.unwrap_or(base.epochs),
+        stagnation_epochs: h.stagnation_epochs.unwrap_or(base.stagnation_epochs),
         platoo_epochs: h.platoo_epochs.unwrap_or(base.platoo_epochs),
         n_nearest: h.n_nearest.unwrap_or(base.n_nearest),
         verbose: false,
@@ -853,5 +854,31 @@ EOF
             ..Default::default()
         };
         assert!(fpa.validate().is_err());
+    }
+
+    /// The mapping must carry `stagnation_epochs` through and keep the solver's own default when the
+    /// caller omits it — a dropped field or a wrong base would silently disable the feature.
+    #[test]
+    fn map_heuristic_onto_carries_stagnation_epochs() {
+        // Deliberately not the generic default: if the mapping took the wrong base or hard-coded the
+        // default, both assertions would still pass with an all-500 setup.
+        let mut base = SAOptions::default().heuristic;
+        base.stagnation_epochs = 123;
+        let defaulted = HeuristicConfig::default();
+        assert_eq!(
+            map_heuristic_onto(&defaulted, base.clone()).stagnation_epochs,
+            base.stagnation_epochs,
+            "omitting the field must preserve the solver-specific default"
+        );
+
+        let requested = HeuristicConfig {
+            stagnation_epochs: Some(7),
+            ..HeuristicConfig::default()
+        };
+        assert_eq!(
+            map_heuristic_onto(&requested, base).stagnation_epochs,
+            7,
+            "an explicit value must reach the solver options"
+        );
     }
 }

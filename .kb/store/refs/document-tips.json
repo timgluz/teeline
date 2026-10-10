@@ -320,6 +320,11 @@
       "document_id": "01a12651-5689-7883-ab53-7ff7bb70901e",
       "slug": "tasks/bench-regression-history",
       "tip_commit_id": "01a12651-aa71-7630-9ae4-047807590611"
+    },
+    {
+      "document_id": "01a126de-0734-7a40-b552-369ed5f2960b",
+      "slug": "tasks/solver-progress-listener",
+      "tip_commit_id": "01a126de-176b-74a1-8d6a-b773ab3c08bb"
     }
   ]
 }
