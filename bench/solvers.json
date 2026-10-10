@@ -44,10 +44,14 @@
       "cli": "nearest_neighbor",
       "name": "Nearest Neighbour",
       "family": "constructive",
-      "deterministic": false,
+      "deterministic": true,
       "doc": "nearest-neighbor",
-      "notes": "Non-deterministic today: `n_nearest` defaults to 3 and the frontier query is visited-blind, so the HashSet-iteration fallback in nearest_neighbor.rs picks a different city per process. Phase 1 of the plan fixes this.",
-      "determinism_evidence": null,
+      "notes": "Fixed: the greedy step now always chooses the true nearest unvisited city, with ties broken by lowest city id. Previously it approximated with an n_nearest=3 frontier and resolved exact ties via HashSet iteration order, giving 3 different tours on a280. Verified identical across 10 process invocations; matches an independent greedy reference in tests/nn_determinism_test.rs.",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 10,
+        "outcome": "identical"
+      },
       "default_configs": [
         "default"
       ]
@@ -137,14 +141,14 @@
       "cli": "two_opt",
       "name": "2-opt",
       "family": "local",
-      "deterministic": false,
+      "deterministic": true,
       "doc": "two-opt",
-      "notes": "NON-DETERMINISTIC (measured). Auto-seeds from nn, so it inherits nn's variance: 6 runs on a280 gave 2814.92 / 3125.49 / 2797.03. Stable on berlin52 only by luck of that instance.",
+      "notes": "Auto-seeds from nn. Deterministic since the nn fix removed the seed variance (verified 3 runs on a280: 2797.02881). Before that fix this was measured varying. Measured identical across 4 process invocations on a280.",
       "deterministic_method": "measured",
       "determinism_evidence": {
         "instance": "a280",
-        "runs": 6,
-        "outcome": "varied"
+        "runs": 4,
+        "outcome": "identical"
       },
       "default_configs": [
         "default"
@@ -155,14 +159,14 @@
       "cli": "three_opt",
       "name": "3-opt",
       "family": "local",
-      "deterministic": false,
+      "deterministic": true,
       "doc": "three-opt",
-      "notes": "NON-DETERMINISTIC (measured). Auto-seeds from nn: 2 runs on a280 gave 2690.56 / 2706.56.",
+      "notes": "Auto-seeds from nn; deterministic since the nn fix (3 runs on a280: 2681.28809). Measured identical across 3 process invocations on a280.",
       "deterministic_method": "measured",
       "determinism_evidence": {
         "instance": "a280",
-        "runs": 2,
-        "outcome": "varied"
+        "runs": 3,
+        "outcome": "identical"
       },
       "default_configs": [
         "default"
@@ -173,14 +177,14 @@
       "cli": "or_opt",
       "name": "Or-opt",
       "family": "local",
-      "deterministic": false,
+      "deterministic": true,
       "doc": "or-opt",
-      "notes": "NON-DETERMINISTIC (measured). Auto-seeds from nn: 6 runs on a280 gave 2815.80 / 2886.48 / 2813.79 / 2884.47.",
+      "notes": "Auto-seeds from nn; deterministic since the nn fix (3 runs on a280: 2813.78564). Measured identical across 4 process invocations on a280.",
       "deterministic_method": "measured",
       "determinism_evidence": {
         "instance": "a280",
-        "runs": 6,
-        "outcome": "varied"
+        "runs": 4,
+        "outcome": "identical"
       },
       "default_configs": [
         "default"

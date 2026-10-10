@@ -54,7 +54,7 @@
 use std::collections::HashMap;
 
 use super::kdtree::KDPoint;
-use super::{CityTable, DistanceType, NearestResult};
+use super::{CityTable, DistanceType, NearestResult, NearestResultItem};
 
 pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     use std::f64::consts::PI;
@@ -279,6 +279,62 @@ impl DistanceMatrix {
         search_result
     }
 
+    /// Nearest city satisfying `is_candidate`, ties broken by **lowest city id**.
+    ///
+    /// Takes a predicate rather than a visited/unvisited `HashSet` on purpose. An
+    /// earlier revision took `&HashSet<usize> visited` and the caller passed its
+    /// `unvisited` set — every city was treated as visited and the query returned
+    /// `None`, collapsing the tour to a single city. A predicate forces the caller to
+    /// state the membership test explicitly (`!unvisited.contains(&id)`), so the set's
+    /// polarity cannot be silently inverted.
+    ///
+    /// The predicate must not match `target` itself; pass a closure that excludes it
+    /// (`id != current_id`), since a city is always at distance 0 from itself and would
+    /// otherwise be selected immediately.
+    ///
+    /// Cost is O(n) per call — the whole row is scanned, because a distance matrix can
+    /// reach every city and therefore cannot miss the true nearest the way a k-limited
+    /// candidate search can. See `KDTree::nearest_unvisited` for the pruned variant.
+    ///
+    /// Deterministic in both distance and identity: the winner is chosen by the total
+    /// order `(distance, city_id)`, never by iteration order. That is the fix for `nn`'s
+    /// run-to-run variance — the previous implementation resolved ties with `min_by`
+    /// over a `HashSet`, whose iteration order varies between processes.
+    ///
+    /// Returns `None` when no city satisfies `is_candidate`.
+    pub fn nearest_unvisited(
+        &self,
+        target: &KDPoint,
+        is_candidate: impl Fn(usize) -> bool,
+    ) -> Option<NearestResultItem> {
+        let city_pos = self.city_id2pos(target.id)?;
+        let row = self.distances_from_index(city_pos);
+
+        let mut best: Option<NearestResultItem> = None;
+        for (pos, distance) in row.iter().enumerate() {
+            if pos == city_pos {
+                continue;
+            }
+            let Some(pt) = self.cities.get(&pos) else {
+                continue;
+            };
+            if !is_candidate(pt.id) {
+                continue;
+            }
+            let better = match &best {
+                None => true,
+                // Total order on (distance, id): equidistant candidates resolve to
+                // the lowest id, so the choice cannot drift between runs.
+                Some(current) => (*distance, pt.id) < (current.distance, current.point.id),
+            };
+            if better {
+                best = Some(NearestResultItem::new(*pt, *distance));
+            }
+        }
+
+        best
+    }
+
     fn distances_from_index(&self, pos: usize) -> Vec<f32> {
         let mut distances = Vec::with_capacity(self.n);
         for i in 0..pos {
@@ -302,6 +358,115 @@ mod tests {
     use super::*;
     use crate::test::helpers::assert_approx;
     use crate::tsp::kdtree;
+
+    #[test]
+    fn nearest_unvisited_takes_the_closest_candidate() {
+        // Collinear 5-city instance: ids 0..4 at x = 0,1,2,3,4. Starting from id 0,
+        // excluding 0, the nearest candidate is id 1.
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![2.0, 0.0],
+            vec![3.0, 0.0],
+            vec![4.0, 0.0],
+        ]);
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+        let start = cities[0].id;
+
+        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        assert_eq!(pick.point.id, cities[1].id);
+        assert_approx(1.0, pick.distance);
+
+        // Excluding the three nearest leaves id 4.
+        let excluded: Vec<usize> = vec![start, cities[1].id, cities[2].id, cities[3].id];
+        let pick = dm
+            .nearest_unvisited(&cities[0], |id| !excluded.contains(&id))
+            .unwrap();
+        assert_eq!(pick.point.id, cities[4].id);
+        assert_approx(4.0, pick.distance);
+    }
+
+    #[test]
+    fn nearest_unvisited_breaks_ties_by_lowest_city_id() {
+        // id 0 at origin; ids 1 and 2 are both exactly 1.0 away.
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![-1.0, 0.0]]);
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+        let start = cities[0].id;
+
+        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        assert_approx(1.0, pick.distance);
+        assert_eq!(
+            pick.point.id, cities[1].id,
+            "exact tie must resolve to the lowest city id, never iteration order"
+        );
+    }
+
+    #[test]
+    fn nearest_unvisited_returns_none_when_nothing_is_eligible() {
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0]]);
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+
+        assert!(
+            dm.nearest_unvisited(&cities[0], |_| false).is_none(),
+            "an empty candidate set must yield None rather than a bogus city"
+        );
+    }
+
+    /// The regression that the predicate API exists to prevent.
+    ///
+    /// A `HashSet`-based signature made it possible to pass `unvisited` where the
+    /// function expected `visited`, and every unit test above still passed because
+    /// their excluded sets were trivial. This test drives the real fixture with the
+    /// real polarity a caller uses, and checks the answer against an independent
+    /// reference built from the public id-based distance API.
+    #[test]
+    fn nearest_unvisited_matches_reference_on_real_a280_data() {
+        use crate::tsp::tsplib;
+
+        let problem = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/data/tsplib/a280.tsp"
+        )))
+        .expect("a280 fixture must parse");
+        let cities = problem.cities().to_vec();
+        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+
+        let start = cities[0].id;
+        let unvisited: std::collections::HashSet<usize> = cities
+            .iter()
+            .map(|c| c.id)
+            .filter(|id| *id != start)
+            .collect();
+        assert_eq!(unvisited.len(), cities.len() - 1);
+
+        let pick = dm
+            .nearest_unvisited(&cities[0], |id| id != start && unvisited.contains(&id))
+            .expect("279 cities are unvisited, so a nearest must exist");
+        assert!(
+            unvisited.contains(&pick.point.id),
+            "must not return an already-visited city"
+        );
+
+        // Independent reference: scan the same candidate set via the public
+        // id-addressed API and take the min by (distance, id).
+        let mut reference: Option<(f32, usize)> = None;
+        for &id in &unvisited {
+            let d = dm.distance_between(start, id).unwrap_or(f32::MAX);
+            let better = match reference {
+                None => true,
+                Some((bd, bi)) => (d, id) < (bd, bi),
+            };
+            if better {
+                reference = Some((d, id));
+            }
+        }
+        let (ref_dist, ref_id) = reference.unwrap();
+        assert_eq!(
+            pick.point.id, ref_id,
+            "predicate query disagreed with the id-based reference"
+        );
+        assert_approx(ref_dist, pick.distance);
+    }
 
     #[test]
     fn test_build_distance_matrix_from_empty_list() {

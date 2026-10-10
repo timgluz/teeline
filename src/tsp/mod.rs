@@ -1889,7 +1889,7 @@ impl NearestResult {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct NearestResultItem {
     pub distance: f32,
     pub point: KDPoint,

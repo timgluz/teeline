@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use super::NearestResult;
+use super::{NearestResult, NearestResultItem};
 
 pub type PointMatrix = Vec<Vec<f32>>;
 pub(crate) type KDSubTree = Option<Box<KDNode>>;
@@ -121,6 +121,78 @@ impl KDTree {
         acc
     }
 
+    /// Nearest point satisfying `predicate`, or `None` when the tree holds no
+    /// eligible point.
+    ///
+    /// Unlike `nearest` followed by filtering the returned `n` items, an ineligible
+    /// point is *never added to the accumulator*. That distinction is the point of
+    /// this method: a filtered-out point must not occupy a result slot nor raise
+    /// `search_radius()`, because `search_radius()` is what prunes subtrees. If a
+    /// visited point is allowed to raise the radius, the search prunes branches that
+    /// may hold the true nearest unvisited point and silently returns a farther one.
+    /// That is precisely how `nearest_neighbor`'s "nearest unvisited among the k
+    /// nearest overall" approximation ended up picking non-nearest cities.
+    ///
+    /// Determinism: the *distance* returned is independent of traversal order
+    /// (pruning is exact for `n = 1`), but which member of an exact-distance tie is
+    /// returned is not specified — see `nearest_unvisited` for the tie-broken form.
+    pub fn nearest_where(
+        &self,
+        target: &KDPoint,
+        predicate: &mut dyn FnMut(&KDPoint) -> bool,
+    ) -> Option<NearestResultItem> {
+        let mut acc = NearestResult::new(*target, 1);
+        if let Some(root) = &self.root {
+            root.nearest_where(target, &mut acc, predicate);
+        }
+        acc.nearest().first().copied()
+    }
+
+    /// Nearest point satisfying `is_candidate`, ties broken by **lowest id**.
+    ///
+    /// The pruned counterpart of `DistanceMatrix::nearest_unvisited`, and the same
+    /// contract: a predicate rather than a visited/unvisited set, so the caller states
+    /// the membership test explicitly instead of relying on a parameter name to convey
+    /// polarity.
+    ///
+    /// Deterministic in distance and identity. `nearest_where` fixes the minimum
+    /// distance without letting skipped points distort pruning, but which member of an
+    /// exact-distance tie it returns is unspecified, so ties are resolved here by a
+    /// scan for the lowest eligible id — and only when a tie actually exists, which
+    /// keeps the common path sublinear.
+    pub fn nearest_unvisited(
+        &self,
+        target: &KDPoint,
+        cities: &[KDPoint],
+        is_candidate: impl Fn(usize) -> bool,
+    ) -> Option<NearestResultItem> {
+        let best = {
+            let mut predicate = |pt: &KDPoint| pt.id != target.id && is_candidate(pt.id);
+            self.nearest_where(target, &mut predicate)?
+        };
+
+        // Exact float equality is deliberate: this asks whether another candidate is
+        // the same distance away, which is exactly when traversal order decides.
+        let tied_lower = cities
+            .iter()
+            .filter(|pt| {
+                pt.id < best.point.id
+                    && pt.id != target.id
+                    && is_candidate(pt.id)
+                    && pt.distance(target) == best.distance
+            })
+            .map(|pt| pt.id)
+            .min();
+
+        match tied_lower {
+            Some(id) => {
+                let pt = cities.iter().find(|c| c.id == id)?;
+                Some(NearestResultItem::new(*pt, best.distance))
+            }
+            None => Some(best),
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.size
     }
@@ -208,6 +280,42 @@ impl KDNode {
             && let Some(branch) = further_branch
         {
             branch.nearest(target_point, acc);
+        }
+    }
+
+    /// `nearest` with a candidate predicate: ineligible points are skipped entirely,
+    /// so they neither fill a result slot nor raise `search_radius()`.
+    ///
+    /// The pruning guard is unchanged, and deliberately uses a strict `>`: a branch
+    /// exactly `search_radius()` away is still visited, so points tied at the current
+    /// best distance are always reachable and cannot be missed because of where the
+    /// tree happened to split. Skipping ineligible points here — rather than
+    /// filtering `nearest`'s output — is what keeps the pruning radius honest.
+    fn nearest_where(
+        &self,
+        target_point: &KDPoint,
+        acc: &mut NearestResult,
+        predicate: &mut dyn FnMut(&KDPoint) -> bool,
+    ) {
+        if predicate(&self.point) {
+            acc.add(self.point, self.point.distance(target_point));
+        }
+
+        let (closest_branch, further_branch) = match self.cmp_by_point(target_point) {
+            None => panic!("Dimension conflict in nearest function"),
+            Some(Ordering::Greater) => (self.left(), self.right()),
+            Some(_) => (self.right(), self.left()),
+        };
+
+        if let Some(branch) = closest_branch {
+            branch.nearest_where(target_point, acc, predicate);
+        }
+
+        let split_dist = self.point.split_distance(target_point, self.level_coord());
+        if acc.search_radius() > split_dist
+            && let Some(branch) = further_branch
+        {
+            branch.nearest_where(target_point, acc, predicate);
         }
     }
 
@@ -564,6 +672,89 @@ mod tests {
 
         let res5 = kd.nearest(&cities[4], 2);
         assert_eq!(cities[3].id, res5.closest_point().unwrap().id);
+    }
+
+    #[test]
+    fn nearest_where_skips_ineligible_points_without_distorting_pruning() {
+        // Four collinear points at x = 0, 10, 20, 30. Querying from x=1 for the
+        // nearest *eligible* point must return 10 even when 0 is excluded, and must
+        // not be fooled into returning 20 because 0 filled the result buffer.
+        let cities = build_points(&[
+            vec![0.0, 0.0],
+            vec![10.0, 0.0],
+            vec![20.0, 0.0],
+            vec![30.0, 0.0],
+        ]);
+        let tree = from_cities(&cities);
+        let target = KDPoint::new(&[1.0, 0.0]);
+
+        // Exclude the two nearest (x=0 at 1.0 and x=10 at 9.0): expect x=20.
+        let excluded = [cities[0].id, cities[1].id];
+        let pick = tree
+            .nearest_where(&target, &mut |pt| !excluded.contains(&pt.id))
+            .expect("two points remain eligible");
+        assert_eq!(pick.point.id, cities[2].id);
+        assert_approx(19.0, pick.distance);
+
+        // Excluding everything yields None rather than a stale candidate.
+        assert!(
+            tree.nearest_where(&target, &mut |_| false).is_none(),
+            "an empty candidate set must yield None"
+        );
+    }
+
+    #[test]
+    fn nearest_unvisited_breaks_ties_by_lowest_id() {
+        // ids 0..2: id 0 at origin, ids 1 and 2 exactly 1.0 away either side.
+        let cities = build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![-1.0, 0.0]]);
+        let tree = from_cities(&cities);
+        let target = cities[0];
+
+        let pick = tree
+            .nearest_unvisited(&target, &cities, |id| id != target.id)
+            .expect("two candidates exist");
+        assert_approx(1.0, pick.distance);
+        assert_eq!(
+            pick.point.id, cities[1].id,
+            "an exact tie must resolve to the lowest id, not traversal order"
+        );
+    }
+
+    #[test]
+    fn nearest_unvisited_matches_brute_force_over_eligible_points() {
+        let cities = build_points(&[
+            vec![0.0, 0.0],
+            vec![3.0, 4.0],
+            vec![1.0, 0.0],
+            vec![10.0, 10.0],
+            vec![0.0, 2.0],
+        ]);
+        let tree = from_cities(&cities);
+        let target = cities[0];
+        let excluded = [cities[1].id, cities[4].id];
+        let is_candidate = |id: usize| id != target.id && !excluded.contains(&id);
+
+        let pick = tree
+            .nearest_unvisited(&target, &cities, is_candidate)
+            .expect("candidates remain");
+
+        let mut expected: Option<(f32, usize)> = None;
+        for pt in &cities {
+            if !is_candidate(pt.id) {
+                continue;
+            }
+            let d = pt.distance(&target);
+            let better = match expected {
+                None => true,
+                Some((bd, bi)) => (d, pt.id) < (bd, bi),
+            };
+            if better {
+                expected = Some((d, pt.id));
+            }
+        }
+        let (exp_d, exp_id) = expected.unwrap();
+        assert_eq!(pick.point.id, exp_id);
+        assert_approx(exp_d, pick.distance);
     }
 
     #[test]

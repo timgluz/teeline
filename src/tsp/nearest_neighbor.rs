@@ -19,7 +19,6 @@ pub fn solve(
         "NN starting"
     );
 
-    let n_nearest = opts.n_nearest;
     let cities_table: HashMap<usize, _> = cities.iter().map(|c| (c.id, *c)).collect();
 
     let mut unvisited: HashSet<usize> = cities.iter().map(|c| c.id).collect();
@@ -41,26 +40,21 @@ pub fn solve(
             let _ = tx.send(ProgressMessage::CityChange(current_id));
         }
 
-        let frontier = distances.nearest(current_city, n_nearest);
-        let next_id = frontier
-            .nearest()
-            .iter()
-            .find(|item| unvisited.contains(&item.point.id))
-            .map(|item| item.point.id)
-            .unwrap_or_else(|| {
-                *unvisited
-                    .iter()
-                    .min_by(|&&a, &&b| {
-                        let da = distances
-                            .distance_between(current_id, a)
-                            .unwrap_or(f32::MAX);
-                        let db = distances
-                            .distance_between(current_id, b)
-                            .unwrap_or(f32::MAX);
-                        da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .expect("unvisited is non-empty")
-            });
+        // Greedy nearest neighbour means *the nearest unvisited city*, full stop.
+        //
+        // This deliberately does not use `opts.n_nearest`. That option bounds a
+        // candidate list for algorithms that genuinely trade exactness for speed
+        // (`lin_kernighan`, `branch_bound`), but using it here made the greedy step
+        // approximate: "the nearest unvisited among the k nearest overall" is not the
+        // nearest unvisited, and it silently produced worse tours. It was also the
+        // first half of the run-to-run variance bug — the second half was the
+        // HashSet-ordered tie-break that this call replaced with a total order.
+        let Some(nearest) = distances.nearest_unvisited(current_city, |id| {
+            id != current_id && unvisited.contains(&id)
+        }) else {
+            break;
+        };
+        let next_id = nearest.point.id;
 
         path.push(next_id);
         unvisited.remove(&next_id);
