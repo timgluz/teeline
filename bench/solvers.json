@@ -9,10 +9,10 @@
       "family": "exact",
       "deterministic": true,
       "doc": "bellman-held-karp",
-      "notes": "Exponential; only viable on very small instances (<= ~20 cities). Measured stable over 5-6 runs on a280 (n=280). Measured identical over 3 runs on burma14. Measured optimal on burma14/gr17/ulysses16.",
+      "notes": "Exponential; only viable on very small instances (<= ~20 cities). Measured stable over 5-6 runs on a280 (n=280). Measured identical over 3 runs on burma14. Measured optimal on burma14/gr17/ulysses16. Measured identical across 3 process invocations on burma14/gr17/ulysses16.",
       "deterministic_method": "measured",
       "determinism_evidence": {
-        "instance": "burma14",
+        "instance": "burma14/gr17/ulysses16",
         "runs": 3,
         "outcome": "identical"
       },
@@ -27,10 +27,10 @@
       "family": "exact",
       "deterministic": true,
       "doc": "branch-bound",
-      "notes": "Default `n_nearest=3` restricts branching to the 3 nearest cities, which makes it INCOMPLETE as an exact solver: measured burma14 3651 / gr17 2187 / ulysses16 6909 against known optima 3323 / 2085 / 6859. With `--n_nearest 100` it returns all three optima. Benchmark both configs: `default` (n_nearest=3) and `exact` (--n_nearest 100).",
+      "notes": "Default `n_nearest=3` restricts branching to the 3 nearest cities, which makes it a BEAM SEARCH, not an exact solver: measured burma14 3651 / gr17 2187 / ulysses16 6909 against known optima 3323 / 2085 / 6859. With `--n_nearest 100` it returns all three optima. Output is reproducible across runs (identical over 3 invocations of each instance). Benchmark both configs: `default` (n_nearest=3) and `exact` (--n_nearest 100).",
       "deterministic_method": "measured",
       "determinism_evidence": {
-        "instance": "burma14",
+        "instance": "burma14/gr17/ulysses16",
         "runs": 3,
         "outcome": "identical"
       },
