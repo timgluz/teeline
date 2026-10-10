@@ -85,10 +85,21 @@ pub fn solve(
     // The first and last epochs are always sampled so a short run still yields a comparison.
     let tracking = opts.stagnation_epochs > 0;
     let measure_interval = if tracking {
-        let n_neurons_f = num_neurons as f64;
-        (epochs / 1000)
-            .max(((n_neurons_f / 8.0).ceil() as usize * n.max(1)) / 10)
-            .max(1)
+        // Widen with n so the sampled work stays a fraction of training (a sample costs about n times
+        // an epoch). Capped so there are always several samples: an interval approaching `epochs`
+        // would leave only the forced first and last samples, making the stop unable to fire early.
+        let for_cost = (n * opts.neuron_multiplier / 8).max(1) * n / 10;
+        let interval = (epochs / 1000).max(for_cost).max(1);
+        let interval = interval.min((epochs / 8).max(1));
+        if interval >= epochs / 2 {
+            tracing::warn!(
+                measure_interval = interval,
+                epochs,
+                "SOM: the sampling interval is too coarse for the plateau stop to fire before the \
+                 run ends; increase --epochs or lower --neuron-multiplier"
+            );
+        }
+        interval
     } else {
         1
     };
@@ -178,7 +189,9 @@ pub fn solve(
                 }
                 // The loop can stop between checkpoints, so publish the map as it stands rather than
                 // leaving the last reported state up to 10% of the run out of date.
-                if let Some(tx) = progress_tx {
+                // The checkpoint block above already published this epoch when it lands on one, so
+                // only publish here otherwise.
+                if let Some(tx) = progress_tx.filter(|_| t % checkpoint != 0) {
                     let snapshot = extract_tour(&norm_cities, &neurons, cities);
                     let cost = problem.distances.tour_length(&snapshot);
                     let _ = tx.send(ProgressMessage::EpochUpdate(t));
