@@ -57,6 +57,13 @@ use super::kdtree::KDPoint;
 use super::{CityTable, DistanceType, NearestResult, NearestResultItem};
 
 pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    // Full-precision PI, deliberately, not TSPLIB's truncated `PI = 3.141592` from the
+    // FAQ. The two differ on 474 of the corpus's 517,680 GEO distances by exactly 1 unit,
+    // but produce identical tour lengths for every GEO instance with a published optimum
+    // (ulysses16/22, gr96/137/202/229/431/666), so the truncated constant buys no
+    // comparability that matters while introducing a real error of ~1e-7 relative. The
+    // FAQ's `deg = (int) x[i]` is matched: `trunc()` also rounds toward zero, which
+    // matters because 916 corpus coordinates are negative.
     use std::f64::consts::PI;
     fn to_rad(x: f32) -> f64 {
         let deg = x.trunc() as f64;
@@ -687,6 +694,35 @@ mod tests {
 
         let res5 = dm.nearest(&cities[4], 2);
         assert_eq!(cities[0].id, res5.closest_point().unwrap().id);
+    }
+
+    #[test]
+    fn geo_distance_matches_a_published_optimum() {
+        // GEO had no fixture with a known optimum, so nothing in CI pinned the great-circle
+        // path to external truth — only a `> 100.0` range check on burma14. This anchors it:
+        // ulysses16's published optimum is 6859, and its optimal tour must measure exactly
+        // that.
+        //
+        // It also pins the PI choice. Full-precision PI and TSPLIB's truncated 3.141592
+        // disagree on individual distances (by 1) yet agree on this total, so this test
+        // alone does not force the constant — it is here so a GEO distance regression of
+        // any real size fails loudly.
+        use crate::tsp::{DistanceType, opt_tour, tsplib};
+        let data = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/ulysses16.tsp"
+        )))
+        .expect("ulysses16 fixture must parse");
+        assert_eq!(data.distance_type, DistanceType::Geo, "fixture is not GEO");
+
+        let dm = data.distance_matrix().expect("geo distance matrix builds");
+        let tour = opt_tour::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/ulysses16.opt.tour"
+        )))
+        .expect("ulysses16.opt.tour must parse; without it this test asserts nothing");
+
+        assert_approx(6859.0, dm.tour_length(&tour.route));
     }
 
     #[test]
