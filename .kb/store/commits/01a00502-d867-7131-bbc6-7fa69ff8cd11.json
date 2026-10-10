@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"d39c6527208184974d19945fd0c3c9addd736c748eec1beabd6fdaca81a1a06e","doc_type":"task","document_id":"01a00502-b3f9-74a0-9886-3e9dffa5a2df","new_version":1,"previous_version":null,"slug":"tasks/blog-passkeys-instead-of-clerk","title":"Blog: Passkeys instead of Clerk (story post + recipe follow-up)"}],"created_at":"2026-08-15T10:41:07.619128873Z","id":"01a00502-d867-7131-bbc6-7fa69ff8cd11","message":"Task: blog 'Passkeys instead of Clerk' (story post + recipe follow-up)"},
+  "content_hash": "7aca59f050601f34e5cf321567adf477cf8125f7396cc18db5eaddaa81eacd09",
+  "hash_version": 3
+}

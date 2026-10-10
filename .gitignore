@@ -2,8 +2,16 @@
 /data
 
 # GitKB
+#
+# The store is tracked deliberately: it holds the specs, ADRs and tasks, and with no sync
+# remote configured an ignored store exists only on one machine — unbacked-up and invisible to
+# anyone who clones. It earned this: a `repair projection` run against a stale store dropped
+# the KB from 64 documents to 1, and only a previously committed snapshot made recovery
+# possible.
+#
+# `.kb/workspaces/` is a materialized copy of the store for editing, so tracking it would
+# duplicate every document. `.kb/workspace/` holds scratch checkouts. The cache is ~300MB.
 .kb/.cache/
-.kb/store/
 .kb/workspace/
 .kb/workspaces/
 .claude/plans

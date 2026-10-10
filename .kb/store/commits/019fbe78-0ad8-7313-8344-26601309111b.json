@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"fc5688dc5e05bc82e24aeb58f3f04575d8a4da680744da601b768daae5cf08ca","doc_type":"task","document_id":"019fbe77-e1b2-7611-a40a-3b8abccc499f","new_version":1,"previous_version":null,"slug":"tasks/gh371-fourier-cli-flags","title":"GH #371: Fourier k_max/m CLI + pipeline TOML flags"}],"created_at":"2026-08-01T17:56:05.886661876Z","id":"019fbe78-0ad8-7313-8344-26601309111b","message":"Create task for GH #371 Fourier CLI/TOML implementation"},
+  "content_hash": "6d93f82f05c660fcc09782d6af15040f4d55c73d4b059a17dcb29ac510303b3e",
+  "hash_version": 3
+}

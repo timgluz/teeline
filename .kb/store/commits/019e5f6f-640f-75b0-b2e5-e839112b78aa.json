@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"b47c1d646efb76488ea6ff2aa75378dc21a7205ee8c32bfc1c979f6d0ff013b7","doc_type":"task","document_id":"019e5f6f-52e3-7860-93c5-a084a5417500","new_version":1,"previous_version":null,"slug":"tasks/gh-97-distance-matrix-fix","title":"fix: DistanceMatrix correctness and panic safety (issue #97)"}],"created_at":"2026-05-25T13:59:56.159659630Z","id":"019e5f6f-640f-75b0-b2e5-e839112b78aa","message":"Add task for issue #97: DistanceMatrix correctness and panic safety"},
+  "content_hash": "af00d9902d187a216a5bce7e7fc2c61139eb09ec483a09cec1d97cf913efef97",
+  "hash_version": 3
+}

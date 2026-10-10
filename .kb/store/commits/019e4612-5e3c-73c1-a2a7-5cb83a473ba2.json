@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"658dfe03fbd3d49612fc7fd9b2d15bd6a059c81b06e71cd03dfbda747addc833","doc_type":"task","document_id":"019e4612-51df-7853-a829-5c3805f56f1d","new_version":1,"previous_version":null,"slug":"tasks/gh-66-pipeline-solver","title":"Pipeline Solver: Chain Multiple Solvers with Warm-Start Seeding (GH #66)"}],"created_at":"2026-05-20T15:47:49.352433104Z","id":"019e4612-5e3c-73c1-a2a7-5cb83a473ba2","message":"Create task: Pipeline Solver — chain multiple solvers with warm-start seeding (GH #66)"},
+  "content_hash": "026866a597e95e37ffa7007a829dfd1076771d5a8d85b8bac6afc8d1d299f5d0",
+  "hash_version": 3
+}
