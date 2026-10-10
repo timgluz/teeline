@@ -84,6 +84,30 @@ pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     (RRR * cos_angle.acos() + 1.0).floor() as f32
 }
 
+/// TSPLIB ATT ("pseudo-Euclidean"): round `r = sqrt((dx^2 + dy^2) / 10)` to the nearest
+/// integer, then add one when rounding went *down*, so the result is never below `r`.
+pub(crate) fn att_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    // Widened before subtracting: `(p1.x() - p2.x()) as f64` would round the difference in
+    // f32 first, and this result is compared against an integer boundary (`t < r`), so the
+    // reference semantics are worth keeping for fractional coordinates.
+    let dx = p1.x() as f64 - p2.x() as f64;
+    let dy = p1.y() as f64 - p2.y() as f64;
+    // Divided before the sqrt, matching the spec's `sqrt((dx^2 + dy^2) / 10)` and the
+    // reference implementations, rather than the algebraically-equal `sqrt(d2) / sqrt(10)`.
+    let r = ((dx * dx + dy * dy) / 10.0).sqrt();
+    let t = r.round();
+    (if t < r { t + 1.0 } else { t }) as f32
+}
+
+/// TSPLIB CEIL_2D: Euclidean distance rounded up.
+pub(crate) fn ceil_2d_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    // Widened before subtracting, for the same reason as `att_distance`: the `ceil` sits on
+    // an integer boundary that an f32-rounded difference could cross.
+    let dx = p1.x() as f64 - p2.x() as f64;
+    let dy = p1.y() as f64 - p2.y() as f64;
+    (dx * dx + dy * dy).sqrt().ceil() as f32
+}
+
 // to have similar builder as kdtree
 pub fn from_cities(cities: &[KDPoint]) -> DistanceMatrix {
     DistanceMatrix::from_cities(cities).unwrap()
@@ -147,6 +171,8 @@ impl DistanceMatrix {
                 let d = match distance_type {
                     DistanceType::Euc2D => pt1.distance(pt2),
                     DistanceType::Geo => geo_distance(pt1, pt2),
+                    DistanceType::Att => att_distance(pt1, pt2),
+                    DistanceType::Ceil2D => ceil_2d_distance(pt1, pt2),
                     DistanceType::Explicit => {
                         return Err(
                             "cannot build distance matrix from coordinates for EXPLICIT type — use DistanceMatrix::new() with precomputed distances",
@@ -411,28 +437,6 @@ mod tests {
         }
     }
 
-    /// Guards a real gap: the parser maps any unrecognised EDGE_WEIGHT_TYPE to the
-    /// default EUC_2D (`parse::<DistanceType>().ok().unwrap_or_default()`), and
-    /// `DistanceType` has no ATT or CEIL_2D variant. So att48/att532/dsj1000 are currently
-    /// measured as if they were planar, and comparing their tour lengths to TSPLIB's
-    /// published optima is not meaningful. If this test starts failing, the formula was
-    /// implemented and the affected benchmark numbers need recomputing.
-    #[test]
-    fn att_is_not_silently_measured_as_euclidean() {
-        use crate::tsp::tsplib;
-        let data = tsplib::read_from_file(std::path::Path::new(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/att48.tsp"
-        )))
-        .expect("att48 fixture must parse");
-        assert_eq!(
-            data.distance_type,
-            crate::tsp::DistanceType::Euc2D,
-            "att48 now uses a non-Euclidean formula: recompute the ATT benchmark rows and \
-             update or delete this guard"
-        );
-    }
-
     #[test]
     fn nearest_unvisited_takes_the_closest_candidate() {
         // Collinear 5-city instance: ids 0..4 at x = 0,1,2,3,4. Starting from id 0,
@@ -543,6 +547,71 @@ mod tests {
             "predicate query disagreed with the id-based reference"
         );
         assert_approx(ref_dist, pick.distance);
+    }
+
+    #[test]
+    fn att_distance_follows_the_tsplib_definition() {
+        // TSPLIB ATT: r = sqrt((dx^2 + dy^2) / 10); t = nint(r); d = t, or t + 1 when the
+        // rounding went down.
+        let city = |id: usize, x: f32, y: f32| kdtree::KDPoint::new_with_id(id, &[x, y]);
+
+        // r = sqrt(100/10) = 3.16228 -> nint 3, and 3 < r -> 4.
+        assert_approx(4.0, att_distance(&city(0, 0.0, 0.0), &city(1, 0.0, 10.0)));
+        // r = sqrt(500/10) = 7.07107 -> 7 < r -> 8. The branch a plain `round` gets wrong.
+        assert_approx(8.0, att_distance(&city(0, 0.0, 0.0), &city(1, 10.0, 20.0)));
+        assert_approx(5.0, att_distance(&city(0, 0.0, 0.0), &city(1, 10.0, 10.0)));
+        // Exactly-integral r must not be nudged up by rounding: dx=10, dy=30 -> r = 10.
+        assert_approx(10.0, att_distance(&city(0, 0.0, 0.0), &city(1, 10.0, 30.0)));
+
+        // ATT is not Euclidean: the integer rounding distinguishes it.
+        let p = city(0, 0.0, 0.0);
+        let q = city(1, 3.0, 4.0);
+        assert_approx(5.0, p.distance(&q));
+        assert_approx(2.0, att_distance(&p, &q)); // sqrt(25/10) = 1.5811 -> 2
+    }
+
+    #[test]
+    fn ceil_2d_distance_rounds_up() {
+        let city = |id: usize, x: f32, y: f32| kdtree::KDPoint::new_with_id(id, &[x, y]);
+        assert_approx(
+            5.0,
+            ceil_2d_distance(&city(0, 0.0, 0.0), &city(1, 3.0, 4.0)),
+        );
+        assert_approx(
+            2.0,
+            ceil_2d_distance(&city(0, 0.0, 0.0), &city(1, 1.0, 1.0)),
+        ); // 1.4142
+        assert_approx(
+            4.0,
+            ceil_2d_distance(&city(0, 0.0, 0.0), &city(1, 3.0, 2.0)),
+        ); // 3.6056
+    }
+
+    #[test]
+    fn att_tour_length_matches_the_known_optimum() {
+        // External anchor: att48's published ATT optimum is 10628, and its tracked optimal
+        // tour must measure exactly that. (33523.71, often quoted for att48, is the
+        // *Euclidean* length of the same tour - a different metric.)
+        use crate::tsp::{DistanceType, opt_tour, tsplib};
+        let data = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/att48.tsp"
+        )))
+        .expect("att48 fixture must parse");
+        assert_eq!(
+            data.distance_type,
+            DistanceType::Att,
+            "att48 no longer declares ATT"
+        );
+        let cities = data.cities().to_vec();
+        let dm = DistanceMatrix::build(&cities, data.distance_type).expect("matrix builds");
+
+        let tour = opt_tour::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/att48.opt.tour"
+        )))
+        .expect("att48.opt.tour must parse; without it this test asserts nothing");
+        assert_approx(10628.0, dm.tour_length(&tour.route));
     }
 
     #[test]
