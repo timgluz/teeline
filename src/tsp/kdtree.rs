@@ -190,35 +190,17 @@ impl KDNode {
     //     ensuring we never prune before the buffer is full.
     //   - Once full, search_radius() == farthest_distance(), the standard
     //     k-d tree k-NN pruning condition.
-    // NOTE: `nearest` and `nearest_where` are deliberately two near-identical copies of
-    // the same branch-selection and pruning recursion, rather than one function taking an
-    // `Option<&mut dyn FnMut>` predicate.
-    //
-    // They were unified, and `cargo bench --bench kdtree` measured the unfiltered
-    // `nearest_k5` path at ~20.5us vs ~19.2us for the same query with the duplication
-    // (berlin52, 40 samples, non-overlapping intervals) — roughly 6% slower on the
-    // hottest path in the crate, which `lin_kernighan` and `branch_bound` both sit on.
-    // The DRY win is not worth that: the two differ by a single guard, and the shared
-    // invariant is documented on both so a pruning change has to be applied twice,
-    // visibly, rather than silently missed. Re-measure before re-unifying.
+    // Kept as two copies rather than one parameterised traversal: unifying them cost ~6%
+    // on `nearest_k5` (cargo bench --bench kdtree), which is the crate's hottest path.
+    // Re-measure before unifying.
 
-    /// Unfiltered k-NN. Every point but `target` itself is eligible.
+    /// Unfiltered k-NN.
     ///
-    /// Pruning correctness: the guard `search_radius() > split_dist` skips the far branch
-    /// only when every point in it is strictly farther than the current k-th best, so no
-    /// *strictly closer* point can be missed. That is the only guarantee.
-    ///
-    /// Equidistant points are **not** guaranteed reachable: the guard is a strict `>`, so a
-    /// branch exactly `search_radius()` away is pruned, and `NearestResult::add` likewise
-    /// rejects `new_distance == search_radius()`. Which member of an exact-distance tie
-    /// ends up in the buffer therefore depends on traversal order. For `n == 1` the
-    /// returned *distance* is still exact — a strictly closer point cannot have been
-    /// pruned — but the returned *point* among tied candidates is unspecified. Callers
-    /// needing a stable choice must break the tie themselves (see `KDNode::nearest_where`
-    /// and `DistanceMatrix::nearest_unvisited`).
+    /// Only guarantees no *strictly closer* point is missed — the guard and
+    /// `NearestResult::add` both use a strict comparison, so equidistant candidates may be
+    /// pruned and the point returned among a tie depends on traversal order. Callers
+    /// needing a stable tie-break must do it themselves.
     fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
-        // `NearestResult::add` already refuses `pt.id == target.id`; kept here too so the
-        // self-exclusion is explicit at the traversal level.
         if self.point.id != target_point.id {
             acc.add(self.point, self.point.distance(target_point));
         }
@@ -243,24 +225,12 @@ impl KDNode {
 
     /// `nearest` with a candidate predicate.
     ///
-    /// The predicate runs *before* `acc.add`, so an ineligible point never occupies a
-    /// result slot nor raises `search_radius()`. That ordering is the point: a skipped
-    /// point allowed to raise the radius would let the pruning below cut off branches
-    /// holding the true nearest eligible point, silently returning a farther one.
+    /// The predicate must run *before* `acc.add`: an ineligible point that reaches the
+    /// accumulator would raise `search_radius()` and let the pruning below cut off branches
+    /// holding the true nearest eligible point.
     ///
-    /// Same strict-`>` pruning guard as `nearest`, with the same guarantee and the same
-    /// caveat: no strictly closer candidate is missed, but a candidate tied at the k-th
-    /// distance may be pruned, so which tied point is returned is unspecified.
-    ///
-    /// `#[cfg(test)]` because nothing in the crate calls it. `nn` uses
-    /// `DistanceMatrix::nearest_unvisited`; a tree-based candidate query cannot beat that
-    /// today, because resolving an exact-distance tie by lowest id needs the whole
-    /// candidate set, which makes any such query O(n) — the same as the matrix scan — so
-    /// the pruned traversal buys nothing. Kept compiled under `cfg(test)` with the test
-    /// below pinning its pruning invariant, so it stays correct and ready if a genuinely
-    /// sublinear formulation ever appears. Gating rather than shipping it as public API
-    /// keeps a second, differently-shaped "nearest unvisited" out of the production
-    /// surface, where it could drift from the matrix implementation.
+    /// `cfg(test)` because nothing calls it: a tree-based variant cannot beat
+    /// `DistanceMatrix::nearest_unvisited` (both are O(n) once ties are resolved by id).
     #[cfg(test)]
     fn nearest_where(
         &self,

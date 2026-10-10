@@ -279,31 +279,18 @@ impl DistanceMatrix {
         search_result
     }
 
-    /// Nearest city satisfying `is_candidate`, ties broken by **lowest city id**.
+    /// Nearest city satisfying `is_candidate`, ties broken by lowest city id.
     ///
-    /// Takes a predicate rather than a visited/unvisited `HashSet` on purpose. An
-    /// earlier revision took `&HashSet<usize> visited` and the caller passed its
-    /// `unvisited` set — every city was treated as visited and the query returned
-    /// `None`, collapsing the tour to a single city. A predicate forces the caller to
-    /// state the membership test explicitly (`unvisited.contains(&id)`), so which set the
-    /// caller means is visible at the call site and cannot be silently inverted.
+    /// A predicate rather than a visited/unvisited set: taking `&HashSet<usize> visited`
+    /// let a caller pass its `unvisited` set without the compiler noticing, inverting the
+    /// test and returning `None` for every query.
     ///
-    /// `target` is excluded internally, so the predicate only ever sees other cities and
-    /// `|id| unvisited.contains(&id)` is already correct. A caller that also writes
-    /// `id != current_id` is harmless, not required — the guard runs before the predicate
-    /// is consulted. (Stated explicitly because a caller relying on the predicate for
-    /// self-exclusion would be broken by any future reordering of that loop.)
+    /// `target` is excluded internally, so `|id| unvisited.contains(&id)` is already
+    /// correct and a caller's extra `id != current_id` is harmless.
     ///
-    /// Cost is O(n) per call — the whole row is scanned, because a distance matrix can
-    /// reach every city and therefore cannot miss the true nearest the way a k-limited
-    /// candidate search can. See `KDTree::nearest_unvisited` for the pruned variant.
-    ///
-    /// Deterministic in both distance and identity: the winner is chosen by the total
-    /// order `(distance, city_id)`, never by iteration order. That is the fix for `nn`'s
-    /// run-to-run variance — the previous implementation resolved ties with `min_by`
-    /// over a `HashSet`, whose iteration order varies between processes.
-    ///
-    /// Returns `None` when no city satisfies `is_candidate`.
+    /// O(n): the whole row is scanned. Deterministic by the total order
+    /// `(distance, city_id)` rather than iteration order, which is what makes `nn`
+    /// reproducible.
     pub fn nearest_unvisited(
         &self,
         target: &KDPoint,
@@ -317,12 +304,8 @@ impl DistanceMatrix {
             if pos == city_pos {
                 continue;
             }
-            // Unreachable for any matrix built through `build()`/`new()`, which populate
-            // `cities` for every position in `0..n` (and `new()` additionally asserts
-            // `city_idx.len() == n`). Skipped rather than asserted to match `nearest()`
-            // immediately above, which handles a gap the same way; the difference is that
-            // a gap here would narrow the candidate scan rather than the k-NN buffer, so
-            // the two are at least consistent instead of one panicking and one not.
+            // Unreachable: `build()`/`new()` populate `cities` for every position 0..n.
+            // Skipped to match `nearest()` above rather than asserting.
             let Some(pt) = self.cities.get(&pos) else {
                 continue;
             };

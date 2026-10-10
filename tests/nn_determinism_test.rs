@@ -1,23 +1,8 @@
-//! Regression tests for `nn`'s run-to-run variance.
+//! Regression tests for `nn` nondeterminism.
 //!
-//! `nn` used to return different tours across process invocations of `data/tsplib/a280.tsp`
-//! (three distinct costs were reachable: 3148.11, 3168.95, 3551.81). Two defects
-//! caused it:
-//!
-//! 1. The greedy step asked for "the nearest unvisited among the k nearest overall",
-//!    which is not the nearest unvisited. Whenever all k nearest were already
-//!    visited it fell through to a second, differently-defined selection path, so
-//!    the result depended on how often that happened.
-//! 2. That fallback resolved ties with `min_by` over a `HashSet`, and `min_by`
-//!    returns the first element *in iteration order* when all comparisons are equal.
-//!    `HashSet` iteration order varies per process, so exactly-tied cities were
-//!    chosen nondeterministically. a280 is a drilling grid with 71 exact ties among
-//!    its 279 greedy steps, which is why it exposed the bug so readily.
-//!
-//! An in-process repeat cannot catch this: `HashSet`'s seed is per process, so the
-//! bug only appears across invocations. These tests therefore (a) assert `nn` matches
-//! an independent greedy reference — which the k-limited approximation violates — and
-//! (b) repeat the solve to catch any reintroduced per-call nondeterminism.
+//! A repeat within one process is not sufficient: `HashSet`'s seed is per process, so the
+//! bug this guards against only shows up across invocations. Hence the reference-based
+//! assertions rather than plain "does it visit every city" checks.
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -44,11 +29,8 @@ fn solve_nn(problem: &TspProblem) -> teeline::tsp::Solution {
     nearest_neighbor::solve(problem, &HeuristicOptions::default(), None, None)
 }
 
-/// Independent reference implementation of greedy nearest neighbour.
-///
-/// Deliberately written against the public API in the most obvious way possible:
-/// scan every unvisited city, take the minimum by `(distance, city_id)`. It shares
-/// no code with the solver, so agreeing with it is meaningful.
+/// Independent greedy reference: scan all unvisited, take the min by
+/// `(distance, city_id)`. Shares no code with the solver, so agreement is meaningful.
 fn reference_greedy_nn(problem: &TspProblem) -> Vec<usize> {
     let cities = &problem.cities;
     let dm = &problem.distances;
@@ -78,10 +60,8 @@ fn reference_greedy_nn(problem: &TspProblem) -> Vec<usize> {
     route
 }
 
-/// The core regression: `nn` must pick the *true* nearest unvisited city at every step.
-///
-/// The previous k-limited implementation returned a different (and longer) tour here —
-/// 3168.95 or 3551.81 instead of 3148.11 on a280.
+/// The core regression: the old k-limited step returned 3168.95 or 3551.81 here instead
+/// of the true greedy 3148.11.
 #[test]
 fn nn_matches_greedy_reference_on_a280() {
     let problem = load("a280.tsp");
@@ -102,11 +82,8 @@ fn nn_matches_greedy_reference_on_berlin52() {
     assert_eq!(solution.route(), reference_greedy_nn(&problem).as_slice());
 }
 
-/// Repeating the solve must not change the answer.
-///
-/// Weaker than cross-process determinism (see the module docs), but it does catch a
-/// reintroduced per-call source of variation, and it is the assertion the original
-/// code would already have needed.
+/// Weaker than cross-process determinism (module docs), but catches a reintroduced
+/// per-call source of variation.
 #[test]
 fn nn_is_stable_across_repeated_solves() {
     let problem = load("a280.tsp");
@@ -176,14 +153,9 @@ fn every_greedy_step_chooses_a_nearest_unvisited_city() {
     }
 }
 
-/// The fix must hold on every edge-weight code path, not just EUC_2D.
-///
-/// `nn` was only ever verified on EUC_2D instances, so a regression specific to another
-/// metric would have gone unnoticed. These fixtures cover the other types the corpus
-/// actually uses: EXPLICIT (a raw lower-diagonal matrix) and ATT (pseudo-Euclidean).
-///
-/// Costs are asserted as reproducible and plausible rather than pinned to exact
-/// constants, so a future algorithmic improvement does not fail the suite.
+/// Non-EUC_2D paths, which the other tests here never exercise: EXPLICIT (a raw
+/// lower-diagonal matrix) and ATT (pseudo-Euclidean). Asserted as reproducible plus a
+/// plausible gap rather than pinned costs, so quality improvements do not fail the suite.
 #[test]
 fn nn_is_stable_and_sane_on_explicit_and_att_instances() {
     for (fixture, optimum) in [("gr17.tsp", 2085.0_f32), ("att48.tsp", 33523.71_f32)] {
@@ -224,15 +196,10 @@ fn nn_is_stable_and_sane_on_explicit_and_att_instances() {
     }
 }
 
-/// A minimal instance with an exact distance tie, pinning the tie-break rule.
-///
-/// Every other fixture in this crate is either tie-free or only asserted to visit all
-/// cities, so a regression back to hash-ordered or `n_nearest`-limited selection could
-/// pass them. This one fails such a regression directly.
-///
-/// Geometry: city 0 at the origin, city 1 at (1,0), city 2 at (-1,0). From city 0,
-/// cities 1 and 2 are *exactly* 1.0 away — a genuine float tie, not a near-tie — so only
-/// the tie-break decides the route. Lowest id must win, giving [0, 1, 2].
+/// An exact distance tie, which no other fixture here has: cities 1 and 2 are both
+/// exactly 1.0 from city 0, so only the tie-break decides the route. Guards against a
+/// regression to hash-ordered or `n_nearest`-limited selection, both of which could pass
+/// the visit-every-city assertions.
 #[test]
 fn nn_breaks_exact_ties_by_lowest_city_id() {
     use teeline::tsp::kdtree;

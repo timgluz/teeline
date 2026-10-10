@@ -7,21 +7,16 @@ use super::{HeuristicOptions, Solution, TspProblem};
 
 pub fn solve(
     problem: &TspProblem,
-    // `nn` is the one solver that reads nothing from HeuristicOptions: the greedy step
-    // needs the nearest unvisited city, and `n_nearest` is a candidate-list limit that
-    // only makes sense for solvers trading exactness for speed. Underscored rather than
-    // removed to keep the uniform `solve(problem, opts, tx, init)` signature every solver
-    // shares, and so the signature does not change if it ever needs an option again.
+    // `nn` reads nothing from HeuristicOptions; `n_nearest` is a candidate-list limit for
+    // solvers that trade exactness for speed. Kept for the uniform solver signature.
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
-    // Deliberately does not log `opts.n_nearest`: the greedy step ignores it, and a log
-    // naming a field with no effect on the result invites someone debugging a
-    // reproducibility problem to blame it. Mirrors `greedy_edge::solve`, which also
-    // ignores HeuristicOptions and logs only `cities`.
+    // Not logging `opts.n_nearest`: it has no effect here, and naming it invites
+    // misattribution when debugging reproducibility.
     tracing::info!(cities = cities.len(), "NN starting");
 
     let cities_table: HashMap<usize, _> = cities.iter().map(|c| (c.id, *c)).collect();
@@ -45,20 +40,12 @@ pub fn solve(
             let _ = tx.send(ProgressMessage::CityChange(current_id));
         }
 
-        // Greedy nearest neighbour means *the nearest unvisited city*, full stop.
+        // No `n_nearest` here: greedy means the nearest unvisited, and a k-limited
+        // candidate set silently produced worse tours.
         //
-        // This deliberately does not use `opts.n_nearest`. That option bounds a
-        // candidate list for algorithms that genuinely trade exactness for speed
-        // (`lin_kernighan`, `branch_bound`), but using it here made the greedy step
-        // approximate: "the nearest unvisited among the k nearest overall" is not the
-        // nearest unvisited, and it silently produced worse tours. It was also the
-        // first half of the run-to-run variance bug — the second half was the
-        // HashSet-ordered tie-break that this call replaced with a total order.
-        // `expect`, not a silent `break`: the loop guard says `unvisited` is non-empty and
-        // `current_city` comes from the same city set the matrix was built from, so a `None`
-        // here means one of those invariants is broken. Breaking quietly would truncate the
-        // tour and return a shorter "solution" with no diagnostic — exactly the
-        // silent-wrong-answer class of bug this rewrite exists to remove, so fail loudly.
+        // `expect` rather than `break`: with `unvisited` non-empty and `current_city` from
+        // the matrix's own cities, `None` means an invariant broke, and a quiet break would
+        // return a truncated tour as if it were a solution.
         let nearest = distances
             .nearest_unvisited(current_city, |id| {
                 id != current_id && unvisited.contains(&id)
