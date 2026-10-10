@@ -87,8 +87,11 @@ pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
 /// TSPLIB ATT ("pseudo-Euclidean"): round `r = sqrt((dx^2 + dy^2) / 10)` to the nearest
 /// integer, then add one when rounding went *down*, so the result is never below `r`.
 pub(crate) fn att_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
-    let dx = (p1.x() - p2.x()) as f64;
-    let dy = (p1.y() - p2.y()) as f64;
+    // Widened before subtracting: `(p1.x() - p2.x()) as f64` would round the difference in
+    // f32 first, and this result is compared against an integer boundary (`t < r`), so the
+    // reference semantics are worth keeping for fractional coordinates.
+    let dx = p1.x() as f64 - p2.x() as f64;
+    let dy = p1.y() as f64 - p2.y() as f64;
     // Divided before the sqrt, matching the spec's `sqrt((dx^2 + dy^2) / 10)` and the
     // reference implementations, rather than the algebraically-equal `sqrt(d2) / sqrt(10)`.
     let r = ((dx * dx + dy * dy) / 10.0).sqrt();
@@ -98,8 +101,10 @@ pub(crate) fn att_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
 
 /// TSPLIB CEIL_2D: Euclidean distance rounded up.
 pub(crate) fn ceil_2d_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
-    let dx = (p1.x() - p2.x()) as f64;
-    let dy = (p1.y() - p2.y()) as f64;
+    // Widened before subtracting, for the same reason as `att_distance`: the `ceil` sits on
+    // an integer boundary that an f32-rounded difference could cross.
+    let dx = p1.x() as f64 - p2.x() as f64;
+    let dy = p1.y() as f64 - p2.y() as f64;
     (dx * dx + dy * dy).sqrt().ceil() as f32
 }
 
