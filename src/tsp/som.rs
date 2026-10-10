@@ -79,36 +79,35 @@ pub fn solve(
     // quantisation error: how far the cities still sit from their best-matching neurons. That is the
     // standard convergence measure for a SOM, and it falls as the map fits the cities.
     //
-    // Measuring it costs O(n * neurons), roughly n times an ordinary epoch, so it is sampled rather
-    // than taken every epoch, and skipped entirely when the plateau stop is off. The first and last
-    // epochs are always sampled so a short run still yields at least one comparison.
+    // Measuring it costs O(n * neurons), about n times an ordinary epoch, so it is sampled: the
+    // interval widens with n so the total sampling cost stays a modest fraction of training rather
+    // than overtaking it on large instances, and sampling is skipped entirely when the stop is off.
+    // The first and last epochs are always sampled so a short run still yields a comparison.
     let tracking = opts.stagnation_epochs > 0;
-    let measure_interval = (epochs / 1000).max(1);
-    let mut budget = Budget::new(epochs, opts.stagnation_epochs);
+    let measure_interval = if tracking {
+        let n_neurons_f = num_neurons as f64;
+        (epochs / 1000)
+            .max(((n_neurons_f / 8.0).ceil() as usize * n.max(1)) / 10)
+            .max(1)
+    } else {
+        1
+    };
+    // Staleness is counted in *samples*, not epochs: a limit expressed in epochs would fire on a
+    // single noisy sample whenever it fell below the sampling interval, and the signal is noisy by
+    // construction (one random city trains each epoch). Rounding up means a limit below one interval
+    // still requires one full interval of evidence.
+    let sample_limit = if tracking {
+        opts.stagnation_epochs.div_ceil(measure_interval).max(1)
+    } else {
+        0
+    };
+    let mut budget = Budget::new(epochs, sample_limit);
+
     let mut best_error = f64::INFINITY;
-    // The outcome consumed by `record` at the top of each epoch; true until the first measurement.
-    let mut improved = true;
 
     // Training loop
+    let mut finished = false;
     for t in 1..=epochs {
-        if !budget.record(improved) {
-            if budget.converged() {
-                tracing::info!(
-                    epoch = budget.epoch(),
-                    stagnation_epochs = budget.stale_epochs(),
-                    "SOM: converged, quantisation error stopped improving"
-                );
-            }
-            // The loop can stop between checkpoints, so publish the map as it stands rather than
-            // leaving the last reported state up to 10% of the run out of date.
-            if let Some(tx) = progress_tx {
-                let snapshot = extract_tour(&norm_cities, &neurons, cities);
-                let cost = problem.distances.tour_length(&snapshot);
-                let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&snapshot), cost));
-            }
-            break;
-        }
-
         let t_f = t as f64;
         let eta = eta0 * (-t_f / epochs as f64).exp();
         let sigma = (sigma0 * (-t_f / epochs as f64).exp()).max(sigma_floor);
@@ -165,8 +164,29 @@ pub fn solve(
 
         if tracking && (t == 1 || t == epochs || t % measure_interval == 0) {
             let error = quantisation_error(&norm_cities, &neurons);
-            improved = error < best_error;
+            let still_improving = error < best_error;
             best_error = best_error.min(error);
+            // Only sampled epochs consult the budget, and the budget counts samples, so a limit below
+            // the sampling interval still needs a full interval of evidence before it can fire.
+            if !budget.record(still_improving) {
+                if budget.converged() {
+                    tracing::info!(
+                        samples = budget.epoch(),
+                        stagnation_samples = budget.stale_epochs(),
+                        "SOM: converged, quantisation error stopped improving"
+                    );
+                }
+                // The loop can stop between checkpoints, so publish the map as it stands rather than
+                // leaving the last reported state up to 10% of the run out of date.
+                if let Some(tx) = progress_tx {
+                    let snapshot = extract_tour(&norm_cities, &neurons, cities);
+                    let cost = problem.distances.tour_length(&snapshot);
+                    let _ = tx.send(ProgressMessage::EpochUpdate(t));
+                    let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&snapshot), cost));
+                }
+                finished = true;
+                break;
+            }
         }
         // Unmeasured epochs inherit the last measured outcome. Reporting progress instead would reset
         // the streak every `measure_interval` epochs, so a limit above 1 could never be reached — the
@@ -179,8 +199,9 @@ pub fn solve(
     tracing::info!(tour_length = final_cost, "SOM done");
 
     if let Some(tx) = progress_tx {
+        // The break path already published the final state, so sending again would duplicate it.
         // Only send a final PathUpdate if the last checkpoint didn't already cover it
-        if !epochs.is_multiple_of(checkpoint) {
+        if !finished && !epochs.is_multiple_of(checkpoint) {
             let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&tour), final_cost));
         }
         let _ = tx.send(ProgressMessage::Done);

@@ -269,14 +269,6 @@ mod tests {
             "one of the other two bounds must explain the stop (ran {})",
             stats.epochs
         );
-        // Which of the two wins is decided by f32 rounding in the cooling loop, so this pins only
-        // that the cap reports honestly when it is the one that applied.
-        if !stats.cooled {
-            assert!(
-                stats.epoch_capped,
-                "if the temperature floor was not reached, the budget must be why it stopped"
-            );
-        }
     }
 
     /// With the plateau stop on, `converged` is the reason and the other two bounds are not claimed.

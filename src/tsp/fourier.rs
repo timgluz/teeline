@@ -45,7 +45,7 @@ pub fn solve(
     let tracking = opts.stagnation_epochs > 0;
     // Stage 1 always improves (`best_length` starts infinite) and the last stage's outcome is never
     // recorded, so at most `k_max - 2` consecutive stages can be stale.
-    if opts.stagnation_epochs >= opts.k_max.saturating_sub(1) {
+    if tracking && opts.stagnation_epochs >= opts.k_max.saturating_sub(1) {
         tracing::warn!(
             stagnation_epochs = opts.stagnation_epochs,
             k_max = opts.k_max,
