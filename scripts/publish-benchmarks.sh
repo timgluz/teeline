@@ -174,7 +174,10 @@ r2_put() {
 
 echo "==> Reading   $TSV"
 echo "==> Staging   $STAGE/v1"
-echo "==> Provenance commit=$GIT_COMMIT dirty=$DIRTY teeline=$TEELINE_VERSION rust=$RUST_VERSION"
+# The definitive provenance is resolved inside the transform below, which prefers
+# the TSV's own header. This line reports the publish-time values as a fallback so
+# it is clear which set the manifest ended up using.
+echo "==> Publish-time git state: commit=$GIT_COMMIT dirty=$DIRTY (used only if the TSV carries no provenance)"
 
 mkdir -p "$STAGE/v1/algorithms" "$STAGE/v1/problems"
 
@@ -206,11 +209,44 @@ REQUIRED = ["solver", "dataset", "run", "wall_s", "peak_rss_kb", "tour_cost"]
 OPTIONAL = ["config", "status"]
 SCHEMA_VERSION = 1
 
+# --- provenance: prefer the TSV's own header over publish-time HEAD ---------
+#
+# The commit that produced the measurements is what makes a number reproducible —
+# not whatever HEAD happens to be when someone runs the publish script. A TSV
+# written by bench-matrix.sh carries `#`-prefixed provenance lines; when they are
+# absent (a hand-written file, or the pre-existing baseline TSVs) we fall back to
+# publish-time HEAD and say so explicitly in `git_commit_source`, rather than
+# implying the data came from that commit.
+provenance: dict[str, str] = {}
+data_lines: list[str] = []
+with open(tsv_path, "r", encoding="utf-8") as fh:
+    for raw in fh:
+        line = raw.rstrip("\n")
+        if line.startswith("#"):
+            body = line.lstrip("#").strip()
+            if "=" in body:
+                k, v = body.split("=", 1)
+                provenance[k.strip()] = v.strip()
+            continue
+        if line.strip():
+            data_lines.append(line)
+
+if "git_commit" in provenance:
+    git_commit = provenance["git_commit"]
+    git_commit_source = "tsv"
+    if "dirty" in provenance:
+        dirty = provenance["dirty"]
+    if "teeline_version" in provenance:
+        teeline_version = provenance["teeline_version"]
+    if "rust_version" in provenance:
+        rust_version = provenance["rust_version"]
+else:
+    git_commit_source = "publish-time"
+
 # --- parse the TSV ---------------------------------------------------------
 
 rows = []
-with open(tsv_path, "r", encoding="utf-8") as fh:
-    lines = [ln.rstrip("\n") for ln in fh if ln.strip()]
+lines = data_lines
 if not lines:
     sys.exit(f"ERROR: {tsv_path} is empty")
 
@@ -394,6 +430,11 @@ write_json(out / "index.json", {
     "schema_version": SCHEMA_VERSION,
     "generated_at": generated_at,
     "git_commit": git_commit,
+    # "tsv" = the file recorded the commit its measurements came from.
+    # "publish-time" = the TSV carried no provenance, so git_commit is merely
+    # HEAD when this ran and does NOT necessarily identify the built binary.
+    # Consumers must not present a publish-time commit as reproducible.
+    "git_commit_source": git_commit_source,
     "dirty": dirty == "1",
     "teeline_version": teeline_version,
     "tier": tier or None,

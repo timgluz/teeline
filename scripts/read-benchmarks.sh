@@ -93,6 +93,12 @@ case "$cmd" in
       "schema_version : \(.schema_version)",
       "generated_at   : \(.generated_at)",
       "git_commit     : \(.git_commit)\(if .dirty then " (DIRTY WORKING TREE)" else "" end)",
+      # A publish-time commit does not identify the measured binary, so say so
+      # rather than letting the reader assume the numbers are reproducible.
+      "commit_source  : \(.git_commit_source // "unknown")
+                        \(if (.git_commit_source // "") == "publish-time"
+                          then "⚠ not the measured binary — TSV carried no provenance"
+                          else "" end)",
       "teeline        : \(.teeline_version)",
       "tier           : \(.tier // "-")",
       "solvers        : \(.solvers | length)",

@@ -65,9 +65,35 @@ Rules:
   `dirty: true` rather than treated as fatal — the tree state at publish time is
   not what makes a number reproducible, the measured binary is. CI can demand the
   stricter behaviour with `--require-clean`.
+- `git_commit_source` says where `git_commit` came from. `"tsv"` means the
+  benchmark file recorded the commit its measurements came from. `"publish-time"`
+  means the file carried no provenance, so `git_commit` is only HEAD when the
+  publish ran and does **not** necessarily identify the built binary — a consumer
+  must not present such a commit as the source of those numbers.
 - `environment` is required. Wall-clock numbers are meaningless without it, and
   the UI shows it next to every table.
 - `optimal_cost` is `null` — never `0` — when the instance has no known optimal tour.
+
+### TSV provenance header
+
+`bench-matrix.sh` prefixes each output TSV with `#`-comment provenance lines, which
+`publish-benchmarks.sh` reads in preference to publish-time git state. The data rows
+that follow are tab-separated:
+
+```text
+# git_commit=899de9d
+# dirty=0
+# teeline_version=1.0.1
+# rust_version=1.99.0
+# tier=a
+# timeout_s=180
+solver <TAB> dataset <TAB> config <TAB> run <TAB> wall_s <TAB> peak_rss_kb <TAB> tour_cost <TAB> status
+nn <TAB> berlin52 <TAB> default <TAB> 1 <TAB> 0.0000 <TAB> 6720 <TAB> 8980.91797 <TAB> ok
+```
+
+A TSV without these lines still publishes, but is marked
+`git_commit_source: "publish-time"` so the weaker provenance is visible rather
+than implied.
 
 ## `algorithms/{solver_id}.json`
 
