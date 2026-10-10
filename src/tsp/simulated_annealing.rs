@@ -43,17 +43,41 @@ pub(crate) fn schedule_length(opts: &SAOptions) -> usize {
     n.ceil() as usize
 }
 
-/// Safety cap applied when `epochs` is not explicitly bounded: `epochs == 0` means unbounded,
-/// and an `epochs` below the schedule length would truncate the run while it is still hot.
+/// Resolves the epoch budget the loop actually applies.
 ///
-/// Kept here rather than in any single constructor so CLI, TOML, wasm and API paths agree —
-/// the default previously lived only in `from_cli`, leaving every other constructor on the
-/// generic 10k value and reintroducing the regression this guard exists to prevent.
+/// Precedence, highest first:
+///
+/// 1. `epochs == 0` means **unbounded** — the temperature schedule alone decides. Zero must keep
+///    this meaning because the old `||` gave it that by accident, and a bare `&&` would otherwise
+///    read it as "zero iterations" and silently return the initial tour unchanged.
+/// 2. An `epochs` **above** the schedule length is a genuine cap and is honoured exactly, so a
+///    user can extend a run beyond the schedule.
+/// 3. Anything else — the generic default, or a value below the schedule — resolves to the
+///    schedule length. Truncating before the schedule finishes stops the run while the
+///    temperature is still high, which accepts nearly every move and degenerates into a random
+///    walk; that is a quality regression the user did not ask for and cannot see. A budget that
+///    asked for this is reported at warn level so the behaviour is not silent.
+///
+/// The schedule length depends on the cooling rate (`0.0001` needs ~138k iterations, `0.00001`
+/// needs ~1.38M), which is why no constant can serve here and why this is resolved at run time
+/// rather than stored in a constructor.
 fn usable_epochs(opts: &SAOptions) -> usize {
-    if opts.heuristic.epochs == 0 {
+    let epochs = opts.heuristic.epochs;
+    if epochs == 0 {
         return usize::MAX;
     }
-    opts.heuristic.epochs.max(schedule_length(opts).max(1))
+    let schedule = schedule_length(opts).max(1);
+    if epochs < schedule {
+        tracing::warn!(
+            requested_epochs = epochs,
+            schedule_length = schedule,
+            "SA: epoch budget is below the cooling schedule length, so it is raised to the \
+             schedule length; the run would otherwise stop while the temperature is still high. \
+             Pass a larger value to extend it, or 0 for no cap."
+        );
+        return schedule;
+    }
+    epochs
 }
 
 pub fn solve(
@@ -67,8 +91,13 @@ pub fn solve(
     let cooling_rate = opts.cooling_rate;
     let mut epoch = 0;
 
+    // Resolved before logging so the log reports the budget actually used. Resolving it here,
+    // rather than in a constructor, is what makes CLI, TOML, wasm and API paths agree.
+    let epoch_limit = usable_epochs(opts);
+
     tracing::info!(
-        epochs = opts.heuristic.epochs,
+        epochs = epoch_limit,
+        requested_epochs = opts.heuristic.epochs,
         max_temp = opts.max_temperature,
         cooling_rate = opts.cooling_rate,
         "SA starting"
@@ -87,11 +116,7 @@ pub fn solve(
     }
 
     let mut temperature = opts.max_temperature;
-    // Resolved once, so every constructor path (CLI, TOML, wasm, API) agrees. See
-    // `usable_epochs` for why this cannot live in `SAOptions::default()`.
-    let epoch_limit = usable_epochs(opts);
-
-    // `&&` so both bounds are strict caps: the run ends at whichever expires first. With
+    // `&&` so the run ends at whichever bound is reached first: the run ends at whichever expires first. With
     // `||` the run continued until the *last* one expired, so `epochs` acted as a floor
     // rather than a budget — at defaults the geometric cooling schedule needs ~138k
     // iterations (1000 -> 0.001 at rate 0.0001) while `epochs` defaulted to 10k, meaning
@@ -201,15 +226,28 @@ mod tests {
     }
 
     #[test]
-    fn test_sa_epochs_below_the_schedule_is_clamped() {
-        // Regression guard. With `||` the epoch bound was a floor: raising it from 10k to 50k to
-        // 138k changed nothing, because the geometric schedule (rate 0.0001, 1000 -> 0.001) needs
-        // ~138,149 iterations. With a bare `&&` the opposite failure appeared: a user-supplied
-        // 1,000 cap truncated the run at T ~= 990 of 1000, which accepts nearly every move and
-        // degenerates into a random walk (measured on a280: ~32k tours vs ~3.4k).
-        //
-        // So an epoch budget below the schedule length is raised to it, and the run still ends on
-        // the temperature bound rather than being cut off while hot.
+    /// `--epochs` is a usable cap in the shortening direction: a budget below the cooling
+    /// schedule length is honoured, not silently raised to it.
+    ///
+    /// Regression guard for the original defect, where `||` meant the loop ran
+    /// `max(epochs, schedule)` and so ignored the budget entirely (10k, 50k and 138k all produced
+    /// identical work). An earlier fix attempt clamped the budget *up* to the schedule length,
+    /// which made the epoch bound unreachable and left the flag unable to shorten a run at all.
+    #[test]
+    /// A budget below the schedule length is raised to it, so a run cannot be truncated while the
+    /// temperature is still high.
+    ///
+    /// Regression guard, in both directions. Originally `||` made the loop run
+    /// `max(epochs, schedule)`, so the budget was ignored entirely (10k, 50k and 138k all did
+    /// identical work) and a *low* value truncated the run into a random walk. A bare `&&` then
+    /// inverted the failure: a low value became a real truncation.
+    ///
+    /// The deliberate trade-off here is that `--epochs` cannot be used to shorten a run — there is
+    /// no way to distinguish "I want a short run" from "I accepted the default budget", because
+    /// the default *is* a small number relative to the schedule. Raising is the safe choice;
+    /// `epochs == 0` remains available for "no cap" (`test_sa_zero_epochs_means_unbounded_...`).
+    #[test]
+    fn test_sa_epochs_below_the_schedule_is_raised_to_it() {
         let problem = tiny_problem();
         let schedule = schedule_length(&SAOptions::default());
         assert!(
@@ -231,8 +269,7 @@ mod tests {
 
         assert_eq!(
             iterations, schedule,
-            "an epochs value below the schedule length must be raised to it, so the run is not \
-             truncated while the temperature is still high"
+            "a budget below the schedule must be raised to it, not honoured as a truncation"
         );
     }
 
@@ -263,7 +300,7 @@ mod tests {
     /// A run with an explicit budget above the schedule length is capped there, and never by the
     /// schedule outlasting it — the `||` defect in the other direction.
     #[test]
-    fn test_sa_epochs_above_the_schedule_is_respected() {
+    fn test_sa_temperature_bound_ends_a_run_with_a_larger_budget() {
         let problem = tiny_problem();
         // The explicit budget exceeds the schedule, so `usable_epochs` leaves it as given and the
         // temperature bound ends the run first. Kept deliberately fast: a slow cooling rate would

@@ -697,7 +697,22 @@ pub struct SAOptions {
 impl Default for SAOptions {
     fn default() -> Self {
         SAOptions {
-            heuristic: HeuristicOptions::default(),
+            // The temperature schedule is the primary stopping rule, so the safety cap has to
+            // exceed the schedule length or it truncates the run while the temperature is still
+            // high — which accepts nearly every move and degenerates into a random walk. At the
+            // default cooling rate the schedule needs ~138,149 iterations, and a 10k cap measured
+            // ~32k tours on a280 versus ~3.4k when the schedule is allowed to finish.
+            //
+            // Any value at or below the schedule length is treated as "use the schedule length"
+            // by `usable_epochs`, so this number is a placeholder for the default cooling rate
+            // rather than a hard cap; slow rates get a correspondingly larger budget. It must be
+            // non-zero because a zero `epochs` means *unbounded* to the loop, and a directly
+            // constructed `SAOptions::default()` running forever would be a worse surprise than
+            // any truncation.
+            heuristic: HeuristicOptions {
+                epochs: 150_000,
+                ..HeuristicOptions::default()
+            },
             cooling_rate: 0.0001,
             min_temperature: 0.001,
             max_temperature: 1_000.0,
@@ -726,9 +741,12 @@ impl SAOptions {
                 self.max_temperature
             ));
         }
-        if self.min_temperature < 0.0 {
+        // Must be > 0, not >= 0: the loop stops when `temperature <= min_temperature`, and the
+        // f32 cooling step bottoms out at the smallest denormal rather than reaching 0. A
+        // min_temperature of exactly 0 therefore never terminates the loop.
+        if self.min_temperature <= 0.0 {
             return Err(format!(
-                "min_temperature must be >= 0 (got {})",
+                "min_temperature must be > 0 (got {})",
                 self.min_temperature
             ));
         }
@@ -792,6 +810,12 @@ impl SAOptions {
             heuristic: HeuristicOptions::from_cli(args)?,
             ..SAOptions::default()
         };
+        // `HeuristicOptions::from_cli` always yields the generic 10k default, which for this
+        // solver means "below the schedule" and would be raised by `usable_epochs` anyway. Set it
+        // to the SA placeholder explicitly so the resolved value is stated in one place.
+        if args.get_one::<String>("epochs").is_none() {
+            sa.heuristic.epochs = SAOptions::default().heuristic.epochs;
+        }
         if let Some(v) = args.get_one::<String>("cooling_rate") {
             sa.cooling_rate = v
                 .parse()
