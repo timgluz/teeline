@@ -174,6 +174,22 @@ pub enum DistanceType {
     Ceil2D,
 }
 
+impl DistanceType {
+    /// TSPLIB's canonical spelling, so the parser and every consumer reporting the type
+    /// back out agree. Shared because the per-consumer copies (api, wasm) drifted into
+    /// non-exhaustive matches as soon as a variant was added — and the wasm crate sits
+    /// outside the workspace, so `cargo clippy --workspace` never caught it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DistanceType::Euc2D => "EUC_2D",
+            DistanceType::Explicit => "EXPLICIT",
+            DistanceType::Geo => "GEO",
+            DistanceType::Att => "ATT",
+            DistanceType::Ceil2D => "CEIL_2D",
+        }
+    }
+}
+
 impl FromStr for DistanceType {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {

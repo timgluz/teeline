@@ -38,13 +38,7 @@ fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicO
 }
 
 fn distance_type_str(dt: DistanceType) -> &'static str {
-    match dt {
-        DistanceType::Euc2D => "EUC_2D",
-        DistanceType::Explicit => "EXPLICIT",
-        DistanceType::Geo => "GEO",
-        DistanceType::Att => "ATT",
-        DistanceType::Ceil2D => "CEIL_2D",
-    }
+    dt.as_str()
 }
 
 fn input_to_problem(input: &TspInput) -> Result<TspProblem, String> {
