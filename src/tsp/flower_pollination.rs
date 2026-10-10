@@ -121,7 +121,7 @@ pub fn solve(
     let mut improved = true;
 
     while budget.record(improved) {
-        let epoch = budget.epoch();
+        let epoch = budget.index();
         let best_at_epoch_start = gbest_cost;
         for i in 0..n_flowers {
             let new_x = if bernoulli(&mut rng, switch_prob) {

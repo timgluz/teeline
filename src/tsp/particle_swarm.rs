@@ -81,7 +81,7 @@ pub fn solve(
     let mut improved = true;
 
     while budget.record(improved) {
-        let epoch = budget.epoch();
+        let epoch = budget.index();
         let best_at_epoch_start = gbest_cost;
         #[allow(clippy::cast_precision_loss)]
         let w = W_MAX - (W_MAX - W_MIN) * (epoch as f64 / epochs.max(1) as f64);

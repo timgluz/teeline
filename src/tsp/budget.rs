@@ -27,34 +27,53 @@ impl Budget {
         }
     }
 
-    /// Records whether the epoch about to run may proceed, and returns whether it should.
+    /// Decides whether the next epoch may run, given whether the previous one improved.
     ///
-    /// The caller reports whether it *improved* on its own best, because only the caller knows what
-    /// "best" means for its algorithm; what this decides is whether progress has stopped. The
-    /// non-improving count resets on every improvement, so `limit` bounds *consecutive* stale epochs.
+    /// Called at the top of the loop. `improved` describes the epoch that just finished, so it is
+    /// ignored on the first call — nothing has run yet, and counting it would charge the solver for
+    /// an epoch it never took. That first call is what admits epoch 0.
     ///
-    /// Called at the top of the loop, so it only counts an epoch it has actually admitted — the count
-    /// is the number of epochs run, not the number requested.
+    /// Returns `false` once the epoch cap is reached, or once the run has stalled for `limit`
+    /// consecutive epochs. The non-improving count resets on every improvement, so `limit` bounds
+    /// *consecutive* stale epochs rather than a total.
     pub(crate) fn record(&mut self, improved: bool) -> bool {
         if self.epoch >= self.epochs {
             return false;
         }
 
-        self.epoch += 1;
+        // The first call admits epoch 0, so there is no previous result to count yet. Counting it
+        // would both shorten the run by one epoch and charge the solver for work it never did.
+        if self.epoch == 0 {
+            self.epoch = 1;
+            return true;
+        }
+
         if improved {
             self.stale = 0;
         } else {
             self.stale += 1;
         }
 
-        // Checked after counting, so the epoch that reaches the limit is the last one admitted and
-        // the count stays exact — checking first would require an extra call to notice.
-        !self.converged()
+        // Checked after counting: the epoch that reaches the limit is the last one admitted, and the
+        // call that would have started the next is where the run ends.
+        if self.converged() {
+            return false;
+        }
+
+        self.epoch += 1;
+        true
     }
 
-    /// Epochs run so far.
+    /// Epochs completed. Also the number of the epoch that ran last, since they are one-based.
     pub(crate) fn epoch(&self) -> usize {
         self.epoch
+    }
+
+    /// Zero-based index of the epoch currently running — what a `for epoch in 0..n` loop would have
+    /// bound. Use this for anything that feeds the epoch into a schedule, so a solver's first epoch
+    /// sees `0` as it did before.
+    pub(crate) fn index(&self) -> usize {
+        self.epoch.saturating_sub(1)
     }
 
     /// Whether convergence — not the epoch cap — is what ended the run.
@@ -80,127 +99,120 @@ impl Budget {
 mod tests {
     use super::*;
 
-    /// Improves every epoch: runs to the cap, and never reports convergence.
-    #[test]
-    fn runs_to_the_cap_while_improving() {
-        let mut b = Budget::new(10, 0);
-        for _ in 0..10 {
-            assert!(b.record(true), "an improving run must continue");
+    /// Drives a budget the way every solver does: `record` is called at the top of the loop with the
+    /// *previous* epoch's outcome, and the first call admits epoch 0 with `improved` ignored. Feeding
+    /// it a sequence of per-epoch outcomes keeps the tests honest about that call pattern, which an
+    /// earlier version of these tests got wrong and so missed an off-by-one.
+    fn run(cap: usize, limit: usize, outcomes: &[bool]) -> (usize, usize, bool, Vec<usize>) {
+        let mut b = Budget::new(cap, limit);
+        let mut seen = Vec::new();
+        let mut previous = true; // admits the first epoch
+
+        for &outcome in outcomes {
+            if !b.record(previous) {
+                return (b.epoch(), b.stale_epochs(), b.converged(), seen);
+            }
+            seen.push(b.index());
+            previous = outcome;
         }
-        assert!(!b.record(true), "the cap must stop the run");
-        assert_eq!(b.epoch(), 10, "the cap must not be exceeded");
+        (b.epoch(), b.stale_epochs(), b.converged(), seen)
+    }
+
+    /// The index a solver sees is zero-based, exactly as `for epoch in 0..n` gave it. Schedules
+    /// derived from the epoch (PSO's inertia, GSA's gravitational constant) depend on this.
+    #[test]
+    fn index_is_zero_based() {
+        let (_, _, _, seen) = run(5, 0, &[true, true, true, true, true]);
+        assert_eq!(seen, vec![0, 1, 2, 3, 4], "the body must see 0, 1, 2, ...");
     }
 
     #[test]
+    fn runs_to_the_cap_while_improving() {
+        let (epochs, stale, converged, seen) = run(10, 0, &[true; 20]);
+        assert_eq!(epochs, 10, "the cap must bound the run");
+        assert_eq!(stale, 0, "an improving run never goes stale");
+        assert!(!converged, "the cap, not convergence, ended it");
+        assert_eq!(seen.len(), 10);
+    }
+
+    /// `limit` consecutive stale epochs end the run, and the count is exact: 20 stale epochs means
+    /// 20 epochs run, with the limit deciding on the call that would have started the 21st.
+    #[test]
     fn stops_after_the_limit_of_consecutive_non_improving_epochs() {
-        let mut b = Budget::new(100_000, 20);
-        for _ in 0..19 {
-            assert!(b.record(false), "must not stop before the limit");
-        }
-        assert!(!b.record(false), "the 20th stale epoch must stop the run");
-        assert_eq!(b.epoch(), 20);
-        assert_eq!(b.stale_epochs(), 20);
+        let (epochs, stale, converged, _) = run(100_000, 20, &[false; 100]);
+        assert_eq!(epochs, 20, "exactly the limit, not one more");
+        assert_eq!(stale, 20);
+        assert!(converged, "the limit is what ended this run");
+    }
+
+    /// The first call admits an epoch without counting it as stale, even though it passes `true`.
+    #[test]
+    fn the_first_call_does_not_count_as_an_epoch_result() {
+        // A limit of 1 stops after exactly one stale epoch; if the first admission counted as a
+        // result, the run would stop before running anything.
+        let (epochs, stale, converged, seen) = run(100, 1, &[false, false]);
+        assert_eq!(seen, vec![0], "only epoch 0 runs");
+        assert_eq!(epochs, 1);
+        assert_eq!(stale, 1);
+        assert!(converged);
     }
 
     #[test]
     fn improvement_resets_the_streak() {
-        let mut b = Budget::new(100, 5);
-        for _ in 0..4 {
-            assert!(b.record(false));
-        }
-        assert!(b.record(true), "an improvement resets the streak");
-        assert_eq!(b.stale_epochs(), 0);
+        // epoch 0, two stale epochs, an improvement, then three more stale epochs
+        let (epochs, stale, converged, _) =
+            run(100, 3, &[false, false, true, false, false, false, false]);
+        assert!(
+            converged,
+            "three stale epochs after the improvement end the run"
+        );
         assert_eq!(
-            b.epoch(),
-            5,
-            "resetting the streak must not reset the epoch count"
+            stale, 3,
+            "the streak ran again from zero after the improvement"
+        );
+        // epochs 0-5 ran; the call that would have started the 7th found the limit reached
+        assert_eq!(
+            epochs, 6,
+            "clearing the streak must not reset the epoch count"
         );
     }
 
-    /// The property the benchmark depends on: a run that keeps finding improvements is never
-    /// stopped early, however long it goes on.
+    /// A run improving at least every `limit` epochs is never mistaken for converged.
     #[test]
     fn periodic_improvement_never_converges_before_the_cap() {
-        let mut b = Budget::new(1000, 50);
-        for i in 0..1000 {
-            // improves every 40th epoch, comfortably inside the 50-epoch limit
-            assert!(
-                b.record(i % 40 == 0),
-                "improvement every 40 epochs must not read as convergence at limit 50"
-            );
-        }
-        assert_eq!(b.epoch(), 1000, "it should reach the cap, not stop early");
+        let outcomes: Vec<bool> = (0..1000).map(|i| i % 40 == 0).collect();
+        let (epochs, _, converged, _) = run(1000, 50, &outcomes);
+        assert_eq!(epochs, 1000, "it should reach the cap, not stop early");
+        assert!(!converged);
     }
 
-    /// An improvement slower than the limit does converge — the boundary that makes the guarantee
-    /// above a property of the improvement rate rather than luck.
+    /// The boundary: improving every 4th epoch with a limit of 3 does converge, which is what makes
+    /// the guarantee above a property of the improvement rate rather than luck.
     #[test]
     fn slower_improvement_than_the_limit_converges() {
-        let mut b = Budget::new(1000, 3);
-        let mut converged_at = None;
-        for i in 0..100 {
-            if !b.record(i % 4 == 0) {
-                converged_at = Some(b.epoch());
-                break;
-            }
-        }
-        assert_eq!(
-            converged_at,
-            Some(4),
-            "epoch 0 improves; epochs 1, 2 and 3 are stale, so the limit is reached on the 4th \
-             recorded epoch"
+        let outcomes: Vec<bool> = (0..100).map(|i| i % 4 == 0).collect();
+        let (_, _, converged, _) = run(1000, 3, &outcomes);
+        assert!(
+            converged,
+            "improving only every 4th epoch must converge at limit 3"
         );
     }
 
     #[test]
     fn limit_zero_disables_convergence() {
-        let mut b = Budget::new(50, 0);
-        for _ in 0..50 {
-            assert!(b.record(false), "limit 0 must never stop early");
-        }
-        assert!(!b.record(false), "the epoch cap still applies");
+        let (epochs, _, converged, _) = run(50, 0, &[false; 100]);
+        assert_eq!(epochs, 50, "limit 0 must never stop early");
+        assert!(!converged);
     }
 
-    /// Reaching the cap with a stale streak still at the limit must NOT be reported as convergence —
-    /// the run ended because it ran out of epochs, and logging it as convergence would misattribute
-    /// the stop.
+    /// Reaching the cap with a stale streak shorter than the limit must not be reported as
+    /// convergence — the run ended because it ran out of epochs.
     #[test]
     fn cap_reached_with_a_stale_streak_is_not_convergence() {
-        let mut b = Budget::new(5, 50);
-        for _ in 0..5 {
-            assert!(b.record(false), "5 epochs fit inside the cap and the limit");
-        }
-        assert!(!b.record(false), "the cap must end the run");
-        assert!(
-            !b.converged(),
-            "a stale streak below the limit is not convergence, even at the cap"
-        );
-        assert_eq!(b.epoch(), 5);
-    }
-
-    #[test]
-    fn convergence_is_reported_only_when_the_limit_ended_the_run() {
-        let mut b = Budget::new(1000, 3);
-        assert!(b.record(true));
-        assert!(b.record(false));
-        assert!(b.record(false));
-        assert!(!b.record(false), "the third stale epoch ends the run");
-        assert!(b.converged(), "the limit, not the cap, is what stopped it");
-        assert_eq!(
-            b.epoch(),
-            4,
-            "the count includes the epoch that reached the limit"
-        );
-    }
-
-    /// `epoch()` counts epochs admitted, so a run stopped by convergence reports the epochs it
-    /// actually ran rather than one more.
-    #[test]
-    fn epoch_counts_only_epochs_that_ran() {
-        let mut b = Budget::new(100, 2);
-        assert!(b.record(false));
-        assert!(!b.record(false), "the second stale epoch ends the run");
-        assert_eq!(b.epoch(), 2, "two epochs ran, not three");
+        let (epochs, stale, converged, _) = run(5, 50, &[false; 100]);
+        assert_eq!(epochs, 5);
+        assert_eq!(stale, 4, "the first call contributes no outcome");
+        assert!(!converged);
     }
 
     /// A cap of zero runs nothing. Callers that treat `epochs: 0` as "no cap" must resolve that

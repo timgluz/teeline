@@ -81,7 +81,7 @@ pub fn solve(
     let mut improved = true;
 
     while budget.record(improved) {
-        let epoch = budget.epoch();
+        let epoch = budget.index();
         let best_at_epoch_start = best_cost;
         for cuckoo_idx in 0..n_nests {
             let levy = levy_step(&mut rng).abs();

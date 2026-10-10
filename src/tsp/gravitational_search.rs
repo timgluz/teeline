@@ -81,7 +81,7 @@ pub fn solve(
     let mut improved = true;
 
     while budget.record(improved) {
-        let epoch = budget.epoch();
+        let epoch = budget.index();
         let best_at_epoch_start = gbest_cost;
         // Spread-based mass normalization (Rashedi 2009)
         let worst_cost = costs.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
