@@ -174,9 +174,18 @@ describe('solverById / isDeterministic', () => {
     expect(isDeterministic('sa')).toBe(false)
   })
 
-  it('does not claim determinism for nn-seeded local search', () => {
-    expect(isDeterministic('2opt')).toBe(false)
-    expect(isDeterministic('3opt')).toBe(false)
-    expect(isDeterministic('or_opt')).toBe(false)
+  it('tracks nn-seeded solvers as coupled to nn once it becomes deterministic', () => {
+    // 2opt/3opt/or_opt auto-seed from nn, so their determinism follows nn's. Written
+    // against nn's current value rather than hard-coded booleans: this test previously
+    // asserted `false` for all three and failed when the nn fix legitimately made them
+    // deterministic. The invariant that matters is the coupling, which the
+    // canonical-file test above also pins.
+    const nnDeterministic = isDeterministic('nn')
+    for (const id of ['2opt', '3opt', 'or_opt']) {
+      expect(
+        isDeterministic(id),
+        `${id} must agree with its nn seed (nn deterministic: ${nnDeterministic})`,
+      ).toBe(nnDeterministic)
+    }
   })
 })

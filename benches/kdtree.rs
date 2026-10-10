@@ -10,8 +10,7 @@
 //! - `build_candidates` — end-to-end mirror of `lin_kernighan::build_candidates`
 //!   (build tree + N queries with k=5), the primary hot path
 //!
-//! TSPLIB files live under `data/tsplib/` and must be present; run from the
-//! repo root.
+//! TSPLIB fixtures are read from `tests/fixtures/` (tracked); run from the repo root.
 
 use std::path::Path;
 
@@ -23,20 +22,15 @@ const DATASETS: &[&str] = &["berlin52", "a280", "att532"];
 const K_NEAREST: usize = 5;
 
 fn load_cities(name: &str) -> Vec<KDPoint> {
-    // Prefer tests/fixtures/ (tracked in git, always available) over data/tsplib/
-    // (gitignored, populated by download_data.sh).
-    let candidates = [
-        Path::new("tests/fixtures").join(format!("{name}.tsp")),
-        Path::new("data/tsplib").join(format!("{name}.tsp")),
-    ];
-    let path = candidates.iter().find(|p| p.exists()).unwrap_or_else(|| {
-        panic!(
-            "TSPLIB file {name}.tsp not found in tests/fixtures/ or data/tsplib/. \
-                 Run from repo root."
-        )
-    });
+    // tests/fixtures/ only: it is tracked, so this works on a fresh checkout. data/tsplib/
+    // is git-ignored and present only after download_data.sh.
+    let path = Path::new("tests/fixtures").join(format!("{name}.tsp"));
+    assert!(
+        path.exists(),
+        "TSPLIB fixture {name}.tsp not found; run from the repo root"
+    );
     let data =
-        tsplib::read_from_file(path).unwrap_or_else(|e| panic!("failed to load {path:?}: {e}"));
+        tsplib::read_from_file(&path).unwrap_or_else(|e| panic!("failed to load {path:?}: {e}"));
     data.cities().to_vec()
 }
 
