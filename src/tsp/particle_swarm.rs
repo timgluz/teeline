@@ -1,6 +1,7 @@
 use rand::RngExt;
 use std::sync::mpsc;
 
+use super::budget::Budget;
 use super::progress::ProgressMessage;
 use super::route::{Route, apply_swaps, swap_sequence};
 use super::{HeuristicOptions, Solution, TspProblem};
@@ -74,7 +75,14 @@ pub fn solve(
     }
 
     let epochs = opts.epochs;
-    for epoch in 0..epochs {
+    let mut budget = Budget::new(epochs, opts.stagnation_epochs);
+    // Starts true so the first epoch runs, then carries the previous epoch's result into the
+    // budget — one decision point for both the cap and the convergence threshold.
+    let mut improved = true;
+
+    while budget.record(improved) {
+        let epoch = budget.index();
+        let best_at_epoch_start = gbest_cost;
         #[allow(clippy::cast_precision_loss)]
         let w = W_MAX - (W_MAX - W_MIN) * (epoch as f64 / epochs.max(1) as f64);
 
@@ -120,6 +128,18 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
         }
+
+        // A single comparison for the epoch, rather than a flag per improvement site: a solver
+        // with several such sites would otherwise assign the same value more than once.
+        improved = gbest_cost < best_at_epoch_start;
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "PSO: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {

@@ -3,7 +3,7 @@ id: 01a12651-55d5-7f71-84c7-360c3a0086fa
 slug: tasks/bench-plateau-stop-all-iterative
 title: "feat(tsp): shared plateau stop for all iterative solvers"
 type: task
-status: draft
+status: active
 priority: high
 tags: [solver, benchmarks, convergence]
 blocked_by: [tasks/bench-sa-honours-epoch-budget]
@@ -55,3 +55,25 @@ solvers that lack one:
 
 Prerequisite for the benchmarking campaign. Coordinate with
 `tasks/bench-sa-honours-epoch-budget`: SA is in both scopes.
+
+## Progress Log
+
+### 2026-10-10
+
+- **Foundation merged** as [#566](https://github.com/timgluz/teeline/pull/566) (merge commit
+  `a1cdb103`). Three review passes, 23 findings, all addressed. Outcomes worth carrying forward:
+  `stagnation_epochs` defaults to **0 (disabled)** so existing API callers' runs are unchanged;
+  the test-only epoch counter was replaced by a testable `Budget` type; `teeline-wasm` and
+  `teeline-qt` both needed the new field — both sit outside the Cargo workspace, so no `--workspace`
+  command compiles them.
+- **Solvers wired so far (5 of 10):** `ga` (#566), plus `pso`, `cs`, `fpa`, `gsa`.
+- **Remaining (5):** `sa`, `aco`, `fourier`, `som`, `tabu_search`.
+
+The four mechanics share one treatment: `for epoch in 0..epochs` becomes
+`while budget.record(improved)`, with improvement decided by one comparison of the best across the
+epoch. My first attempt marked `improved` at each improvement site instead, which is wrong for a
+solver with several such sites (`cuckoo_search` has two) — `clippy`'s `unused_assignments` caught it.
+
+**Still to do beyond wiring:** per-solver convergence tests, migrating `lin_kernighan` off
+`platoo_epochs`, removing `simulated_annealing`'s test-only `ITERATIONS` counter, and updating the
+solver docs.
