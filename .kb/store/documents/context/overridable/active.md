@@ -43,9 +43,9 @@ Nine tasks created, split from the plan:
 | Task | Status / depends on |
 |---|---|
 | `tasks/bench-sa-honours-epoch-budget` | ✅ **completed** (`72007e0`) |
-| `tasks/bench-platoo-epochs-help-name` | **ready** |
-| `tasks/bench-plateau-stop-all-iterative` | **ready** (bigger; 10 solvers) |
-| `tasks/bench-measurement-harness` | all three above |
+| `tasks/bench-platoo-epochs-help-name` | ✅ **completed** (#563) |
+| `tasks/bench-plateau-stop-all-iterative` | **next** — plan written |
+| `tasks/bench-measurement-harness` | plateau only (other two landed) |
 | `tasks/bench-tier-a-campaign` | harness |
 | `tasks/bench-publish-provenance` | campaign |
 | `tasks/bench-algorithm-pages` | publish |
@@ -53,10 +53,18 @@ Nine tasks created, split from the plan:
 | `tasks/bench-single-solver-skill` | publish |
 | `tasks/bench-regression-history` | publish (optional, may stay unstarted) |
 
-Where to resume: **`tasks/bench-plateau-stop-all-iterative`** is the next unblocked task and the
-larger of the two remaining prerequisites (10 solvers need a convergence criterion;
-`lin_kernighan` and `stochastic_hill` already have one to reuse). `tasks/bench-platoo-epochs-help-name`
-is small and independent. `tasks/bench-measurement-harness` stays blocked until both land.
+Where to resume: **`tasks/bench-plateau-stop-all-iterative`** — the last prerequisite before the
+harness. Plan: `docs/superpowers/plans/2026-10-12-plateau-stop.md`.
+
+Planning finding worth not rediscovering: the task says "reuse the existing `platoo_epochs`
+semantics", but the two implementations disagree — `lin_kernighan` **stops** on `platoo_epochs`,
+`stochastic_hill` **restarts**. The agreed resolution is a separate `stagnation_epochs` stop knob
+(decided with the user), leaving `platoo_epochs` as the restart threshold so hill climbing's search
+is unchanged. `lin_kernighan` migrates to the new knob.
+
+Cost driver: `platoo_epochs` has ~78 references across 9 files (lib, CLI, api models + service,
+wasm bindings + lib, qt), so a parallel field follows that whole path. Also note SOM is `som.rs`,
+not `kohonen_som.rs`, despite what the docs say.
 
 Lesson from the SA fix, worth applying to the plateau work: the iteration budget was only
 observable by timing the process, so a bound that never took effect went unnoticed — on a small
