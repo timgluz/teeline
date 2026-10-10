@@ -379,8 +379,8 @@ mod tests {
     #[test]
     fn geo_distance_is_finite_and_correct() {
         // burma14 declares EDGE_WEIGHT_TYPE: GEO, so this exercises the acos path that can
-        // round outside its domain. Without a clamp that yields NaN distances, which then
-        // poison any comparison-based selection.
+        // round outside its domain. Unclamped, that yields NaN distances which then poison
+        // any comparison-based selection.
         use crate::tsp::{DistanceType, tsplib};
         let data = tsplib::read_from_file(std::path::Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -402,17 +402,28 @@ mod tests {
                 );
             }
         }
+    }
 
-        // Independent anchor: burma14's optimal tour measures 3323 under TSPLIB's GEO
-        // formula (verified against the published optimum), so a formula regression that
-        // stayed finite would still be caught here.
-        let opt = crate::tsp::opt_tour::read_from_file(std::path::Path::new(concat!(
+    /// Guards a real gap: the parser maps any unrecognised EDGE_WEIGHT_TYPE to the
+    /// default EUC_2D (`parse::<DistanceType>().ok().unwrap_or_default()`), and
+    /// `DistanceType` has no ATT or CEIL_2D variant. So att48/att532/dsj1000 are currently
+    /// measured as if they were planar, and comparing their tour lengths to TSPLIB's
+    /// published optima is not meaningful. If this test starts failing, the formula was
+    /// implemented and the affected benchmark numbers need recomputing.
+    #[test]
+    fn att_is_not_silently_measured_as_euclidean() {
+        use crate::tsp::tsplib;
+        let data = tsplib::read_from_file(std::path::Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/data/tsplib/burma14.opt.tour"
-        )));
-        if let Ok(tour) = opt {
-            assert_approx(3323.0, dm.tour_length(&tour.route));
-        }
+            "/tests/fixtures/att48.tsp"
+        )))
+        .expect("att48 fixture must parse");
+        assert_eq!(
+            data.distance_type,
+            crate::tsp::DistanceType::Euc2D,
+            "att48 now uses a non-Euclidean formula: recompute the ATT benchmark rows and \
+             update or delete this guard"
+        );
     }
 
     #[test]
