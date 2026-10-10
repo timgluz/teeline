@@ -223,3 +223,49 @@ fn nn_is_stable_and_sane_on_explicit_and_att_instances() {
         );
     }
 }
+
+/// A minimal instance with an exact distance tie, pinning the tie-break rule.
+///
+/// Every other fixture in this crate is either tie-free or only asserted to visit all
+/// cities, so a regression back to hash-ordered or `n_nearest`-limited selection could
+/// pass them. This one fails such a regression directly.
+///
+/// Geometry: city 0 at the origin, city 1 at (1,0), city 2 at (-1,0). From city 0,
+/// cities 1 and 2 are *exactly* 1.0 away — a genuine float tie, not a near-tie — so only
+/// the tie-break decides the route. Lowest id must win, giving [0, 1, 2].
+#[test]
+fn nn_breaks_exact_ties_by_lowest_city_id() {
+    use teeline::tsp::kdtree;
+
+    let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![-1.0, 0.0]]);
+    let dm = teeline::tsp::distance_matrix::from_cities(&cities);
+    let problem = TspProblem::new(cities.clone(), dm);
+
+    let first = solve_nn(&problem);
+    assert_eq!(
+        first.route(),
+        &[cities[0].id, cities[1].id, cities[2].id],
+        "an exact tie must resolve to the lowest city id"
+    );
+
+    // Stable across repeats, which is what hash-ordered selection could not guarantee.
+    for _ in 0..5 {
+        assert_eq!(solve_nn(&problem).route(), first.route());
+    }
+
+    // `n_nearest` must not influence `nn` at all: it is a candidate-list limit for other
+    // solvers, and using it here is exactly what made the greedy step approximate.
+    let with_small_k = HeuristicOptions {
+        n_nearest: 1,
+        ..Default::default()
+    };
+    let with_large_k = HeuristicOptions {
+        n_nearest: 1000,
+        ..Default::default()
+    };
+    assert_eq!(
+        nearest_neighbor::solve(&problem, &with_small_k, None, None).route(),
+        nearest_neighbor::solve(&problem, &with_large_k, None, None).route(),
+        "n_nearest changed the route; nn must ignore it"
+    );
+}

@@ -285,8 +285,8 @@ impl DistanceMatrix {
     /// earlier revision took `&HashSet<usize> visited` and the caller passed its
     /// `unvisited` set — every city was treated as visited and the query returned
     /// `None`, collapsing the tour to a single city. A predicate forces the caller to
-    /// state the membership test explicitly (`!unvisited.contains(&id)`), so the set's
-    /// polarity cannot be silently inverted.
+    /// state the membership test explicitly (`unvisited.contains(&id)`), so which set the
+    /// caller means is visible at the call site and cannot be silently inverted.
     ///
     /// `target` is excluded internally, so the predicate only ever sees other cities and
     /// `|id| unvisited.contains(&id)` is already correct. A caller that also writes

@@ -29,7 +29,6 @@ pub fn from_cities(points: &[KDPoint]) -> KDTree {
         tree.size = n_points;
         tree.root = Some(root);
     }
-    // Independent copy: `tree_points` was consumed by the recursive build.
 
     tree
 }
@@ -205,9 +204,18 @@ impl KDNode {
 
     /// Unfiltered k-NN. Every point but `target` itself is eligible.
     ///
-    /// The guard is a strict `>`: a branch exactly `search_radius()` away is still
-    /// visited, so points tied at the current best distance stay reachable and cannot be
-    /// missed because of where the tree happened to split.
+    /// Pruning correctness: the guard `search_radius() > split_dist` skips the far branch
+    /// only when every point in it is strictly farther than the current k-th best, so no
+    /// *strictly closer* point can be missed. That is the only guarantee.
+    ///
+    /// Equidistant points are **not** guaranteed reachable: the guard is a strict `>`, so a
+    /// branch exactly `search_radius()` away is pruned, and `NearestResult::add` likewise
+    /// rejects `new_distance == search_radius()`. Which member of an exact-distance tie
+    /// ends up in the buffer therefore depends on traversal order. For `n == 1` the
+    /// returned *distance* is still exact — a strictly closer point cannot have been
+    /// pruned — but the returned *point* among tied candidates is unspecified. Callers
+    /// needing a stable choice must break the tie themselves (see `KDNode::nearest_where`
+    /// and `DistanceMatrix::nearest_unvisited`).
     fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
         // `NearestResult::add` already refuses `pt.id == target.id`; kept here too so the
         // self-exclusion is explicit at the traversal level.
@@ -240,7 +248,9 @@ impl KDNode {
     /// point allowed to raise the radius would let the pruning below cut off branches
     /// holding the true nearest eligible point, silently returning a farther one.
     ///
-    /// Same strict-`>` pruning guard as `nearest`, for the same tie-reachability reason.
+    /// Same strict-`>` pruning guard as `nearest`, with the same guarantee and the same
+    /// caveat: no strictly closer candidate is missed, but a candidate tied at the k-th
+    /// distance may be pruned, so which tied point is returned is unspecified.
     ///
     /// `#[cfg(test)]` because nothing in the crate calls it. `nn` uses
     /// `DistanceMatrix::nearest_unvisited`; a tree-based candidate query cannot beat that
@@ -647,7 +657,11 @@ mod tests {
             vec![30.0, 0.0],
         ]);
         let tree = from_cities(&cities);
-        let target = KDPoint::new(&[1.0, 0.0]);
+        // Sentinel id, not `KDPoint::new` (which uses id 0): the query's id must not
+        // collide with a tree point's, or `NearestResult::add` drops that point by id and
+        // the predicate never gets the chance to decide — which would silently hollow out
+        // this test. `usize::MAX` keeps every exclusion the predicate's job.
+        let target = KDPoint::new_with_id(usize::MAX, &[1.0, 0.0]);
 
         // Drives the gated `KDNode::nearest_where` directly through the tree root, since
         // the `KDTree`-level wrapper was removed as dead code.
