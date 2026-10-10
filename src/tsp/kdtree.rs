@@ -201,9 +201,7 @@ impl KDNode {
     /// pruned and the point returned among a tie depends on traversal order. Callers
     /// needing a stable tie-break must do it themselves.
     fn nearest(&self, target_point: &KDPoint, acc: &mut NearestResult) {
-        if self.point.id != target_point.id {
-            acc.add(self.point, self.point.distance(target_point));
-        }
+        acc.add(self.point, self.point.distance(target_point));
 
         let (closest_branch, further_branch) = match self.cmp_by_point(target_point) {
             None => panic!("Dimension conflict in nearest function"),

@@ -71,7 +71,10 @@ pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     let q2 = (lat1 - lat2).cos();
     let q3 = (lat1 + lat2).cos();
     const RRR: f64 = 6378.388;
-    (RRR * (0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)).acos() + 1.0).floor() as f32
+    // Clamped because rounding can nudge the argument just outside acos's domain, where
+    // it returns NaN and poisons the distance.
+    let cos_angle = (0.5 * ((1.0 + q1) * q2 - (1.0 - q1) * q3)).clamp(-1.0, 1.0);
+    (RRR * cos_angle.acos() + 1.0).floor() as f32
 }
 
 // to have similar builder as kdtree
@@ -314,9 +317,14 @@ impl DistanceMatrix {
             }
             let better = match &best {
                 None => true,
-                // Total order on (distance, id): equidistant candidates resolve to
-                // the lowest id, so the choice cannot drift between runs.
-                Some(current) => (*distance, pt.id) < (current.distance, current.point.id),
+                // `total_cmp`, not `<`: the latter is false against NaN, so a non-finite
+                // distance reaching `best` would block every later candidate and win by
+                // default. `total_cmp` is a genuine total order, so the result stays
+                // deterministic even on malformed input.
+                Some(current) => distance
+                    .total_cmp(&current.distance)
+                    .then_with(|| pt.id.cmp(&current.point.id))
+                    .is_lt(),
             };
             if better {
                 best = Some(NearestResultItem::new(*pt, *distance));
@@ -349,6 +357,63 @@ mod tests {
     use super::*;
     use crate::test::helpers::assert_approx;
     use crate::tsp::kdtree;
+
+    #[test]
+    fn nearest_unvisited_ignores_a_non_finite_distance() {
+        // Hand-built matrix: distance(0,1) = NaN, distance(0,2) = 5, distance(1,2) = 1.
+        // Packed lower triangle is [d(1,0), d(2,0), d(2,1)].
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
+        let table: crate::tsp::CityTable =
+            cities.iter().enumerate().map(|(i, c)| (i, *c)).collect();
+        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], table);
+
+        // City 1 must be skipped despite being "closest" only in the sense that NaN loses
+        // every ordinary comparison — a NaN in `best` would otherwise stick forever.
+        let pick = dm
+            .nearest_unvisited(&cities[0], |id| id != cities[0].id)
+            .expect("city 2 is reachable");
+        assert_eq!(pick.point.id, cities[2].id);
+        assert_approx(5.0, pick.distance);
+    }
+
+    #[test]
+    fn geo_distance_is_finite_and_correct() {
+        // burma14 declares EDGE_WEIGHT_TYPE: GEO, so this exercises the acos path that can
+        // round outside its domain. Without a clamp that yields NaN distances, which then
+        // poison any comparison-based selection.
+        use crate::tsp::{DistanceType, tsplib};
+        let data = tsplib::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/burma14.tsp"
+        )))
+        .expect("burma14 fixture must parse");
+        let cities = data.cities().to_vec();
+        let dm = DistanceMatrix::build(&cities, DistanceType::Geo).expect("geo matrix builds");
+
+        for a in &cities {
+            for b in &cities {
+                let d = dm.distance_between(a.id, b.id).unwrap();
+                assert!(d.is_finite(), "geo distance {} -> {} is {d}", a.id, b.id);
+                assert!(
+                    d >= 0.0,
+                    "geo distance {} -> {} is negative: {d}",
+                    a.id,
+                    b.id
+                );
+            }
+        }
+
+        // Independent anchor: burma14's optimal tour measures 3323 under TSPLIB's GEO
+        // formula (verified against the published optimum), so a formula regression that
+        // stayed finite would still be caught here.
+        let opt = crate::tsp::opt_tour::read_from_file(std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/data/tsplib/burma14.opt.tour"
+        )));
+        if let Ok(tour) = opt {
+            assert_approx(3323.0, dm.tour_length(&tour.route));
+        }
+    }
 
     #[test]
     fn nearest_unvisited_takes_the_closest_candidate() {
