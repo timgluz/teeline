@@ -751,7 +751,13 @@ pub struct SAOptions {
 impl Default for SAOptions {
     fn default() -> Self {
         SAOptions {
-            heuristic: HeuristicOptions::default(),
+            // A placeholder, not a cap: `usable_epochs` resolves any value at or below the cooling
+            // schedule length to the schedule length. Must be non-zero, because 0 means unbounded
+            // and `SAOptions::default()` running forever would be a worse surprise than truncation.
+            heuristic: HeuristicOptions {
+                epochs: 150_000,
+                ..HeuristicOptions::default()
+            },
             cooling_rate: 0.0001,
             min_temperature: 0.001,
             max_temperature: 1_000.0,
@@ -780,9 +786,12 @@ impl SAOptions {
                 self.max_temperature
             ));
         }
-        if self.min_temperature < 0.0 {
+        // Must be > 0, not >= 0: the loop stops when `temperature <= min_temperature`, and the
+        // f32 cooling step bottoms out at the smallest denormal rather than reaching 0. A
+        // min_temperature of exactly 0 therefore never terminates the loop.
+        if self.min_temperature <= 0.0 {
             return Err(format!(
-                "min_temperature must be >= 0 (got {})",
+                "min_temperature must be > 0 (got {})",
                 self.min_temperature
             ));
         }
@@ -846,6 +855,12 @@ impl SAOptions {
             heuristic: HeuristicOptions::from_cli(args)?,
             ..SAOptions::default()
         };
+        // `HeuristicOptions::from_cli` always yields the generic 10k default, which for this
+        // solver means "below the schedule" and would be raised by `usable_epochs` anyway. Set it
+        // to the SA placeholder explicitly so the resolved value is stated in one place.
+        if args.get_one::<String>("epochs").is_none() {
+            sa.heuristic.epochs = SAOptions::default().heuristic.epochs;
+        }
         if let Some(v) = args.get_one::<String>("cooling_rate") {
             sa.cooling_rate = v
                 .parse()

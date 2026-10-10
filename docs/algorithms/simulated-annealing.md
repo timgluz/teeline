@@ -39,12 +39,28 @@ procedure SimulatedAnnealing(cities, T_start, T_end, cooling):
 
 ## Options
 
+Both stopping rules are strict caps: the run ends at whichever is reached first. The
+temperature schedule normally finishes first, and `--epochs` is a safety bound.
+
 | Flag | Description | Default |
 | ------ | ------------- | --------- |
 | `--max_temperature` | Starting temperature | 1000.0 |
 | `--min_temperature` | Stopping temperature | 0.001 |
-| `--cooling_rate` | Fractional temperature drop per step | — |
-| `--epochs` | Maximum iterations | — |
+| `--cooling_rate` | Fractional temperature drop per step | 0.0001 |
+| `--epochs` | Maximum iterations (safety cap) | derived — see below |
+
+`--epochs 0` means *no epoch cap*: the temperature schedule alone decides.
+
+The default budget is sized above the cooling schedule, which is derived from the parameters as
+`ceil(ln(max/min) / -ln(1 - cooling_rate))` — matching the loop's `T ← T × (1 − cooling_rate)`.
+At the defaults that schedule needs ~138,149 iterations; a slower rate needs far more (`0.00001`
+requires ~1.38M). Setting `--epochs` below the schedule length is allowed but logged as a
+warning: the run then stops while the temperature is still high, which accepts nearly every move
+and looks like a poor solver rather than a truncated run.
+
+Because the schedule is the primary stopping rule, a `--min_temperature` of `0` is rejected — the
+loop stops on `temperature <= min_temperature` and the f32 cooling step never actually reaches
+zero.
 
 ## Usage
 
