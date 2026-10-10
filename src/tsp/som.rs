@@ -90,13 +90,14 @@ pub fn solve(
         // would leave only the forced first and last samples, making the stop unable to fire early.
         let for_cost = (n * opts.neuron_multiplier / 8).max(1) * n / 10;
         let interval = (epochs / 1000).max(for_cost).max(1);
+        // The cap above already guarantees several samples, so the case that actually leaves the stop
+        // unable to fire is a limit no run can reach: the stale count is bounded by the samples taken.
         let interval = interval.min((epochs / 8).max(1));
-        if interval >= epochs / 2 {
+        if opts.stagnation_epochs >= epochs {
             tracing::warn!(
-                measure_interval = interval,
+                stagnation_epochs = opts.stagnation_epochs,
                 epochs,
-                "SOM: the sampling interval is too coarse for the plateau stop to fire before the \
-                 run ends; increase --epochs or lower --neuron-multiplier"
+                "SOM: stagnation_epochs is not below epochs, so the plateau stop can never fire"
             );
         }
         interval
