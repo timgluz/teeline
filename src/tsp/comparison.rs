@@ -231,6 +231,49 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn tour_cost_with_type_att_and_ceil_2d() {
+        // Covers the ATT / CEIL_2D arms of `tour_cost_with_type` — their own code paths in
+        // this function, which the api and CLI route tour-cost reporting through.
+        let cities: Vec<KDPoint> = [[0.0, 0.0], [3.0, 4.0], [10.0, 30.0], [-5.0, 2.0]]
+            .iter()
+            .enumerate()
+            .map(|(i, c)| KDPoint { id: i, coords: *c })
+            .collect();
+        let route = vec![0, 1, 2, 3];
+
+        let att = tour_cost_with_type(&route, &cities, DistanceType::Att);
+        let ceil = tour_cost_with_type(&route, &cities, DistanceType::Ceil2D);
+        let euc = tour_cost_with_type(&route, &cities, DistanceType::Euc2D);
+
+        // Each metric must produce its own value, not silently fall through to Euclidean.
+        assert!(att > 0.0 && ceil > 0.0);
+        assert_ne!(att, euc, "ATT arm fell through to Euclidean");
+        assert_ne!(ceil, euc, "CEIL_2D arm fell through to Euclidean");
+
+        // Agree with the primitives they delegate to, summed over the closed tour.
+        let n = route.len();
+        for (dt, f) in [
+            (
+                DistanceType::Att,
+                distance_matrix::att_distance as fn(&KDPoint, &KDPoint) -> f32,
+            ),
+            (
+                DistanceType::Ceil2D,
+                distance_matrix::ceil_2d_distance as fn(&KDPoint, &KDPoint) -> f32,
+            ),
+        ] {
+            let expected: f32 = (0..n)
+                .map(|i| f(&cities[route[i]], &cities[route[(i + 1) % n]]))
+                .sum();
+            let got = tour_cost_with_type(&route, &cities, dt);
+            assert!(
+                (got - expected).abs() < 0.01,
+                "tour_cost_with_type disagrees with its primitive: {got} vs {expected}"
+            );
+        }
+    }
+
     fn tour_cost_with_type_geo_burma14_pair() {
         // Two cities from burma14 at positions that should produce the known
         // GEO distance from the distance_matrix tests: 837.

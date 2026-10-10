@@ -190,6 +190,37 @@ impl DistanceType {
     }
 }
 
+#[cfg(test)]
+mod distance_type_tests {
+    use super::*;
+
+    /// `as_str` is the single source of TSPLIB's spelling, consumed by teeline-api and
+    /// teeline-wasm. Both are outside this crate's coverage run (the wasm crate is not even
+    /// in the workspace), so without this test the arms are only exercised incidentally.
+    #[test]
+    fn as_str_covers_every_variant() {
+        assert_eq!(DistanceType::Euc2D.as_str(), "EUC_2D");
+        assert_eq!(DistanceType::Explicit.as_str(), "EXPLICIT");
+        assert_eq!(DistanceType::Geo.as_str(), "GEO");
+        assert_eq!(DistanceType::Att.as_str(), "ATT");
+        assert_eq!(DistanceType::Ceil2D.as_str(), "CEIL_2D");
+    }
+
+    /// Round-trip: every spelling `as_str` emits must parse back to the same variant.
+    #[test]
+    fn as_str_round_trips_through_from_str() {
+        for dt in [
+            DistanceType::Euc2D,
+            DistanceType::Explicit,
+            DistanceType::Geo,
+            DistanceType::Att,
+            DistanceType::Ceil2D,
+        ] {
+            assert_eq!(dt.as_str().parse::<DistanceType>().unwrap(), dt);
+        }
+    }
+}
+
 impl FromStr for DistanceType {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
