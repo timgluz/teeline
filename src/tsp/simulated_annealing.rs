@@ -7,15 +7,15 @@ use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{SAOptions, Solution, TspProblem};
 
-/// Counts loop iterations on the current thread, for tests only. Compiled out of all
-/// non-test builds.
-///
-/// The epoch budget was previously unobservable without timing the process, which is why a
-/// bound that never took effect went unnoticed — a timing assertion is swamped by fixed
-/// startup cost on small instances. Counting iterations makes the bound directly assertable.
-///
-/// Thread-local rather than a global: `cargo test` runs tests in parallel, and a shared
-/// counter would mix iterations from concurrently-running tests.
+// Counts loop iterations on the current thread, for tests only. Compiled out of all non-test
+// builds.
+//
+// The epoch budget was previously unobservable without timing the process, which is how a bound
+// that never took effect went unnoticed: a timing assertion is swamped by fixed startup cost on
+// small instances. Counting iterations makes the bound directly assertable.
+//
+// Thread-local rather than a global, because `cargo test` runs tests in parallel and a shared
+// counter would mix iterations from concurrently-running tests.
 #[cfg(test)]
 thread_local! {
     pub(crate) static ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
@@ -116,16 +116,15 @@ pub fn solve(
     }
 
     let mut temperature = opts.max_temperature;
-    // `&&` so the run ends at whichever bound is reached first: the run ends at whichever expires first. With
-    // `||` the run continued until the *last* one expired, so `epochs` acted as a floor
-    // rather than a budget — at defaults the geometric cooling schedule needs ~138k
-    // iterations (1000 -> 0.001 at rate 0.0001) while `epochs` defaulted to 10k, meaning
-    // `--epochs` could not shorten a run at all. Meanwhile a small `epochs` truncated the
-    // run while the temperature was still near its maximum, so no annealing happened.
+    // `&&`, and the epoch bound is resolved by `usable_epochs` (it is raised to the schedule
+    // length when smaller, which is why `epoch < epoch_limit` is not the bound that usually
+    // expires). With `||` the loop instead ran until the *last* bound expired, so `epochs` acted
+    // as a floor rather than a budget: at defaults the schedule needs ~138k iterations while the
+    // default was 10k, so `--epochs` could not shorten a run at all.
     //
-    // `epochs == 0` means "no epoch cap" — the temperature schedule decides — which is what
-    // the previous `||` gave it by accident. With a bare `&&` it would instead mean *zero*
-    // iterations and silently return the initial tour unchanged.
+    // `epochs == 0` means "no epoch cap" — the temperature schedule decides — which is what the
+    // previous `||` gave it by accident. With a bare `&&` it would instead mean *zero* iterations
+    // and silently return the initial tour unchanged.
     while epoch < epoch_limit && temperature > opts.min_temperature {
         #[cfg(test)]
         ITERATIONS.with(|n| n.set(n.get() + 1));
@@ -203,16 +202,6 @@ mod tests {
         assert_eq!(result.route(), optimal.as_slice());
     }
 
-    /// The epoch budget is a strict cap, not a floor.
-    ///
-    /// Regression guard for a real defect: with `while epoch < epochs || temperature >
-    /// min_temperature`, the loop ran until *both* bounds expired. The geometric cooling
-    /// schedule (rate 0.0001, 1000 -> 0.001) needs ~138k iterations, far more than the default
-    /// 10k epochs, so raising `--epochs` from 10k to 50k to 138k changed nothing and the flag
-    /// could not bound a run.
-    ///
-    /// This asserts iterations, not wall time: on small instances the fixed startup cost swamps
-    /// the compute, which is why timing-based checks missed this.
     fn tiny_problem() -> TspProblem {
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
@@ -225,27 +214,17 @@ mod tests {
         TspProblem::new(cities, dm)
     }
 
-    #[test]
-    /// `--epochs` is a usable cap in the shortening direction: a budget below the cooling
-    /// schedule length is honoured, not silently raised to it.
-    ///
-    /// Regression guard for the original defect, where `||` meant the loop ran
-    /// `max(epochs, schedule)` and so ignored the budget entirely (10k, 50k and 138k all produced
-    /// identical work). An earlier fix attempt clamped the budget *up* to the schedule length,
-    /// which made the epoch bound unreachable and left the flag unable to shorten a run at all.
-    #[test]
     /// A budget below the schedule length is raised to it, so a run cannot be truncated while the
     /// temperature is still high.
     ///
-    /// Regression guard, in both directions. Originally `||` made the loop run
-    /// `max(epochs, schedule)`, so the budget was ignored entirely (10k, 50k and 138k all did
-    /// identical work) and a *low* value truncated the run into a random walk. A bare `&&` then
-    /// inverted the failure: a low value became a real truncation.
+    /// Regression guard in both directions. Originally `||` made the loop run
+    /// `max(epochs, schedule)`, so the budget was ignored entirely — 10k, 50k and 138k all did
+    /// identical work — while a *low* value truncated the run into a random walk. A bare `&&` then
+    /// inverted the failure, making a low value a real truncation.
     ///
-    /// The deliberate trade-off here is that `--epochs` cannot be used to shorten a run — there is
-    /// no way to distinguish "I want a short run" from "I accepted the default budget", because
-    /// the default *is* a small number relative to the schedule. Raising is the safe choice;
-    /// `epochs == 0` remains available for "no cap" (`test_sa_zero_epochs_means_unbounded_...`).
+    /// The deliberate trade-off is that `--epochs` cannot shorten a run: the default budget is
+    /// itself small relative to the schedule, so "I want a short run" is indistinguishable from
+    /// "I accepted the default". Raising is the safe choice, and `epochs == 0` still means no cap.
     #[test]
     fn test_sa_epochs_below_the_schedule_is_raised_to_it() {
         let problem = tiny_problem();
@@ -267,9 +246,14 @@ mod tests {
         let _ = solve(&problem, &opts, None, None);
         let iterations = ITERATIONS.with(|n| n.get());
 
-        assert_eq!(
-            iterations, schedule,
-            "a budget below the schedule must be raised to it, not honoured as a truncation"
+        // Tolerance, not equality: `schedule_length` is computed in f64 from the analytic form,
+        // while the loop cools in f32 (`t - rate * t`) and accumulates rounding over ~138k steps.
+        // The real count can therefore differ from the analytic figure by a few iterations, and an
+        // exact assertion would be platform-dependent.
+        let tolerance = schedule / 100;
+        assert!(
+            iterations <= schedule && iterations + tolerance >= schedule,
+            "a budget below the schedule must be raised to it: ran {iterations}, schedule {schedule}"
         );
     }
 
@@ -323,14 +307,20 @@ mod tests {
         let _ = solve(&problem, &opts, None, None);
         let iterations = ITERATIONS.with(|n| n.get());
 
-        assert_eq!(
-            iterations, schedule,
-            "the temperature schedule should end this run before the explicit budget"
+        // Same f32-vs-f64 reasoning as above, so a tolerance rather than equality.
+        assert!(
+            iterations <= schedule,
+            "the run must not exceed the schedule: ran {iterations}, schedule {schedule}"
+        );
+        assert!(
+            schedule - iterations <= schedule / 100,
+            "the run should end at the schedule, not far short of it: \
+             ran {iterations}, schedule {schedule}"
         );
     }
 
-    /// The temperature schedule still terminates a run on its own when the epoch budget is
-    /// effectively unbounded, so making `epochs` a strict cap did not remove the cooling bound.
+    /// `schedule_length` is derived from the cooling parameters rather than hardcoded, and a
+    /// degenerate schedule falls back to the explicit budget instead of clamping it to zero.
     #[test]
     fn test_sa_schedule_length_follows_the_cooling_rate() {
         // The cap must be derived from the cooling parameters, not hardcoded: a slower rate needs
