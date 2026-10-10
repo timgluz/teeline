@@ -2,6 +2,7 @@ use std::sync::mpsc;
 
 use rand::RngExt;
 
+use super::budget::Budget;
 use super::probability::levy_step;
 use super::progress::ProgressMessage;
 use super::route::Route;
@@ -74,7 +75,14 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
     }
 
-    for epoch in 0..opts.heuristic.epochs {
+    let mut budget = Budget::new(opts.heuristic.epochs, opts.heuristic.stagnation_epochs);
+    // Starts true so the first epoch runs, then carries the previous epoch's result into the
+    // budget — one decision point for both the cap and the convergence threshold.
+    let mut improved = true;
+
+    while budget.record(improved) {
+        let epoch = budget.epoch().saturating_sub(1);
+        let best_at_epoch_start = best_cost;
         for cuckoo_idx in 0..n_nests {
             let levy = levy_step(&mut rng).abs();
             #[allow(
@@ -127,6 +135,18 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
         }
+
+        // A single comparison for the epoch, rather than a flag per improvement site: a solver
+        // with several such sites would otherwise assign the same value more than once.
+        improved = best_cost < best_at_epoch_start;
+    }
+
+    if budget.limit() > 0 && budget.stale_epochs() >= budget.limit() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {
