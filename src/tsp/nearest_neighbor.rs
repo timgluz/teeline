@@ -7,17 +7,22 @@ use super::{HeuristicOptions, Solution, TspProblem};
 
 pub fn solve(
     problem: &TspProblem,
-    opts: &HeuristicOptions,
+    // `nn` is the one solver that reads nothing from HeuristicOptions: the greedy step
+    // needs the nearest unvisited city, and `n_nearest` is a candidate-list limit that
+    // only makes sense for solvers trading exactness for speed. Underscored rather than
+    // removed to keep the uniform `solve(problem, opts, tx, init)` signature every solver
+    // shares, and so the signature does not change if it ever needs an option again.
+    _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
-    tracing::info!(
-        n_nearest = opts.n_nearest,
-        cities = cities.len(),
-        "NN starting"
-    );
+    // Deliberately does not log `opts.n_nearest`: the greedy step ignores it, and a log
+    // naming a field with no effect on the result invites someone debugging a
+    // reproducibility problem to blame it. Mirrors `greedy_edge::solve`, which also
+    // ignores HeuristicOptions and logs only `cities`.
+    tracing::info!(cities = cities.len(), "NN starting");
 
     let cities_table: HashMap<usize, _> = cities.iter().map(|c| (c.id, *c)).collect();
 
@@ -49,11 +54,16 @@ pub fn solve(
         // nearest unvisited, and it silently produced worse tours. It was also the
         // first half of the run-to-run variance bug — the second half was the
         // HashSet-ordered tie-break that this call replaced with a total order.
-        let Some(nearest) = distances.nearest_unvisited(current_city, |id| {
-            id != current_id && unvisited.contains(&id)
-        }) else {
-            break;
-        };
+        // `expect`, not a silent `break`: the loop guard says `unvisited` is non-empty and
+        // `current_city` comes from the same city set the matrix was built from, so a `None`
+        // here means one of those invariants is broken. Breaking quietly would truncate the
+        // tour and return a shorter "solution" with no diagnostic — exactly the
+        // silent-wrong-answer class of bug this rewrite exists to remove, so fail loudly.
+        let nearest = distances
+            .nearest_unvisited(current_city, |id| {
+                id != current_id && unvisited.contains(&id)
+            })
+            .expect("unvisited is non-empty and current_city came from the matrix's own cities");
         let next_id = nearest.point.id;
 
         path.push(next_id);

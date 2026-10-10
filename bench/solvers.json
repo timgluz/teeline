@@ -54,7 +54,8 @@
       },
       "default_configs": [
         "default"
-      ]
+      ],
+      "deterministic_method": "measured"
     },
     {
       "id": "christofides",

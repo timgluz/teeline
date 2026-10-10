@@ -155,11 +155,19 @@ impl KDTree {
     /// the membership test explicitly instead of relying on a parameter name to convey
     /// polarity.
     ///
-    /// Deterministic in distance and identity. `nearest_where` fixes the minimum
-    /// distance without letting skipped points distort pruning, but which member of an
-    /// exact-distance tie it returns is unspecified, so ties are resolved here by a
-    /// scan for the lowest eligible id — and only when a tie actually exists, which
-    /// keeps the common path sublinear.
+    /// Deterministic in distance and identity: `nearest_where` fixes the minimum
+    /// distance without letting skipped points distort pruning, then the lowest id among
+    /// exact-distance ties is chosen explicitly rather than left to traversal order.
+    ///
+    /// **Cost is O(n), not sublinear.** Resolving the tie group requires inspecting the
+    /// points at that distance, so this scans the whole `cities` slice on every call even
+    /// when no tie exists. That makes it no cheaper than
+    /// `DistanceMatrix::nearest_unvisited` in the worst case, despite the pruned
+    /// traversal underneath it; `nn` therefore uses the matrix path.
+    /// `cities` **must be exactly the point set this tree was built from** — the same ids
+    /// and coordinates, in any order. Nothing enforces that, so a caller passing a
+    /// filtered, stale or reordered slice silently gets a wrong tie-break rather than an
+    /// error.
     pub fn nearest_unvisited(
         &self,
         target: &KDPoint,

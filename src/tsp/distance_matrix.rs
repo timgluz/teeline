@@ -423,9 +423,12 @@ mod tests {
     fn nearest_unvisited_matches_reference_on_real_a280_data() {
         use crate::tsp::tsplib;
 
+        // tests/fixtures/, not data/tsplib/: the latter is git-ignored and only present
+        // after `download_data.sh`, so pointing at it would fail on a fresh checkout and
+        // in CI. tests/fixtures/a280.tsp is tracked.
         let problem = tsplib::read_from_file(std::path::Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/data/tsplib/a280.tsp"
+            "/tests/fixtures/a280.tsp"
         )))
         .expect("a280 fixture must parse");
         let cities = problem.cities().to_vec();
