@@ -36,8 +36,9 @@ pub(crate) fn schedule_length(opts: &SAOptions) -> usize {
 /// - `epochs == 0` means unbounded.
 /// - A value below the schedule length is raised to it: stopping while the temperature is still high
 ///   accepts nearly every move, so the run degenerates into a random walk rather than annealing.
-/// - Resolved at run time because the budget depends on the cooling parameters, and the CLI applies
-///   `--cooling_rate` after the options are built.
+/// - Resolved at run time because the budget depends on the cooling parameters, whichever
+///   constructor supplied them; computing it in `solve` keeps CLI, TOML, wasm and API paths in
+///   agreement.
 ///
 /// Consequence: `--epochs` can bound a run at the schedule length or leave it uncapped, but cannot
 /// shorten it — an explicitly small budget is indistinguishable from an accepted default. Fixing
