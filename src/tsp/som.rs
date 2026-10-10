@@ -1,3 +1,4 @@
+use crate::tsp::budget::Budget;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::route::Route;
 use crate::tsp::{SOMOptions, Solution, TspProblem};
@@ -74,7 +75,50 @@ pub fn solve(
 
     let mut rng = rand::rng();
 
+    // SOM has no incumbent tour to watch — the map is only decoded at the end — so "progress" is the
+    // quantisation error: how far the cities still sit from their best-matching neurons. That is the
+    // standard convergence measure for a SOM, and it falls as the map fits the cities.
+    //
+    // Measuring it costs O(n * neurons), about n times an ordinary epoch, so it is sampled: the
+    // interval widens with n so the total sampling cost stays a modest fraction of training rather
+    // than overtaking it on large instances, and sampling is skipped entirely when the stop is off.
+    // The first and last epochs are always sampled so a short run still yields a comparison.
+    let tracking = opts.stagnation_epochs > 0;
+    let measure_interval = if tracking {
+        // Widen with n so the sampled work stays a fraction of training (a sample costs about n times
+        // an epoch). Capped so there are always several samples: an interval approaching `epochs`
+        // would leave only the forced first and last samples, making the stop unable to fire early.
+        let for_cost = (n * opts.neuron_multiplier / 8).max(1) * n / 10;
+        let interval = (epochs / 1000).max(for_cost).max(1);
+        // The cap above already guarantees several samples, so the case that actually leaves the stop
+        // unable to fire is a limit no run can reach: the stale count is bounded by the samples taken.
+        let interval = interval.min((epochs / 8).max(1));
+        if opts.stagnation_epochs >= epochs {
+            tracing::warn!(
+                stagnation_epochs = opts.stagnation_epochs,
+                epochs,
+                "SOM: stagnation_epochs is not below epochs, so the plateau stop can never fire"
+            );
+        }
+        interval
+    } else {
+        1
+    };
+    // Staleness is counted in *samples*, not epochs: a limit expressed in epochs would fire on a
+    // single noisy sample whenever it fell below the sampling interval, and the signal is noisy by
+    // construction (one random city trains each epoch). Rounding up means a limit below one interval
+    // still requires one full interval of evidence.
+    let sample_limit = if tracking {
+        opts.stagnation_epochs.div_ceil(measure_interval).max(1)
+    } else {
+        0
+    };
+    let mut budget = Budget::new(epochs, sample_limit);
+
+    let mut best_error = f64::INFINITY;
+
     // Training loop
+    let mut finished = false;
     for t in 1..=epochs {
         let t_f = t as f64;
         let eta = eta0 * (-t_f / epochs as f64).exp();
@@ -129,6 +173,38 @@ pub fn solve(
                 let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&snapshot), cost));
             }
         }
+
+        if tracking && (t == 1 || t == epochs || t % measure_interval == 0) {
+            let error = quantisation_error(&norm_cities, &neurons);
+            let still_improving = error < best_error;
+            best_error = best_error.min(error);
+            // Only sampled epochs consult the budget, and the budget counts samples, so a limit below
+            // the sampling interval still needs a full interval of evidence before it can fire.
+            if !budget.record(still_improving) {
+                if budget.converged() {
+                    tracing::info!(
+                        samples = budget.epoch(),
+                        stagnation_samples = budget.stale_epochs(),
+                        "SOM: converged, quantisation error stopped improving"
+                    );
+                }
+                // The loop can stop between checkpoints, so publish the map as it stands rather than
+                // leaving the last reported state up to 10% of the run out of date.
+                // The checkpoint block above already published this epoch when it lands on one, so
+                // only publish here otherwise.
+                if let Some(tx) = progress_tx.filter(|_| t % checkpoint != 0) {
+                    let snapshot = extract_tour(&norm_cities, &neurons, cities);
+                    let cost = problem.distances.tour_length(&snapshot);
+                    let _ = tx.send(ProgressMessage::EpochUpdate(t));
+                    let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&snapshot), cost));
+                }
+                finished = true;
+                break;
+            }
+        }
+        // Unmeasured epochs inherit the last measured outcome. Reporting progress instead would reset
+        // the streak every `measure_interval` epochs, so a limit above 1 could never be reached — the
+        // plateau stop would silently never fire, which is worse than not sampling at all.
     }
 
     let tour = extract_tour(&norm_cities, &neurons, cities);
@@ -137,14 +213,33 @@ pub fn solve(
     tracing::info!(tour_length = final_cost, "SOM done");
 
     if let Some(tx) = progress_tx {
+        // The break path already published the final state, so sending again would duplicate it.
         // Only send a final PathUpdate if the last checkpoint didn't already cover it
-        if !epochs.is_multiple_of(checkpoint) {
+        if !finished && !epochs.is_multiple_of(checkpoint) {
             let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&tour), final_cost));
         }
         let _ = tx.send(ProgressMessage::Done);
     }
 
     Solution::new(&tour, problem)
+}
+
+/// Mean distance from each city to its closest neuron — the standard SOM fit measure.
+fn quantisation_error(norm_cities: &[[f64; 2]], neurons: &[[f64; 2]]) -> f64 {
+    if norm_cities.is_empty() {
+        return 0.0;
+    }
+    let total: f64 = norm_cities
+        .iter()
+        .map(|city| {
+            neurons
+                .iter()
+                .map(|neuron| sq_dist(neuron, city))
+                .fold(f64::INFINITY, f64::min)
+                .sqrt()
+        })
+        .sum();
+    total / norm_cities.len() as f64
 }
 
 /// Extract a tour from current neuron state.

@@ -234,7 +234,8 @@ fn tuning_args() -> Vec<Arg> {
             .long("stagnation_epochs")
             .help(
                 "consecutive non-improving epochs before stopping early; 0 = never stop early \
-                 (honoured by: ga)",
+                 (honoured by: ga, pso, cs, fpa, gsa, sa, aco, som, tabu; for fourier it counts \
+                 harmonic stages, not epochs, and has no effect at or above --k-max minus one)",
             )
             .required(false),
         // The misspelled spelling is kept as a hidden alias so existing scripts and CI keep

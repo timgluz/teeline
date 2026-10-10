@@ -7,8 +7,10 @@ pub struct HeuristicConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epochs: Option<usize>,
     /// Stop after this many consecutive epochs without improvement; `0` means never stop early (the
-    /// epoch cap still applies). Defaults to 0 (disabled), so omitting it changes nothing. Currently
-    /// honoured only by the `ga` solver — other solvers accept and ignore it.
+    /// epoch cap still applies). Defaults to 0 (disabled), so omitting it changes nothing. Honoured by
+    /// the solvers that read a `heuristic` block — `ga`, `pso`, `cs`, `fpa`, `gsa`, `sa`, `aco`,
+    /// `tabu`; solvers without one accept and ignore it. `som` and `fourier` take their own
+    /// `stagnation_epochs` in `SomConfig` and `FourierConfig` (fourier counts harmonic stages).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stagnation_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -142,6 +144,9 @@ pub struct SomConfig {
     pub radius_fraction: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neuron_multiplier: Option<usize>,
+    /// Consecutive non-improving epochs before stopping early; 0 = never stop early.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stagnation_epochs: Option<usize>,
 }
 
 /// Fourier constructive solver. Mirrors `FourierOptions` (f64 fields match the lib).
@@ -159,6 +164,10 @@ pub struct FourierConfig {
     pub lambda_decay: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lr: Option<f64>,
+    /// Consecutive non-improving stages before stopping early; 0 = never stop early. Counts harmonic
+    /// stages rather than epochs, so a value at or above `k_max - 1` cannot fire.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stagnation_epochs: Option<usize>,
 }
 
 /// Per-solver optional configuration. Pass only the field matching your chosen solver.

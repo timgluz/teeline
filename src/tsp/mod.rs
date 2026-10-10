@@ -1458,6 +1458,13 @@ pub struct FourierOptions {
     pub lambda_decay: f64, // tension decay multiplier per k_active stage, default 0.5
     pub lr: f64,           // gradient learning rate, default 0.05
     pub epochs: usize,     // gradient steps per k_active stage, default 400
+    /// Consecutive non-improving harmonic stages before stopping early; 0 = never stop early.
+    ///
+    /// Counts *stages*, not epochs — the outer loop runs once per harmonic and `epochs` above is the
+    /// number of gradient steps within a stage. At or above `k_max - 1` the plateau can never fire:
+    /// stage 1 always improves and the final stage's outcome is never recorded, leaving at most
+    /// `k_max - 2` consecutive stale stages. Carried here because fourier has no `HeuristicOptions`.
+    pub stagnation_epochs: usize,
 }
 
 impl Default for FourierOptions {
@@ -1469,6 +1476,7 @@ impl Default for FourierOptions {
             lambda_decay: 0.5,
             lr: 0.05,
             epochs: 400,
+            stagnation_epochs: 0,
         }
     }
 }
@@ -1538,9 +1546,12 @@ impl FourierOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
+                "stagnation_epochs" => {
+                    f.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [fourier] — valid: k_max, m, lambda, lambda_decay, lr, epochs"
+                        "config: unknown field `{other}` in [fourier] — valid: k_max, m, lambda, lambda_decay, lr, epochs, stagnation_epochs"
                     ));
                 }
             }
@@ -1566,6 +1577,11 @@ impl FourierOptions {
                 .parse::<usize>()
                 .map_err(|_| format!("--m: invalid integer `{v}`"))?;
         }
+        if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            f.stagnation_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
+        }
         f.validate()?;
         Ok(f)
     }
@@ -1581,6 +1597,10 @@ pub struct SOMOptions {
     pub learning_rate: f64,       // η₀ — initial learning rate, default 0.8
     pub radius_fraction: f64,     // σ₀ = radius_fraction × N neurons, default 0.1
     pub neuron_multiplier: usize, // N = n_cities × neuron_multiplier, default 8
+    /// Consecutive non-improving epochs before stopping early; 0 = never stop early. Carried here
+    /// rather than in a `HeuristicOptions` because SOM has no such field and does not use the other
+    /// heuristics; its epoch cap lives in this struct too.
+    pub stagnation_epochs: usize,
 }
 
 impl Default for SOMOptions {
@@ -1590,6 +1610,7 @@ impl Default for SOMOptions {
             learning_rate: 0.8,
             radius_fraction: 0.1,
             neuron_multiplier: 8,
+            stagnation_epochs: 0,
         }
     }
 }
@@ -1651,9 +1672,12 @@ impl SOMOptions {
                     }
                     s.neuron_multiplier = raw as usize;
                 }
+                "stagnation_epochs" => {
+                    s.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [som] — valid: epochs, learning_rate, radius_fraction, neuron_multiplier"
+                        "config: unknown field `{other}` in [som] — valid: epochs, learning_rate, radius_fraction, neuron_multiplier, stagnation_epochs"
                     ));
                 }
             }
@@ -1683,6 +1707,11 @@ impl SOMOptions {
             s.neuron_multiplier = v
                 .parse::<usize>()
                 .map_err(|_| format!("--neuron_multiplier: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            s.stagnation_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
         }
         s.validate()?;
         Ok(s)
@@ -1823,7 +1852,7 @@ pub fn solve_with_context(
         Solvers::SimulatedAnnealing => {
             let sa = opts.sa.as_ref().cloned().unwrap_or_default();
             sa.validate()?;
-            simulated_annealing::solve(problem, &sa, tx, init_tour)
+            simulated_annealing::solve(problem, &sa, tx, init_tour).0
         }
         Solvers::StochasticHill => stochastic_hill::solve(problem, &h, tx, init_tour),
         Solvers::TabuSearch => tabu_search::solve(problem, &h, tx, init_tour),
@@ -2267,6 +2296,17 @@ mod tests {
             42,
             "[lk]"
         );
+        // `som` and `fourier` carry the option on their own struct, not in a `heuristic` sub-table.
+        assert_eq!(
+            SOMOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[som]"
+        );
+        assert_eq!(
+            FourierOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[fourier]"
+        );
     }
 
     /// The "valid fields" hints name the accepted keys, so they must mention the new option —
@@ -2280,12 +2320,48 @@ mod tests {
             ("[cs]", CSOptions::from_toml(&t).unwrap_err()),
             ("[fpa]", FPAOptions::from_toml(&t).unwrap_err()),
             ("[lk]", LKOptions::from_toml(&t).unwrap_err()),
+            ("[som]", SOMOptions::from_toml(&t).unwrap_err()),
+            ("[fourier]", FourierOptions::from_toml(&t).unwrap_err()),
         ] {
             assert!(
                 err.contains("stagnation_epochs"),
                 "{label} hint should list stagnation_epochs, got: {err}"
             );
         }
+    }
+
+    /// `fourier` and `som` build their options independently of `HeuristicOptions`, so each needs its
+    /// own check that a bad value is reported rather than quietly defaulted.
+    #[test]
+    fn test_fourier_and_som_cli_reject_bad_stagnation_epochs() {
+        use clap::{Arg, ArgAction, Command};
+        // Every argument either `from_cli` reads, since both are handed the same command.
+        let mk = || {
+            let mut cmd = Command::new("t").arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            );
+            for id in [
+                "epochs",
+                "k_max",
+                "m",
+                "learning_rate",
+                "radius_fraction",
+                "neuron_multiplier",
+            ] {
+                cmd = cmd.arg(Arg::new(id).long(id).action(ArgAction::Set));
+            }
+            cmd
+        };
+
+        let fourier = mk().get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = FourierOptions::from_cli(&fourier).unwrap_err();
+        assert!(err.contains("--stagnation_epochs"), "fourier: got {err}");
+
+        let som = mk().get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = SOMOptions::from_cli(&som).unwrap_err();
+        assert!(err.contains("--stagnation_epochs"), "som: got {err}");
     }
 
     /// A non-numeric value must be rejected with a message naming the flag, rather than silently
@@ -2726,6 +2802,11 @@ mod tests {
             .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
             .arg(Arg::new("k_max").long("k-max").action(ArgAction::Set)) // hyphen matches production CLI
             .arg(Arg::new("m").long("m").action(ArgAction::Set))
+            .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            )
     }
 
     #[test]

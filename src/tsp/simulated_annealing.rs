@@ -2,17 +2,11 @@ use std::sync::mpsc;
 
 use rand::RngExt;
 
+use super::budget::Budget;
 use super::probability::{cooling, metropolis};
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{SAOptions, Solution, TspProblem};
-
-// Test-only iteration counter. Thread-local rather than global: tests run in parallel, so a shared
-// counter would mix counts across them.
-#[cfg(test)]
-thread_local! {
-    pub(crate) static ITERATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
-}
 
 /// Iterations the cooling schedule needs to reach `min_temperature` from `max_temperature`.
 ///
@@ -62,16 +56,33 @@ fn usable_epochs(opts: &SAOptions) -> usize {
     epochs
 }
 
+/// Which bound ended a run, and what it consumed, so tests and callers can observe a run without
+/// instrumenting the loop.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SolveStats {
+    /// Epochs actually run.
+    pub epochs: usize,
+    /// Sustained non-improvement ended the run.
+    pub converged: bool,
+    /// The temperature fell to its floor, ending the run.
+    pub cooled: bool,
+    /// The epoch budget was exhausted, ending the run.
+    ///
+    /// Derived rather than compared directly: `usable_epochs` can raise the budget to the cooling
+    /// schedule length, so reaching it does not by itself mean the budget was the binding bound, and
+    /// convergence can also fire on the final admitted epoch.
+    pub epoch_capped: bool,
+}
+
 pub fn solve(
     problem: &TspProblem,
     opts: &SAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
-) -> Solution {
+) -> (Solution, SolveStats) {
     let cities = &problem.cities;
     let distances = &problem.distances;
     let cooling_rate = opts.cooling_rate;
-    let mut epoch = 0;
 
     // Resolved here, not in a constructor, so the log reports the budget actually used and every
     // constructor path agrees.
@@ -88,27 +99,45 @@ pub fn solve(
     let mut best_route = init_tour
         .map(Route::new)
         .unwrap_or_else(|| Route::from_cities(cities));
-    let mut best_distance = distances.tour_length(best_route.route());
+    let mut current_route = best_route.clone();
+    let mut current_distance = distances.tour_length(current_route.route());
+    // The incumbent, which the walk may leave behind but never loses.
+    let mut best_distance = current_distance;
 
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::PathUpdate(
-            best_route.clone(),
-            best_distance,
+            current_route.clone(),
+            current_distance,
         ));
     }
 
     let mut temperature = opts.max_temperature;
-    // Both bounds are capping: whichever is reached first ends the run.
-    while epoch < epoch_limit && temperature > opts.min_temperature {
-        #[cfg(test)]
-        ITERATIONS.with(|n| n.set(n.get() + 1));
+    // Three bounds are capping, and whichever is reached first ends the run: the epoch budget, the
+    // cooling schedule (the temperature falling to its floor), and sustained non-improvement.
+    let mut budget = Budget::new(epoch_limit, opts.heuristic.stagnation_epochs);
+    let mut improved = true;
 
-        let candidate = best_route.random_successor();
+    while temperature > opts.min_temperature && budget.record(improved) {
+        let epoch = budget.index();
+        // Reset first: only a new incumbent below sets this again, so an epoch that improves nothing
+        // is reported as such rather than inheriting the previous epoch's outcome.
+        improved = false;
+
+        let candidate = current_route.random_successor();
         let candidate_distance = distances.tour_length(candidate.route());
 
-        if is_acceptable(temperature, best_distance, candidate_distance) {
-            best_route = candidate;
-            best_distance = candidate_distance;
+        if is_acceptable(temperature, current_distance, candidate_distance) {
+            current_route = candidate;
+            current_distance = candidate_distance;
+        }
+
+        // The walk accepts worsening moves, so the current tour is not what a caller wants back. Track
+        // the best seen separately: it is what the run is for, and it is the only honest progress
+        // signal.
+        if current_distance < best_distance {
+            best_distance = current_distance;
+            best_route = current_route.clone();
+            improved = true;
 
             if let Some(tx) = progress_tx {
                 let _ = tx.send(ProgressMessage::PathUpdate(
@@ -121,13 +150,36 @@ pub fn solve(
 
         tracing::debug!(epoch, temperature, "SA: tick");
         temperature = cooling(temperature, cooling_rate);
-        epoch += 1;
+        // Progress means a new best was found, not merely that a move was accepted: SA accepts uphill
+        // moves by design, so an acceptance count would treat the search's own wandering as
+        // advancement and the plateau stop would rarely fire. `improved` is left false when this
+        // epoch's candidate was rejected, which is why nothing writes it here.
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "SA: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(best_route.route(), cities, distances)
+
+    let converged = budget.converged();
+    let cooled = temperature <= opts.min_temperature;
+    let stats = SolveStats {
+        epochs: budget.epoch(),
+        converged,
+        cooled,
+        epoch_capped: !converged && !cooled && budget.epoch() >= epoch_limit,
+    };
+    (
+        Solution::from_parts(best_route.route(), cities, distances),
+        stats,
+    )
 }
 
 fn is_acceptable(temperature: f32, old_distance: f32, new_distance: f32) -> bool {
@@ -172,7 +224,7 @@ mod tests {
             ..SAOptions::default()
         };
         let problem = TspProblem::new(cities, dm);
-        let result = solve(&problem, &opts, None, Some(&optimal));
+        let (result, _) = solve(&problem, &opts, None, Some(&optimal));
         assert_eq!(result.route(), optimal.as_slice());
     }
 
@@ -186,6 +238,103 @@ mod tests {
         ]);
         let dm = distance_matrix::from_cities(&cities);
         TspProblem::new(cities, dm)
+    }
+
+    /// `SolveStats` must not report convergence when the epoch budget is what ran out.
+    ///
+    /// The budget here equals the schedule length, which is the case that makes a bare
+    /// `epoch >= limit` comparison wrong: the cap and the temperature floor are reached together, so
+    /// only the derived `!converged && !cooled` form distinguishes them. For SA the two genuinely
+    /// coincide — `usable_epochs` raises any smaller budget to the schedule — so the useful guarantee
+    /// is that neither is ever misreported as convergence.
+    #[test]
+    fn test_sa_stats_do_not_call_a_budget_stop_convergence() {
+        let problem = tiny_problem();
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: schedule_length(&SAOptions::default()),
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+
+        let (_, stats) = solve(&problem, &opts, None, None);
+
+        assert!(
+            !stats.converged,
+            "the plateau stop is disabled, so convergence cannot be the reason it stopped"
+        );
+        assert!(
+            stats.cooled || stats.epoch_capped,
+            "one of the other two bounds must explain the stop (ran {})",
+            stats.epochs
+        );
+    }
+
+    /// With the plateau stop on, `converged` is the reason and the other two bounds are not claimed.
+    #[test]
+    fn test_sa_stats_report_convergence_when_the_plateau_stops_the_run() {
+        let problem = tiny_problem();
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 0, // no epoch cap
+                stagnation_epochs: 20,
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+
+        let (_, stats) = solve(&problem, &opts, None, None);
+
+        assert!(stats.converged, "20 non-improving epochs must end the run");
+        assert!(
+            !stats.epoch_capped,
+            "the budget was unbounded, so it cannot have been the bound that applied"
+        );
+    }
+
+    /// The plateau stop must bound a run independently of the cooling schedule.
+    ///
+    /// Started from the optimal tour so no improvement is available: with the honest signal — a new
+    /// *best* tour, not an accepted move — SA keeps improving for most of a long schedule on a small
+    /// problem, so a plateau has to be constructed deliberately rather than hoped for.
+    ///
+    /// Scope: this covers the wiring. It cannot discriminate a best-tour signal from an
+    /// acceptance-based one, since both eventually stop; the difference is argued at the assignment in
+    /// `solve`.
+    #[test]
+    fn test_sa_stops_on_stagnation() {
+        let problem = tiny_problem();
+        let opts = SAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 0, // no epoch cap
+                stagnation_epochs: 20,
+                ..HeuristicOptions::default()
+            },
+            ..SAOptions::default()
+        };
+        let schedule = schedule_length(&opts);
+        assert!(
+            schedule > 100,
+            "test premise: the schedule must leave room for a plateau stop, got {schedule}"
+        );
+
+        // The optimal tour of `tiny_problem`'s five points, found by brute force: starting anywhere
+        // else leaves an improvement available, and then no plateau forms at a 20-epoch limit.
+        let optimal = vec![0, 1, 3, 4, 2];
+        let (_, stats) = solve(&problem, &opts, None, Some(&optimal));
+
+        assert!(stats.converged, "20 non-improving epochs must end the run");
+        assert!(
+            !stats.epoch_capped,
+            "the epoch budget was unbounded, so it cannot be the bound that applied"
+        );
+        assert!(
+            stats.epochs < schedule,
+            "the plateau stop must end the run before the cooling schedule does: \
+             ran {} of {schedule}",
+            stats.epochs
+        );
     }
 
     /// A budget below the schedule length is raised to it rather than truncating the run.
@@ -206,9 +355,8 @@ mod tests {
             ..SAOptions::default()
         };
 
-        ITERATIONS.with(|n| n.set(0));
-        let _ = solve(&problem, &opts, None, None);
-        let iterations = ITERATIONS.with(|n| n.get());
+        let (_, stats) = solve(&problem, &opts, None, None);
+        let iterations = stats.epochs;
 
         // Tolerance on both sides, not equality: `schedule_length` is computed in f64 from the
         // analytic form, while the loop cools in f32 (`t - rate * t`) and accumulates rounding over
@@ -232,9 +380,8 @@ mod tests {
             ..SAOptions::default()
         };
 
-        ITERATIONS.with(|n| n.set(0));
-        let _ = solve(&problem, &opts, None, None);
-        let iterations = ITERATIONS.with(|n| n.get());
+        let (_, stats) = solve(&problem, &opts, None, None);
+        let iterations = stats.epochs;
 
         assert!(
             iterations > 1_000,
@@ -263,9 +410,8 @@ mod tests {
             "test premise: schedule {schedule} should be below the explicit budget"
         );
 
-        ITERATIONS.with(|n| n.set(0));
-        let _ = solve(&problem, &opts, None, None);
-        let iterations = ITERATIONS.with(|n| n.get());
+        let (_, stats) = solve(&problem, &opts, None, None);
+        let iterations = stats.epochs;
 
         // Same f32-vs-f64 reasoning as above: the epoch cap (5000) does not bind here, so the f32
         // cooling loop alone decides the count and can land a few iterations either side of the

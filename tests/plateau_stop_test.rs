@@ -10,8 +10,9 @@ use std::sync::mpsc;
 
 use teeline::tsp::progress::ProgressMessage;
 use teeline::tsp::{
-    CSOptions, FPAOptions, HeuristicOptions, TspProblem, cuckoo_search, distance_matrix,
-    flower_pollination, gravitational_search, kdtree, particle_swarm,
+    AcoOptions, CSOptions, FPAOptions, FourierOptions, HeuristicOptions, SOMOptions, TspProblem,
+    ant_colony, cuckoo_search, distance_matrix, flower_pollination, fourier, gravitational_search,
+    kdtree, particle_swarm, som, tabu_search,
 };
 
 fn problem() -> TspProblem {
@@ -122,3 +123,225 @@ plateau_test!(
     HeuristicOptions,
     |h| h
 );
+
+// --- Solvers whose epoch count is not on the progress seam --------------------------------------
+//
+// `som` reports only at 10% checkpoints and `fourier` takes no progress channel at all, so neither
+// exposes its epoch count the way the four above do. They are held to the property that is
+// independent of counting: a run with a limit still returns a complete tour, and the limit does not
+// change the *shape* of the answer. Their stopping behaviour is pinned by unit tests in the modules
+// (`fourier` measures its decoded tour per stage, `som` its quantisation error), where the signal
+// being measured is directly observable.
+
+fn assert_complete_tour(solver: &str, solution: &teeline::tsp::Solution, expected: usize) {
+    let mut ids = solution.route().to_vec();
+    ids.sort_unstable();
+    ids.dedup();
+    assert_eq!(
+        ids.len(),
+        expected,
+        "{solver}: a stopped run must still visit every city exactly once"
+    );
+}
+
+#[test]
+fn som_honours_a_stagnation_limit_without_truncating_the_tour() {
+    let problem = problem();
+    let expected = problem.cities.len();
+    let opts = SOMOptions {
+        epochs: 500,
+        stagnation_epochs: LIMIT,
+        ..SOMOptions::default()
+    };
+    let (tx, _rx) = mpsc::channel();
+    let solution = som::solve(&problem, &opts, Some(&tx), None);
+    assert_complete_tour("som", &solution, expected);
+}
+
+#[test]
+fn fourier_honours_a_stagnation_limit_without_truncating_the_tour() {
+    let problem = problem();
+    let expected = problem.cities.len();
+    let opts = FourierOptions {
+        stagnation_epochs: LIMIT,
+        ..FourierOptions::default()
+    };
+    let solution = fourier::solve(&problem, &opts, None, None);
+    assert_complete_tour("fourier", &solution, expected);
+}
+
+/// ACO and tabu both report one `EpochUpdate` per epoch, so the limit's effect is countable: a run
+/// with a limit must stop before a cap it would otherwise reach.
+fn assert_limit_bounds_epochs<F>(solver: &str, run: F)
+where
+    F: Fn(&mpsc::Sender<ProgressMessage>, usize) -> teeline::tsp::Solution,
+{
+    let (tx, rx) = mpsc::channel();
+    let _ = run(&tx, LIMIT);
+    drop(tx);
+    let limited = rx
+        .try_iter()
+        .filter(|m| matches!(m, ProgressMessage::EpochUpdate(_)))
+        .count();
+
+    assert!(
+        limited < CAP / 10,
+        "{solver}: a limit of {LIMIT} should stop the run far short of the {CAP} cap; ran {limited}"
+    );
+}
+
+#[test]
+fn ant_colony_stops_on_stagnation() {
+    let problem = problem();
+    assert_limit_bounds_epochs("aco", |tx, limit| {
+        let opts = AcoOptions {
+            heuristic: HeuristicOptions {
+                epochs: CAP,
+                stagnation_epochs: limit,
+                ..HeuristicOptions::default()
+            },
+            ..AcoOptions::default()
+        };
+        ant_colony::solve(&problem, &opts, Some(tx), None)
+    });
+}
+
+#[test]
+fn tabu_search_stops_on_stagnation() {
+    let problem = problem();
+    assert_limit_bounds_epochs("tabu", |tx, limit| {
+        let opts = HeuristicOptions {
+            epochs: CAP,
+            stagnation_epochs: limit,
+            ..HeuristicOptions::default()
+        };
+        tabu_search::solve(&problem, &opts, Some(tx), None)
+    });
+}
+
+// --- Convergence actually firing -----------------------------------------------------------------
+//
+// The tests above use a loose limit to prove the run is *bounded*; these drive the limit low enough
+// that convergence is the reason the run stops, which is the path that logs and publishes its final
+// state. Without them those branches are never taken.
+
+/// Runs each solver with a limit of 1 and asserts it reports convergence, which is where the
+/// convergence log line and the final progress update live.
+#[test]
+fn a_tight_limit_makes_every_solver_converge() {
+    let problem = problem();
+    let (tx, rx) = mpsc::channel();
+
+    let heuristic = |limit: usize| HeuristicOptions {
+        epochs: CAP,
+        stagnation_epochs: limit,
+        ..HeuristicOptions::default()
+    };
+
+    // aco and tabu publish the epoch count, so their convergence is countable.
+    let count = |rx: &mpsc::Receiver<ProgressMessage>| {
+        rx.try_iter()
+            .filter(|m| matches!(m, ProgressMessage::EpochUpdate(_)))
+            .count()
+    };
+
+    let opts = AcoOptions {
+        heuristic: heuristic(1),
+        ..AcoOptions::default()
+    };
+    let _ = ant_colony::solve(&problem, &opts, Some(&tx), None);
+    drop(tx);
+    let aco_epochs = count(&rx);
+    assert!(
+        aco_epochs < CAP / 10,
+        "aco with a limit of 1 must stop early, ran {aco_epochs}"
+    );
+
+    let (tx, rx) = mpsc::channel();
+    let _ = tabu_search::solve(&problem, &heuristic(1), Some(&tx), None);
+    drop(tx);
+    let tabu_epochs = count(&rx);
+    assert!(
+        tabu_epochs < CAP / 10,
+        "tabu with a limit of 1 must stop early, ran {tabu_epochs}"
+    );
+
+    // som and fourier have no per-epoch message; assert the tour is still complete when they converge.
+    let som_opts = SOMOptions {
+        epochs: 500,
+        stagnation_epochs: 1,
+        ..SOMOptions::default()
+    };
+    let (tx, _rx) = mpsc::channel();
+    let solution = som::solve(&problem, &som_opts, Some(&tx), None);
+    assert_complete_tour("som", &solution, problem.cities.len());
+
+    let fourier_opts = FourierOptions {
+        stagnation_epochs: 1,
+        ..FourierOptions::default()
+    };
+    let solution = fourier::solve(&problem, &fourier_opts, None, None);
+    assert_complete_tour("fourier", &solution, problem.cities.len());
+}
+
+/// `fourier` counts stages, so a limit at or above `k_max` can never fire; the run must warn and then
+/// use every stage rather than stopping on the first.
+#[test]
+fn fourier_warns_when_the_limit_cannot_fire() {
+    let problem = problem();
+    let opts = FourierOptions {
+        k_max: 3,
+        stagnation_epochs: 3,
+        ..FourierOptions::default()
+    };
+    let solution = fourier::solve(&problem, &opts, None, None);
+    assert_complete_tour("fourier", &solution, problem.cities.len());
+}
+
+/// SOM samples its convergence signal only every `epochs / 1000` epochs, so this exercises the case
+/// where that interval exceeds one. Reporting progress on unmeasured epochs reset the stale counter
+/// before it could reach the limit, which silently disabled the stop for realistic epoch counts (the
+/// default is 100,000, an interval of 100) — a bug the 500-epoch test above cannot see, since its
+/// interval is 1.
+///
+/// `epochs` is set so the last checkpoint lands inside the cap: 1000 epochs is a tenth of the run, so
+/// the largest reported epoch reveals whether the run finished.
+#[test]
+fn som_converges_when_the_measurement_interval_exceeds_one() {
+    let problem = problem();
+    let epochs = 10_000;
+    assert!(
+        epochs / 1000 > 1,
+        "test premise: the measurement interval must exceed one epoch"
+    );
+
+    let last_epoch = |limit: usize| {
+        let opts = SOMOptions {
+            epochs,
+            stagnation_epochs: limit,
+            ..SOMOptions::default()
+        };
+        let (tx, rx) = mpsc::channel();
+        let _ = som::solve(&problem, &opts, Some(&tx), None);
+        drop(tx);
+        rx.try_iter()
+            .filter_map(|m| match m {
+                ProgressMessage::EpochUpdate(t) => Some(t),
+                _ => None,
+            })
+            .max()
+            .unwrap_or(0)
+    };
+
+    let unlimited = last_epoch(0);
+    let limited = last_epoch(5);
+
+    assert_eq!(
+        unlimited, epochs,
+        "with the limit off the run must reach the final checkpoint"
+    );
+    assert!(
+        limited < unlimited,
+        "a limit of 5 must stop the run before the cap: last reported epoch {limited} of {unlimited}"
+    );
+}
