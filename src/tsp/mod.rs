@@ -1,6 +1,7 @@
 pub mod ant_colony;
 pub mod bellman_karp;
 pub mod branch_bound;
+pub(crate) mod budget;
 pub mod christofides;
 pub mod comparison;
 pub use comparison::{ComparisonStats, compare_tours, tour_cost};
@@ -20,7 +21,6 @@ pub mod opt_tour;
 pub mod or_opt;
 pub mod particle_swarm;
 pub mod pipeline;
-pub(crate) mod plateau;
 pub mod probability;
 pub mod progress;
 pub mod random_shuffle;
