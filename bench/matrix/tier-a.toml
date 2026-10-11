@@ -1,0 +1,73 @@
+# Tier A — capability-tiered benchmark matrix.
+#
+# Read by scripts/bench-matrix.sh, which turns it into bench/runs/tier-a.jsonl. The
+# published contract is docs/benchmarks/schema.md.
+#
+# Coverage is capability-tiered rather than exhaustive. Exact solvers are exponential, so
+# they are measured only on instances small enough to finish; a solver that cannot produce
+# a result on an instance is not measured on it at all, rather than burning its budget to
+# record a timeout that was never in doubt.
+
+tier = "a"
+
+# Runs per (solver, instance, config) cell. Five, so a non-deterministic solver gets a
+# spread rather than a single number.
+runs = 5
+
+# Per-family wall-clock budget in seconds. A result is only comparable within its family, and a
+# gap figure without its budget is uninterpretable — these are published alongside the numbers
+# (see `bench/budgets.json`, which must agree with this table, and which a test enforces).
+#
+# Every family named in [coverage] needs an entry: there is deliberately no fallback, because a
+# family measured under some default while the published budgets state another number would put
+# an allowance on the page that the data was not taken under.
+[budgets]
+exact = 60
+local = 300
+meta = 300
+constructive = 30
+utility = 60
+
+# Which instance groups each solver family is measured on. `upto24` is the small group an
+# exponential solver can finish; `all` spans every distance type and size.
+[coverage]
+exact = ["upto24"]
+constructive = ["upto24", "all"]
+local = ["upto24", "all"]
+meta = ["upto24", "all"]
+utility = ["upto24", "all"]
+
+# Instances, grouped by what they are evidence for. Every entry is verified to parse.
+# `gr120` (LOWER_DIAG_ROW) stands in for `si175`, which fails on the unsupported
+# UPPER_DIAG_ROW format — substituted deliberately, not skipped silently.
+#
+# The distance types are covered as: GEO (burma14, ulysses16), EXPLICIT (gr17, gr120),
+# ATT (att48), CEIL_2D (dsj1000), EUC_2D (the rest).
+[instances]
+# Small enough for an exponential solver within its budget.
+burma14 = "upto24"    # GEO, 14
+gr17 = "upto24"       # EXPLICIT, 17
+ulysses16 = "upto24"  # GEO, 16
+# The wider corpus.
+ulysses22 = "all"     # EUC_2D, 22
+att48 = "all"         # ATT, 48
+berlin52 = "all"      # EUC_2D, 52
+eil76 = "all"         # EUC_2D, 76
+kroA100 = "all"       # EUC_2D, 100
+gr120 = "all"         # EXPLICIT, 120
+ch150 = "all"         # EUC_2D, 150
+a280 = "all"          # EUC_2D, 280
+dsj1000 = "all"       # CEIL_2D, 1000
+
+# Configs are named sets of extra CLI arguments. `default` applies to every solver and is
+# what a solver does out of the box; any other config names the solvers and instances it
+# applies to.
+[configs.default]
+
+# `branch_bound` is exact only when `--n_nearest` is at least the number of cities; at its
+# default of 3 it is a beam search. Publishing it unqualified as "exact" would misrepresent
+# it, so the exact run is labelled separately and scoped to instances it can finish.
+[configs.exact]
+solvers = ["branch_bound"]
+instances = ["burma14", "gr17", "ulysses16"]
+args = ["--n_nearest", "100"]

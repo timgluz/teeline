@@ -91,3 +91,29 @@ unsupported `UPPER_DIAG_ROW` format and must be substituted, not silently skippe
   the file more strictly than the old TSV path did: unknown keys, a non-boolean `dirty`, a
   non-numeric required field and a mixed-provenance file are all hard errors.
 - The 7-column TSV and its `#`-provenance header are gone; `--tsv` is now `--runs`.
+
+### Progress — 2026-10-11
+
+Implemented on `feat/bench-matrix-harness`, [PR #571](https://github.com/timgluz/teeline/pull/571),
+awaiting merge.
+
+`scripts/bench-matrix.sh` (runner) + `scripts/bench-matrix-plan.py` (planner) +
+`bench/matrix/tier-a.toml` (tier config) replace `scripts/bench-solvers.sh`, which is deleted;
+`task bench:solvers` is now `task bench:tierA`. All acceptance criteria are covered by
+`tests/e2e/bench-matrix.bats` (22 cases) and the full e2e suite is 107 green.
+
+Two things worth carrying forward, both found while building it:
+
+- **`default_timeout_s` was removed rather than kept as a fallback.** A family measured under a
+  fallback while `bench/budgets.json` published another number would put an allowance on the page
+  the data was not taken under. Every family named in `[coverage]` must now state its `[budgets]`
+  entry, and a test fails if the tier and `bench/budgets.json` disagree.
+- **`bench/budgets.json` disagreed with the tier** when the harness was first written — `exact`
+  30s vs 60s and `local` 120s vs 300s. Aligned to the tier (which follows the Tier A plan). Worth
+  knowing that the earlier values were placeholders, not decisions.
+
+**The volume figure in `tasks/bench-tier-a-campaign` needs correcting.** It says 2,640 runs
+(22 solvers x 12 instances x 2 budgets x 5 runs), but capability tiering means exact solvers are
+never planned on the large instances — they cannot finish, so their budget would only buy a
+timeout that was never in doubt. Tier A plans **249 cells / 1245 runs**. The task says the
+campaign "owns the numbers", so it is left to that task rather than changed here.

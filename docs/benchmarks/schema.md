@@ -72,10 +72,9 @@ note that the CLI name is not always the doc id (`som` → `kohonen_som`,
   "schema_version": 2,
   "generated_at": "2026-10-12T09:00:00Z",
   "tier": "A",
-  "default_timeout_s": 180,
   "budgets": {
     "meta": { "seconds": 300, "agreed": true },
-    "local": { "seconds": 120, "agreed": false }
+    "local": { "seconds": 300, "agreed": false }
   },
   "budgets_note": "…why some figures are provisional…",
   "solvers": [
@@ -95,8 +94,10 @@ Rules:
   exactly this.
 - `generated_at` is when this manifest was written, which is **not** when the
   results were measured. It is not a provenance substitute.
-- `default_timeout_s` is the run's overall timeout as recorded by the harness; the
-  per-family `budgets` are what a result must be read against.
+- There is no single overall timeout: the per-family `budgets` are the authority, and every
+  measured family has one (the tier config requires it). An earlier version of this contract
+  carried a `default_timeout_s` sourced from the run log's file header; that header no longer
+  exists, and a field that no producer writes must not be documented as if it did.
 - `budgets` maps a solver family to its wall-clock allowance. `agreed: true` means
   the figure is fixed by a decision; `agreed: false` marks a provisional value that
   has not been settled, so a page must not present it as an agreed like-for-like
@@ -160,6 +161,56 @@ A row with **no** `measurement` is published with `git_commit_source: "publish-t
 commit is then only HEAD when the publish ran and does **not** identify the built binary.
 This is the one case where the block carries the publisher's version and tree state, and the
 label is what makes that legible — a consumer must not read those as the measured binary.
+
+### The tier config
+
+`bench-matrix.sh` is driven by a TOML tier (`bench/matrix/tier-a.toml`), so coverage and budgets
+are reviewable data rather than bash arrays:
+
+```toml
+tier = "a"
+runs = 5
+
+[budgets]                      # seconds per family; MUST match bench/budgets.json
+exact = 60
+local = 300
+meta = 300
+
+[coverage]                     # which instance groups each family is measured on
+exact = ["upto24"]
+local = ["upto24", "all"]
+
+[instances]
+burma14 = "upto24"
+berlin52 = "all"
+
+[configs.default]
+
+[configs.exact]                # a named set of extra CLI args
+solvers = ["branch_bound"]
+instances = ["burma14", "gr17", "ulysses16"]
+args = ["--n_nearest", "100"]
+```
+
+Rules the harness enforces, each because the alternative is a hole in the published corpus:
+
+- **Every family must appear in `[coverage]`**, even if measured nowhere. A family that is
+  simply absent is indistinguishable from one somebody forgot, so it is refused; `local = []`
+  is how a tier says "deliberately not measured here".
+- **Exact solvers are not planned on instances they cannot finish.** Capability tiering keeps an
+  exponential solver off the large instances rather than spending its budget to record a timeout
+  that was never in doubt.
+- **Every family in `[coverage]` must state a `[budgets]` entry**, and the whole table must match
+  `bench/budgets.json`, which is what gets published. A page that stated a different allowance
+  than the tier used would misstate the basis of every gap on it, so there is no fallback budget
+  for the harness to quietly substitute.
+- **A config naming a solver or instance that does not exist is refused**, as is an instance group
+  that no family names — each would otherwise match nothing and silently measure less than the
+  tier appears to.
+- **A missing or unparseable instance aborts the sweep**, before it runs anything, rather than
+  being skipped or recorded as an ordinary `error` row.
+- **A cell already in the output is skipped**, so an interrupted sweep resumes. A half-written
+  final line is dropped first, because it would otherwise make the whole file unparseable.
 
 ## `algorithms/{solver_id}.json`
 
