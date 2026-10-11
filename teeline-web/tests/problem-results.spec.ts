@@ -24,7 +24,19 @@ const INDEX = JSON.stringify({
     utility: { seconds: 60, agreed: false },
   },
   solvers: [],
-  problems: [],
+  problems: [{ id: 'berlin52', cities: 52 }],
+})
+
+/** A manifest that does not name berlin52: the shard answers 200, nothing published it. */
+const INDEX_WITHOUT_BERLIN52 = JSON.stringify({
+  schema_version: 2,
+  generated_at: '2026-10-11T12:05:56Z',
+  tier: 'a',
+  budgets: {
+    local: { seconds: 300, agreed: false },
+  },
+  solvers: [],
+  problems: [{ id: 'att48', cities: 48 }],
 })
 
 async function openLeaderboard(page: Page, shard: string): Promise<void> {
@@ -142,6 +154,32 @@ test.describe('problem page leaderboard', () => {
       'This page states an optimal tour of 7,542',
     )
     await expect(section).toContainText('ranked against no optimum')
+  })
+
+  test('renders nothing for a shard the manifest does not name', async ({
+    page,
+  }) => {
+    // A retired shard keeps answering 200 — the publisher omits it from the manifest instead of
+    // deleting it — so the response alone cannot say whether the numbers are current.
+    await page.route('**/bench/v2/index.json', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: INDEX_WITHOUT_BERLIN52,
+      }),
+    )
+    await page.route('**/bench/v2/problems/*.json', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: fixture('problem-berlin52.json'),
+      }),
+    )
+
+    await page.goto('/problems/berlin52/')
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+    await page.waitForTimeout(500)
+    await expect(page.locator('#results')).toHaveCount(0)
   })
 
   test('renders no results section for an instance with no published shard', async ({

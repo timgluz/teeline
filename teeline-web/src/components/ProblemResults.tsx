@@ -116,6 +116,16 @@ export default function ProblemResults({
   }
 
   const { shard, index } = state
+
+  // A 200 does not mean "published": the publisher omits retired objects from the manifest without
+  // deleting them from R2, so a shard can keep answering with pre-fix numbers (a null optimum, one
+  // or two solvers) and nothing in the response says so. The manifest is what published means, so
+  // an unlisted dataset renders nothing — the same as a 404. With no manifest to check against, the
+  // board is shown but says its currency could not be confirmed.
+  const listed =
+    index === null ? null : index.problems.some((problem) => problem.id === id)
+  if (listed === false) return null
+
   const rows = leaderboardRows(shard)
   // A shard with no rows of any kind is the same fact as no shard.
   if (rows.length === 0) return null
@@ -149,8 +159,8 @@ export default function ProblemResults({
       </h2>
 
       <p class="mt-2 text-sm text-text-dim">
-        {solverCount} solver{solverCount === 1 ? '' : 's'} measured on this
-        instance
+        {solverCount} solver{solverCount === 1 ? '' : 's'} with a completed run
+        on this instance
         {configCount > 1 ? `, in ${rows.length} configurations` : ''}.{' '}
         {axis === 'gap'
           ? 'Ranked on median gap from the known optimum, best of the runs beside it.'
@@ -277,6 +287,19 @@ export default function ProblemResults({
           which. Leaderboards are aggregates and carry no provenance of their
           own.
         </p>
+        {/* The publisher drops (solver, config) cells with no completed run, so an absent row is
+            ambiguous and the page must not let the board read as a full roster. */}
+        <p class="mt-2 text-xs text-text-dim">
+          A solver whose every run hit the budget has no row here at all: the
+          publisher omits cells with no completed run, so this board cannot tell
+          that apart from a solver never measured on this instance.
+        </p>
+        {listed === null && (
+          <p class="mt-2 text-xs text-text-dim" role="status">
+            The published manifest could not be read, so this board being
+            current could not be confirmed.
+          </p>
+        )}
         <p class="mt-2 font-mono text-xs text-text-dim">
           data:{' '}
           <a
