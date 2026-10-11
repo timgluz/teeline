@@ -21,9 +21,10 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 BASE_URL="${BENCH_BASE_URL:-https://static.tspsolver.com}"
-PREFIX="${BENCH_PREFIX:-bench/v1}"
+PREFIX="${BENCH_PREFIX:-bench/v2}"
 VIA="http"
 CF_R2_BUCKET="${CF_R2_BUCKET:-}"
+SNAPSHOT_TAG=""
 
 usage() {
   sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
@@ -31,7 +32,8 @@ usage() {
 
 Options:
   --base-url <url>   Base URL (default: https://static.tspsolver.com)
-  --prefix <key>     R2 key prefix (default: bench/v1)
+  --prefix <key>     R2 key prefix (default: bench/v2)
+  --snapshot <tag>   Read a release snapshot instead of the current tree
   --via <http|r2>    Read over HTTP (default) or via the Cloudflare API
   --bucket <name>    R2 bucket name, required for --via r2
   -h, --help         Show this help
@@ -45,10 +47,17 @@ while [[ $# -gt 0 ]]; do
     --prefix) PREFIX="${2:?}"; shift 2 ;;
     --via) VIA="${2:?}"; shift 2 ;;
     --bucket) CF_R2_BUCKET="${2:?}"; shift 2 ;;
+    # A snapshot is a complete copy under the same prefix, so every command keeps working
+    # against it by prefixing the key path.
+    --snapshot) SNAPSHOT_TAG="${2:?}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) ARGS+=("$1"); shift ;;
   esac
 done
+
+if [[ -n "$SNAPSHOT_TAG" ]]; then
+  PREFIX="${PREFIX%/}/snapshots/$SNAPSHOT_TAG"
+fi
 
 if [[ ${#ARGS[@]} -eq 0 ]]; then
   usage >&2
@@ -92,26 +101,53 @@ case "$cmd" in
     echo "$body" | jq -r '
       "schema_version : \(.schema_version)",
       "generated_at   : \(.generated_at)",
-      "git_commit     : \(.git_commit)\(if .dirty then " (DIRTY WORKING TREE)" else "" end)",
-      # A publish-time commit does not identify the measured binary, so say so
-      # rather than letting the reader assume the numbers are reproducible.
-      "commit_source  : \(.git_commit_source // "unknown")
-                        \(if (.git_commit_source // "") == "publish-time"
-                          then "⚠ not the measured binary — TSV carried no provenance"
-                          else "" end)",
-      "teeline        : \(.teeline_version)",
       "tier           : \(.tier // "-")",
       "solvers        : \(.solvers | length)",
       "problems       : \(.problems | length)",
+      # Deliberately no commit here: solvers are measured at different commits under the
+      # differential cadence, so a single value would be a claim the data cannot support.
+      # Each solver shard states when *it* was measured.
       "",
-      "solvers measured:",
-      (.solvers[] | "  \(.id)\t\(.name)\tconfigs=\(.configs | join(","))")
+      "per-family budgets (s):",
+      (.budgets // {} | to_entries[] |
+        "  \(.key)\t\(.value.seconds)\t\(if .value.agreed then "" else "provisional" end)"),
+      "",
+      "solvers (provenance is per shard — see: read-benchmarks.sh algorithm <id>):",
+      (.solvers[] | "  \(.id)\t\(.name)\t\(.family // "-")\tconfigs=\(.configs | join(","))")
+    '
+    ;;
+
+  snapshot)
+    # The snapshot's own manifest, plus what it was measured with.
+    tag="${ARGS[1]:?snapshot requires a tag, e.g. 'snapshot v1.0.0'}"
+    body="$(fetch "snapshots/${tag}/index.json")"
+    echo "$body" | jq -r '
+      "snapshot       : '"$tag"'",
+      "schema_version : \(.schema_version)",
+      "generated_at   : \(.generated_at)",
+      "solvers        : \(.solvers | length)",
+      "problems       : \(.problems | length)",
+      "",
+      "Read it with: scripts/read-benchmarks.sh --snapshot '"$tag"' index"
     '
     ;;
 
   algorithm)
     id="${ARGS[1]:?algorithm requires a solver id, e.g. 'algorithm lk'}"
     body="$(fetch "algorithms/${id}.json")"
+    # A separate jq for the provenance lines: mixing bare strings into the table expression
+    # would leave the trailing `| .[]` iterating over them as well as the rows.
+    echo "$body" | jq -r '
+      "measured at    : \(.measurement.git_commit)\(if .measurement.dirty then " (DIRTY)" else "" end)
+                        source=\(.measurement.git_commit_source // "unknown")\(
+                          if (.measurement.git_commit_source // "") == "publish-time"
+                          then " ⚠ not the measured binary — TSV carried no provenance"
+                          else "" end)",
+      "measured when  : \(.measurement.measured_at)",
+      "teeline        : \(.measurement.teeline_version)",
+      "environment    : \(.measurement.environment.os // "?")/\(.measurement.environment.build // "?") rust \(.measurement.environment.rust_version // "?")"
+    '
+    echo ""
     echo "$body" | jq -r '
       ([["\(.solver) — \(.results | length) instance(s), configs: \(.configs | join(", "))"],
         [""],

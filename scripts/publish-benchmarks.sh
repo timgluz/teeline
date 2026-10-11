@@ -7,10 +7,10 @@
 #   scripts/publish-benchmarks.sh --tier a --dry-run
 #   scripts/publish-benchmarks.sh --tier a --only r2
 #   scripts/publish-benchmarks.sh --tier a --only criteriondb
-#   scripts/publish-benchmarks.sh --tsv bench/runs/custom.tsv --prefix bench/v1 --dry-run
+#   scripts/publish-benchmarks.sh --tsv bench/runs/custom.tsv --prefix bench/v2 --dry-run
 #
 # Reads:  bench/runs/<tier>.tsv   (or --tsv), bench/solvers.json, docs/problems/*.md
-# Writes: build/bench-json/v1/**  (local staging), then R2
+# Writes: build/bench-json/v2/**  (local staging), then R2
 #
 # The JSON contract is documented in docs/benchmarks/schema.md — read that first.
 
@@ -28,8 +28,16 @@ TSV=""
 DRY_RUN=0
 ONLY="both"
 REQUIRE_CLEAN=0
-PREFIX="bench/v1"
+PREFIX="bench/v2"
 STAGE="build/bench-json"
+# Previously published tree, merged in so a differential re-run keeps the solvers it did
+# not re-measure (their shards and provenance) and the problem leaderboards complete.
+PREVIOUS="build/bench-prev"
+SNAPSHOT_TAG=""
+BUDGETS="bench/budgets.json"
+PUBLIC_BASE="${PUBLIC_BASE:-https://static.tspsolver.com}"
+FETCH_PREVIOUS=1
+FORCE_SNAPSHOT=0
 CRITERIONDB_URL="${CRITERIONDB_URL:-http://127.0.0.1:8080}"
 CRITERIONDB_PROJECT="${CRITERIONDB_PROJECT:-default}"
 
@@ -40,8 +48,14 @@ usage() {
 Options:
   --tier <a|b|c>       Read bench/runs/tier-<tier>.tsv (lowercase)
   --tsv <path>         Read an explicit TSV instead of a tier file
-  --prefix <key>       R2 key prefix (default: bench/v1)
+  --prefix <key>       R2 key prefix (default: bench/v2)
   --stage <dir>        Local staging directory (default: build/bench-json)
+  --previous <dir>     Previously published tree to merge with (default: build/bench-prev)
+  --public-base <url>  Base URL to fetch the previous tree from (default: $PUBLIC_BASE)
+  --no-fetch-previous  Never fetch the previous tree; fail if it is missing and needed
+  --snapshot <tag>     Also write an immutable copy under snapshots/<tag>/ (release tag)
+  --force-snapshot     Overwrite an existing snapshot tag (normally refused)
+  --budgets <path>     Per-family budgets file (default: bench/budgets.json)
   --only <sink>        r2 | criteriondb | both (default: both)
   --bucket <name>      R2 bucket name (default: $CF_R2_BUCKET)
   --require-clean      Refuse to publish unless the working tree is clean (CI use)
@@ -56,6 +70,12 @@ while [[ $# -gt 0 ]]; do
     --tsv) TSV="${2:?}"; shift 2 ;;
     --prefix) PREFIX="${2:?}"; shift 2 ;;
     --stage) STAGE="${2:?}"; shift 2 ;;
+    --previous) PREVIOUS="${2:?}"; shift 2 ;;
+    --public-base) PUBLIC_BASE="${2:?}"; shift 2 ;;
+    --no-fetch-previous) FETCH_PREVIOUS=0; shift ;;
+    --snapshot) SNAPSHOT_TAG="${2:?}"; shift 2 ;;
+    --force-snapshot) FORCE_SNAPSHOT=1; shift ;;
+    --budgets) BUDGETS="${2:?}"; shift 2 ;;
     --only) ONLY="${2:?}"; shift 2 ;;
     --bucket) CF_R2_BUCKET="${2:?}"; shift 2 ;;
     --require-clean) REQUIRE_CLEAN=1; shift ;;
@@ -169,21 +189,73 @@ r2_put() {
 }
 
 # ---------------------------------------------------------------------------
+# Merge with the previously published tree
+#
+# A differential re-run measures only the algorithms that changed, so the tree it publishes
+# must be completed from what is already live: otherwise the other solvers lose their shards
+# and the problem leaderboards lose the entries that rank them. There is no bucket listing,
+# so the previous index is read first and it names the shards to fetch.
+# ---------------------------------------------------------------------------
+
+fetch_previous() {
+  local base="$PUBLIC_BASE/${PREFIX}" dest="$PREVIOUS/v2"
+  mkdir -p "$dest/algorithms" "$dest/problems"
+
+  if ! curl -fsS "$base/index.json" -o "$dest/index.json"; then
+    echo "    no previous tree at $base/index.json"
+    return 1
+  fi
+  echo "    fetched index.json"
+
+  local ids
+  ids="$(jq -r '.solvers[]?.id' "$dest/index.json" 2>/dev/null)"
+  for id in $ids; do
+    curl -fsS "$base/algorithms/$id.json" -o "$dest/algorithms/$id.json" || \
+      echo "    WARN: could not fetch algorithms/$id.json" >&2
+  done
+  ids="$(jq -r '.problems[]?.id' "$dest/index.json" 2>/dev/null)"
+  for id in $ids; do
+    curl -fsS "$base/problems/$id.json" -o "$dest/problems/$id.json" || \
+      echo "    WARN: could not fetch problems/$id.json" >&2
+  done
+  return 0
+}
+
+MERGE_PREVIOUS=1
+if [[ -s "$PREVIOUS/v2/index.json" ]]; then
+  echo "==> Previous  $PREVIOUS/v2 (merging)"
+elif [[ "$FETCH_PREVIOUS" -eq 1 && "$ONLY" != "criteriondb" ]]; then
+  echo "==> Previous  fetching $PUBLIC_BASE/${PREFIX}"
+  if fetch_previous; then
+    echo "    merged solvers are taken from the live tree"
+  else
+    MERGE_PREVIOUS=0
+    echo "WARN: no previously published tree under ${PREFIX}, so the result will contain only"
+    echo "      the solvers in this TSV. That is correct for a first publish or a full"
+    echo "      re-run; for a differential re-run it would drop the other solvers."
+  fi
+else
+  MERGE_PREVIOUS=0
+  echo "==> Previous  skipped (--no-fetch-previous); the result covers only this TSV's solvers"
+fi
+
+# ---------------------------------------------------------------------------
 # Transform: TSV -> the published JSON contract
 # ---------------------------------------------------------------------------
 
 echo "==> Reading   $TSV"
-echo "==> Staging   $STAGE/v1"
+echo "==> Staging   $STAGE/v2"
 # The definitive provenance is resolved inside the transform below, which prefers
 # the TSV's own header. This line reports the publish-time values as a fallback so
 # it is clear which set the manifest ended up using.
 echo "==> Publish-time git state: commit=$GIT_COMMIT dirty=$DIRTY (used only if the TSV carries no provenance)"
 
-mkdir -p "$STAGE/v1/algorithms" "$STAGE/v1/problems"
+mkdir -p "$STAGE/v2/algorithms" "$STAGE/v2/problems"
 
-python3 - "$TSV" "$STAGE/v1" "$GIT_COMMIT" "$DIRTY" "$TEELINE_VERSION" \
-          "$RUST_VERSION" "$GENERATED_AT" "$TIER" "$BUILD_PROFILE" <<'PY'
-"""Transform a benchmark TSV into the docs/benchmarks/schema.md v1 contract.
+python3 - "$TSV" "$STAGE/v2" "$GIT_COMMIT" "$DIRTY" "$TEELINE_VERSION" \
+          "$RUST_VERSION" "$GENERATED_AT" "$TIER" "$BUILD_PROFILE" \
+          "$PREVIOUS/v2" "$BUDGETS" "$SNAPSHOT_TAG" "$PREFIX" <<'PY'
+"""Transform a benchmark TSV into the docs/benchmarks/schema.md v2 contract.
 
 Statistics use the median as the headline (robust to the heavy right tail that
 stochastic TSP solvers produce) and carry best/worst alongside, because for a
@@ -202,12 +274,13 @@ from pathlib import Path
 (
     tsv_path, out_dir, git_commit, dirty, teeline_version,
     rust_version, generated_at, tier, build_profile,
-) = sys.argv[1:10]
+    previous_dir, budgets_path, snapshot_tag, prefix,
+) = sys.argv[1:14]
 
 ROOT = Path.cwd()
 REQUIRED = ["solver", "dataset", "run", "wall_s", "peak_rss_kb", "tour_cost"]
 OPTIONAL = ["config", "status"]
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # --- provenance: prefer the TSV's own header over publish-time HEAD ---------
 #
@@ -242,6 +315,38 @@ if "git_commit" in provenance:
         rust_version = provenance["rust_version"]
 else:
     git_commit_source = "publish-time"
+
+# The provenance of *these* measurements. It describes only the solvers present in this TSV:
+# under the per-release differential cadence the other solvers were measured at a different
+# commit, so it can never be lifted to a dataset-level claim. Keeping provenance here, beside
+# the numbers it describes, is what makes that mistake unrepresentable.
+measurement = {
+    "git_commit": git_commit,
+    "git_commit_source": git_commit_source,
+    "dirty": dirty == "1",
+    "teeline_version": teeline_version,
+    "measured_at": generated_at,
+    "environment": {
+        "os": "linux",
+        "build": build_profile,
+        "rust_version": rust_version,
+    },
+}
+
+# --- per-family budgets ----------------------------------------------------
+#
+# Published with the data so a gap is never shown without the allowance it was measured
+# under. Each entry records whether the figure is fixed by a decision or is still a
+# provisional placeholder, so a consumer can avoid presenting the latter as agreed.
+budgets: dict = {}
+budgets_comment = ""
+try:
+    with open(budgets_path, "r", encoding="utf-8") as fh:
+        budgets_doc = json.load(fh)
+    budgets = budgets_doc.get("budgets", {})
+    budgets_comment = budgets_doc.get("$comment", "")
+except FileNotFoundError:
+    print(f"    WARN: budgets file not found ({budgets_path}); budgets omitted", file=sys.stderr)
 
 # --- parse the TSV ---------------------------------------------------------
 
@@ -430,80 +535,154 @@ for (sid, dataset, config), bucket in sorted(cells.items()):
     })
 
 out = Path(out_dir)
+for sub in ("algorithms", "problems"):
+    (out / sub).mkdir(parents=True, exist_ok=True)
 
 def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
 
+def load_previous(kind: str) -> dict:
+    """Load the previously published shards, keyed by their `solver`/`dataset` field.
+
+    Absent on a first publish or a full re-run, in which case there is simply nothing to
+    merge and the run must cover every solver (the caller enforces that).
+    """
+    prev: dict = {}
+    d = Path(previous_dir) / kind
+    if not d.is_dir():
+        return prev
+    for f in sorted(d.glob("*.json")):
+        try:
+            doc = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"    WARN: ignoring unreadable previous shard {f}: {exc}", file=sys.stderr)
+            continue
+        key = doc.get("solver") if kind == "algorithms" else doc.get("dataset")
+        if key:
+            prev[key] = doc
+    return prev
+
+measured = set(per_solver)
+prev_algos = load_previous("algorithms")
+prev_problems = load_previous("problems")
+
+# --- algorithms/{id}.json --------------------------------------------------
+#
+# A solver measured here is replaced wholesale, including its `measurement` block. Every
+# other solver keeps the shard it already had — carried over byte for byte, so its
+# provenance still describes when *it* was measured rather than inheriting this run's.
+final_algos: dict = {}
+for sid, doc in prev_algos.items():
+    if sid not in measured:
+        final_algos[sid] = doc
 for sid, slot in sorted(per_solver.items()):
-    write_json(out / "algorithms" / f"{sid}.json", {
+    final_algos[sid] = {
         "schema_version": SCHEMA_VERSION,
         "solver": sid,
+        "measurement": measurement,
         "configs": sorted(slot["configs"]),
         "results": dict(sorted(slot["results"].items())),
-    })
+    }
 
-for dataset, board in sorted(per_problem.items()):
-    # Rank by median gap where an optimal is known, otherwise by median tour cost.
+for sid, doc in sorted(final_algos.items()):
+    write_json(out / "algorithms" / f"{sid}.json", doc)
+
+# --- problems/{dataset}.json ----------------------------------------------
+#
+# A leaderboard lists every solver for that instance, so it cannot be replaced from a TSV
+# that measured only some of them: the entries for solvers not in this run are kept and the
+# fresh ones take their place, then the board is re-ranked.
+def rank_key(b: dict):
+    return (
+        b.get("gap_pct", {}).get("median", float("inf")) if "gap_pct" in b else float("inf"),
+        b["tour_cost"]["median"],
+    )
+
+final_problems: dict = {}
+for dataset in sorted(set(prev_problems) | set(per_problem)):
+    if dataset in per_problem:
+        fresh = [b for b in per_problem[dataset] if b["runs"] > 0]
+        kept = [
+            b
+            for b in prev_problems.get(dataset, {}).get("leaderboard", [])
+            if b.get("solver") not in measured
+        ]
+        board = kept + fresh
+        meta = instances.get(dataset, {"cities": None, "optimal_cost": None})
+        cities, optimal = meta["cities"], meta["optimal_cost"]
+    else:
+        doc = prev_problems[dataset]
+        board = list(doc.get("leaderboard", []))
+        cities, optimal = doc.get("cities"), doc.get("optimal_cost")
+
     # Solvers that only timed out never reach the leaderboard: there is nothing to rank.
     board = [b for b in board if b["runs"] > 0]
-    board.sort(key=lambda b: (
-        b.get("gap_pct", {}).get("median", float("inf"))
-        if "gap_pct" in b else float("inf"),
-        b["tour_cost"]["median"],
-    ))
-    meta = instances.get(dataset, {"cities": None, "optimal_cost": None})
-    write_json(out / "problems" / f"{dataset}.json", {
+    board.sort(key=rank_key)
+    final_problems[dataset] = {
         "schema_version": SCHEMA_VERSION,
         "dataset": dataset,
-        "cities": meta["cities"],
-        "optimal_cost": meta["optimal_cost"],
+        "cities": cities,
+        "optimal_cost": optimal,
         "leaderboard": board,
-    })
+    }
+
+for dataset, doc in sorted(final_problems.items()):
+    write_json(out / "problems" / f"{dataset}.json", doc)
+
+# --- index.json ------------------------------------------------------------
+#
+# Deliberately carries NO commit, dirty flag, version or environment. Those belong to each
+# solver's own measurement, and a single value here would present twenty solvers that were
+# measured at different commits as if they shared one. The manifest says what exists; the
+# shards say when each thing was measured.
+def solver_meta(sid: str) -> dict:
+    try:
+        entry = solver_entry(sid)
+        return {"name": entry["name"], "family": entry.get("family")}
+    except (KeyError, SystemExit):
+        # A shard carried over from a previous publish whose solver is no longer in
+        # solvers.json: keep listing it rather than dropping data silently.
+        return {"name": sid, "family": None}
 
 write_json(out / "index.json", {
     "schema_version": SCHEMA_VERSION,
     "generated_at": generated_at,
-    "git_commit": git_commit,
-    # "tsv" = the file recorded the commit its measurements came from.
-    # "publish-time" = the TSV carried no provenance, so git_commit is merely
-    # HEAD when this ran and does NOT necessarily identify the built binary.
-    # Consumers must not present a publish-time commit as reproducible.
-    "git_commit_source": git_commit_source,
-    "dirty": dirty == "1",
-    "teeline_version": teeline_version,
     "tier": tier or None,
-    "environment": {
-        "os": "linux",
-        "build": build_profile,
-        "rust_version": rust_version,
-    },
+    "default_timeout_s": int(provenance["timeout_s"]) if provenance.get("timeout_s", "").isdigit() else None,
+    "budgets": budgets,
+    "budgets_note": budgets_comment,
     "solvers": [
-        {
-            "id": sid,
-            "name": solver_entry(sid)["name"],
-            "configs": sorted(slot["configs"]),
-        }
-        for sid, slot in sorted(per_solver.items())
+        {"id": sid, "configs": final_algos[sid].get("configs", []), **solver_meta(sid)}
+        for sid in sorted(final_algos)
     ],
     "problems": [
         {
             "id": dataset,
-            "cities": instances.get(dataset, {}).get("cities"),
-            "optimal_cost": instances.get(dataset, {}).get("optimal_cost"),
+            "cities": doc.get("cities"),
+            "optimal_cost": doc.get("optimal_cost"),
         }
-        for dataset in sorted(per_problem)
+        for dataset, doc in sorted(final_problems.items())
     ],
 })
 
-print(f"    algorithms: {len(per_solver)} shard(s)")
-print(f"    problems:   {len(per_problem)} shard(s)")
+# Handed to the criteriondb mirror so the archived runs record the commit that produced the
+# numbers rather than whatever HEAD happened to be when the publish ran — the same distinction
+# the per-solver shards make. Written beside the staged tree, not into it, so it is not uploaded.
+(out.parent / "_provenance.json").write_text(
+    json.dumps(measurement, indent=2, sort_keys=False) + "\n", encoding="utf-8"
+)
+
+print(f"    measured:   {len(measured)} solver(s) from {tsv_path}")
+print(f"    algorithms: {len(final_algos)} shard(s) written"
+      + (f" ({len(final_algos) - len(measured)} carried over)" if len(final_algos) > len(measured) else ""))
+print(f"    problems:   {len(final_problems)} shard(s) written")
 print(f"    cells:      {len(cells)}  runs: {len(rows)}")
 PY
 
 echo "==> Staged JSON:"
-find "$STAGE/v1" -name '*.json' | sort | sed 's/^/    /' | head -40
-if [[ "$(find "$STAGE/v1" -name '*.json' | wc -l)" -gt 40 ]]; then
-  echo "    ... ($(find "$STAGE/v1" -name '*.json' | wc -l) files total)"
+find "$STAGE/v2" -name '*.json' | sort | sed 's/^/    /' | head -40
+if [[ "$(find "$STAGE/v2" -name '*.json' | wc -l)" -gt 40 ]]; then
+  echo "    ... ($(find "$STAGE/v2" -name '*.json' | wc -l) files total)"
 fi
 
 # The solver-id <-> CLI-name mapping, emitted once here so the criteriondb mirror
@@ -527,6 +706,34 @@ PY
 # Upload
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Release snapshots
+#
+# A snapshot is the complete tree as it stood at a release tag, so a regression can later be
+# evaluated against what an algorithm actually produced in that release. It is immutable by
+# design: re-writing a tag would silently redefine what that release measured.
+# ---------------------------------------------------------------------------
+
+snapshot_stage() {
+  local tag="$1"
+  # Kept as two statements: `local tag="$1" snap=...$tag` reads $tag before it is bound.
+  local snap="$STAGE/v2/snapshots/$tag"
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    if [[ "$FORCE_SNAPSHOT" -eq 0 ]] && curl -fsS -o /dev/null --head \
+        "$PUBLIC_BASE/${PREFIX}/snapshots/$tag/index.json" 2>/dev/null; then
+      echo "ERROR: snapshot '$tag' already exists at ${PREFIX}/snapshots/$tag." >&2
+      echo "       Snapshots are immutable; pass --force-snapshot to overwrite it." >&2
+      return 1
+    fi
+  fi
+
+  rm -rf "$snap"
+  mkdir -p "$snap"
+  cp "$STAGE/v2/index.json" "$snap/index.json"
+  cp -r "$STAGE/v2/algorithms" "$STAGE/v2/problems" "$snap/"
+  echo "==> Snapshot  snapshots/$tag ($(find "$snap" -name '*.json' | wc -l) object(s))"
+}
+
 upload_r2() {
   if [[ -z "$R2_CLIENT" ]]; then
     echo "ERROR: no R2 client available — install the 'cf' CLI:" >&2
@@ -549,11 +756,23 @@ upload_r2() {
   # mapfile, not `for file in $(find ...)`: unquoted command substitution
   # word-splits and glob-expands, so a staged path containing whitespace (or a
   # `*`) would be silently mangled into several bogus "filenames".
-  local -a files=()
-  mapfile -t files < <(find "$STAGE/v1" -name '*.json' ! -name index.json | sort)
-  files+=("$STAGE/v1/index.json")
+  local -a shards=() manifests=()
+  mapfile -t shards < <(find "$STAGE/v2" -name '*.json' ! -name index.json | sort)
+  # Every index.json goes last *within its own directory*: the top-level manifest advertises
+  # the top-level shards, and each snapshot's manifest advertises that snapshot's shards.
+  mapfile -t manifests < <(find "$STAGE/v2" -name 'index.json' | sort)
+  local -a files=("${shards[@]}" "${manifests[@]}")
+
+  local skipped=0
   for file in "${files[@]}"; do
-    key="${file#"$STAGE/v1/"}"
+    key="${file#"$STAGE/v2/"}"
+    # Skip objects whose bytes are unchanged. This is what makes a differential publish touch
+    # only the shard it re-measured: every other object keeps its ETag, its provenance and its
+    # place in the tree.
+    if [[ "$MERGE_PREVIOUS" -eq 1 && -f "$PREVIOUS/v2/$key" ]] && cmp -s "$file" "$PREVIOUS/v2/$key"; then
+      skipped=$((skipped + 1))
+      continue
+    fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
       echo "    [dry-run] would put ${PREFIX}/${key}"
     else
@@ -562,7 +781,7 @@ upload_r2() {
     fi
     count=$((count + 1))
   done
-  echo "==> $count object(s) $([[ "$DRY_RUN" -eq 1 ]] && echo 'would be ' || echo '')uploaded"
+  echo "==> $count object(s) $([[ "$DRY_RUN" -eq 1 ]] && echo 'would be ' || echo '')uploaded, $skipped unchanged"
 }
 
 mirror_criteriondb() {
@@ -691,6 +910,9 @@ for (sid, dataset, config), runs in sorted(cells.items()):
     payload = {
         "environment": environment,
         "git_commit": os.environ.get("GIT_COMMIT"),
+        # "tsv" means the file recorded the commit its measurements came from; "publish-time"
+        # means it did not, so git_commit is only HEAD when the publish ran.
+        "git_commit_source": os.environ.get("GIT_COMMIT_SOURCE", "publish-time"),
         "git_branch": os.environ.get("GIT_BRANCH"),
         "tags": {"config_label": config, "tier": os.environ.get("BENCH_TIER", "")},
         "profile": "tspsolver",
@@ -719,15 +941,25 @@ if failed:
 PY
 }
 
+if [[ -n "$SNAPSHOT_TAG" ]]; then
+  snapshot_stage "$SNAPSHOT_TAG" || exit 1
+fi
+
 if [[ "$ONLY" == "r2" || "$ONLY" == "both" ]]; then
   upload_r2
 fi
 
 if [[ "$ONLY" == "criteriondb" || "$ONLY" == "both" ]]; then
-  # git metadata for the archived run
-  GIT_COMMIT_FULL="$(git rev-parse HEAD 2>/dev/null || echo)"
+  # Provenance for the archived run. Prefer the commit the TSV recorded: under the
+  # differential cadence these runs may not all come from HEAD, and stamping them with the
+  # publish-time commit would attach a claim the measurements do not support.
+  if [[ -f "$STAGE/_provenance.json" ]]; then
+    MEASURED_COMMIT="$(jq -r '.git_commit // empty' "$STAGE/_provenance.json" 2>/dev/null)"
+    MEASURED_SOURCE="$(jq -r '.git_commit_source // empty' "$STAGE/_provenance.json" 2>/dev/null)"
+  fi
   GIT_BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
-  export GIT_COMMIT="$GIT_COMMIT_FULL"
+  export GIT_COMMIT="${MEASURED_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo)}"
+  export GIT_COMMIT_SOURCE="${MEASURED_SOURCE:-publish-time}"
   export GIT_BRANCH="$GIT_BRANCH_NAME"
   export BENCH_TIER="${TIER:-}"
   mirror_criteriondb
