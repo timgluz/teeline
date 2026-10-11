@@ -155,22 +155,44 @@ function tourLength(name, tourTxt) {
   return Math.round(total)
 }
 
-// Parse NODE_COORD_SECTION for (x,y) pairs
-function parseCoords(txt) {
-  const sectionMatch = txt.match(/NODE_COORD_SECTION\s*\n([\s\S]*?)(?:EOF|\n\s*\n|$)/i)
-  if (!sectionMatch) return null
-  const lines = sectionMatch[1].trim().split('\n').filter(l => l.trim())
-  const pts = []
-  for (const line of lines) {
-    const parts = line.trim().split(/\s+/)
-    // Format: index x y
-    if (parts.length >= 3) {
+// Read a section body as whitespace-split rows. The section ends at the next keyword
+// line or EOF, not at a blank line: `swiss42` pads its headers with trailing spaces,
+// and a coordinate-less instance's `DISPLAY_DATA_SECTION` is not always followed by
+// `EOF`.
+function readSection(txt, name) {
+  const lines = txt.split(/\r?\n/)
+  const header = new RegExp(`^${name}\\s*$`, 'i')
+  const start = lines.findIndex(l => header.test(l.trim()))
+  if (start < 0) return null
+
+  const rows = []
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line) continue
+    if (/^EOF$/i.test(line) || /^[A-Z_]+\s*(:|$)/.test(line)) break
+    rows.push(line.split(/\s+/))
+  }
+  return rows.length > 0 ? rows : null
+}
+
+// Minimap points, as `index x y` rows. NODE_COORD_SECTION holds the real coordinates;
+// DISPLAY_DATA_SECTION holds TSPLIB's own 2-D projection for instances whose distances
+// come from a matrix, which is why the five EXPLICIT instances that ship one can be
+// drawn without deriving anything.
+function parsePoints(txt) {
+  for (const section of ['NODE_COORD_SECTION', 'DISPLAY_DATA_SECTION']) {
+    const rows = readSection(txt, section)
+    if (!rows) continue
+    const pts = []
+    for (const parts of rows) {
+      if (parts.length < 3) continue
       const x = parseFloat(parts[1])
       const y = parseFloat(parts[2])
       if (!isNaN(x) && !isNaN(y)) pts.push({ x, y })
     }
+    if (pts.length > 0) return pts
   }
-  return pts.length > 0 ? pts : null
+  return null
 }
 
 // Generate inline SVG minimap
@@ -230,9 +252,8 @@ for (const file of TSP_FILES.sort()) {
   const group = sizeGroup(cities)
   const optimalCost = getOptimalCost(name)
 
-  const hasCoords = !['EXPLICIT', 'MATRIX'].some(t => ewt.toUpperCase().includes(t))
-  const coords = hasCoords ? parseCoords(txt) : null
-  const minimap = generateMinimap(coords)
+  const points = parsePoints(txt)
+  const minimap = generateMinimap(points)
 
   const dataUrl = `${DATA_BASE}/${name}.tsp`
 
