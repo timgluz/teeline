@@ -1,0 +1,120 @@
+{
+  "schema_version": 2,
+  "solver": "2opt",
+  "measurement": {
+    "dirty": false,
+    "environment": {
+      "build": "release",
+      "os": "linux",
+      "rust_version": "1.99.0"
+    },
+    "git_commit": "e4588d6f",
+    "git_commit_source": "jsonl",
+    "measured_at": "2026-10-11T10:55:06Z",
+    "teeline_version": "1.0.12"
+  },
+  "configs": ["budget"],
+  "results": {
+    "berlin52": {
+      "cities": 52,
+      "optimal_cost": null,
+      "by_config": {
+        "budget": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "tour_cost": {
+            "median": 8384.1885,
+            "best": 8384.1885,
+            "worst": 8384.1885,
+            "mean": 8384.1885
+          },
+          "wall_s": {
+            "median": 0.0194,
+            "best": 0.0151,
+            "worst": 0.0212,
+            "mean": 0.0182
+          },
+          "peak_rss_kb": {
+            "median": 6932.0,
+            "best": 6860.0,
+            "worst": 7000.0,
+            "mean": 6936.8
+          }
+        }
+      }
+    },
+    "eil76": {
+      "cities": 76,
+      "optimal_cost": 538.0,
+      "by_config": {
+        "budget": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "gap_pct": {
+            "median": 15.2472,
+            "best": 15.2472,
+            "worst": 15.2472,
+            "mean": 15.2472
+          },
+          "tour_cost": {
+            "median": 620.03,
+            "best": 620.03,
+            "worst": 620.03,
+            "mean": 620.03
+          },
+          "wall_s": {
+            "median": 0.0129,
+            "best": 0.0113,
+            "worst": 0.019,
+            "mean": 0.0138
+          },
+          "peak_rss_kb": {
+            "median": 6964.0,
+            "best": 6844.0,
+            "worst": 6984.0,
+            "mean": 6928.8
+          },
+          "optimal_cost": 538.0
+        }
+      }
+    },
+    "gr17": {
+      "cities": 17,
+      "optimal_cost": 2085.0,
+      "by_config": {
+        "budget": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "gap_pct": {
+            "median": 0.0,
+            "best": 0.0,
+            "worst": 0.0,
+            "mean": 0.0
+          },
+          "tour_cost": {
+            "median": 2085.0,
+            "best": 2085.0,
+            "worst": 2085.0,
+            "mean": 2085.0
+          },
+          "wall_s": {
+            "median": 0.0127,
+            "best": 0.0116,
+            "worst": 0.0171,
+            "mean": 0.014
+          },
+          "peak_rss_kb": {
+            "median": 6948.0,
+            "best": 6816.0,
+            "worst": 7004.0,
+            "mean": 6923.2
+          },
+          "optimal_cost": 2085.0
+        }
+      }
+    }
+  }
+}

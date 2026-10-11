@@ -13,6 +13,7 @@ hasExplainer: true
 | **Alias** | `som`, `kohonen` |
 | **Type** | Heuristic — constructive |
 | **Complexity** | O(epochs · N · n) per run |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

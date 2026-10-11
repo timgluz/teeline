@@ -14,6 +14,7 @@ hasExplainer: true
 | **Type** | Heuristic — constructive approximation |
 | **Complexity** | O(n²) |
 | **Approximation bound** | ≤ 1.5× optimal (EUC_2D only) |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

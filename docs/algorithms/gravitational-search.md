@@ -14,6 +14,7 @@ hasExplainer: true
 | **Type** | Heuristic — swarm metaheuristic |
 | **Complexity** | O(epochs · pop²) |
 | **Auto-seeds from** | `shuffle` (random swarm) |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

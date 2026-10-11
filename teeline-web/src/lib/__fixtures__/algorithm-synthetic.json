@@ -1,0 +1,90 @@
+{
+  "schema_version": 2,
+  "solver": "aco",
+  "configs": ["default"],
+  "measurement": {
+    "git_commit": "f37b564d",
+    "git_commit_source": "publish-time",
+    "dirty": null,
+    "measured_at": null,
+    "teeline_version": null,
+    "environment": null
+  },
+  "results": {
+    "a280": {
+      "cities": 280,
+      "optimal_cost": null,
+      "by_config": {
+        "default": {
+          "runs": 0,
+          "timeouts": 5,
+          "errors": 1,
+          "tour_cost": null,
+          "wall_s": null
+        }
+      }
+    },
+    "berlin52": {
+      "cities": 52,
+      "optimal_cost": null,
+      "by_config": {
+        "default": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "tour_cost": {
+            "median": 7600.5,
+            "best": 7545.1,
+            "worst": 7900.25,
+            "mean": 7680.0
+          },
+          "wall_s": {
+            "median": 0.3,
+            "best": 0.2,
+            "worst": 0.4,
+            "mean": 0.3
+          },
+          "peak_rss_kb": {
+            "median": 7000,
+            "best": 6900,
+            "worst": 7100
+          }
+        }
+      }
+    },
+    "eil76": {
+      "cities": 76,
+      "optimal_cost": 538.0,
+      "by_config": {
+        "default": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "gap_pct": {
+            "median": 3.5,
+            "best": 1.2,
+            "worst": 8.0,
+            "mean": 3.9
+          },
+          "tour_cost": {
+            "median": 556.83,
+            "best": 544.46,
+            "worst": 581.04,
+            "mean": 559.0
+          },
+          "wall_s": {
+            "median": 0.31,
+            "best": 0.28,
+            "worst": 0.35
+          },
+          "peak_rss_kb": {
+            "median": 7000,
+            "best": 6900,
+            "worst": 7100
+          },
+          "optimal_cost": 538.0
+        }
+      }
+    }
+  }
+}

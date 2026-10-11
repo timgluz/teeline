@@ -1,0 +1,137 @@
+{
+  "schema_version": 2,
+  "solver": "branch_bound",
+  "measurement": {
+    "dirty": false,
+    "environment": {
+      "build": "release",
+      "os": "linux",
+      "rust_version": "1.99.0"
+    },
+    "git_commit": "e4588d6f",
+    "git_commit_source": "jsonl",
+    "measured_at": "2026-10-11T10:55:06Z",
+    "teeline_version": "1.0.12"
+  },
+  "configs": ["budget", "exact"],
+  "results": {
+    "burma14": {
+      "cities": 14,
+      "optimal_cost": null,
+      "by_config": {
+        "budget": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "tour_cost": {
+            "median": 3651.0,
+            "best": 3651.0,
+            "worst": 3651.0,
+            "mean": 3651.0
+          },
+          "wall_s": {
+            "median": 0.0232,
+            "best": 0.0165,
+            "worst": 0.0326,
+            "mean": 0.0233
+          },
+          "peak_rss_kb": {
+            "median": 7168.0,
+            "best": 7052.0,
+            "worst": 7356.0,
+            "mean": 7195.2
+          }
+        },
+        "exact": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "tour_cost": {
+            "median": 3323.0,
+            "best": 3323.0,
+            "worst": 3323.0,
+            "mean": 3323.0
+          },
+          "wall_s": {
+            "median": 0.0514,
+            "best": 0.0502,
+            "worst": 0.0612,
+            "mean": 0.0542
+          },
+          "peak_rss_kb": {
+            "median": 7124.0,
+            "best": 7096.0,
+            "worst": 7184.0,
+            "mean": 7131.2
+          }
+        }
+      }
+    },
+    "gr17": {
+      "cities": 17,
+      "optimal_cost": 2085.0,
+      "by_config": {
+        "budget": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "gap_pct": {
+            "median": 4.8921,
+            "best": 4.8921,
+            "worst": 4.8921,
+            "mean": 4.8921
+          },
+          "tour_cost": {
+            "median": 2187.0,
+            "best": 2187.0,
+            "worst": 2187.0,
+            "mean": 2187.0
+          },
+          "wall_s": {
+            "median": 0.0156,
+            "best": 0.0131,
+            "worst": 0.0196,
+            "mean": 0.0157
+          },
+          "peak_rss_kb": {
+            "median": 6936.0,
+            "best": 6868.0,
+            "worst": 7144.0,
+            "mean": 6968.0
+          },
+          "optimal_cost": 2085.0
+        },
+        "exact": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "gap_pct": {
+            "median": 0.0,
+            "best": 0.0,
+            "worst": 0.0,
+            "mean": 0.0
+          },
+          "tour_cost": {
+            "median": 2085.0,
+            "best": 2085.0,
+            "worst": 2085.0,
+            "mean": 2085.0
+          },
+          "wall_s": {
+            "median": 1.5639,
+            "best": 1.5509,
+            "worst": 1.6047,
+            "mean": 1.5688
+          },
+          "peak_rss_kb": {
+            "median": 6932.0,
+            "best": 6804.0,
+            "worst": 7056.0,
+            "mean": 6932.8
+          },
+          "optimal_cost": 2085.0
+        }
+      }
+    }
+  }
+}

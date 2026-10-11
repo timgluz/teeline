@@ -14,6 +14,7 @@ hasExplainer: true
 | **Type** | Heuristic — constructive |
 | **Complexity** | O(n²) worst case |
 | **Deterministic** | Yes — given the same input, always the same tour |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

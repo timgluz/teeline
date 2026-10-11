@@ -1,0 +1,256 @@
+{
+  "schema_version": 2,
+  "dataset": "berlin52",
+  "cities": 52,
+  "optimal_cost": 7542.0,
+  "leaderboard": [
+    {
+      "solver": "lk",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 0.0,
+        "best": 0.0,
+        "worst": 3.3148,
+        "mean": 0.663
+      },
+      "tour_cost": {
+        "median": 7542.0,
+        "best": 7542.0,
+        "worst": 7792.0,
+        "mean": 7592.0
+      },
+      "wall_s": {
+        "median": 0.112,
+        "best": 0.0783,
+        "worst": 0.1323,
+        "mean": 0.1111
+      },
+      "peak_rss_kb": {
+        "median": 7040.0,
+        "best": 6944.0,
+        "worst": 7160.0,
+        "mean": 7041.6
+      }
+    },
+    {
+      "solver": "aco",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 2.1612,
+        "best": 1.7237,
+        "worst": 2.9303,
+        "mean": 2.3628
+      },
+      "tour_cost": {
+        "median": 7705.0,
+        "best": 7672.0,
+        "worst": 7763.0,
+        "mean": 7720.2
+      },
+      "wall_s": {
+        "median": 0.0662,
+        "best": 0.0627,
+        "worst": 0.0753,
+        "mean": 0.0689
+      },
+      "peak_rss_kb": {
+        "median": 7132.0,
+        "best": 7052.0,
+        "worst": 7216.0,
+        "mean": 7131.2
+      }
+    },
+    {
+      "solver": "3opt",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 2.6386,
+        "best": 2.6386,
+        "worst": 2.6386,
+        "mean": 2.6386
+      },
+      "tour_cost": {
+        "median": 7741.0,
+        "best": 7741.0,
+        "worst": 7741.0,
+        "mean": 7741.0
+      },
+      "wall_s": {
+        "median": 0.0788,
+        "best": 0.0711,
+        "worst": 0.0823,
+        "mean": 0.0785
+      },
+      "peak_rss_kb": {
+        "median": 6864.0,
+        "best": 6784.0,
+        "worst": 6996.0,
+        "mean": 6876.8
+      }
+    },
+    {
+      "solver": "or_opt",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 7.372,
+        "best": 7.372,
+        "worst": 7.372,
+        "mean": 7.372
+      },
+      "tour_cost": {
+        "median": 8098.0,
+        "best": 8098.0,
+        "worst": 8098.0,
+        "mean": 8098.0
+      },
+      "wall_s": {
+        "median": 0.0369,
+        "best": 0.0244,
+        "worst": 0.0412,
+        "mean": 0.0359
+      },
+      "peak_rss_kb": {
+        "median": 6936.0,
+        "best": 6844.0,
+        "worst": 6984.0,
+        "mean": 6918.4
+      }
+    },
+    {
+      "solver": "ga",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 7.6637,
+        "best": 6.0594,
+        "worst": 12.4768,
+        "mean": 8.9844
+      },
+      "tour_cost": {
+        "median": 8120.0,
+        "best": 7999.0,
+        "worst": 8483.0,
+        "mean": 8219.6
+      },
+      "wall_s": {
+        "median": 1.1709,
+        "best": 1.1516,
+        "worst": 1.1911,
+        "mean": 1.1694
+      },
+      "peak_rss_kb": {
+        "median": 7004.0,
+        "best": 6904.0,
+        "worst": 7188.0,
+        "mean": 7034.4
+      }
+    },
+    {
+      "solver": "sa",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 8.4991,
+        "best": 5.476,
+        "worst": 9.109,
+        "mean": 7.6876
+      },
+      "tour_cost": {
+        "median": 8183.0,
+        "best": 7955.0,
+        "worst": 8229.0,
+        "mean": 8121.8
+      },
+      "wall_s": {
+        "median": 0.1702,
+        "best": 0.1653,
+        "worst": 0.1885,
+        "mean": 0.1725
+      },
+      "peak_rss_kb": {
+        "median": 7184.0,
+        "best": 7108.0,
+        "worst": 7304.0,
+        "mean": 7186.4
+      }
+    },
+    {
+      "solver": "cs",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 8.8173,
+        "best": 4.3755,
+        "worst": 11.1111,
+        "mean": 7.8494
+      },
+      "tour_cost": {
+        "median": 8207.0,
+        "best": 7872.0,
+        "worst": 8380.0,
+        "mean": 8134.0
+      },
+      "wall_s": {
+        "median": 0.3088,
+        "best": 0.3066,
+        "worst": 0.3292,
+        "mean": 0.3143
+      },
+      "peak_rss_kb": {
+        "median": 7176.0,
+        "best": 6988.0,
+        "worst": 7316.0,
+        "mean": 7170.4
+      }
+    },
+    {
+      "solver": "savings",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 11.0581,
+        "best": 11.0581,
+        "worst": 11.0581,
+        "mean": 11.0581
+      },
+      "tour_cost": {
+        "median": 8376.0,
+        "best": 8376.0,
+        "worst": 8376.0,
+        "mean": 8376.0
+      },
+      "wall_s": {
+        "median": 0.009,
+        "best": 0.0085,
+        "worst": 0.0111,
+        "mean": 0.0096
+      },
+      "peak_rss_kb": {
+        "median": 6964.0,
+        "best": 6876.0,
+        "worst": 7132.0,
+        "mean": 6984.0
+      }
+    }
+  ]
+}

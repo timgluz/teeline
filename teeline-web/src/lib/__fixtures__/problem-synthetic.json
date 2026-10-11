@@ -1,0 +1,137 @@
+{
+  "schema_version": 2,
+  "dataset": "berlin52",
+  "cities": 52,
+  "optimal_cost": 7542.0,
+  "leaderboard": [
+    {
+      "solver": "branch_bound",
+      "config": "exact",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": { "median": 0.0, "best": 0.0, "worst": 0.0, "mean": 0.0 },
+      "tour_cost": {
+        "median": 7542.0,
+        "best": 7542.0,
+        "worst": 7542.0,
+        "mean": 7542.0
+      },
+      "wall_s": { "median": 12.5, "best": 11.9, "worst": 13.1, "mean": 12.5 }
+    },
+    {
+      "solver": "branch_bound",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": { "median": 4.89, "best": 4.8, "worst": 5.0, "mean": 4.9 },
+      "tour_cost": {
+        "median": 7910.8,
+        "best": 7904.0,
+        "worst": 7919.1,
+        "mean": 7911.0
+      },
+      "wall_s": { "median": 0.5, "best": 0.4, "worst": 0.6, "mean": 0.5 }
+    },
+    {
+      "solver": "2opt",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 11.16,
+        "best": 11.1,
+        "worst": 11.2,
+        "mean": 11.16
+      },
+      "tour_cost": {
+        "median": 8384.2,
+        "best": 8379.5,
+        "worst": 8387.0,
+        "mean": 8384.2
+      },
+      "wall_s": {
+        "median": 0.0194,
+        "best": 0.017,
+        "worst": 0.022,
+        "mean": 0.02
+      }
+    },
+    {
+      "solver": "lk",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": { "median": 0.52, "best": 0.3, "worst": 1.1, "mean": 0.6 },
+      "tour_cost": {
+        "median": 7581.2,
+        "best": 7564.6,
+        "worst": 7624.9,
+        "mean": 7590.0
+      },
+      "wall_s": { "median": 0.0956, "best": 0.08, "worst": 0.12, "mean": 0.1 }
+    },
+    {
+      "solver": "aco",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": { "median": 3.2, "best": 1.1, "worst": 9.0, "mean": 4.0 },
+      "tour_cost": {
+        "median": 7783.3,
+        "best": 7624.9,
+        "worst": 8220.8,
+        "mean": 7843.7
+      },
+      "wall_s": { "median": 0.0652, "best": 0.05, "worst": 0.09, "mean": 0.07 }
+    },
+    {
+      "solver": "shuffle",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 282.5,
+        "best": 240.1,
+        "worst": 330.0,
+        "mean": 284.0
+      },
+      "tour_cost": {
+        "median": 28844.9,
+        "best": 25655.5,
+        "worst": 32424.2,
+        "mean": 28863.6
+      },
+      "wall_s": { "median": 0.0144, "best": 0.01, "worst": 0.02, "mean": 0.015 }
+    },
+    {
+      "solver": "mystery_solver",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": { "median": 2.0, "best": 1.8, "worst": 2.2, "mean": 2.0 },
+      "tour_cost": {
+        "median": 7692.8,
+        "best": 7677.8,
+        "worst": 7707.9,
+        "mean": 7692.8
+      },
+      "wall_s": { "median": 1.5, "best": 1.4, "worst": 1.6, "mean": 1.5 }
+    },
+    {
+      "solver": "gsa",
+      "config": "budget",
+      "runs": 0,
+      "timeouts": 5,
+      "errors": 0,
+      "tour_cost": null,
+      "wall_s": null
+    }
+  ]
+}
