@@ -82,6 +82,18 @@ describe('tourLength', () => {
     expect(tourLength(tsp('EUC_2D', small), tour([1, 2, 3, 4]))).toBe(4)
   })
 
+  it('keeps a GEO tour finite where repeated coordinates are involved', () => {
+    // `geoDistance` clamps acos's argument, mirroring `src/tsp/distance_matrix.rs` where f32
+    // rounding can push it outside [-1, 1] and NaN poisons the total. f64 keeps this input in range,
+    // so the test pins the observable contract — a finite total — rather than the clamp's branch.
+    const samePlace = [
+      [1, 10, 20],
+      [2, 10, 20],
+    ]
+    // Two edges of 1 each: GEO's formula adds 1 inside the floor, even for identical points.
+    expect(tourLength(tsp('GEO', samePlace, 2), tour([1, 2]))).toBe(2)
+  })
+
   it('pays the return edge, which the file does not spell out', () => {
     // Four ids, four edges: the tour is closed implicitly, so 6 + 6 + 6 + 6.
     expect(tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 4]))).toBe(24)
@@ -128,9 +140,16 @@ describe('tourLength', () => {
     // No DIMENSION to check the route against.
     const noDimension = `NAME: t\nEDGE_WEIGHT_TYPE: EUC_2D\nNODE_COORD_SECTION\n1 0 0\n2 1 0\nEOF\n`
     expect(tourLength(noDimension, tour([1, 2]))).toBeNull()
-    // A DIMENSION that disagrees with the coordinate rows: the route matches the rows, not the
-    // declared size, so it is not a tour of the instance the file describes.
+    // A DIMENSION that disagrees with the coordinate rows, both ways round: the route has to be a
+    // tour of the instance the file describes, and the coordinate section is that instance.
     expect(tourLength(tsp('EUC_2D', square, 9), tour([1, 2, 3, 4]))).toBeNull()
+    expect(tourLength(tsp('EUC_2D', square, 3), tour([1, 2, 3]))).toBeNull()
+    // Coordinates that overflow the metric entirely: a refusal, not `Infinity` on a page.
+    const huge = [
+      [1, 1e200, 1e200],
+      [2, -1e200, -1e200],
+    ]
+    expect(tourLength(tsp('EUC_2D', huge), tour([1, 2]))).toBeNull()
     // A route naming a city the coordinate section does not have.
     expect(tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 9]))).toBeNull()
   })

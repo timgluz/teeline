@@ -98,6 +98,9 @@ export function tourLength(tspText, tourText) {
   // Length alone is not enough: `[1, 2, 3, 3]` is four ids for a four-city instance that visits city
   // 3 twice and city 4 never, and it scores *shorter* than any real tour.
   if (new Set(route).size !== dimension) return null
+  // The coordinate section is the instance: a file declaring 3 cities but listing 4 has a route of
+  // 3 ids that is not a tour of what it describes.
+  if (coords.size !== dimension) return null
   if (route.some((id) => !coords.has(id))) return null
 
   let total = 0
