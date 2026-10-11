@@ -1,12 +1,11 @@
 ---
 id: 01a12651-5646-7e10-ba40-b75b1a4fc3b2
 slug: tasks/bench-algorithm-pages
-title: "feat(web): render per-algorithm benchmark tables from published data"
+title: "feat(web): render per-algorithm benchmark tables and graphs from published data"
 type: task
 status: draft
 priority: high
 tags: [benchmarks, teeline-web, frontend]
-blocked_by: [tasks/bench-publish-provenance]
 ---
 
 ## Overview
