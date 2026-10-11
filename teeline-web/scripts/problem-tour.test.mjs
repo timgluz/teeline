@@ -46,11 +46,15 @@ describe('the other TSPLIB metrics', () => {
     expect(ceilDistance({ x: 0, y: 0 }, { x: 0.1, y: 0 })).toBe(1)
     expect(ceilDistance({ x: 0, y: 0 }, { x: 2, y: 0 })).toBe(2)
     // TSPLIB's GEO formula adds 1 inside the floor, so even identical points come out as 1 rather
-    // than 0. That is the definition, not an off-by-one — and it is why the corpus values match.
+    // than 0. That is the definition, not an off-by-one.
     expect(geoDistance({ x: 10, y: 20 }, { x: 10, y: 20 })).toBe(1)
-    expect(geoDistance({ x: 16.47, y: 96.1 }, { x: 23.7, y: 96.99 })).toBe(
-      geoDistance({ x: 23.7, y: 96.99 }, { x: 16.47, y: 96.1 }),
+    // A reference value, so a wrong radius, degree/minute conversion or PI constant cannot pass on
+    // symmetry alone: ulysses16 cities 1 (38.24, 20.42) and 2 (39.57, 26.15), computed from the
+    // TSPLIB definition with full-precision PI — the constant the solver uses.
+    expect(geoDistance({ x: 38.24, y: 20.42 }, { x: 39.57, y: 26.15 })).toBe(
+      509,
     )
+    expect(geoDistance({ x: 16.47, y: 96.1 }, { x: 16.47, y: 94.44 })).toBe(153) // burma14 1-2
   })
 })
 
@@ -90,7 +94,7 @@ describe('tourLength', () => {
     // pr1002 writes 1002 ids across 64 lines; reading a line at a time scored 11 of rd100's 100
     // cities and published 4344 for a 7910 optimum.
     const onePerLine = tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 4], 1))
-    const packed = tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 4], 4))
+    const packed = tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 4], 3)) // two lines: "1 2 3" / "4"
     expect(packed).toBe(onePerLine)
     expect(packed).toBe(24)
   })
@@ -100,6 +104,22 @@ describe('tourLength', () => {
     // the worst kind of wrong number to publish as a proven optimum.
     expect(tourLength(tsp('EUC_2D', square), tour([1, 2]))).toBeNull()
     expect(tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 4, 4]))).toBeNull()
+    // The same *length* as the instance, but city 3 twice and city 4 never: without the permutation
+    // check this scored 18 for a square whose every real tour is 24.
+    expect(tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 3]))).toBeNull()
+    expect(tourLength(tsp('EUC_2D', square), tour([1, 2, 2, 3]))).toBeNull()
+  })
+
+  it('scores the non-EUC types through the same dispatcher', () => {
+    // ATT triangle (0,0) (10,0) (10,10): each edge rounds up to 4, 4 and 5 -> 13. The solver's own
+    // --optimal-tour reports 13 for this fixture.
+    const att = [
+      [1, 0, 0],
+      [2, 10, 0],
+      [3, 10, 10],
+    ]
+    expect(tourLength(tsp('ATT', att), tour([1, 2, 3]))).toBe(13)
+    expect(tourLength(tsp('CEIL_2D', att), tour([1, 2, 3]))).toBe(35) // 10 + 10 + ceil(14.14)
   })
 
   it('refuses what it cannot score rather than guessing', () => {
@@ -108,6 +128,9 @@ describe('tourLength', () => {
     // No DIMENSION to check the route against.
     const noDimension = `NAME: t\nEDGE_WEIGHT_TYPE: EUC_2D\nNODE_COORD_SECTION\n1 0 0\n2 1 0\nEOF\n`
     expect(tourLength(noDimension, tour([1, 2]))).toBeNull()
+    // A DIMENSION that disagrees with the coordinate rows: the route matches the rows, not the
+    // declared size, so it is not a tour of the instance the file describes.
+    expect(tourLength(tsp('EUC_2D', square, 9), tour([1, 2, 3, 4]))).toBeNull()
     // A route naming a city the coordinate section does not have.
     expect(tourLength(tsp('EUC_2D', square), tour([1, 2, 3, 9]))).toBeNull()
   })

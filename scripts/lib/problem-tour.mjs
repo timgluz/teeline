@@ -35,11 +35,17 @@ export function geoDistance(a, b) {
     const deg = Math.trunc(v)
     return (Math.PI * (deg + (5 * (v - deg)) / 3)) / 180
   }
+  // Full-precision PI, not TSPLIB's truncated 3.141592: the solver uses full precision
+  // deliberately, and the two differ by one unit on ~0.09% of GEO distances, so matching it is
+  // what keeps a length here comparable with a reported cost.
   const [latA, lonA, latB, lonB] = [toRad(a.x), toRad(a.y), toRad(b.x), toRad(b.y)]
   const q1 = Math.cos(lonA - lonB)
   const q2 = Math.cos(latA - latB)
   const q3 = Math.cos(latA + latB)
-  return Math.floor(6378.388 * Math.acos(0.5 * ((1 + q1) * q2 - (1 - q1) * q3)) + 1)
+  // Clamped because rounding can nudge the argument just outside acos's domain, where it returns
+  // NaN and poisons the total — `src/tsp/distance_matrix.rs` clamps for the same reason.
+  const cosAngle = Math.min(1, Math.max(-1, 0.5 * ((1 + q1) * q2 - (1 - q1) * q3)))
+  return Math.floor(6378.388 * Math.acos(cosAngle) + 1)
 }
 
 const DISTANCES = {
@@ -54,7 +60,10 @@ const DISTANCES = {
  * an unknown distance type, no coordinate section, or a route naming a city that has none.
  */
 export function tourLength(tspText, tourText) {
-  const type = (/(?:^|\n)EDGE_WEIGHT_TYPE\s*:\s*(\S+)/.exec(tspText)?.[1] || '').toUpperCase()
+  // `[ \t]*` around the keyword and colon: TSPLIB headers are padded in the wild, and a header
+  // this misses silently turns a derivable cost into Unknown.
+  const type = (/(?:^|\n)[ \t]*EDGE_WEIGHT_TYPE[ \t]*:[ \t]*(\S+)/.exec(tspText)?.[1] || '')
+    .toUpperCase()
   const distance = DISTANCES[type]
   if (!distance) return null
 
@@ -69,7 +78,10 @@ export function tourLength(tspText, tourText) {
     }
   }
 
-  const dimension = parseInt(/(?:^|\n)DIMENSION\s*:\s*(\d+)/.exec(tspText)?.[1] ?? '', 10)
+  const dimension = parseInt(
+    /(?:^|\n)[ \t]*DIMENSION[ \t]*:[ \t]*(\d+)/.exec(tspText)?.[1] ?? '',
+    10,
+  )
 
   // Node ids are whitespace-separated, not one per line. Several shipped tours pack them (pr1002
   // writes 1002 ids across 64 lines), and reading a line at a time scored a subset of the route —
@@ -83,11 +95,14 @@ export function tourLength(tspText, tourText) {
   // A route that does not name every city is not a tour of this instance. Without this the subset
   // above still produced a total (rd100's 11-of-100 ids scored 4344 against a 7910 optimum).
   if (!Number.isInteger(dimension) || route.length !== dimension) return null
+  // Length alone is not enough: `[1, 2, 3, 3]` is four ids for a four-city instance that visits city
+  // 3 twice and city 4 never, and it scores *shorter* than any real tour.
+  if (new Set(route).size !== dimension) return null
   if (route.some((id) => !coords.has(id))) return null
 
   let total = 0
   for (let i = 0; i < route.length; i++) {
     total += distance(coords.get(route[i]), coords.get(route[(i + 1) % route.length]))
   }
-  return Math.round(total)
+  return Number.isFinite(total) ? Math.round(total) : null
 }
