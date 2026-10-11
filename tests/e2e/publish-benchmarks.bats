@@ -322,3 +322,48 @@ TSV
     [ ! -f "$TMPDIR/stage-stray/v2/algorithms/zzz_stray.json" ]
     [ "$(jq -r '[.solvers[].id] | index("zzz_stray") == null' "$TMPDIR/stage-stray/v2/index.json")" = "true" ]
 }
+
+@test "a first publish against an empty prefix succeeds via the 404 path" {
+    # The route the previous tests could not reach: they use --no-fetch-previous, so the
+    # fetch path never runs. It had a blocker — fetch_previous created the shard directories
+    # before discovering the 404, and the transform then read the leftovers as a tree with no
+    # manifest and aborted, so the very first publish could never succeed.
+    local root="$TMPDIR/webroot" portfile="$TMPDIR/port" logfile="$TMPDIR/http.log"
+    mkdir -p "$root"
+    SERVER_PID=""
+    python3 - "$root" "$portfile" >"$logfile" 2>&1 <<'PY' &
+import functools
+import http.server
+import pathlib
+import socketserver
+import sys
+
+root, portfile = sys.argv[1], sys.argv[2]
+handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=root)
+with socketserver.TCPServer(("127.0.0.1", 0), handler) as httpd:
+    pathlib.Path(portfile).write_text(str(httpd.server_address[1]))
+    httpd.serve_forever()
+PY
+    SERVER_PID=$!
+    local i
+    for i in $(seq 50); do
+        [ -s "$portfile" ] && break
+        sleep 0.1
+    done
+    [ -s "$portfile" ] || skip "could not start a local HTTP server"
+
+    local port
+    port="$(cat "$portfile")"
+    run "$PUBLISH" --dry-run --first-publish --stage "$TMPDIR/first" \
+        --public-base "http://127.0.0.1:$port" --tsv "$TMPDIR/prev.tsv"
+
+    kill "$SERVER_PID" 2>/dev/null || true
+
+    # An empty bucket is a first publish, not a failure.
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"HTTP 404"* ]]
+    [ -f "$TMPDIR/first/v2/index.json" ]
+    [ "$(jq -r '.solvers | length' "$TMPDIR/first/v2/index.json")" = "2" ]
+    # And the leftovers the failed attempt used to choke on must not be treated as a tree.
+    [ ! -f "$TMPDIR/first/v2/../../bench-prev/v2/index.json" ]
+}

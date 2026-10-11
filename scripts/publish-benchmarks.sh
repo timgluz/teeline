@@ -218,7 +218,7 @@ fetch_previous() {
   PREVIOUS_STATUS="${PREVIOUS_STATUS:-000}"
   case "$PREVIOUS_STATUS" in
     200) ;;
-    404) rm -f "$dest/index.json"; return 0 ;;
+    404) rm -rf "$dest"; return 0 ;;
     000) echo "    ERROR: cannot reach $base/index.json (network or DNS failure)" >&2; return 1 ;;
     *)   echo "    ERROR: $base/index.json returned HTTP $PREVIOUS_STATUS" >&2; return 1 ;;
   esac
@@ -285,6 +285,14 @@ elif [[ "$ONLY" != "criteriondb" && -s "$PREVIOUS/v2/index.json" ]]; then
   echo "==> Previous  $PREVIOUS/v2 (not fetched)"
 fi
 
+# What the transform should read as the previous tree. When there is nothing to merge — a first
+# publish, or --no-fetch-previous with no local tree — point it at a path that does not exist, so
+# "absent" is explicit rather than depending on which directories happen to be left on disk.
+PREVIOUS_ARG="$PREVIOUS/v2"
+if [[ "$MERGE_PREVIOUS" -eq 0 ]]; then
+  PREVIOUS_ARG="$STAGE/.no-previous-tree"
+fi
+
 # Publishing a tree that only contains this TSV's solvers is legitimate for a first publish
 # and destructive otherwise, so it needs saying out loud rather than being the silent default.
 if [[ "$ONLY" != "criteriondb" && "$MERGE_PREVIOUS" -eq 0 && "$FIRST_PUBLISH" -eq 0 ]]; then
@@ -315,7 +323,7 @@ mkdir -p "$STAGE/v2/algorithms" "$STAGE/v2/problems"
 
 python3 - "$TSV" "$STAGE/v2" "$GIT_COMMIT" "$DIRTY" "$TEELINE_VERSION" \
           "$RUST_VERSION" "$GENERATED_AT" "$TIER" "$BUILD_PROFILE" \
-          "$PREVIOUS/v2" "$BUDGETS" "$SNAPSHOT_TAG" "$PREFIX" <<'PY'
+          "$PREVIOUS_ARG" "$BUDGETS" "$SNAPSHOT_TAG" "$PREFIX" <<'PY'
 """Transform a benchmark TSV into the docs/benchmarks/schema.md v2 contract.
 
 Statistics use the median as the headline (robust to the heavy right tail that
@@ -616,18 +624,15 @@ def load_previous(kind: str) -> dict:
     prev: dict = {}
     root = Path(previous_dir)
     d = root / kind
-    if not d.is_dir():
-        return prev
 
-    # Only the shards the previous manifest names count as published state. A stray file in
-    # the directory was never live, and merging it would resurrect something no reader could
-    # have seen — including a shard deliberately withdrawn.
+    # The manifest is read first: it, not the directory listing, says what was published.
     manifest = root / "index.json"
     if not manifest.is_file():
-        sys.exit(
-            f"ERROR: previous tree has no index.json ({manifest}); cannot tell which shards "
-            f"were published"
-        )
+        # No previous tree at all is the legitimate first-publish case. Shards without a
+        # manifest are not: nothing could have served them, and their ids are unknowable.
+        if d.is_dir() and any(d.glob("*.json")):
+            sys.exit(f"ERROR: previous tree has shards but no index.json ({manifest})")
+        return prev
     try:
         doc = json.loads(manifest.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -636,7 +641,9 @@ def load_previous(kind: str) -> dict:
     field = "solvers" if kind == "algorithms" else "problems"
     listed = {e["id"] for e in doc.get(field, []) if "id" in e}
 
-    for f in sorted(d.glob("*.json")):
+    # A missing shard directory is an empty shard set, not an excuse to skip the check below:
+    # the manifest still names them, so their absence must be reported.
+    for f in sorted(d.glob("*.json")) if d.is_dir() else []:
         try:
             doc = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
