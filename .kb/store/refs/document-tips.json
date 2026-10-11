@@ -304,7 +304,7 @@
     {
       "document_id": "01a12651-5646-7e10-ba40-b75b1a4fc3b2",
       "slug": "tasks/bench-algorithm-pages",
-      "tip_commit_id": "01a12651-aa71-7630-9ae4-047807590611"
+      "tip_commit_id": "01a12a7f-dba0-77d1-a218-88b0f8785981"
     },
     {
       "document_id": "01a12651-565c-7183-9d74-562a67e27df0",
@@ -335,6 +335,16 @@
       "document_id": "01a129e9-f1ca-7460-820b-95cd828a489e",
       "slug": "tasks/ci-cli-e2e-bats-workflow",
       "tip_commit_id": "01a129eb-23c9-7fc1-87b0-fae3900dda6b"
+    },
+    {
+      "document_id": "01a12a78-a413-7033-9744-876e15d07cd7",
+      "slug": "tasks/migrate-jaq-for-toml-queries",
+      "tip_commit_id": "01a12a78-b645-7be2-8fcd-f7e43b09db88"
+    },
+    {
+      "document_id": "01a12a7f-a6c5-7322-9471-5b900527510b",
+      "slug": "tasks/bench-problem-leaderboard",
+      "tip_commit_id": "01a12a7f-a72d-7d90-8973-484969671cc0"
     }
   ]
 }

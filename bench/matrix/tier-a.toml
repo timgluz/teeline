@@ -59,10 +59,18 @@ ch150 = "all"         # EUC_2D, 150
 a280 = "all"          # EUC_2D, 280
 dsj1000 = "all"       # CEIL_2D, 1000
 
-# Configs are named sets of extra CLI arguments. `default` applies to every solver and is
-# what a solver does out of the box; any other config names the solvers and instances it
-# applies to.
-[configs.default]
+# Configs are named sets of extra CLI arguments. A config with no `solvers`/`instances` applies to
+# everything; one that names them applies only there.
+#
+# `budget` is the budget-limited run decision 1 asks for: the solver as configured, with the
+# family's wall-clock budget as the only limit. It carries no arguments because the allowance is
+# the timeout, not a flag.
+#
+# The converged half of decision 1 is deliberately absent. `--stagnation_epochs` is honoured by ten
+# solvers but five local-search solvers ignore it, and `som`/`fourier` reject the unbounded
+# `--epochs 0` it needs — so a "to convergence" column would be missing for 7 of 22 solvers, and a
+# column that is absent for a third of the table is worse than one that is not published yet.
+[configs.budget]
 
 # `branch_bound` is exact only when `--n_nearest` is at least the number of cities; at its
 # default of 3 it is a beam search. Publishing it unqualified as "exact" would misrepresent

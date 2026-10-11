@@ -451,3 +451,43 @@ TOML
     # --dry-run promises to change nothing, so it must not repair the file either.
     [ "$(wc -c < "$OUT")" -eq "$before" ]
 }
+
+@test "a tier with no configs at all is refused" {
+    # The name is a label, so any name works — but with no configs there is nothing to measure,
+    # and the sweep would plan zero cells and look complete.
+    cat > "$TMPDIR/tier-noconfig.toml" <<'TOML'
+tier = "test"
+runs = 1
+[budgets]
+constructive = 5
+[coverage]
+constructive = ["small"]
+[instances]
+burma14 = "small"
+TOML
+
+    run "$BENCH" "$TMPDIR/tier-noconfig.toml" --binary "$BIN" --out "$TMPDIR/n.jsonl" --dry-run
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"no [configs"* ]]
+}
+
+@test "a config may be named anything, since the name is only a label" {
+    cat > "$TMPDIR/tier-named.toml" <<'TOML'
+tier = "test"
+runs = 1
+[budgets]
+constructive = 5
+[coverage]
+constructive = ["small"]
+[instances]
+burma14 = "small"
+[configs.budget]
+TOML
+
+    # --solver nn so the tier need not enumerate every family it does not measure.
+    run "$BENCH" "$TMPDIR/tier-named.toml" --binary "$BIN" --out "$TMPDIR/named.jsonl" \
+        --dry-run --solver nn
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"budget"* ]]
+    [[ "$output" != *"default"* ]]
+}

@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"e2e7310ae50846630828e5d0f48204570ccc0b48ddf795bb45371e4bfbd388b5","doc_type":"task","document_id":"01a12651-5646-7e10-ba40-b75b1a4fc3b2","metadata_changes":[{"field":"blocked_by","old_value":["tasks/bench-publish-provenance"]},{"field":"blocks","old_value":["tasks/bench-problem-leaderboard"]},{"field":"title","new_value":"feat(web): render per-algorithm benchmark tables and graphs from published data","old_value":"feat(web): render per-algorithm benchmark tables from published data"}],"new_version":3,"previous_commit_id":"01a12a7f-8240-74c3-a1b8-f4c048a2c96e","previous_hash":"5b7d53babf412a8a51ef2e13d95067ddaf6f0354150e2fff43c8e8710fc4f8dd","previous_version":2,"slug":"tasks/bench-algorithm-pages","title":"feat(web): render per-algorithm benchmark tables and graphs from published data"}],"created_at":"2026-10-11T10:26:24.741263130Z","id":"01a12a7f-dba0-77d1-a218-88b0f8785981","message":"Clear the stale blocker: the provenance task is complete"},
+  "content_hash": "585cae07f4d46b7071caf1d2356444b5ca981c96d675d7460eb6bf20530296f8",
+  "hash_version": 3
+}

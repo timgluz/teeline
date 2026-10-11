@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"b389a600fcca7b2406e75288ef2572eb8513f673ff081853b722876f215f379d","doc_type":"task","document_id":"01a12a7f-a6c5-7322-9471-5b900527510b","new_version":1,"previous_version":null,"slug":"tasks/bench-problem-leaderboard","title":"feat(web): render the per-instance leaderboard and graph on problem pages"}],"created_at":"2026-10-11T10:26:11.335631030Z","id":"01a12a7f-a72d-7d90-8973-484969671cc0","message":"Add the problem-page leaderboard task"},
+  "content_hash": "cceb8310414b1927de2746b8bac1ce652f3ba97416864a2d8d643306aeb210a6",
+  "hash_version": 3
+}
