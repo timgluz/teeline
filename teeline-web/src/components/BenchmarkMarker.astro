@@ -1,0 +1,38 @@
+---
+// The marker on an index row whose instance or solver has published benchmark results.
+//
+// Rendered hidden and revealed by BenchmarkMarkers once the manifest names it, so a reader without
+// JavaScript — or one reading during a manifest outage — is shown nothing rather than a claim.
+import { MARKER_TITLE } from '../lib/benchmark-markers'
+
+interface Props {
+  /** Dataset id or solver id, matching the manifest entry. */
+  id: string
+  kind: 'dataset' | 'solver'
+}
+
+const { id, kind } = Astro.props
+// The results section each detail page renders, with the anchor it already carries.
+const href =
+  kind === 'dataset' ? `/problems/${id}/#results` : `/algorithms/${id}/#benchmarks`
+---
+
+<span data-bench-marker hidden class="ml-2">
+  <a
+    href={href}
+    title={MARKER_TITLE}
+    aria-label={MARKER_TITLE}
+    class="text-accent no-underline hover:underline"
+  >
+    <svg
+      class="inline-block h-3 w-3"
+      viewBox="0 0 12 12"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.5"
+      aria-hidden="true"
+    >
+      <path d="M2 10V6M6 10V3M10 10V7" stroke-linecap="round"></path>
+    </svg>
+  </a>
+</span>
