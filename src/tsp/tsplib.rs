@@ -218,16 +218,9 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
     } else {
         let fmt = metadata
             .get("EDGE_WEIGHT_FORMAT")
-            .map(|v| v.trim().to_string())
+            .map(|v| v.trim().to_uppercase())
             .unwrap_or_default();
-        let packed = match fmt.as_str() {
-            "FULL_MATRIX" => parse_full_matrix(&raw_weight_tokens, dimension)?,
-            "UPPER_ROW" => parse_upper_row(&raw_weight_tokens, dimension)?,
-            "LOWER_DIAG_ROW" => parse_lower_diag_row(&raw_weight_tokens, dimension)?,
-            other => {
-                return Err(format!("Unsupported EDGE_WEIGHT_FORMAT: {other}"));
-            }
-        };
+        let packed = parse_explicit(&raw_weight_tokens, dimension, &fmt)?;
         Some(packed)
     };
 
@@ -268,60 +261,59 @@ fn grid_coords(n: usize) -> Vec<KDPoint> {
         .collect()
 }
 
-fn parse_full_matrix(tokens: &[f32], n: usize) -> Result<Vec<f32>, String> {
-    if tokens.len() != n * n {
-        return Err(format!(
-            "FULL_MATRIX: expected {} tokens, got {}",
-            n * n,
-            tokens.len()
-        ));
-    }
-    Ok((1..n)
-        .flat_map(|i| (0..i).map(move |j| tokens[i * n + j]))
-        .collect())
+/// The entries an `EDGE_WEIGHT_FORMAT` writes, in the order the file stores them. TSPLIB has nine
+/// layouts: each picks a triangle, includes the diagonal or not, and walks it row-wise or
+/// column-wise. They are all the same matrix, so a reader that transposes one of them produces a
+/// plausible wrong answer rather than an error — which is why they share one reader.
+fn explicit_entries(format: &str, n: usize) -> Result<Vec<(usize, usize)>, String> {
+    Ok(match format {
+        "FULL_MATRIX" => (0..n).flat_map(|i| (0..n).map(move |j| (i, j))).collect(),
+        "UPPER_ROW" => (0..n)
+            .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
+            .collect(),
+        "LOWER_ROW" => (0..n).flat_map(|i| (0..i).map(move |j| (i, j))).collect(),
+        "UPPER_DIAG_ROW" => (0..n).flat_map(|i| (i..n).map(move |j| (i, j))).collect(),
+        "LOWER_DIAG_ROW" => (0..n).flat_map(|i| (0..=i).map(move |j| (i, j))).collect(),
+        "UPPER_COL" => (0..n).flat_map(|j| (0..j).map(move |i| (i, j))).collect(),
+        "LOWER_COL" => (0..n)
+            .flat_map(|j| (j + 1..n).map(move |i| (i, j)))
+            .collect(),
+        "UPPER_DIAG_COL" => (0..n).flat_map(|j| (0..=j).map(move |i| (i, j))).collect(),
+        "LOWER_DIAG_COL" => (0..n).flat_map(|j| (j..n).map(move |i| (i, j))).collect(),
+        "" => return Err("EDGE_WEIGHT_SECTION without an EDGE_WEIGHT_FORMAT".to_string()),
+        other => return Err(format!("Unsupported EDGE_WEIGHT_FORMAT: {other}")),
+    })
 }
 
-fn parse_upper_row(tokens: &[f32], n: usize) -> Result<Vec<f32>, String> {
-    let expected = n * (n - 1) / 2;
-    if tokens.len() != expected {
+/// Decode an `EDGE_WEIGHT_SECTION` into the packed lower triangle, row-wise — the one shape
+/// `DistanceMatrix` reads, whatever layout the file used.
+///
+/// The matrix is reconstructed in full from the triangle the format stores, because TSPLIB's
+/// `TYPE: TSP` means the matrix is symmetric; `TYPE: ATSP` never reaches here (it is rejected),
+/// so mirroring the stored triangle is the whole of the asymmetry question.
+fn parse_explicit(tokens: &[f32], n: usize, format: &str) -> Result<Vec<f32>, String> {
+    let entries = explicit_entries(format, n)?;
+    if tokens.len() != entries.len() {
         return Err(format!(
-            "UPPER_ROW: expected {expected} tokens, got {}",
+            "{format}: expected {} tokens, got {}",
+            entries.len(),
             tokens.len()
         ));
     }
+
     let mut matrix = vec![0.0f32; n * n];
-    let mut idx = 0;
-    for i in 0..n - 1 {
-        for j in i + 1..n {
-            matrix[i * n + j] = tokens[idx];
-            matrix[j * n + i] = tokens[idx];
-            idx += 1;
-        }
+    for (token, (i, j)) in tokens.iter().zip(entries) {
+        matrix[i * n + j] = *token;
+        matrix[j * n + i] = *token;
     }
-    let mut result = Vec::with_capacity(n * (n - 1) / 2);
+
+    let mut packed = Vec::with_capacity(n * (n - 1) / 2);
     for i in 1..n {
         for j in 0..i {
-            result.push(matrix[i * n + j]);
+            packed.push(matrix[i * n + j]);
         }
     }
-    Ok(result)
-}
-
-fn parse_lower_diag_row(tokens: &[f32], n: usize) -> Result<Vec<f32>, String> {
-    let expected = n * (n + 1) / 2;
-    if tokens.len() != expected {
-        return Err(format!(
-            "LOWER_DIAG_ROW: expected {expected} tokens, got {}",
-            tokens.len()
-        ));
-    }
-    let mut result = Vec::with_capacity(n * (n - 1) / 2);
-    let mut idx = 0;
-    for i in 0..n {
-        result.extend_from_slice(&tokens[idx..idx + i]);
-        idx += i + 1;
-    }
-    Ok(result)
+    Ok(packed)
 }
 
 fn is_state_marker(line: &str) -> bool {
@@ -509,48 +501,89 @@ mod tests {
 
     // ── unpacker unit tests ───────────────────────────────────────────────────
     // Canonical 3-city symmetric matrix: d(0,1)=1, d(0,2)=2, d(1,2)=3
-    // Expected lower triangle: [d(1,0)=1, d(2,0)=2, d(2,1)=3]
+    // Expected lower triangle, row-wise: [d(1,0)=1, d(2,0)=2, d(2,1)=3]
+
+    /// The nine layouts, each holding that same 3-city matrix. n=3 needs 3 tokens without the
+    /// diagonal and 6 with it, so the cases double as a length check for every format.
+    const THREE_CITY_LAYOUTS: [(&str, &[f32]); 9] = [
+        // row-major 3x3
+        (
+            "FULL_MATRIX",
+            &[0.0, 1.0, 2.0, 1.0, 0.0, 3.0, 2.0, 3.0, 0.0],
+        ),
+        ("UPPER_ROW", &[1.0, 2.0, 3.0]),
+        ("LOWER_ROW", &[1.0, 2.0, 3.0]),
+        ("UPPER_DIAG_ROW", &[0.0, 1.0, 2.0, 0.0, 3.0, 0.0]),
+        ("LOWER_DIAG_ROW", &[0.0, 1.0, 0.0, 2.0, 3.0, 0.0]),
+        ("UPPER_COL", &[1.0, 2.0, 3.0]),
+        ("LOWER_COL", &[1.0, 2.0, 3.0]),
+        ("UPPER_DIAG_COL", &[0.0, 1.0, 0.0, 2.0, 3.0, 0.0]),
+        ("LOWER_DIAG_COL", &[0.0, 1.0, 2.0, 0.0, 3.0, 0.0]),
+    ];
 
     #[test]
-    fn test_unpack_full_matrix() {
-        // 3x3 row-major: d(i,j) at [i*3+j]
-        let tokens = [0.0, 1.0, 2.0, 1.0, 0.0, 3.0, 2.0, 3.0, 0.0];
-        let result = parse_full_matrix(&tokens, 3).unwrap();
-        assert_eq!(vec![1.0, 2.0, 3.0], result);
+    fn test_unpack_every_edge_weight_format() {
+        for (format, tokens) in THREE_CITY_LAYOUTS {
+            let result =
+                parse_explicit(tokens, 3, format).unwrap_or_else(|e| panic!("{format}: {e}"));
+            assert_eq!(
+                vec![1.0, 2.0, 3.0],
+                result,
+                "{format} should pack the same matrix as every other layout"
+            );
+        }
     }
 
     #[test]
-    fn test_unpack_upper_row() {
-        // Upper row (excl. diagonal): row0=[d(0,1),d(0,2)], row1=[d(1,2)]
-        let tokens = [1.0, 2.0, 3.0];
-        let result = parse_upper_row(&tokens, 3).unwrap();
-        assert_eq!(vec![1.0, 2.0, 3.0], result);
+    fn test_unpack_keeps_the_row_and_column_orders_distinct() {
+        // The 3-city cases above cannot tell a row-wise read from a column-wise one: at n=3 both
+        // orders visit the same single pair per row/column, so every layout takes the same token
+        // sequence. At n=5 they differ — UPPER_ROW reads d(1,4) third, UPPER_COL reads d(2,3)
+        // there — so decoding one order's tokens with the other's mapping must change the matrix.
+        // This is the failure the shared reader exists to prevent: a transposed estimate.
+        let tokens = [1.0, 2.0, 5.0, 3.0, 6.0, 8.0, 4.0, 7.0, 9.0, 10.0]; // d12; d13,d23; d14,d24,d34; d15,…
+        let as_upper_col = parse_explicit(&tokens, 5, "UPPER_COL").unwrap();
+        let as_upper_row = parse_explicit(&tokens, 5, "UPPER_ROW").unwrap();
+        assert_eq!(
+            vec![1.0, 2.0, 5.0, 3.0, 6.0, 8.0, 4.0, 7.0, 9.0, 10.0],
+            as_upper_col,
+            "UPPER_COL tokens should decode to the matrix they describe"
+        );
+        assert_ne!(
+            as_upper_col, as_upper_row,
+            "UPPER_ROW and UPPER_COL must not share one mapping"
+        );
     }
 
     #[test]
-    fn test_unpack_lower_diag_row() {
-        // Lower diag row (incl. diagonal): row0=[0], row1=[d(1,0),0], row2=[d(2,0),d(2,1),0]
-        let tokens = [0.0, 1.0, 0.0, 2.0, 3.0, 0.0];
-        let result = parse_lower_diag_row(&tokens, 3).unwrap();
-        assert_eq!(vec![1.0, 2.0, 3.0], result);
+    fn test_unpack_rejects_a_length_that_does_not_match_the_format() {
+        // 5 tokens is not a valid count for n=3 under any layout. Reading it anyway would shift
+        // every distance by one from the first diagonal it assumed.
+        for (format, _) in THREE_CITY_LAYOUTS {
+            let tokens = [0.0f32; 5];
+            assert!(
+                parse_explicit(&tokens, 3, format).is_err(),
+                "{format} accepted 5 tokens for a 3-city matrix"
+            );
+        }
     }
 
     #[test]
-    fn test_unpack_full_matrix_wrong_size() {
-        let tokens = [0.0, 1.0, 2.0]; // too short for n=3
-        assert!(parse_full_matrix(&tokens, 3).is_err());
+    fn test_unpack_rejects_an_unknown_format() {
+        let err = parse_explicit(&[1.0, 2.0, 3.0], 3, "UPPER_TRIANGLE").unwrap_err();
+        assert!(
+            err.contains("UPPER_TRIANGLE"),
+            "error should name it: {err}"
+        );
     }
 
     #[test]
-    fn test_unpack_upper_row_wrong_size() {
-        let tokens = [1.0, 2.0]; // expected 3 for n=3
-        assert!(parse_upper_row(&tokens, 3).is_err());
-    }
-
-    #[test]
-    fn test_unpack_lower_diag_row_wrong_size() {
-        let tokens = [0.0, 1.0]; // expected 6 for n=3
-        assert!(parse_lower_diag_row(&tokens, 3).is_err());
+    fn test_unpack_reports_a_missing_format_as_missing() {
+        // The message has to distinguish "this file declares nothing" from "we do not know this
+        // one", because only the second is our gap.
+        let err = parse_explicit(&[1.0, 2.0, 3.0], 3, "").unwrap_err();
+        assert!(err.contains("without an EDGE_WEIGHT_FORMAT"), "{err}");
+        assert!(!err.contains("Unsupported"), "{err}");
     }
 
     // ── grid_coords ───────────────────────────────────────────────────────────
@@ -611,6 +644,65 @@ mod tests {
         assert!((dm.distance_between(1, 2).unwrap() - 1.0).abs() < 1e-3);
         assert!((dm.distance_between(1, 3).unwrap() - 2.0).abs() < 1e-3);
         assert!((dm.distance_between(2, 3).unwrap() - 3.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn test_process_lines_parses_every_edge_weight_format() {
+        // Five cities, d(1,2)=1 … d(4,5)=10. Reading through process_lines covers the dispatch as
+        // well as the layout, which the unpacker tests above cannot.
+        let layouts = [
+            (
+                "FULL_MATRIX",
+                "0 1 2 3 4 1 0 5 6 7 2 5 0 8 9 3 6 8 0 10 4 7 9 10 0",
+            ),
+            ("UPPER_ROW", "1 2 3 4 5 6 7 8 9 10"),
+            ("LOWER_ROW", "1 2 5 3 6 8 4 7 9 10"),
+            ("UPPER_DIAG_ROW", "0 1 2 3 4 0 5 6 7 0 8 9 0 10 0"),
+            ("LOWER_DIAG_ROW", "0 1 0 2 5 0 3 6 8 0 4 7 9 10 0"),
+            ("UPPER_COL", "1 2 5 3 6 8 4 7 9 10"),
+            ("LOWER_COL", "1 2 3 4 5 6 7 8 9 10"),
+            ("UPPER_DIAG_COL", "0 1 0 2 5 0 3 6 8 0 4 7 9 10 0"),
+            ("LOWER_DIAG_COL", "0 1 2 3 4 0 5 6 7 0 8 9 0 10 0"),
+        ];
+        let expected = [
+            (1, 2, 1.0),
+            (1, 3, 2.0),
+            (1, 4, 3.0),
+            (1, 5, 4.0),
+            (2, 3, 5.0),
+            (2, 4, 6.0),
+            (2, 5, 7.0),
+            (3, 4, 8.0),
+            (3, 5, 9.0),
+            (4, 5, 10.0),
+        ];
+
+        for (format, weights) in layouts {
+            let cursor = format!(
+                "NAME: t\nDIMENSION: 5\nEDGE_WEIGHT_TYPE: EXPLICIT\nEDGE_WEIGHT_FORMAT: {format}\nEDGE_WEIGHT_SECTION\n{weights}\nEOF\n"
+            );
+            let dt = process_lines(BufReader::new(cursor.as_bytes()))
+                .unwrap_or_else(|e| panic!("{format}: {e}"));
+            assert!(dt.has_explicit_weights(), "{format}");
+            let dm = dt.distance_matrix().unwrap();
+            for (a, b, want) in expected {
+                let got = dm.distance_between(a, b).unwrap();
+                assert!(
+                    (got - want).abs() < 1e-3,
+                    "{format}: d({a},{b}) = {got}, want {want}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_process_lines_rejects_a_matrix_without_a_format() {
+        // Without EDGE_WEIGHT_FORMAT there is no way to know how the section is laid out, and
+        // guessing one would silently mis-measure the instance.
+        let cursor =
+            "NAME: t\nDIMENSION: 3\nEDGE_WEIGHT_TYPE: EXPLICIT\nEDGE_WEIGHT_SECTION\n1 2 3\nEOF\n";
+        let err = process_lines(BufReader::new(cursor.as_bytes())).unwrap_err();
+        assert!(err.contains("without an EDGE_WEIGHT_FORMAT"), "{err}");
     }
 
     #[test]
