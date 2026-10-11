@@ -50,10 +50,14 @@ jobs:
         run: npm run test:e2e:auth
 
   # The rest of the suite. Splitting rather than extending the job above keeps the auth stack (and
-  # its 3-minute wrangler startup) out of the way of specs that only need `astro dev`, and leaves
-  # the existing check's name and meaning alone.
+  # its three-minute wrangler startup) out of the way of specs that only need `astro dev`, and
+  # leaves the existing check's name and meaning alone.
   e2e-web:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: teeline-web
 
     steps:
       - uses: actions/checkout@v7
@@ -64,19 +68,30 @@ jobs:
           cache: 'npm'
           cache-dependency-path: teeline-web/package-lock.json
 
+      # The component's core .wasm is git-ignored and built by the release, so a fresh checkout has
+      # none — without it the solve page never reaches `.status-dot--ready` and the WebMCP tool
+      # tests time out. Same source and same transpile step as deploy-web.yml, so this exercises the
+      # artifact production actually serves.
+      - name: Download WASM component from latest release
+        run: |
+          mkdir -p ../teeline-wasm/js-bindings
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern 'teeline-solver.wasm' --output ../teeline-wasm/teeline-solver.wasm "$(gh release list --repo "$GITHUB_REPOSITORY" --limit 1 --json tagName --jq '.[0].tagName')"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Transpile WASM to JS bindings (jco)
+        run: npx --yes @bytecodealliance/jco@1.20.0 transpile ../teeline-wasm/teeline-solver.wasm --name teeline_wasm -o ../teeline-wasm/js-bindings
+
       - name: Install dependencies
-        working-directory: teeline-web
         run: npm ci
 
       - name: Install Playwright Chromium
-        working-directory: teeline-web
         run: npx playwright install chromium
 
       # One project, not both: `chrome` selects the runner's own Google Chrome via `channel`, and
       # only Chromium is installed here. The specs are browser-agnostic (WebMCP's agent event is
       # simulated), and a developer still runs both with `npm run test:e2e`.
       - name: Run the web e2e suite
-        working-directory: teeline-web
         run: npx playwright test --project=chromium
         env:
           CI: true
