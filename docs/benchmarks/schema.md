@@ -161,6 +161,52 @@ commit is then only HEAD when the publish ran and does **not** identify the buil
 This is the one case where the block carries the publisher's version and tree state, and the
 label is what makes that legible — a consumer must not read those as the measured binary.
 
+### The tier config
+
+`bench-matrix.sh` is driven by a TOML tier (`bench/matrix/tier-a.toml`), so coverage and budgets
+are reviewable data rather than bash arrays:
+
+```toml
+tier = "a"
+runs = 5
+default_timeout_s = 300
+
+[budgets]                      # seconds per family; MUST match bench/budgets.json
+exact = 60
+local = 300
+meta = 300
+
+[coverage]                     # which instance groups each family is measured on
+exact = ["upto24"]
+local = ["upto24", "all"]
+
+[instances]
+burma14 = "upto24"
+berlin52 = "all"
+
+[configs.default]
+
+[configs.exact]                # a named set of extra CLI args
+solvers = ["branch_bound"]
+instances = ["burma14", "gr17", "ulysses16"]
+args = ["--n_nearest", "100"]
+```
+
+Rules the harness enforces, each because the alternative is a hole in the published corpus:
+
+- **Every family must appear in `[coverage]`**, even if measured nowhere. A family that is
+  simply absent is indistinguishable from one somebody forgot, so it is refused; `local = []`
+  is how a tier says "deliberately not measured here".
+- **Exact solvers are not planned on instances they cannot finish.** Capability tiering keeps an
+  exponential solver off the large instances rather than spending its budget to record a timeout
+  that was never in doubt.
+- **`[budgets]` must match `bench/budgets.json`**, which is what gets published. A page that
+  stated a different allowance than the tier used would misstate the basis of every gap on it.
+- **A missing or unparseable instance aborts the sweep**, before it runs anything, rather than
+  being skipped or recorded as an ordinary `error` row.
+- **A cell already in the output is skipped**, so an interrupted sweep resumes. A half-written
+  final line is dropped first, because it would otherwise make the whole file unparseable.
+
 ## `algorithms/{solver_id}.json`
 
 ```json

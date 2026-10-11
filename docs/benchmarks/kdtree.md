@@ -22,7 +22,7 @@ catching regressions.
 
 ### Solver benchmarks (GNU `time -v`)
 
-- **Tool**: `scripts/bench-solvers.sh` via `task bench:solvers`
+- **Tool**: `scripts/bench-solvers.sh` via `task bench:solvers` — both since retired; the harness is now `scripts/bench-matrix.sh` driven by `bench/matrix/tier-a.toml` through `task bench:tierA`. The numbers below are the record of that run, not something the current harness reproduces.
 - **Metrics**: wall time (seconds), peak RSS (kB), tour cost
 - **Runs**: 5 per solver/dataset combo
 - **Datasets per solver**:
