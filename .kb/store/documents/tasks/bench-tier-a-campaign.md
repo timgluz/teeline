@@ -14,6 +14,14 @@ blocked_by: [tasks/bench-measurement-harness]
 Run the Tier A sweep across all 22 solvers and 12 instances, producing the raw measurements the
 published data is derived from: **2,640 runs** (22 solvers x 12 instances x 2 budgets x 5 runs).
 
+> **This figure is wrong, and the corrected one is 1245 runs / 249 cells.** It counts cells that
+> capability tiering excludes: an exponential solver cannot produce a result on `dsj1000`, so
+> measuring it there would only spend the budget proving a timeout that was never in doubt.
+> `bench/matrix/tier-a.toml` therefore gives the `exact` family only the three small instances.
+> The harness reports the real plan (`scripts/bench-matrix.sh bench/matrix/tier-a.toml --dry-run`),
+> so take the number from there rather than from this estimate — and the ~11h wall-clock estimate
+> below is high for the same reason.
+
 Requires the three prerequisites, because the run depends on two things they provide: a working
 iteration budget (SA currently ignores `--epochs`) and a convergence criterion (20 of 22 solvers
 have none, so the to-convergence half of the matrix would otherwise be undefined).

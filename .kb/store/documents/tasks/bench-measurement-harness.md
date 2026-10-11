@@ -3,7 +3,7 @@ id: 01a12651-5604-74c1-9e04-1a8d386a2ee9
 slug: tasks/bench-measurement-harness
 title: "feat(bench): bench-matrix.sh harness with tier config and resume"
 type: task
-status: draft
+status: completed
 priority: high
 tags: [benchmarks, tooling]
 blocked_by: [tasks/bench-sa-honours-epoch-budget, tasks/bench-plateau-stop-all-iterative, tasks/bench-platoo-epochs-help-name]
@@ -117,3 +117,20 @@ Two things worth carrying forward, both found while building it:
 never planned on the large instances — they cannot finish, so their budget would only buy a
 timeout that was never in doubt. Tier A plans **249 cells / 1245 runs**. The task says the
 campaign "owns the numbers", so it is left to that task rather than changed here.
+
+### Completed — 2026-10-11
+
+Merged as `101d6788` ([PR #571](https://github.com/timgluz/teeline/pull/571)).
+
+`scripts/bench-matrix.sh` + `scripts/bench-matrix-plan.py` + `bench/matrix/tier-a.toml` replaced
+`scripts/bench-solvers.sh` (deleted; `task bench:solvers` is now `task bench:tierA`). Verified on
+merged master: `tests/e2e/bench-matrix.bats` 22 cases, full e2e suite 107 green, `cargo test
+--workspace` 29 groups, clippy/fmt/shellcheck clean, and the tier plans 249 cells / 1245 runs.
+
+The consumer half was exercised against the real tier, not just the fixtures: `nn` across all
+twelve instances produced a file the publisher turned into 1 algorithm shard and 12 problem
+shards, and the shard's `measurement.environment.build` read `debug` — derived from the binary
+path, which is what stops a debug run being published as a release one.
+
+`--retry-errors` was added beyond the original scope. A sweep whose cells are all recorded but
+which contains error rows used to report "nothing to do", which made a broken sweep look finished.
