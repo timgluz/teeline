@@ -38,6 +38,8 @@ BUDGETS="bench/budgets.json"
 PUBLIC_BASE="${PUBLIC_BASE:-https://static.tspsolver.com}"
 FETCH_PREVIOUS=1
 FORCE_SNAPSHOT=0
+FIRST_PUBLISH=0
+PREVIOUS_EXPLICIT=0
 CRITERIONDB_URL="${CRITERIONDB_URL:-http://127.0.0.1:8080}"
 CRITERIONDB_PROJECT="${CRITERIONDB_PROJECT:-default}"
 
@@ -55,6 +57,7 @@ Options:
   --no-fetch-previous  Never fetch the previous tree; fail if it is missing and needed
   --snapshot <tag>     Also write an immutable copy under snapshots/<tag>/ (release tag)
   --force-snapshot     Overwrite an existing snapshot tag (normally refused)
+  --first-publish      Confirm there is no previous tree and this run covers everything
   --budgets <path>     Per-family budgets file (default: bench/budgets.json)
   --only <sink>        r2 | criteriondb | both (default: both)
   --bucket <name>      R2 bucket name (default: $CF_R2_BUCKET)
@@ -70,11 +73,12 @@ while [[ $# -gt 0 ]]; do
     --tsv) TSV="${2:?}"; shift 2 ;;
     --prefix) PREFIX="${2:?}"; shift 2 ;;
     --stage) STAGE="${2:?}"; shift 2 ;;
-    --previous) PREVIOUS="${2:?}"; shift 2 ;;
+    --previous) PREVIOUS="${2:?}"; PREVIOUS_EXPLICIT=1; shift 2 ;;
     --public-base) PUBLIC_BASE="${2:?}"; shift 2 ;;
     --no-fetch-previous) FETCH_PREVIOUS=0; shift ;;
     --snapshot) SNAPSHOT_TAG="${2:?}"; shift 2 ;;
     --force-snapshot) FORCE_SNAPSHOT=1; shift ;;
+    --first-publish) FIRST_PUBLISH=1; shift ;;
     --budgets) BUDGETS="${2:?}"; shift 2 ;;
     --only) ONLY="${2:?}"; shift 2 ;;
     --bucket) CF_R2_BUCKET="${2:?}"; shift 2 ;;
@@ -197,46 +201,97 @@ r2_put() {
 # so the previous index is read first and it names the shards to fetch.
 # ---------------------------------------------------------------------------
 
+# HTTP status seen when reading the previous index: only 404 means "first publish".
+PREVIOUS_STATUS=""
+
 fetch_previous() {
   local base="$PUBLIC_BASE/${PREFIX}" dest="$PREVIOUS/v2"
+  # Start clean. A shard left over from an earlier run must not be merged as if it had been
+  # published, and the index fetched below is what defines which shards exist at all.
+  rm -rf "$dest"
   mkdir -p "$dest/algorithms" "$dest/problems"
 
-  if ! curl -fsS "$base/index.json" -o "$dest/index.json"; then
-    echo "    no previous tree at $base/index.json"
+  # Capture the status rather than relying on curl's exit code: a 404 and a DNS failure both
+  # fail, but only the first means there is nothing to merge with.
+  PREVIOUS_STATUS="$(curl -sS -o "$dest/index.json" -w '%{http_code}' "$base/index.json" || echo 000)"
+  case "$PREVIOUS_STATUS" in
+    200) ;;
+    404) rm -f "$dest/index.json"; return 0 ;;
+    000) echo "    ERROR: cannot reach $base/index.json (network or DNS failure)" >&2; return 1 ;;
+    *)   echo "    ERROR: $base/index.json returned HTTP $PREVIOUS_STATUS" >&2; return 1 ;;
+  esac
+
+  # stderr is not suppressed: if this fails we want to see why, not treat it as an empty tree.
+  if ! jq -e '.solvers and .problems' "$dest/index.json" >/dev/null; then
+    echo "    ERROR: the previous index.json is not a valid manifest" >&2
     return 1
   fi
-  echo "    fetched index.json"
 
-  local ids
-  ids="$(jq -r '.solvers[]?.id' "$dest/index.json" 2>/dev/null)"
-  for id in $ids; do
-    curl -fsS "$base/algorithms/$id.json" -o "$dest/algorithms/$id.json" || \
-      echo "    WARN: could not fetch algorithms/$id.json" >&2
-  done
-  ids="$(jq -r '.problems[]?.id' "$dest/index.json" 2>/dev/null)"
-  for id in $ids; do
-    curl -fsS "$base/problems/$id.json" -o "$dest/problems/$id.json" || \
-      echo "    WARN: could not fetch problems/$id.json" >&2
-  done
+  # A shard the manifest names but we cannot fetch would silently vanish from the republished
+  # tree — the solver would drop out of the manifest and the leaderboards — so this is fatal.
+  local failures=0 id
+  while read -r id; do
+    [[ -n "$id" ]] || continue
+    if ! curl -fsS --retry 3 "$base/algorithms/$id.json" -o "$dest/algorithms/$id.json"; then
+      echo "    ERROR: could not fetch algorithms/$id.json (named by the previous index)" >&2
+      failures=$((failures + 1))
+    fi
+  done < <(jq -r '.solvers[]?.id' "$dest/index.json")
+
+  while read -r id; do
+    [[ -n "$id" ]] || continue
+    if ! curl -fsS --retry 3 "$base/problems/$id.json" -o "$dest/problems/$id.json"; then
+      echo "    ERROR: could not fetch problems/$id.json (named by the previous index)" >&2
+      failures=$((failures + 1))
+    fi
+  done < <(jq -r '.problems[]?.id' "$dest/index.json")
+
+  [[ "$failures" -eq 0 ]] || return 1
   return 0
 }
 
-MERGE_PREVIOUS=1
-if [[ -s "$PREVIOUS/v2/index.json" ]]; then
-  echo "==> Previous  $PREVIOUS/v2 (merging)"
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq is required (the merge reads the previous manifest with it)." >&2
+  exit 1
+fi
+
+MERGE_PREVIOUS=0
+if [[ "$PREVIOUS_EXPLICIT" -eq 1 ]]; then
+  # An explicitly supplied tree is taken as-is; its freshness is the operator's call.
+  if [[ ! -s "$PREVIOUS/v2/index.json" ]]; then
+    echo "ERROR: --previous '$PREVIOUS' contains no v2/index.json" >&2
+    exit 1
+  fi
+  MERGE_PREVIOUS=1
+  echo "==> Previous  $PREVIOUS/v2 (explicit)"
 elif [[ "$FETCH_PREVIOUS" -eq 1 && "$ONLY" != "criteriondb" ]]; then
   echo "==> Previous  fetching $PUBLIC_BASE/${PREFIX}"
-  if fetch_previous; then
-    echo "    merged solvers are taken from the live tree"
-  else
-    MERGE_PREVIOUS=0
-    echo "WARN: no previously published tree under ${PREFIX}, so the result will contain only"
-    echo "      the solvers in this TSV. That is correct for a first publish or a full"
-    echo "      re-run; for a differential re-run it would drop the other solvers."
+  if ! fetch_previous; then
+    echo "ERROR: could not obtain the previously published tree." >&2
+    echo "       Refusing to continue: publishing now would replace the live manifest and" >&2
+    echo "       leaderboards with a tree containing only this TSV's solvers." >&2
+    exit 1
   fi
-else
-  MERGE_PREVIOUS=0
-  echo "==> Previous  skipped (--no-fetch-previous); the result covers only this TSV's solvers"
+  if [[ "$PREVIOUS_STATUS" == "200" ]]; then
+    MERGE_PREVIOUS=1
+    echo "    fetched $(find "$PREVIOUS/v2" -name '*.json' | wc -l) previous shard(s)"
+  else
+    echo "    no previously published tree under ${PREFIX} (HTTP 404)"
+  fi
+elif [[ -s "$PREVIOUS/v2/index.json" ]]; then
+  MERGE_PREVIOUS=1
+  echo "==> Previous  $PREVIOUS/v2 (not fetched)"
+fi
+
+# Publishing a tree that only contains this TSV's solvers is legitimate for a first publish
+# and destructive otherwise, so it needs saying out loud rather than being the silent default.
+if [[ "$MERGE_PREVIOUS" -eq 0 && "$FIRST_PUBLISH" -eq 0 ]]; then
+  echo "ERROR: there is no previous tree to merge with." >&2
+  echo "       Without one, only this TSV's solvers and problems would be published, and any" >&2
+  echo "       solver already live would drop out of the manifest and the leaderboards." >&2
+  echo "       Pass --first-publish if this run really does cover everything, or supply" >&2
+  echo "       --previous <dir>." >&2
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------
@@ -250,6 +305,10 @@ echo "==> Staging   $STAGE/v2"
 # it is clear which set the manifest ended up using.
 echo "==> Publish-time git state: commit=$GIT_COMMIT dirty=$DIRTY (used only if the TSV carries no provenance)"
 
+# Clear the staged shards first. Leftovers from an earlier run or a different TSV would
+# otherwise be uploaded as orphans, and a stale snapshots/ tree would be re-uploaded on every
+# later run — overwriting an immutable snapshot and bypassing the guard in snapshot_stage.
+rm -rf "$STAGE/v2/algorithms" "$STAGE/v2/problems" "$STAGE/v2/snapshots"
 mkdir -p "$STAGE/v2/algorithms" "$STAGE/v2/problems"
 
 python3 - "$TSV" "$STAGE/v2" "$GIT_COMMIT" "$DIRTY" "$TEELINE_VERSION" \
@@ -325,7 +384,11 @@ measurement = {
     "git_commit_source": git_commit_source,
     "dirty": dirty == "1",
     "teeline_version": teeline_version,
-    "measured_at": generated_at,
+    # When the measurement was taken, which is not when it was published: a TSV carried forward
+    # or republished would otherwise be stamped with today's date. The harness records this in
+    # the TSV header; a file without it yields null rather than a publish-time stand-in that
+    # would misdate the result.
+    "measured_at": provenance.get("measured_at") or None,
     "environment": {
         "os": "linux",
         "build": build_profile,
@@ -548,9 +611,25 @@ def load_previous(kind: str) -> dict:
     merge and the run must cover every solver (the caller enforces that).
     """
     prev: dict = {}
-    d = Path(previous_dir) / kind
+    root = Path(previous_dir)
+    d = root / kind
     if not d.is_dir():
         return prev
+
+    # Only the shards the previous manifest names count as published state. A stray file in
+    # the directory was never live, and merging it would resurrect something no reader could
+    # have seen — including a shard deliberately withdrawn.
+    listed = None
+    manifest = root / "index.json"
+    if manifest.is_file():
+        try:
+            doc = json.loads(manifest.read_text(encoding="utf-8"))
+            field = "solvers" if kind == "algorithms" else "problems"
+            listed = {e["id"] for e in doc.get(field, []) if "id" in e}
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"    WARN: previous index.json unreadable ({exc}); merging every shard on disk",
+                  file=sys.stderr)
+
     for f in sorted(d.glob("*.json")):
         try:
             doc = json.loads(f.read_text(encoding="utf-8"))
@@ -558,8 +637,12 @@ def load_previous(kind: str) -> dict:
             print(f"    WARN: ignoring unreadable previous shard {f}: {exc}", file=sys.stderr)
             continue
         key = doc.get("solver") if kind == "algorithms" else doc.get("dataset")
-        if key:
-            prev[key] = doc
+        if not key:
+            continue
+        if listed is not None and key not in listed:
+            print(f"    WARN: ignoring {f.name}: not named by the previous manifest", file=sys.stderr)
+            continue
+        prev[key] = doc
     return prev
 
 measured = set(per_solver)
@@ -608,11 +691,20 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
             if b.get("solver") not in measured
         ]
         board = kept + fresh
-        meta = instances.get(dataset, {"cities": None, "optimal_cost": None})
-        cities, optimal = meta["cities"], meta["optimal_cost"]
+        # Fall back to the previous instance metadata: a dataset with no problem doc still has
+        # a known city count and possibly an optimal, and nulling them loses real information.
+        if dataset in instances:
+            cities, optimal = instances[dataset]["cities"], instances[dataset]["optimal_cost"]
+        else:
+            prev_doc = prev_problems.get(dataset, {})
+            cities, optimal = prev_doc.get("cities"), prev_doc.get("optimal_cost")
     else:
         doc = prev_problems[dataset]
-        board = list(doc.get("leaderboard", []))
+        # Drop entries for solvers re-measured in this run: their shards were replaced and no
+        # longer contain this dataset, so keeping them would rank results nothing backs.
+        board = [
+            b for b in doc.get("leaderboard", []) if b.get("solver") not in measured
+        ]
         cities, optimal = doc.get("cities"), doc.get("optimal_cost")
 
     # Solvers that only timed out never reach the leaderboard: there is nothing to rank.
@@ -716,15 +808,36 @@ PY
 
 snapshot_stage() {
   local tag="$1"
+  # Validated before it reaches a path: a tag like `..` or one containing `/` would otherwise
+  # let `rm -rf` below delete outside the snapshots directory.
+  if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "ERROR: invalid snapshot tag '$tag'." >&2
+    echo "       Use letters, digits, dot, dash or underscore, starting with a letter or digit." >&2
+    return 1
+  fi
   # Kept as two statements: `local tag="$1" snap=...$tag` reads $tag before it is bound.
   local snap="$STAGE/v2/snapshots/$tag"
-  if [[ "$DRY_RUN" -eq 0 ]]; then
-    if [[ "$FORCE_SNAPSHOT" -eq 0 ]] && curl -fsS -o /dev/null --head \
-        "$PUBLIC_BASE/${PREFIX}/snapshots/$tag/index.json" 2>/dev/null; then
-      echo "ERROR: snapshot '$tag' already exists at ${PREFIX}/snapshots/$tag." >&2
-      echo "       Snapshots are immutable; pass --force-snapshot to overwrite it." >&2
-      return 1
-    fi
+
+  if [[ "$DRY_RUN" -eq 0 && "$FORCE_SNAPSHOT" -eq 0 ]]; then
+    # Fail closed. A network error or a 5xx must not be read as "the tag is free", because
+    # then a transient failure would authorise overwriting an immutable snapshot.
+    local status
+    status="$(curl -sS -o /dev/null -w '%{http_code}' --head \
+      "$PUBLIC_BASE/${PREFIX}/snapshots/$tag/index.json" || echo 000)"
+    case "$status" in
+      404) ;;
+      200)
+        echo "ERROR: snapshot '$tag' already exists at ${PREFIX}/snapshots/$tag." >&2
+        echo "       Snapshots are immutable; pass --force-snapshot to overwrite it." >&2
+        return 1
+        ;;
+      *)
+        echo "ERROR: cannot confirm whether snapshot '$tag' exists (HTTP $status)." >&2
+        echo "       Refusing to risk overwriting an immutable snapshot; retry, or pass" >&2
+        echo "       --force-snapshot if you intend to replace it." >&2
+        return 1
+        ;;
+    esac
   fi
 
   rm -rf "$snap"
@@ -756,11 +869,15 @@ upload_r2() {
   # mapfile, not `for file in $(find ...)`: unquoted command substitution
   # word-splits and glob-expands, so a staged path containing whitespace (or a
   # `*`) would be silently mangled into several bogus "filenames".
-  local -a shards=() manifests=()
-  mapfile -t shards < <(find "$STAGE/v2" -name '*.json' ! -name index.json | sort)
+  local -a shards=() manifests=() snapshot_filter=()
+  # Without --snapshot there is no snapshot in this run's tree, and any snapshots/ directory
+  # still on disk belongs to an earlier one: re-uploading it would rewrite an immutable
+  # snapshot and skip the existence guard.
+  [[ -n "$SNAPSHOT_TAG" ]] || snapshot_filter=(-not -path '*/snapshots/*')
+  mapfile -t shards < <(find "$STAGE/v2" -name '*.json' ! -name index.json "${snapshot_filter[@]}" | sort)
   # Every index.json goes last *within its own directory*: the top-level manifest advertises
   # the top-level shards, and each snapshot's manifest advertises that snapshot's shards.
-  mapfile -t manifests < <(find "$STAGE/v2" -name 'index.json' | sort)
+  mapfile -t manifests < <(find "$STAGE/v2" -name 'index.json' "${snapshot_filter[@]}" | sort)
   local -a files=("${shards[@]}" "${manifests[@]}")
 
   local skipped=0

@@ -115,6 +115,7 @@ that follow are tab-separated:
 # rust_version=1.99.0
 # tier=a
 # timeout_s=180
+# measured_at=2026-10-12T09:00:00Z
 solver <TAB> dataset <TAB> config <TAB> run <TAB> wall_s <TAB> peak_rss_kb <TAB> tour_cost <TAB> status
 nn <TAB> berlin52 <TAB> default <TAB> 1 <TAB> 0.0000 <TAB> 6720 <TAB> 8980.91797 <TAB> ok
 ```
@@ -169,7 +170,7 @@ nests variants of the same solver.
 | `git_commit_source` | `tsv` if the benchmark file recorded that commit; `publish-time` if it did not |
 | `dirty` | Whether the tree was dirty when the measurement was taken |
 | `teeline_version` | Version of the measured binary |
-| `measured_at` | When the measurement was taken (not when it was published) |
+| `measured_at` | When the measurement was taken (not when it was published); `null` if the TSV did not record it |
 | `environment` | `os`, `build`, `rust_version` |
 
 Rules:
@@ -185,6 +186,10 @@ Rules:
   `--require-clean`.
 - `environment` is required. Wall-clock numbers are meaningless without it, and
   the page shows it beside the table.
+- `measured_at` is `null` when the TSV recorded no `# measured_at=` line. It is
+  deliberately **not** filled in from the publish time: a file carried forward or
+  republished would then be stamped with today's date, which is the misdating this
+  contract exists to avoid. The harness records it; a missing value stays missing.
 - The provenance footer on an algorithm page is this block. Staleness is
   communicated this way rather than by a badge: being able to see which version
   produced a number is the requirement (design section 3.8).

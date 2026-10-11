@@ -70,7 +70,9 @@ teardown() {
 }
 
 publish() {
-    "$PUBLISH" --dry-run --no-fetch-previous --stage "$TMPDIR/stage" "$@"
+    # --first-publish because these fixtures deliberately publish a partial tree: there is no
+    # previous tree to merge with, and the script refuses that unless it is stated explicitly.
+    "$PUBLISH" --dry-run --no-fetch-previous --first-publish --stage "$TMPDIR/stage" "$@"
 }
 
 @test "algorithms/{id}.json carries a per-solver measurement block" {
@@ -220,4 +222,58 @@ publish() {
 
     local shard="$TMPDIR/stage/v2/algorithms/nn.json"
     [ "$(jq -r '.measurement.git_commit_source' "$shard")" = "publish-time" ]
+}
+
+@test "a TSV without a measured_at yields null rather than the publish time" {
+    run publish --tsv "$TMPDIR/prev.tsv"
+    [ "$status" -eq 0 ]
+    # The fixture records no `# measured_at=`, and stamping it with the publish time would
+    # misdate a result that may have been carried forward from an earlier run.
+    [ "$(jq -r '.measurement.measured_at' "$TMPDIR/stage/v2/algorithms/nn.json")" = "null" ]
+}
+
+@test "a TSV that records measured_at has it published" {
+    { echo "# measured_at=2026-01-02T03:04:05Z"; cat "$TMPDIR/prev.tsv"; } > "$TMPDIR/stamped.tsv"
+    run publish --tsv "$TMPDIR/stamped.tsv"
+    [ "$status" -eq 0 ]
+    [ "$(jq -r '.measurement.measured_at' "$TMPDIR/stage/v2/algorithms/nn.json")" = "2026-01-02T03:04:05Z" ]
+}
+
+@test "a partial publish with no previous tree is refused unless stated" {
+    # This is the guard that stops a differential run from quietly replacing the live manifest
+    # and leaderboards with a tree holding only this TSV's solvers.
+    run "$PUBLISH" --dry-run --no-fetch-previous --stage "$TMPDIR/nostage" --tsv "$TMPDIR/prev.tsv"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--first-publish"* ]]
+    [ ! -f "$TMPDIR/nostage/v2/index.json" ]
+}
+
+@test "an invalid snapshot tag is refused before it reaches the filesystem" {
+    run publish --tsv "$TMPDIR/prev.tsv" --snapshot "../escape"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"invalid snapshot tag"* ]]
+    # Nothing outside the snapshots directory may be touched.
+    [ ! -d "$TMPDIR/stage/v2/escape" ]
+}
+
+@test "a differential republish drops entries for a re-measured solver on other datasets" {
+    publish --tsv "$TMPDIR/prev.tsv"
+    cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
+
+    # Measure sa on eil51 only, so its replacement shard no longer covers zzz_unknown.
+    cat > "$TMPDIR/sa-partial.tsv" <<'TSV'
+# git_commit=bbbbbbbb
+solver	dataset	config	run	wall_s	peak_rss_kb	tour_cost	status
+sa	eil51	default	1	0.20	8000	428.0	ok
+TSV
+
+    run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage3" \
+        --tsv "$TMPDIR/sa-partial.tsv"
+    [ "$status" -eq 0 ]
+
+    # sa's shard no longer has zzz_unknown, so the leaderboard must not still rank it there.
+    [ "$(jq -r '.results | has("zzz_unknown")' "$TMPDIR/stage3/v2/algorithms/sa.json")" = "false" ]
+    [ "$(jq -r '[.leaderboard[].solver] | index("sa") == null' "$TMPDIR/stage3/v2/problems/zzz_unknown.json")" = "true" ]
+    # nn was not re-measured, so it stays.
+    [ "$(jq -r '[.leaderboard[].solver] | index("nn") != null' "$TMPDIR/stage3/v2/problems/zzz_unknown.json")" = "true" ]
 }

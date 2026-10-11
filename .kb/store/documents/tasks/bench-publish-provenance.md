@@ -3,7 +3,7 @@ id: 01a12651-5631-7b92-b921-802fa80a731d
 slug: tasks/bench-publish-provenance
 title: "feat(bench): publish per-solver provenance, snapshots and criteriondb mirror"
 type: task
-status: draft
+status: active
 priority: high
 tags: [benchmarks, r2, criteriondb, schema]
 blocked_by: [tasks/bench-tier-a-campaign]
@@ -63,3 +63,42 @@ Snapshots are ~154KB each, so retaining several releases is cheap.
 
 `docs/benchmarks/schema.md` is the contract and must be updated in the same change, since this
 alters what `git_commit` means. Cross-reference: `decisions/benchmarking-design` section 3.5.
+
+## Progress Log
+
+### 2026-10-11
+
+Implemented as [#569](https://github.com/timgluz/teeline/pull/569), branch
+`feat/bench-per-solver-provenance`.
+
+Design decisions taken (both confirmed with the maintainer before implementing):
+
+- **Previous state for the differential merge is fetched from the public URL into
+  `build/bench-prev/`**, with `--previous <dir>` as an override and `--no-fetch-previous` to work
+  offline. Chosen over requiring an explicit directory (no manual step) and over committing a mirror
+  (avoids a second source of truth). The first v2 publish has no previous v2 tree, so it is a
+  full baseline — expected, and the reason the merge machinery is covered by tests rather than by a
+  live run.
+- **Per-family budgets live in a committed `bench/budgets.json`**, which the harness can adopt later
+  instead of inventing a second format. Only `meta` (300s, decision 10) is fixed by a decision; the
+  others were never specified numerically, so they are published with `agreed: false` rather than
+  presented as settled.
+
+Also decided:
+
+- **Bumped to `/bench/v2/` + `schema_version: 2`.** Removing provenance fields from `index.json` is
+  breaking for a consumer of them, and the contract's own rule is that the prefix and version move
+  together. v1 stays served and untouched. It is live but has no deployed consumer yet, so nothing
+  needs migrating.
+- **The criteriondb mirror now records the measured commit**, not publish-time HEAD — it had the same
+  false-provenance defect this task exists to fix, and the acceptance criterion only asked for
+  `config_label`.
+
+Scope left out, deliberately:
+
+- The **staleness guard** that refuses a single-solver re-run when shared code changed (design
+  section 6). It belongs with `tasks/bench-single-solver-skill`, and now has the per-solver commits
+  it needs in order to compare.
+- The harness (`bench-matrix.sh`, `tier-a.toml`) — separate task; budgets were published now so the
+  harness can read them.
+- Migrating the live v1 data to v2; the campaign's baseline run establishes v2.
