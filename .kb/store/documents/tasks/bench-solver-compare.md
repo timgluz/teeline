@@ -3,7 +3,7 @@ id: 01a12b16-2fb5-77a1-bda3-a36249775339
 slug: tasks/bench-solver-compare
 title: "feat(web): compare an algorithm's published results with another solver"
 type: task
-status: draft
+status: active
 priority: high
 tags: [benchmarks, teeline-web, frontend]
 ---
@@ -74,3 +74,13 @@ it useful to someone who has not installed teeline.
 - Is a picker enough, or should `/algorithms/` offer a pre-built comparison of two chosen solvers?
 - Should problem pages link into a comparison? That page belongs to
   [[tasks/bench-problem-leaderboard]], so the join should live in the shared read layer either way.
+
+## Progress Log
+
+### 2026-10-11 — shipped in #576, one criterion short
+
+The comparison, the `?compare=` deep link, the comparator columns and summary row, both provenance
+blocks and the config-keyed join all shipped in #576. One acceptance criterion is **not** met: a
+non-deterministic *comparator* shows only its median gap, where the criterion asks for its spread.
+The primary's spread is unaffected (it has its own best/worst columns). Fixing that is the next
+commit on this task, not a new one.

@@ -3,7 +3,7 @@ id: 01a12b16-2fd0-7f11-abac-72499916b64e
 slug: tasks/bench-data-download
 title: "feat(web): offer the published benchmark data for download"
 type: task
-status: draft
+status: active
 priority: medium
 tags: [benchmarks, teeline-web, data]
 ---
@@ -39,11 +39,21 @@ exactly this link.
 
 ## Acceptance Criteria
 
-- [ ] An algorithm page links to its own shard, and a problem page to its leaderboard shard
-- [ ] The manifest is linked somewhere discoverable, with the budgets it carries
-- [ ] The label matches what a browser actually does with a cross-origin link
-- [ ] No build-time fetch is introduced
-- [ ] A test pins the rendered href, so a base-URL change cannot silently break it
+- [x] An algorithm page links to its own shard, and a problem page to its leaderboard shard
+- [x] The manifest is linked somewhere discoverable, with the budgets it carries
+- [x] The label matches what a browser actually does with a cross-origin link
+- [x] No build-time fetch is introduced
+- [x] A test pins the rendered href, so a base-URL change cannot silently break it
+
+## Progress Log
+
+### 2026-10-11 — algorithm pages shipped in #576
+
+The algorithm page's shard link (in the benchmark header), the manifest and the contract links (in
+the provenance block) shipped in #576, with the e2e pinning the hrefs and asserting the page still
+fetches exactly one shard. The **problem page** half is deliberately left with
+[[tasks/bench-problem-leaderboard]]: that page has no results section yet, so its shard link lands
+with the section that renders the shard.
 
 ## Notes
 

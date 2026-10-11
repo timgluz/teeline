@@ -3,10 +3,9 @@ id: 01a12a7f-a6c5-7322-9471-5b900527510b
 slug: tasks/bench-problem-leaderboard
 title: "feat(web): render the per-instance leaderboard and graph on problem pages"
 type: task
-status: draft
+status: active
 priority: high
 tags: [benchmarks, teeline-web, frontend]
-blocked_by: [tasks/bench-algorithm-pages]
 ---
 
 ## Overview
@@ -88,3 +87,34 @@ ranks:
 - `problems/index.astro` lists instances; consider whether it should show a coverage hint (how many
   solvers are measured per instance) — deliberately out of scope here, noted so it is a decision
   rather than an oversight.
+## Findings before implementing
+
+Two things the published shape does not support as written, both checked against the live tree:
+
+- **Problem shards carry no provenance.** `problems/{id}.json` has exactly `schema_version`,
+  `dataset`, `cities`, `optimal_cost` and `leaderboard`; the per-row `measurement` block lives only
+  in `algorithms/{id}.json`. A per-solver provenance footer therefore cannot be built from this
+  shard without fetching up to 22 algorithm shards. The page instead links each row's solver to its
+  own page, where that solver's `measurement` is stated, and says why.
+- **A solver whose every run timed out is absent, not last.** `scripts/publish-benchmarks.sh` drops
+  rows with `runs == 0` before ranking ("Solvers that only timed out never reach the leaderboard:
+  there is nothing to rank"), so the all-timeout case is indistinguishable from never measured. The
+  criterion "ranked last and marked" holds for a *partially* timed-out cell (runs > 0, timeouts > 0)
+  and renders from the data; making the all-timeout case renderable needs the publisher to publish
+  `runs: 0` rows, which is a change to the contract and is not in this task.
+
+## Plan
+
+1. **Read layer** (`src/lib/benchmark.ts`): `leaderboardRows(shard)` — one row per `(solver,
+   config)` with family and determinism from `bench/solvers.json`, ranked on the instance's axis
+   (gap when an optimum is published, tour cost otherwise), with unrankable rows last and `rank:
+   null`. Reuses `parseProblemShard`, `chooseColumns`' rules and `format*`.
+2. **Component** (`ProblemResults.tsx`, `client:visible`): summary line stating every family's
+   allowance (families are mixed here by design), the ranked table, a horizontal bar chart coloured
+   by family, the solver-page link per row, and the data links from
+   [[tasks/bench-data-download]].
+3. **Page**: mount it on `problems/[id]/index.astro` after the markdown body, passing the doc's
+   `optimalCost` so a disagreement between the page's claim and the shard's can be stated rather
+   than silently shown twice.
+4. **Tests**: ranking with a timeout present, ranking without a gap, two configs of one solver
+   staying distinct, the no-shard case, and an e2e for the rendered board.
