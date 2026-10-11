@@ -102,3 +102,40 @@ Scope left out, deliberately:
 - The harness (`bench-matrix.sh`, `tier-a.toml`) — separate task; budgets were published now so the
   harness can read them.
 - Migrating the live v1 data to v2; the campaign's baseline run establishes v2.
+
+### Review rounds (2026-10-11)
+
+Four open-code-review passes on #569: **13 → 7 → 5 → 8** findings, all addressed. The count going up
+on the last pass is worth noting: the reviewer was by then probing edge cases rather than defects in
+the main path, and the last round was mostly the same rule applied inconsistently.
+
+What the rounds actually caught — nearly all in the "framework" around the transform rather than the
+provenance shape itself:
+
+- **Any fetch failure was read as "no previous tree"**, so a network blip would have published a tree
+  containing only this TSV's solvers, replacing the live manifest and leaderboards. Only a confirmed
+  404 means first publish now.
+- **A failed shard download only warned**, silently dropping that solver from the republished tree.
+- **The previous tree was trusted forever** from a cache that nothing refreshed, so a differential
+  publish could merge against a stale tree and revert solvers.
+- **The first publish could never succeed**: `fetch_previous` created the shard directories before
+  discovering the 404, and the transform read the leftovers as a tree with no manifest and aborted.
+  Verified against the live endpoint, since `bench/v2/` 404s today — the exact first-publish case.
+- **`load_previous` returned early before reading the manifest**, dropping every solver the manifest
+  named when the shard directory happened to be missing.
+- **`set -e` is suspended inside a function called in a condition**, so failed `mkdir`/`cp` inside
+  `fetch_previous` and `snapshot_stage` were ignored and a partial copy was reported as a written
+  snapshot.
+- **A partial TSV header paired a measured commit with the publisher's `dirty`, version, rustc, `os`
+  and `build`** — the same false-claim class the task exists to fix, in miniature. Every field the
+  TSV does not record is now `null`.
+- Exposed a pre-existing CI bug: `upload_r2` demanded an R2 client even under `--dry-run`, so no
+  publish test could have passed in CI. No publish test existed before this PR.
+
+The lesson worth carrying: the *schema* change was straightforward, and everything expensive was in
+the merge/IO framework around it. Tests that only exercised the shape (my first 11) passed while the
+first publish was completely broken; the test that caught it had to drive the real HTTP path.
+
+Also added `codecov.yml` with a 0.1% project threshold: `codecov/project` failed this branch at
+-0.01% on a change touching no Rust at all, and the default 0% threshold reports that noise as a
+failure. `codecov/patch` left strict.
