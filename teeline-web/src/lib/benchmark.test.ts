@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest'
 import twoOptRaw from './__fixtures__/algorithm-2opt.json?raw'
 import branchBoundRaw from './__fixtures__/algorithm-branch-bound.json?raw'
 import syntheticRaw from './__fixtures__/algorithm-synthetic.json?raw'
+import berlinRaw from './__fixtures__/problem-berlin52.json?raw'
+import problemSyntheticRaw from './__fixtures__/problem-synthetic.json?raw'
 
 import {
   DASH,
@@ -22,6 +24,7 @@ import {
   chooseColumns,
   fetchAlgorithmShard,
   fetchBenchmarkIndex,
+  fetchProblemShard,
   formatDirty,
   formatGapPct,
   formatSeconds,
@@ -30,7 +33,9 @@ import {
   observations,
   parseAlgorithmShard,
   parseBenchmarkIndex,
+  parseProblemShard,
   provenance,
+  solverSeries,
   summarise,
   timeoutNote,
   type BenchmarkRow,
@@ -460,6 +465,78 @@ describe('provenance', () => {
     expect(lines.find((line) => line.label === 'environment')?.value).toBe(
       'not recorded',
     )
+  })
+})
+
+describe('problem shards and the landing chart', () => {
+  const berlin = parseProblemShard(JSON.parse(berlinRaw))
+  const syntheticProblem = parseProblemShard(JSON.parse(problemSyntheticRaw))
+
+  it('parses a leaderboard and keeps an unknown optimum as null', () => {
+    expect(berlin.dataset).toBe('berlin52')
+    expect(berlin.cities).toBe(52)
+    expect(berlin.optimalCost).toBeNull()
+    expect(berlin.leaderboard[0].solver).toBe('lk')
+    expect(berlin.leaderboard[0].gapPct).toBeNull()
+    expect(berlin.leaderboard[0].tourCost?.median).toBeGreaterThan(0)
+  })
+
+  it('treats one solver publishing two configs as two entries', () => {
+    const configs = syntheticProblem.leaderboard
+      .filter((entry) => entry.solver === 'branch_bound')
+      .map((entry) => entry.config)
+      .sort()
+    expect(configs).toEqual(['budget', 'exact'])
+  })
+
+  it('refuses a schema version it does not know', () => {
+    expect(() =>
+      parseProblemShard({ ...JSON.parse(berlinRaw), schema_version: 99 }),
+    ).toThrow(/unsupported benchmark schema_version 99/)
+  })
+
+  it('treats a 404 as absence, like the algorithm shards', async () => {
+    const result = await fetchProblemShard('nope', false, stubFetch(404, null))
+    expect(result).toEqual({ kind: 'absent' })
+  })
+
+  it('plots tour length and says so when no optimum is published', () => {
+    const series = solverSeries(berlin)
+    expect(series.axis).toBe('tour')
+    expect(series.axisLabel).toMatch(/no published optimum/)
+    // Serialised straight to JSON, so the fixture's null optimum is the real case.
+    expect(JSON.parse(berlinRaw).optimal_cost).toBeNull()
+    expect(series.points).toHaveLength(8)
+    expect(series.points.every((point) => Number.isFinite(point.wallS))).toBe(
+      true,
+    )
+  })
+
+  it('plots gaps, never a mix, when an optimum is published', () => {
+    const series = solverSeries(syntheticProblem)
+    expect(series.axis).toBe('gap')
+    // The timed-out solver has no result, so it is counted rather than plotted.
+    expect(series.points.map((point) => point.solver)).not.toContain('gsa')
+    expect(series.omitted.noResult).toBe(1)
+  })
+
+  it('carries each solver\u2019s family, and null for one the index does not know', () => {
+    const series = solverSeries(syntheticProblem)
+    const byName = new Map(series.points.map((point) => [point.solver, point]))
+    expect(byName.get('lk')?.family).toBe('local')
+    expect(byName.get('shuffle')?.family).toBe('utility')
+    expect(byName.get('mystery_solver')?.family).toBeNull()
+  })
+
+  it('labels only the best point in each family', () => {
+    const series = solverSeries(syntheticProblem)
+    const labelled = series.labelled.map((entry) => entry.solver)
+    // One per family present: exact, local, meta, utility — plus the unknown-solver group.
+    expect(labelled).toHaveLength(5)
+    expect(labelled).toContain('branch_bound')
+    // Two solvers in `local`, only the better one earns a label.
+    expect(labelled).toContain('lk')
+    expect(labelled).not.toContain('2opt')
   })
 })
 

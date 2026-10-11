@@ -7,7 +7,7 @@
 // Wire names are snake_case and are normalised at this boundary, as solver-index.ts does for
 // bench/solvers.json, so nothing downstream has to know the wire spelling.
 
-import { isDeterministic } from './solver-index'
+import { isDeterministic, solverById } from './solver-index'
 import type { SolverFamily } from './solver-index'
 
 /** The only contract version this module understands. See parseAlgorithmShard. */
@@ -93,11 +93,14 @@ export type FetchLike = (
   url: string,
 ) => Promise<{ status: number; ok: boolean; json(): Promise<unknown> }>
 
-export type ShardResult =
-  | { kind: 'ok'; shard: AlgorithmShard }
-  /** HTTP 404 — an unpublished solver is a normal state, not a failure. */
+export type ShardOutcome<T> =
+  | { kind: 'ok'; shard: T }
+  /** HTTP 404 — an unpublished page is a normal state, not a failure. */
   | { kind: 'absent' }
   | { kind: 'error'; status: number | null; message: string }
+
+export type ShardResult = ShardOutcome<AlgorithmShard>
+export type ProblemResult = ShardOutcome<ProblemShard>
 
 export function benchmarkBaseUrl(dev: boolean): string {
   // Dev goes through the Vite proxy (astro.config.mjs), production hits R2 directly. Without
@@ -118,19 +121,19 @@ export function indexUrl(dev: boolean): string {
 }
 
 /**
- * Fetch and parse one algorithm shard.
+ * Fetch and parse one shard.
  *
  * Only a 404 is treated as absence. Any other failure — a 500, a DNS failure, a shard this
  * version cannot parse — is an error the caller is expected to surface, because swallowing it
  * would leave a page that looks like "no results yet" when the data is present but broken.
  */
-export async function fetchAlgorithmShard(
-  id: string,
-  dev: boolean,
-  fetchImpl: FetchLike = fetch,
-): Promise<ShardResult> {
+async function fetchShard<T>(
+  url: string,
+  parse: (raw: unknown) => T,
+  fetchImpl: FetchLike,
+): Promise<ShardOutcome<T>> {
   try {
-    const response = await fetchImpl(algorithmShardUrl(id, dev))
+    const response = await fetchImpl(url)
     if (response.status === 404) return { kind: 'absent' }
     if (!response.ok) {
       return {
@@ -139,7 +142,7 @@ export async function fetchAlgorithmShard(
         message: `HTTP ${response.status}`,
       }
     }
-    return { kind: 'ok', shard: parseAlgorithmShard(await response.json()) }
+    return { kind: 'ok', shard: parse(await response.json()) }
   } catch (err) {
     return {
       kind: 'error',
@@ -147,6 +150,22 @@ export async function fetchAlgorithmShard(
       message: err instanceof Error ? err.message : String(err),
     }
   }
+}
+
+export function fetchAlgorithmShard(
+  id: string,
+  dev: boolean,
+  fetchImpl: FetchLike = fetch,
+): Promise<ShardResult> {
+  return fetchShard(algorithmShardUrl(id, dev), parseAlgorithmShard, fetchImpl)
+}
+
+export function fetchProblemShard(
+  id: string,
+  dev: boolean,
+  fetchImpl: FetchLike = fetch,
+): Promise<ProblemResult> {
+  return fetchShard(problemShardUrl(id, dev), parseProblemShard, fetchImpl)
 }
 
 /**
@@ -362,6 +381,73 @@ export function parseBenchmarkIndex(raw: unknown): BenchmarkIndex {
     budgets,
     solvers,
     problems,
+  }
+}
+
+/**
+ * One instance, every solver measured on it — the landing chart's shape, and the inverse of
+ * an algorithm shard.
+ */
+export interface LeaderboardEntry {
+  solver: string
+  config: string
+  runs: number
+  timeouts: number
+  errors: number
+  gapPct: Stat | null
+  tourCost: Stat | null
+  wallS: Stat | null
+  peakRssKb: Stat | null
+  optimalCost: number | null
+}
+
+export interface ProblemShard {
+  dataset: string
+  cities: number | null
+  optimalCost: number | null
+  leaderboard: LeaderboardEntry[]
+}
+
+function parseLeaderboard(raw: unknown): LeaderboardEntry[] {
+  if (!Array.isArray(raw)) throw new Error('leaderboard is not an array')
+  return raw.map((value, i) => {
+    const entry = asRecord(value, `leaderboard[${i}]`)
+    return {
+      // A solver may appear more than once (branch_bound publishes `budget` and `exact`):
+      // these are (solver, config) rows, not solvers, and collapsing them would present a
+      // beam search and an exact run as one entry.
+      solver: asString(entry.solver, `leaderboard[${i}].solver`),
+      config: optionalString(entry.config) ?? 'default',
+      runs: asNumber(entry.runs, `leaderboard[${i}].runs`),
+      timeouts: asNumber(entry.timeouts, `leaderboard[${i}].timeouts`),
+      errors: asNumber(entry.errors, `leaderboard[${i}].errors`),
+      gapPct: asStat(entry.gap_pct, `leaderboard[${i}].gap_pct`),
+      tourCost: asStat(entry.tour_cost, `leaderboard[${i}].tour_cost`),
+      wallS: asStat(entry.wall_s, `leaderboard[${i}].wall_s`),
+      peakRssKb: asStat(entry.peak_rss_kb, `leaderboard[${i}].peak_rss_kb`),
+      optimalCost: optionalNumber(
+        entry.optimal_cost,
+        `leaderboard[${i}].optimal_cost`,
+      ),
+    }
+  })
+}
+
+export function parseProblemShard(raw: unknown): ProblemShard {
+  const obj = asRecord(raw, 'problem shard')
+  if (obj.schema_version !== SCHEMA_VERSION) {
+    throw new Error(
+      `unsupported benchmark schema_version ${JSON.stringify(
+        obj.schema_version,
+      )}; this page reads v${SCHEMA_VERSION}`,
+    )
+  }
+  return {
+    dataset: asString(obj.dataset, 'dataset'),
+    // Null when the dataset has no problem doc, not a malformed shard.
+    cities: optionalNumber(obj.cities, 'cities'),
+    optimalCost: optionalNumber(obj.optimal_cost, 'optimal_cost'),
+    leaderboard: parseLeaderboard(obj.leaderboard),
   }
 }
 
@@ -666,6 +752,100 @@ function toPoint(row: BenchmarkRow, y: number): ChartPoint {
     x: row.cities!,
     y,
   }
+}
+
+// ---------------------------------------------------------------------------
+// The landing chart: one instance, every solver
+// ---------------------------------------------------------------------------
+
+export interface SolverPoint {
+  solver: string
+  config: string
+  /** Null for a solver that has a shard but no entry in bench/solvers.json. */
+  family: SolverFamily | null
+  /** Wall-clock seconds. The x axis is runtime, so this is never the quality value. */
+  wallS: number
+  /** Gap percent or tour length, whichever the axis turned out to be. */
+  y: number
+}
+
+export interface SolverSeries {
+  dataset: string
+  axis: ChartAxis
+  axisLabel: string
+  points: SolverPoint[]
+  /** The best point in each family, so the chart labels a few points rather than all of them. */
+  labelled: { solver: string; config: string }[]
+  omitted: { noResult: number; noTime: number; noQuality: number }
+}
+
+/**
+ * Runtime against quality for every solver measured on one instance.
+ *
+ * Same axis rule as the per-algorithm chart and for the same reason: a gap and a tour length
+ * are different quantities, so the series is all of one or all of the other, never a mix.
+ * Families are kept on the point rather than folded into the y value, because the allowance
+ * differs per family and the chart has to be able to say so.
+ */
+export function solverSeries(shard: ProblemShard): SolverSeries {
+  const ran = shard.leaderboard.filter((entry) => entry.runs > 0)
+  const noResult = shard.leaderboard.length - ran.length
+  const timed = ran.filter((entry) => entry.wallS !== null)
+  const noTime = ran.length - timed.length
+
+  const base = { dataset: shard.dataset, omitted: { noResult, noTime } }
+
+  const withGap = timed.filter((entry) => entry.gapPct !== null)
+  if (withGap.length > 0) {
+    const points = withGap.map((entry) =>
+      toSolverPoint(entry, entry.gapPct!.median),
+    )
+    return {
+      ...base,
+      axis: 'gap',
+      axisLabel: 'gap vs known optimum (%)',
+      points,
+      labelled: bestPerFamily(points),
+      omitted: { ...base.omitted, noQuality: timed.length - withGap.length },
+    }
+  }
+
+  const withTour = timed.filter((entry) => entry.tourCost !== null)
+  const points = withTour.map((entry) =>
+    toSolverPoint(entry, entry.tourCost!.median),
+  )
+  return {
+    ...base,
+    axis: 'tour',
+    axisLabel: 'tour length (no published optimum)',
+    points,
+    labelled: bestPerFamily(points),
+    omitted: { ...base.omitted, noQuality: timed.length - withTour.length },
+  }
+}
+
+function toSolverPoint(entry: LeaderboardEntry, y: number): SolverPoint {
+  return {
+    solver: entry.solver,
+    config: entry.config,
+    family: solverById(entry.solver)?.family ?? null,
+    wallS: entry.wallS!.median,
+    y,
+  }
+}
+
+function bestPerFamily(
+  points: SolverPoint[],
+): { solver: string; config: string }[] {
+  const best = new Map<SolverFamily | null, SolverPoint>()
+  for (const point of points) {
+    const current = best.get(point.family)
+    if (!current || point.y < current.y) best.set(point.family, point)
+  }
+  return [...best.values()].map((point) => ({
+    solver: point.solver,
+    config: point.config,
+  }))
 }
 
 // ---------------------------------------------------------------------------

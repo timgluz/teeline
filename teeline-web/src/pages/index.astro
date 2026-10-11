@@ -2,14 +2,18 @@
 import LandingLayout from '../layouts/LandingLayout.astro'
 import LandingHero from '../components/LandingHero.astro'
 import LandingAlgorithms from '../components/LandingAlgorithms.astro'
-import LandingBenchmarks from '../components/LandingBenchmarks.astro'
+import LandingBenchmarks from '../components/LandingBenchmarks.tsx'
 import LandingAccess from '../components/LandingAccess.astro'
 ---
 
 <LandingLayout>
   <LandingHero />
   <LandingAlgorithms />
-  <LandingBenchmarks />
+  <LandingBenchmarks
+    instance="berlin52"
+    dev={import.meta.env.DEV}
+    client:visible
+  />
   <LandingAccess />
 
   <footer class="border-t border-border">

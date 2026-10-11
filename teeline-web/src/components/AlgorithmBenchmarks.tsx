@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'preact/hooks'
 
+import { niceTicks, placeLabels } from '../lib/chart-layout'
 import { solverById } from '../lib/solver-index'
 import {
   DASH,
@@ -417,7 +418,9 @@ function Scatter({ series }: { series: ChartSeries }) {
   // Both axes start at zero: an axis that starts near the minimum would exaggerate the
   // differences between solvers on the same instance.
   const yMax = Math.max(...ys)
-  const yTop = yMax > 0 ? yMax * 1.15 : 1
+  const yTicks = niceTicks(yMax)
+  // The top tick bounds the plot, so the labels stay round and the tallest point stays inside.
+  const yTop = yTicks[yTicks.length - 1]
 
   const sx = (x: number) =>
     xMax === xMin
@@ -425,52 +428,22 @@ function Scatter({ series }: { series: ChartSeries }) {
       : PAD.left + ((x - xMin) / (xMax - xMin)) * plotW
   const sy = (y: number) => PAD.top + (1 - y / yTop) * plotH
 
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * yTop)
   const xTicks = [0, 0.5, 1].map((f) => xMin + f * (xMax - xMin))
   const yFormat =
     series.axis === 'gap'
       ? (v: number) => `${v.toFixed(1)}%`
       : (v: number) => v.toFixed(0)
 
-  // Labels are placed greedily: the first offset clear of every label already placed wins.
-  // Instances a few cities apart (ulysses16 and ulysses22 differ by six) would otherwise
-  // draw their labels over each other, and a chart whose labels cannot be read hides the
-  // numbers it exists to show. Widths are estimated from the monospace advance.
-  const placed: { x: number; y: number; w: number; h: number }[] = []
-  const labels = series.points.map((point) => {
-    const cx = sx(point.x)
-    const cy = sy(point.y)
-    const w = point.dataset.length * 7
-    const h = 13
-    const candidates = [
-      { dx: 8, dy: 3, anchor: 'start' as const },
-      { dx: 8, dy: 15, anchor: 'start' as const },
-      { dx: -8, dy: 3, anchor: 'end' as const },
-      { dx: 8, dy: -8, anchor: 'start' as const },
-    ]
-    for (const candidate of candidates) {
-      const x =
-        candidate.anchor === 'end' ? cx + candidate.dx - w : cx + candidate.dx
-      const y = cy + candidate.dy - 8
-      const box = { x, y, w, h }
-      const outside = box.x < 2 || box.x + box.w > W - 2
-      const collides = placed.some(
-        (other) =>
-          box.x < other.x + other.w &&
-          other.x < box.x + box.w &&
-          box.y < other.y + other.h &&
-          other.y < box.y + box.h,
-      )
-      if (!outside && !collides) {
-        placed.push(box)
-        return { point, cx, cy, ...candidate }
-      }
-    }
-    // Every candidate collided: keep the label beside its point rather than dropping it.
-    const fallback = candidates[0]
-    placed.push({ x: cx + fallback.dx, y: cy + fallback.dy - 8, w, h })
-    return { point, cx, cy, ...fallback }
-  })
+  // Every instance is labelled here: there are few of them, and a legend would be longer than
+  // the chart. Placement is shared with the landing chart so the two cannot drift.
+  const placements = placeLabels(
+    series.points.map((point) => ({
+      text: point.dataset,
+      x: sx(point.x),
+      y: sy(point.y),
+    })),
+    { width: W, height: H },
+  )
 
   return (
     <svg
@@ -534,24 +507,33 @@ function Scatter({ series }: { series: ChartSeries }) {
       >
         {series.axis === 'gap' ? 'gap vs optimal →' : 'tour length →'}
       </text>
-      {labels.map(({ point, cx, cy, dx, dy, anchor }) => (
-        <g key={`${point.dataset}/${point.config}`}>
-          <circle cx={cx} cy={cy} r="4" fill={POINT_COLOR} />
-          <text
-            x={cx + dx}
-            y={cy + dy}
-            text-anchor={anchor}
-            font-size="10"
-            fill={TEXT_COLOR}
-            font-family="JetBrains Mono, monospace"
-          >
-            {point.dataset}
-          </text>
+      {series.points.map((point) => (
+        <circle
+          key={`${point.dataset}/${point.config}`}
+          cx={sx(point.x)}
+          cy={sy(point.y)}
+          r="4"
+          fill={POINT_COLOR}
+        >
           <title>
             {point.label}
             {`: x ${point.x} cities, y ${yFormat(point.y)}`}
           </title>
-        </g>
+        </circle>
+      ))}
+
+      {placements.map((placement) => (
+        <text
+          key={placement.text}
+          x={placement.x}
+          y={placement.y}
+          text-anchor={placement.anchor}
+          font-size="10"
+          fill={TEXT_COLOR}
+          font-family="JetBrains Mono, monospace"
+        >
+          {placement.text}
+        </text>
       ))}
     </svg>
   )
