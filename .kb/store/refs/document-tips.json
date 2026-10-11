@@ -344,7 +344,7 @@
     {
       "document_id": "01a12a7f-a6c5-7322-9471-5b900527510b",
       "slug": "tasks/bench-problem-leaderboard",
-      "tip_commit_id": "01a12b44-c075-72a1-977f-d0ac46c4b1eb"
+      "tip_commit_id": "01a12b4a-397f-77f1-9075-900a8630c472"
     },
     {
       "document_id": "01a12a9f-cbab-71d0-9901-7aeb4b890f51",
@@ -359,12 +359,12 @@
     {
       "document_id": "01a12b16-2fb5-77a1-bda3-a36249775339",
       "slug": "tasks/bench-solver-compare",
-      "tip_commit_id": "01a12b3a-e8a2-7f13-938c-88e02e335d19"
+      "tip_commit_id": "01a12b4a-397f-77f1-9075-900a8630c472"
     },
     {
       "document_id": "01a12b16-2fd0-7f11-abac-72499916b64e",
       "slug": "tasks/bench-data-download",
-      "tip_commit_id": "01a12b3a-e8a2-7f13-938c-88e02e335d19"
+      "tip_commit_id": "01a12b4a-397f-77f1-9075-900a8630c472"
     },
     {
       "document_id": "01a12b16-2fe4-7a20-b2f2-1c24f8526891",

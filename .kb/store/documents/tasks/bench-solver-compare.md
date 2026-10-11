@@ -84,3 +84,10 @@ blocks and the config-keyed join all shipped in #576. One acceptance criterion i
 non-deterministic *comparator* shows only its median gap, where the criterion asks for its spread.
 The primary's spread is unaffected (it has its own best/worst columns). Fixing that is the next
 commit on this task, not a new one.
+
+### 2026-10-11 — the missing criterion is fixed in #577
+
+A non-deterministic comparator now renders its spread in its column and its summary row
+(`8.18% (7.62%–8.92%)`), which is what the criterion asked for. This task can be marked completed
+once #577 merges; the fix landed on `feat/bench-problem-leaderboard` rather than a branch of its
+own, since both touch the same component.

@@ -159,3 +159,27 @@ Dropping min and max leaves `cs` at four times its median, and the outliers are 
 a solver's real weakness, and the worst case is almost always the largest instance, which makes the
 spread a *capability* signal rather than scatter. Show the per-instance distribution, or median
 **and** worst together; never a bare average.
+
+## Progress Log
+
+### 2026-10-11 — implemented in #577, one criterion unreachable from the data
+
+Shipped: the ranked table, the family-coloured bar graph with a legend, the family budget line, the
+per-row link to each solver's page, the aggregate-provenance note, the data links, and the
+page/shard optimum disagreement note. `src/components/ProblemResults.tsx` is a `client:visible`
+island; `leaderboardRows`/`leaderboardAxis`/`leaderboardFamilies` live in the read layer with unit
+tests for ranking, absence and the two-config case.
+
+The criterion "a timed-out row is ranked last and marked" holds for a partially timed-out cell
+(`runs > 0`, `timeouts > 0`) and renders from the data. An **all**-timeout cell still cannot: the
+publisher drops `runs: 0` rows before ranking, so the page cannot tell it apart from a solver never
+measured on the instance. Making that renderable needs the publisher to publish `runs: 0` rows —
+a contract change, and the reason this task is not marked completed.
+
+### 2026-10-11 — problems found while implementing
+
+- A fixture named its config `default` where the publisher writes `budget`. Any comparison against
+  that solver read as "not measured" — the failure the config-keyed join exists to prevent, hidden
+  by a fixture that did not match the contract. The fixture now matches.
+- The bar chart's label gutter clipped the longest solver names ("Ant Colony Optimization" rendered
+  as "t Colony Optimization"). 156px of gutter fits the longest label in the set.

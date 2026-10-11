@@ -60,3 +60,8 @@ with the section that renders the shard.
 - `docs/benchmarks/schema.md` is the contract to link alongside the data. It lives in the repo rather
   than on the site, so the link target is GitHub — the Fourier post already links `docs/benchmarks.md`
   that way.
+
+### 2026-10-11 — the problem-page half is in #577
+
+`ProblemResults.tsx` links `problems/{id}.json`, the manifest and the contract from the leaderboard
+section's provenance block, so the last open criterion is met once #577 merges.
