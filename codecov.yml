@@ -1,0 +1,15 @@
+# Codecov configuration.
+#
+# Only the project status is tuned here. Its default is `target: auto` with a 0% threshold,
+# which means "coverage may not decrease at all" — and that fails on sub-0.1% movement that has
+# nothing to do with the change under review. The project figure moves when the *base* moves, so
+# a pull request that touches no Rust at all (docs, shell scripts, benchmark data) can still see
+# it drift: measured 91.22% vs 91.23% on a change that only edited `scripts/`. The patch status is
+# left at its default, because patch coverage is attributable to the diff and should be strict.
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        # Absorb run-to-run noise only; a real regression is far larger than this.
+        threshold: 0.1%

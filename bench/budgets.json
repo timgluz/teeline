@@ -1,0 +1,11 @@
+{
+  "$comment": "Wall-clock budget in seconds per solver family, published with the benchmark data so a gap figure is never shown without the allowance it was measured under (decisions/benchmarking-design sections 3.2 and 4). 'agreed' records whether the value is fixed by a decision or is still a provisional placeholder: only meta is settled (decision 10, 300s). The rest are working values so the pipeline can be exercised, and tasks/bench-tier-a-campaign is expected to confirm or replace them before results are presented as like-for-like.",
+  "schema_version": 1,
+  "budgets": {
+    "constructive": { "seconds": 30, "agreed": false },
+    "exact": { "seconds": 30, "agreed": false },
+    "local": { "seconds": 120, "agreed": false },
+    "meta": { "seconds": 300, "agreed": true },
+    "utility": { "seconds": 60, "agreed": false }
+  }
+}

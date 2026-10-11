@@ -7,6 +7,7 @@
 #   scripts/read-benchmarks.sh index                    # manifest + freshness
 #   scripts/read-benchmarks.sh algorithm lk             # one algorithm shard
 #   scripts/read-benchmarks.sh problem berlin52         # one problem leaderboard
+#   scripts/read-benchmarks.sh snapshot v1.0.0          # a release snapshot's manifest
 #   scripts/read-benchmarks.sh list                     # every key under the prefix
 #   scripts/read-benchmarks.sh check                    # verify every shard parses
 #   scripts/read-benchmarks.sh raw <key>                # fetch any key verbatim
@@ -21,17 +22,19 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 BASE_URL="${BENCH_BASE_URL:-https://static.tspsolver.com}"
-PREFIX="${BENCH_PREFIX:-bench/v1}"
+PREFIX="${BENCH_PREFIX:-bench/v2}"
 VIA="http"
 CF_R2_BUCKET="${CF_R2_BUCKET:-}"
+SNAPSHOT_TAG=""
 
 usage() {
-  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:
   --base-url <url>   Base URL (default: https://static.tspsolver.com)
-  --prefix <key>     R2 key prefix (default: bench/v1)
+  --prefix <key>     R2 key prefix (default: bench/v2)
+  --snapshot <tag>   Read a release snapshot instead of the current tree
   --via <http|r2>    Read over HTTP (default) or via the Cloudflare API
   --bucket <name>    R2 bucket name, required for --via r2
   -h, --help         Show this help
@@ -45,10 +48,25 @@ while [[ $# -gt 0 ]]; do
     --prefix) PREFIX="${2:?}"; shift 2 ;;
     --via) VIA="${2:?}"; shift 2 ;;
     --bucket) CF_R2_BUCKET="${2:?}"; shift 2 ;;
+    # A snapshot is a complete copy under the same prefix, so every command keeps working
+    # against it by prefixing the key path.
+    --snapshot) SNAPSHOT_TAG="${2:?}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) ARGS+=("$1"); shift ;;
   esac
 done
+
+# Validated here as well as in publish: a tag is interpolated into the object key, so `../x`
+# would escape the snapshots prefix. Read-only, but the rule should hold at every entry point.
+if [[ -n "$SNAPSHOT_TAG" && ! "$SNAPSHOT_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "ERROR: invalid snapshot tag '$SNAPSHOT_TAG'." >&2
+  echo "       Use letters, digits, dot, dash or underscore, starting with a letter or digit." >&2
+  exit 2
+fi
+
+if [[ -n "$SNAPSHOT_TAG" ]]; then
+  PREFIX="${PREFIX%/}/snapshots/$SNAPSHOT_TAG"
+fi
 
 if [[ ${#ARGS[@]} -eq 0 ]]; then
   usage >&2
@@ -92,26 +110,69 @@ case "$cmd" in
     echo "$body" | jq -r '
       "schema_version : \(.schema_version)",
       "generated_at   : \(.generated_at)",
-      "git_commit     : \(.git_commit)\(if .dirty then " (DIRTY WORKING TREE)" else "" end)",
-      # A publish-time commit does not identify the measured binary, so say so
-      # rather than letting the reader assume the numbers are reproducible.
-      "commit_source  : \(.git_commit_source // "unknown")
-                        \(if (.git_commit_source // "") == "publish-time"
-                          then "⚠ not the measured binary — TSV carried no provenance"
-                          else "" end)",
-      "teeline        : \(.teeline_version)",
       "tier           : \(.tier // "-")",
       "solvers        : \(.solvers | length)",
       "problems       : \(.problems | length)",
+      # Deliberately no commit here: solvers are measured at different commits under the
+      # differential cadence, so a single value would be a claim the data cannot support.
+      # Each solver shard states when *it* was measured.
       "",
-      "solvers measured:",
-      (.solvers[] | "  \(.id)\t\(.name)\tconfigs=\(.configs | join(","))")
+      "per-family budgets (s):",
+      (.budgets // {} | to_entries[] |
+        "  \(.key)\t\(.value.seconds)\t\(if .value.agreed then "" else "provisional" end)"),
+      "",
+      "solvers (provenance is per shard — see: read-benchmarks.sh algorithm <id>):",
+      (.solvers[] | "  \(.id)\t\(.name)\t\(.family // "-")\tconfigs=\(.configs | join(","))")
+    '
+    ;;
+
+  snapshot)
+    # The snapshot's own manifest. Provenance is per shard here too, so there is no single
+    # "measured with" value to print.
+    tag="${ARGS[1]:?snapshot requires a tag, e.g. 'snapshot v1.0.0'}"
+    if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+      echo "ERROR: invalid snapshot tag '$tag'." >&2
+      exit 2
+    fi
+    if [[ -n "$SNAPSHOT_TAG" ]]; then
+      echo "ERROR: 'snapshot' already reads a snapshot; drop one of the two tags" >&2
+      exit 2
+    fi
+    body="$(fetch "snapshots/${tag}/index.json")"
+    # --arg, not splicing: a tag containing a quote or backslash would otherwise break the
+    # program or inject jq of its own.
+    echo "$body" | jq -r --arg tag "$tag" '
+      "snapshot       : \($tag)",
+      "schema_version : \(.schema_version)",
+      "generated_at   : \(.generated_at)",
+      "solvers        : \(.solvers | length)",
+      "problems       : \(.problems | length)",
+      "",
+      "Read inside it with: scripts/read-benchmarks.sh --snapshot \($tag) index"
     '
     ;;
 
   algorithm)
     id="${ARGS[1]:?algorithm requires a solver id, e.g. 'algorithm lk'}"
     body="$(fetch "algorithms/${id}.json")"
+    # A separate jq for the provenance lines: mixing bare strings into the table expression
+    # would leave the trailing `| .[]` iterating over them as well as the rows.
+    echo "$body" | jq -r '
+      # `dirty` is tri-state: null means the TSV did not record it, which is not the same as
+      # clean — rendering null as false would claim a clean tree nobody verified.
+      "measured at    : \(.measurement.git_commit)\(
+                          if .measurement.dirty == true then " (DIRTY)"
+                          elif .measurement.dirty == null then " (dirty state not recorded)"
+                          else "" end)
+                        source=\(.measurement.git_commit_source // "unknown")\(
+                          if (.measurement.git_commit_source // "") == "publish-time"
+                          then " ⚠ not the measured binary — TSV carried no provenance"
+                          else "" end)",
+      "measured when  : \(.measurement.measured_at // "not recorded")",
+      "teeline        : \(.measurement.teeline_version // "not recorded")",
+      "environment    : \(.measurement.environment.os // "?")/\(.measurement.environment.build // "?") rust \(.measurement.environment.rust_version // "not recorded")"
+    '
+    echo ""
     echo "$body" | jq -r '
       ([["\(.solver) — \(.results | length) instance(s), configs: \(.configs | join(", "))"],
         [""],
@@ -178,18 +239,32 @@ case "$cmd" in
       jq -r '.problems[] | "problems/\(.id).json"' <<<"$manifest"
     )
     for key in "${keys[@]}"; do
-      if body="$(fetch "$key" 2>/dev/null)" && jq -e '.schema_version' >/dev/null 2>&1 <<<"$body"; then
-        printf 'ok    %s\n' "$key"
-      else
+      if ! body="$(fetch "$key" 2>/dev/null)" || ! jq -e '.schema_version' >/dev/null 2>&1 <<<"$body"; then
         printf 'FAIL  %s\n' "$key"
         failures=$((failures + 1))
+        continue
       fi
+      # Provenance lives in the algorithm shards, so a shard that parses but carries no
+      # measurement block is still incomplete. Problem shards are aggregates and carry none.
+      case "$key" in
+        algorithms/*)
+          if jq -e '.measurement.git_commit' >/dev/null 2>&1 <<<"$body"; then
+            printf 'ok    %s  (%s)\n' "$key" "$(jq -r '.measurement.git_commit' <<<"$body")"
+          else
+            printf 'FAIL  %s  (no measurement block)\n' "$key"
+            failures=$((failures + 1))
+          fi
+          ;;
+        *) printf 'ok    %s\n' "$key" ;;
+      esac
     done
     echo
     echo "manifest schema_version: $(jq -r '.schema_version' <<<"$manifest")"
     echo "generated_at:            $(jq -r '.generated_at' <<<"$manifest")"
-    echo "commit:                  $(jq -r '.git_commit // "-"' <<<"$manifest")"
-    echo "commit_source:           $(jq -r '.git_commit_source // "unknown"' <<<"$manifest")"
+    echo "tier:                    $(jq -r '.tier // "-"' <<<"$manifest")"
+    # No commit is printed: v2 carries provenance per solver shard, and a single value here
+    # would be the dataset-level claim this contract removes. The per-shard check below is
+    # the replacement.
     if [[ "$failures" -gt 0 ]]; then
       echo "FAILED: $failures shard(s) missing or unparseable" >&2
       exit 1

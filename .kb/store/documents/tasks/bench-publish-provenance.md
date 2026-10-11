@@ -3,7 +3,7 @@ id: 01a12651-5631-7b92-b921-802fa80a731d
 slug: tasks/bench-publish-provenance
 title: "feat(bench): publish per-solver provenance, snapshots and criteriondb mirror"
 type: task
-status: draft
+status: active
 priority: high
 tags: [benchmarks, r2, criteriondb, schema]
 blocked_by: [tasks/bench-tier-a-campaign]
@@ -63,3 +63,79 @@ Snapshots are ~154KB each, so retaining several releases is cheap.
 
 `docs/benchmarks/schema.md` is the contract and must be updated in the same change, since this
 alters what `git_commit` means. Cross-reference: `decisions/benchmarking-design` section 3.5.
+
+## Progress Log
+
+### 2026-10-11
+
+Implemented as [#569](https://github.com/timgluz/teeline/pull/569), branch
+`feat/bench-per-solver-provenance`.
+
+Design decisions taken (both confirmed with the maintainer before implementing):
+
+- **Previous state for the differential merge is fetched from the public URL into
+  `build/bench-prev/`**, with `--previous <dir>` as an override and `--no-fetch-previous` to work
+  offline. Chosen over requiring an explicit directory (no manual step) and over committing a mirror
+  (avoids a second source of truth). The first v2 publish has no previous v2 tree, so it is a
+  full baseline — expected, and the reason the merge machinery is covered by tests rather than by a
+  live run.
+- **Per-family budgets live in a committed `bench/budgets.json`**, which the harness can adopt later
+  instead of inventing a second format. Only `meta` (300s, decision 10) is fixed by a decision; the
+  others were never specified numerically, so they are published with `agreed: false` rather than
+  presented as settled.
+
+Also decided:
+
+- **Bumped to `/bench/v2/` + `schema_version: 2`.** Removing provenance fields from `index.json` is
+  breaking for a consumer of them, and the contract's own rule is that the prefix and version move
+  together. v1 stays served and untouched. It is live but has no deployed consumer yet, so nothing
+  needs migrating.
+- **The criteriondb mirror now records the measured commit**, not publish-time HEAD — it had the same
+  false-provenance defect this task exists to fix, and the acceptance criterion only asked for
+  `config_label`.
+
+Scope left out, deliberately:
+
+- The **staleness guard** that refuses a single-solver re-run when shared code changed (design
+  section 6). It belongs with `tasks/bench-single-solver-skill`, and now has the per-solver commits
+  it needs in order to compare.
+- The harness (`bench-matrix.sh`, `tier-a.toml`) — separate task; budgets were published now so the
+  harness can read them.
+- Migrating the live v1 data to v2; the campaign's baseline run establishes v2.
+
+### Review rounds (2026-10-11)
+
+Four open-code-review passes on #569: **13 → 7 → 5 → 8** findings, all addressed. The count going up
+on the last pass is worth noting: the reviewer was by then probing edge cases rather than defects in
+the main path, and the last round was mostly the same rule applied inconsistently.
+
+What the rounds actually caught — nearly all in the "framework" around the transform rather than the
+provenance shape itself:
+
+- **Any fetch failure was read as "no previous tree"**, so a network blip would have published a tree
+  containing only this TSV's solvers, replacing the live manifest and leaderboards. Only a confirmed
+  404 means first publish now.
+- **A failed shard download only warned**, silently dropping that solver from the republished tree.
+- **The previous tree was trusted forever** from a cache that nothing refreshed, so a differential
+  publish could merge against a stale tree and revert solvers.
+- **The first publish could never succeed**: `fetch_previous` created the shard directories before
+  discovering the 404, and the transform read the leftovers as a tree with no manifest and aborted.
+  Verified against the live endpoint, since `bench/v2/` 404s today — the exact first-publish case.
+- **`load_previous` returned early before reading the manifest**, dropping every solver the manifest
+  named when the shard directory happened to be missing.
+- **`set -e` is suspended inside a function called in a condition**, so failed `mkdir`/`cp` inside
+  `fetch_previous` and `snapshot_stage` were ignored and a partial copy was reported as a written
+  snapshot.
+- **A partial TSV header paired a measured commit with the publisher's `dirty`, version, rustc, `os`
+  and `build`** — the same false-claim class the task exists to fix, in miniature. Every field the
+  TSV does not record is now `null`.
+- Exposed a pre-existing CI bug: `upload_r2` demanded an R2 client even under `--dry-run`, so no
+  publish test could have passed in CI. No publish test existed before this PR.
+
+The lesson worth carrying: the *schema* change was straightforward, and everything expensive was in
+the merge/IO framework around it. Tests that only exercised the shape (my first 11) passed while the
+first publish was completely broken; the test that caught it had to drive the real HTTP path.
+
+Also added `codecov.yml` with a 0.1% project threshold: `codecov/project` failed this branch at
+-0.01% on a change touching no Rust at all, and the default 0% threshold reports that noise as a
+failure. `codecov/patch` left strict.
