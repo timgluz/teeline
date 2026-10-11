@@ -3,7 +3,7 @@ id: 01a12651-5631-7b92-b921-802fa80a731d
 slug: tasks/bench-publish-provenance
 title: "feat(bench): publish per-solver provenance, snapshots and criteriondb mirror"
 type: task
-status: active
+status: completed
 priority: high
 tags: [benchmarks, r2, criteriondb, schema]
 blocked_by: [tasks/bench-tier-a-campaign]
@@ -139,3 +139,29 @@ first publish was completely broken; the test that caught it had to drive the re
 Also added `codecov.yml` with a 0.1% project threshold: `codecov/project` failed this branch at
 -0.01% on a change touching no Rust at all, and the default 0% threshold reports that noise as a
 failure. `codecov/patch` left strict.
+
+### Completed — 2026-10-11
+
+Merged in two PRs:
+
+- [#569](https://github.com/timgluz/teeline/pull/569) (merge `8c9b2fff`) — per-solver `measurement`
+  blocks, `index.json` stripped of its dataset-level commit claim, per-family budgets, immutable
+  snapshots, the criteriondb mirror recording the measured commit, and the contract bumped to
+  `/bench/v2` with `schema_version: 2`.
+- [#570](https://github.com/timgluz/teeline/pull/570) (merge `b715ab9a`) — the raw run format moved
+  from TSV to JSONL with per-row provenance, which is what makes a resumable sweep's mixed-build
+  rows detectable. See `decisions/benchmarking-design` §3.5a.
+
+Acceptance criteria are met and covered by tests (`tests/e2e/publish-benchmarks.bats`, 36 cases;
+`cargo test --workspace` 29 groups; shellcheck clean on merged master).
+
+**One criterion is verified by tests rather than by a live run:** "snapshot written at a release tag
+and verified retrievable". The mechanism, its immutability guard and its read-back path are
+implemented and tested locally, but **no v2 data has been published yet** — `bench/v2/` still 404s,
+and the first publish will be a full baseline since there is no v2 tree to merge with. Exercising
+that path against R2 belongs to `tasks/bench-tier-a-campaign`, which is where a real publish
+happens.
+
+Also produced along the way: `tasks/bench-lk-use-shared-plateau-option` and
+`tasks/ci-cli-e2e-bats-workflow` (both draft), and a rewritten `tasks/bench-measurement-harness`
+specifying JSONL with per-row provenance.

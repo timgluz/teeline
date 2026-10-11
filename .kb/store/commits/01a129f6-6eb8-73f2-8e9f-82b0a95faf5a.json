@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"16f4b0fb77c77fb8ee720b33033e50bc31368f1ec5b5ba218f3cbe629aab20aa","doc_type":"task","document_id":"01a12651-5631-7b92-b921-802fa80a731d","metadata_changes":[{"field":"blocks","old_value":["tasks/bench-algorithm-pages","tasks/bench-docs-spec-update","tasks/bench-single-solver-skill","tasks/bench-regression-history"]},{"field":"status","new_value":"completed","old_value":"active"}],"new_version":5,"previous_commit_id":"01a129f6-6d1f-75b2-b8c9-54fd52ad197c","previous_hash":"fc07b04aa6fcd5e20e5e9fdea69e8be5bbcb5bfd5e941432e5a8d29d720780ae","previous_version":4,"slug":"tasks/bench-publish-provenance","title":"feat(bench): publish per-solver provenance, snapshots and criteriondb mirror"}],"created_at":"2026-10-11T07:56:18.372715822Z","id":"01a129f6-6eb8-73f2-8e9f-82b0a95faf5a","message":"Mark per-solver provenance complete (merged in #569 and #570)"},
+  "content_hash": "b50591cb4a3fc8dd8966181c99580e88aa236182b30bcc169575b270451ed320",
+  "hash_version": 3
+}
