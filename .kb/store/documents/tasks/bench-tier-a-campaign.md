@@ -65,3 +65,28 @@ the first cells should pin it down before committing to a full run.
 
 Expect timeouts on `a280` and especially `dsj1000` at the 300s metaheuristic budget. That is
 acceptable and intended to be visible; the budget is expected to rise in later runs.
+
+### Measurement basis: measure from a merged commit
+
+The first Tier A attempt was started from `feat/bench-tier-a-budget-config`, and that branch was
+then **squash-merged** (#573). A squash replaces the branch's commits with one new commit, so the
+SHA the rows recorded — `f37b564d` — was left with no path from `master`. Every published row would
+have named a commit a reader could not check out, which is the one thing per-solver provenance
+exists to make possible.
+
+The measurements themselves were sound: `git diff f37b564d origin/master -- src/ bench/matrix/
+scripts/` was empty, so master's tree is byte-identical to what produced them and the numbers were
+not in question. Only the identity was orphaned. The sweep was restarted from `18d8b274` after 490
+rows, because re-measuring the cheap rows cost ~40 minutes while the expensive timeouts were still
+ahead — cheaper than publishing an unverifiable reference or inventing a tag to rescue it.
+
+**Two things to carry forward:**
+
+- Start a long measurement from `master`, or from a commit already merged. The harness records the
+  commit of the tree it runs from, which is correct; the hazard is that the tree is a branch that
+  may not survive the merge.
+- This project squash-merges. Any measurement taken from an open PR's branch will be orphaned the
+  same way.
+
+Checked afterwards: the restarted run produced identical tour costs for the re-measured rows, so
+the restart cost wall-clock time and nothing else.
