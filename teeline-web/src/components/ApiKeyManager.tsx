@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
-import { ApiError, apiFetch } from '../auth/api'
+import { apiFetch } from '../auth/api'
 import {
   loginWithPasskey,
   logout,
