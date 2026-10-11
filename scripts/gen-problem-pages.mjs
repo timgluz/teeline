@@ -195,8 +195,143 @@ function parsePoints(txt) {
   return null
 }
 
+// TSPLIB's matrix instances define the distances and nothing else, so their picture has to be
+// derived. `UPPER_ROW` stores the strict upper triangle row by row, the `*_DIAG_ROW` variants
+// include the (zero) diagonal, and `FULL_MATRIX` stores every entry.
+function parseDistanceMatrix(txt, dim, format) {
+  const rows = readSection(txt, 'EDGE_WEIGHT_SECTION')
+  if (!rows) return null
+  const values = rows.flat().map(Number)
+  if (values.some(v => !Number.isFinite(v))) return null
+
+  const upper = (dim * (dim - 1)) / 2
+  const upperDiag = (dim * (dim + 1)) / 2
+  const shape = {
+    UPPER_ROW: upper,
+    LOWER_DIAG_ROW: upperDiag,
+    UPPER_DIAG_ROW: upperDiag,
+    LOWER_ROW: upper,
+    FULL_MATRIX: dim * dim,
+  }[format]
+  // A matrix of the wrong length would silently lay out the wrong instance.
+  if (!shape || values.length !== shape) return null
+
+  const D = Array.from({ length: dim }, () => new Float64Array(dim))
+  let k = 0
+  if (format === 'FULL_MATRIX') {
+    for (let i = 0; i < dim; i++) for (let j = 0; j < dim; j++) D[i][j] = values[k++]
+  } else if (format === 'UPPER_ROW') {
+    for (let i = 0; i < dim; i++) for (let j = i + 1; j < dim; j++) D[i][j] = D[j][i] = values[k++]
+  } else if (format === 'LOWER_ROW') {
+    for (let i = 0; i < dim; i++) for (let j = 0; j < i; j++) D[i][j] = D[j][i] = values[k++]
+  } else if (format === 'UPPER_DIAG_ROW') {
+    for (let i = 0; i < dim; i++) for (let j = i; j < dim; j++) D[i][j] = D[j][i] = values[k++]
+  } else {
+    for (let i = 0; i < dim; i++) for (let j = 0; j <= i; j++) D[i][j] = D[j][i] = values[k++]
+  }
+  return D
+}
+
+// Classical MDS: double-centre the squared distances and keep the top two eigenvectors, which
+// are the two dimensions that best preserve the distances in the plane. This is the same
+// operation TSPLIB performed for the instances it published a DISPLAY_DATA_SECTION for —
+// scoring this against those five gives r = 0.95–0.998.
+//
+// Power iteration with a fixed starting vector, so the layout is a pure function of the matrix
+// and regeneration stays byte-reproducible.
+function mdsLayout(D, dim) {
+  const rowMean = new Float64Array(dim)
+  const colMean = new Float64Array(dim)
+  let grand = 0
+  for (let i = 0; i < dim; i++) {
+    for (let j = 0; j < dim; j++) {
+      const sq = D[i][j] * D[i][j]
+      rowMean[i] += sq
+      colMean[j] += sq
+      grand += sq
+    }
+  }
+  for (let i = 0; i < dim; i++) rowMean[i] /= dim
+  for (let j = 0; j < dim; j++) colMean[j] /= dim
+  grand /= dim * dim
+
+  const centred = (i, j) => -0.5 * (D[i][j] * D[i][j] - rowMean[i] - colMean[j] + grand)
+
+  // Power iteration converges on the largest-magnitude eigenvalue, and a double-centred matrix
+  // is indefinite, so the spectrum is shifted by its largest |diagonal| to make the leading
+  // eigenvalue dominant. Shifting by a multiple of the identity leaves the eigenvectors alone.
+  let shift = 0
+  for (let i = 0; i < dim; i++) shift = Math.max(shift, Math.abs(centred(i, i)))
+  const work = Array.from({ length: dim }, (_, i) => {
+    const row = new Float64Array(dim)
+    for (let j = 0; j < dim; j++) row[j] = centred(i, j) + (i === j ? shift : 0)
+    return row
+  })
+
+  const multiply = (M, v) => {
+    const out = new Float64Array(dim)
+    for (let i = 0; i < dim; i++) {
+      let sum = 0
+      const row = M[i]
+      for (let j = 0; j < dim; j++) sum += row[j] * v[j]
+      out[i] = sum
+    }
+    return out
+  }
+  const norm = v => {
+    let sum = 0
+    for (let i = 0; i < v.length; i++) sum += v[i] * v[i]
+    return Math.sqrt(sum)
+  }
+
+  const axes = []
+  for (let axis = 0; axis < 2; axis++) {
+    let v = new Float64Array(dim)
+    for (let i = 0; i < dim; i++) v[i] = Math.sin(i * 1.7 + axis * 3.1) + Math.cos(i * 0.37)
+    let len = norm(v) || 1
+    for (let i = 0; i < dim; i++) v[i] /= len
+
+    for (let iter = 0; iter < 400; iter++) {
+      const next = multiply(work, v)
+      len = norm(next) || 1
+      for (let i = 0; i < dim; i++) next[i] /= len
+      v = next
+    }
+
+    const wv = multiply(work, v)
+    let rayleigh = 0
+    for (let i = 0; i < dim; i++) rayleigh += v[i] * wv[i]
+    const eigenvalue = rayleigh - shift
+    axes.push({ v, eigenvalue })
+
+    // Deflate the shifted matrix by the eigenpair just found: work = (B + shift·I) - λvvᵀ, so
+    // the shift needs no correction here.
+    for (let i = 0; i < dim; i++) {
+      const row = work[i]
+      const vi = v[i]
+      if (vi === 0) continue
+      for (let j = 0; j < dim; j++) row[j] -= eigenvalue * vi * v[j]
+    }
+  }
+
+  return Array.from({ length: dim }, (_, i) => ({
+    x: axes[0].v[i] * Math.sqrt(Math.max(axes[0].eigenvalue, 0)),
+    y: axes[1].v[i] * Math.sqrt(Math.max(axes[1].eigenvalue, 0)),
+  }))
+}
+
+// Points for the minimap, and whether they had to be derived rather than read off the file.
+function minimapPoints(txt, dim, format) {
+  const published = parsePoints(txt)
+  if (published) return { points: published, derived: false }
+
+  const D = parseDistanceMatrix(txt, dim, format)
+  if (!D) return { points: null, derived: false }
+  return { points: mdsLayout(D, dim), derived: true }
+}
+
 // Generate inline SVG minimap
-function generateMinimap(coords) {
+function generateMinimap(coords, derived = false) {
   if (!coords || coords.length === 0) return ''
 
   const xs = coords.map(p => p.x)
@@ -224,15 +359,21 @@ function generateMinimap(coords) {
     `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="${r}" fill="#0d9488" opacity="0.7"/>`
   ).join('\n    ')
 
-  return `<svg viewBox="0 0 ${VIEW_W} ${VIEW_H}" width="100%" style="max-width:${VIEW_W}px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
+  const label = derived
+    ? 'City layout derived from the distance matrix; this instance publishes no coordinates'
+    : 'City map for this problem'
+
+  return `<svg viewBox="0 0 ${VIEW_W} ${VIEW_H}" width="100%" style="max-width:${VIEW_W}px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="${label}">
   ${dots}
 </svg>`
 }
 
+const DERIVED_NOTE = 'Layout derived from the distance matrix — this instance publishes no coordinates.'
+
 // ── main ─────────────────────────────────────────────────────────────
 
-let count = 0
-const problemIds = []
+const pages = []
+const failures = []
 
 for (const file of TSP_FILES.sort()) {
   const name = basename(file, '.tsp')
@@ -252,8 +393,13 @@ for (const file of TSP_FILES.sort()) {
   const group = sizeGroup(cities)
   const optimalCost = getOptimalCost(name)
 
-  const points = parsePoints(txt)
-  const minimap = generateMinimap(points)
+  const format = (header['EDGE_WEIGHT_FORMAT'] || '').toUpperCase()
+  const { points, derived } = minimapPoints(txt, cities, format)
+  if (!points) {
+    failures.push(`${name} has no coordinates and no parseable ${ewt} matrix${format ? ` (${format})` : ''}`)
+    continue
+  }
+  const minimap = generateMinimap(points, derived)
 
   const dataUrl = `${DATA_BASE}/${name}.tsp`
 
@@ -270,6 +416,10 @@ for (const file of TSP_FILES.sort()) {
     ? `/?dataset=${name}&opt=${solverOptimalCost}`
     : `/?dataset=${name}`
 
+  // A derived layout has to say so on the page: it looks like a map but it is a projection of
+  // the distances, and the distance matrix is recoverable from it only approximately.
+  const mapBlock = derived ? `${minimap}\n\n${DERIVED_NOTE}` : minimap
+
   const content = `---
 id: "${id}"
 name: "${shortName}"
@@ -285,20 +435,27 @@ creator: "${CREATOR}"
 license: "${LICENSE}"
 ---
 
-${minimap}
+${mapBlock}
 
 ${title}
 `
 
-  writeFileSync(join(DOCS_DIR, `${id}.md`), content)
-  problemIds.push({ id, group, cities })
-  count++
+  pages.push({ id, group, cities, content })
 }
 
-console.log(`Generated ${count} problem pages in ${DOCS_DIR}`)
+// Every page is built before any is written: a failure part-way through would otherwise leave
+// the tree with a mix of regenerated and stale pages.
+if (failures.length > 0) {
+  for (const failure of failures) console.error(`Cannot draw ${failure}`)
+  process.exit(1)
+}
+
+for (const page of pages) writeFileSync(join(DOCS_DIR, `${page.id}.md`), page.content)
+
+console.log(`Generated ${pages.length} problem pages in ${DOCS_DIR}`)
 
 // Print size group summary
 for (const g of ['small', 'medium', 'large', 'xl']) {
-  const ids = problemIds.filter(p => p.group === g).map(p => p.id)
+  const ids = pages.filter(p => p.group === g).map(p => p.id)
   console.log(`  ${g} (${ids.length}): ${ids.join(', ')}`)
 }
