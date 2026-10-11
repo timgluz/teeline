@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"9d86f64c28a5f4da0932c0d880652cc52717877cb8ec1b3e49cd488461b22704","doc_type":"task","document_id":"01a12a9f-cbab-71d0-9901-7aeb4b890f51","new_version":1,"previous_version":null,"slug":"tasks/fix-euc-2d-rounding","title":"fix(solvers): EUC_2D must use TSPLIB's nint rounding, as Att and Ceil2D already do"}],"created_at":"2026-10-11T11:01:17.926303471Z","id":"01a12a9f-cc0e-7df1-a889-98e9788bb393","message":"Add the EUC_2D rounding task the optima fix depends on"},
+  "content_hash": "0e9b8ee84a18ff49ec8f50acf201ca9dd66ee5dcc42b8fe5534ba4138709d793",
+  "hash_version": 3
+}
