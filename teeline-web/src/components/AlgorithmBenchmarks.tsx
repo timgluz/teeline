@@ -9,28 +9,40 @@
 import { useEffect, useState } from 'preact/hooks'
 
 import { niceTicks, placeLabels } from '../lib/chart-layout'
-import { solverById } from '../lib/solver-index'
+import { SOLVER_INDEX, solverById } from '../lib/solver-index'
+import { SOLVER_META } from '../nav-data'
 import {
   DASH,
+  algorithmShardUrl,
   buildRows,
   budgetFor,
   chartSeries,
   chooseColumns,
+  comparisonSeries,
   fetchAlgorithmShard,
   fetchBenchmarkIndex,
   formatGapPct,
   formatSeconds,
   formatTour,
+  indexUrl,
   lostRunsNote,
   observations,
+  pairRows,
   provenance,
+  sharedInstances,
   summarise,
   timeoutNote,
   type AlgorithmShard,
   type BenchmarkIndex,
   type BenchmarkRow,
+  type BudgetEntry,
+  type ChartAxis,
   type ChartSeries,
+  type ComparisonPair,
+  type ComparisonSeries,
   type InstanceMeta,
+  type ProvenanceLine,
+  type Summary,
 } from '../lib/benchmark'
 
 export interface AlgorithmBenchmarksProps {
@@ -49,10 +61,114 @@ type State =
   | { kind: 'error'; message: string }
   | { kind: 'ready'; shard: AlgorithmShard; index: BenchmarkIndex | null }
 
+/** The second shard, once a reader has chosen something to compare against. */
+type CompareState =
+  | { kind: 'none' }
+  | { kind: 'loading' }
+  | { kind: 'absent' }
+  | { kind: 'error'; message: string }
+  | { kind: 'ready'; shard: AlgorithmShard }
+
 const AXIS_COLOR = '#232327'
 const LABEL_COLOR = '#8A8A92'
 const TEXT_COLOR = '#F5F5F6'
 const POINT_COLOR = '#22D3A5'
+/** The comparator's series, distinct from the primary's at a glance. */
+const COMPARED_COLOR = '#6366F1'
+/** The data contract, which lives in the repo rather than on the site. */
+const SCHEMA_URL =
+  'https://github.com/timgluz/teeline/blob/master/docs/benchmarks/schema.md'
+
+const SOLVER_IDS = new Set(SOLVER_INDEX.map((solver) => solver.id))
+
+/** Every solver that publishes a shard, by display name — the picker's options. */
+const COMPARE_OPTIONS = [...SOLVER_INDEX]
+  .map((solver) => ({ id: solver.id, name: solverName(solver.id) }))
+  .sort((a, b) => a.name.localeCompare(b.name))
+
+function solverName(id: string): string {
+  return SOLVER_META[id]?.name ?? id
+}
+
+interface Comparison {
+  solver: string
+  name: string
+  rows: BenchmarkRow[]
+  budget: BudgetEntry | null
+  summary: Summary
+  pairs: ComparisonPair[]
+  series: ComparisonSeries
+  /** Instances both solvers were measured on, under the same config. */
+  shared: number
+  lines: ProvenanceLine[]
+}
+
+function buildComparison(
+  primary: AlgorithmShard,
+  compared: AlgorithmShard,
+  primaryRows: BenchmarkRow[],
+  instances: Record<string, InstanceMeta>,
+  index: BenchmarkIndex | null,
+): Comparison {
+  const rows = buildRows(compared, instances)
+  const family = solverById(compared.solver)?.family
+  const budget = family ? budgetFor(index, family) : null
+  const pairs = pairRows(primaryRows, rows)
+  return {
+    solver: compared.solver,
+    name: solverName(compared.solver),
+    rows,
+    budget,
+    summary: summarise(rows, budget),
+    pairs,
+    series: comparisonSeries(pairs, primary.solver, compared.solver),
+    shared: sharedInstances(pairs),
+    lines: provenance(compared.measurement),
+  }
+}
+
+/** One drawn point, whichever chart is being rendered. */
+interface ChartDatum {
+  key: string
+  x: number
+  y: number
+  colour: string
+  /** Drawn beside the point. Omitted for a second series, whose instances are already labelled. */
+  label?: string
+  tooltip: string
+}
+
+function singleSeriesData(series: ChartSeries): ChartDatum[] {
+  return series.points.map((point) => ({
+    key: `${point.dataset}/${point.config}`,
+    x: point.x,
+    y: point.y,
+    colour: POINT_COLOR,
+    label: point.dataset,
+    tooltip: `${point.label}: ${yValue(series.axis, point.y)}`,
+  }))
+}
+
+function comparisonData(
+  comparison: Comparison,
+  primarySolver: string,
+): ChartDatum[] {
+  const { axis } = comparison.series
+  return comparison.series.points.map((point) => ({
+    key: `${point.solver}/${point.dataset}/${point.config}`,
+    x: point.x,
+    y: point.y,
+    colour: point.solver === primarySolver ? POINT_COLOR : COMPARED_COLOR,
+    // Only the primary's points are labelled: the comparator sits on the same instances, and
+    // twenty labels on a scatter is noise rather than information.
+    label: point.solver === primarySolver ? point.dataset : undefined,
+    tooltip: `${point.solver}: ${yValue(axis, point.y)}`,
+  }))
+}
+
+function yValue(axis: ChartAxis, value: number): string {
+  return axis === 'gap' ? formatGapPct(value) : formatTour(value)
+}
 
 export default function AlgorithmBenchmarks({
   id,
@@ -84,6 +200,50 @@ export default function AlgorithmBenchmarks({
       cancelled = true
     }
   }, [id, dev])
+
+  const [compareId, setCompareId] = useState<string | null>(null)
+  const [compare, setCompare] = useState<CompareState>({ kind: 'none' })
+
+  // `?compare=<id>` makes a comparison a link worth sharing: read it once at hydration, and
+  // rewrite it on change so the address bar keeps matching what is on screen.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('compare')
+    if (requested !== null && requested !== id && SOLVER_IDS.has(requested)) {
+      setCompareId(requested)
+    }
+  }, [id])
+
+  useEffect(() => {
+    if (compareId === null) {
+      setCompare({ kind: 'none' })
+      return
+    }
+    let cancelled = false
+    setCompare({ kind: 'loading' })
+    void (async () => {
+      const result = await fetchAlgorithmShard(compareId, dev)
+      if (cancelled) return
+      if (result.kind === 'ok') {
+        setCompare({ kind: 'ready', shard: result.shard })
+      } else if (result.kind === 'absent') {
+        setCompare({ kind: 'absent' })
+      } else {
+        setCompare({ kind: 'error', message: result.message })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [compareId, dev])
+
+  function chooseCompare(next: string): void {
+    const value = next === '' ? null : next
+    setCompareId(value)
+    const url = new URL(window.location.href)
+    if (value === null) url.searchParams.delete('compare')
+    else url.searchParams.set('compare', value)
+    window.history.replaceState(null, '', url)
+  }
 
   if (state.kind === 'absent') return null
   if (state.kind === 'loading') {
@@ -141,17 +301,104 @@ export default function AlgorithmBenchmarks({
   const series = chartSeries(rows)
   const lines = provenance(shard.measurement)
 
+  const comparison =
+    compare.kind === 'ready'
+      ? buildComparison(shard, compare.shard, rows, instances, index)
+      : null
+  const compareNote =
+    compare.kind === 'absent'
+      ? `${solverName(compareId ?? '')} has no published shard, so there is nothing to compare.`
+      : compare.kind === 'error'
+        ? `The comparison could not be read (${compare.message}).`
+        : compare.kind === 'loading'
+          ? 'Loading the comparison…'
+          : null
+
   const hasTour = rows.some((row) => row.tour !== null)
   const hasWall = rows.some((row) => row.wall !== null)
 
+  const primaryFamily = solverById(shard.solver)?.family
+  const comparedFamily = comparison
+    ? solverById(comparison.solver)?.family
+    : undefined
+  const crossFamily =
+    comparison !== null &&
+    primaryFamily !== undefined &&
+    comparedFamily !== undefined &&
+    primaryFamily !== comparedFamily
+
+  // Stated next to the numbers, because a comparison invites exactly the reading these
+  // sentences prevent: that the two columns were measured under the same allowance.
+  const compareSentence =
+    comparison === null
+      ? ''
+      : comparison.shared === 0
+        ? `${comparison.name} shares no instance and config with this solver, so there is nothing to compare. `
+        : `Compared with ${comparison.name} on ${comparison.shared} shared instance${
+            comparison.shared === 1 ? '' : 's'
+          }. ${
+            crossFamily
+              ? `They sit in different families, so their gaps are not like-for-like: ${primaryFamily} ${budget?.seconds ?? '?'} s against ${comparedFamily} ${comparison.budget?.seconds ?? '?'} s. `
+              : ''
+          }`
+
+  // One chart, whichever view is on: the same component draws one series or two, so the axis
+  // rule has to hold for whichever set of points it is given.
+  const chartData = comparison
+    ? comparisonData(comparison, shard.solver)
+    : singleSeriesData(series)
+  const chartAxis = comparison ? comparison.series.axis : series.axis
+  const chartAxisLabel = comparison
+    ? comparison.series.axisLabel
+    : series.axisLabel
+  const chartOmitted = {
+    noOptimum: comparison ? 0 : series.omitted.noOptimum,
+    noResult: comparison ? 0 : series.omitted.noResult,
+    comparator: comparison ? comparison.series.omitted[comparison.solver] : 0,
+  }
+
   return (
     <section id="benchmarks" class="mt-10" aria-labelledby="benchmarks-heading">
-      <h2
-        id="benchmarks-heading"
-        class="text-lg font-semibold tracking-tight lg:text-xl"
-      >
-        Benchmarks
-      </h2>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+        <h2
+          id="benchmarks-heading"
+          class="text-lg font-semibold tracking-tight lg:text-xl"
+        >
+          Benchmarks
+        </h2>
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs">
+          <label class="flex items-center gap-2 text-text-dim">
+            compare with
+            <select
+              class="rounded border border-border bg-surface px-2 py-1 font-mono text-xs text-text"
+              value={compareId ?? ''}
+              onChange={(event) =>
+                chooseCompare((event.target as HTMLSelectElement).value)
+              }
+            >
+              <option value="">nobody</option>
+              {COMPARE_OPTIONS.filter((option) => option.id !== id).map(
+                (option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+          {/* Cross-origin `download` is ignored by browsers, so this opens the shard rather
+              than promising a save that will not happen. */}
+          <a
+            class="text-accent no-underline hover:underline"
+            href={algorithmShardUrl(id, dev)}
+            target="_blank"
+            rel="noopener"
+            title="Open this solver's published shard (JSON)"
+          >
+            shard ↗
+          </a>
+        </div>
+      </div>
 
       {/* The prose says what the numbers amount to; the numbers themselves are in the table
           below, including its summary row. Repeating aggregates here would give the reader two
@@ -167,8 +414,14 @@ export default function AlgorithmBenchmarks({
         .{' '}
         {!columns.gap &&
           'No instance here has a published optimum, so there is no gap to show. '}
-        {notes.join(' ')}
+        {notes.join(' ')} {compareSentence}
       </p>
+
+      {compareNote && (
+        <p class="mt-2 text-sm text-text-dim" role="status">
+          {compareNote}
+        </p>
+      )}
 
       {!columns.gap && summary.instancesWithOptimum > 0 && (
         <p class="mt-2 text-sm text-text-dim">
@@ -201,25 +454,46 @@ export default function AlgorithmBenchmarks({
               {hasTour && <Th right>Tour (median)</Th>}
               {hasTour && columns.spread && <Th right>Tour (best–worst)</Th>}
               {hasWall && <Th right>Wall (median)</Th>}
+              {comparison && <Th right>Gap ({comparison.name})</Th>}
+              {comparison && <Th right>Wall ({comparison.name})</Th>}
               <Th right>Runs</Th>
               <Th right>Lost runs</Th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <Row
-                key={`${row.dataset}/${row.config}`}
-                row={row}
-                columns={columns}
-                hasTour={hasTour}
-                hasWall={hasWall}
-                multiConfig={summary.configs.length > 1}
-              />
-            ))}
+            {comparison
+              ? comparison.pairs.map((pair) => (
+                  <Row
+                    key={`${pair.dataset}/${pair.config}`}
+                    row={pair.primary}
+                    columns={columns}
+                    hasTour={hasTour}
+                    hasWall={hasWall}
+                    multiConfig={summary.configs.length > 1}
+                    comparing
+                    compared={pair.comparator}
+                  />
+                ))
+              : rows.map((row) => (
+                  <Row
+                    key={`${row.dataset}/${row.config}`}
+                    row={row}
+                    columns={columns}
+                    hasTour={hasTour}
+                    hasWall={hasWall}
+                    multiConfig={summary.configs.length > 1}
+                  />
+                ))}
           </tbody>
           <tfoot>
+            {/* Two rows when comparing, each under its own columns: one merged row would put
+                two solvers' medians in the same cell and invite reading them as one figure. */}
             <tr class="border-t-2 border-border font-medium">
-              <td class="px-3 py-2">All {summary.instances} instances</td>
+              <td class="px-3 py-2">
+                {comparison
+                  ? solverName(shard.solver)
+                  : `All ${summary.instances} instances`}
+              </td>
               <td class="px-3 py-2 text-right font-mono">{DASH}</td>
               <td class="px-3 py-2 font-mono text-xs">{DASH}</td>
               {columns.optimal && (
@@ -251,6 +525,12 @@ export default function AlgorithmBenchmarks({
                   {formatSeconds(summary.medianWallS)}
                 </td>
               )}
+              {comparison && (
+                <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+              )}
+              {comparison && (
+                <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+              )}
               <td class="px-3 py-2 text-right font-mono">
                 {summary.totalRuns}
               </td>
@@ -258,27 +538,87 @@ export default function AlgorithmBenchmarks({
                 {lostRunsNote(summary.totalTimeouts, summary.totalErrors)}
               </td>
             </tr>
+            {comparison && (
+              <tr class="border-t border-border font-medium">
+                <td class="px-3 py-2">{comparison.name}</td>
+                <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                <td class="px-3 py-2 font-mono text-xs">{DASH}</td>
+                {columns.optimal && (
+                  <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                )}
+                {columns.gap && (
+                  <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                )}
+                {columns.gap && columns.spread && (
+                  <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                )}
+                {columns.gap && columns.spread && (
+                  <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                )}
+                {hasTour && (
+                  <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                )}
+                {hasTour && columns.spread && (
+                  <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                )}
+                {hasWall && (
+                  <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+                )}
+                <td class="px-3 py-2 text-right font-mono">
+                  {formatGapPct(comparison.summary.medianGapPct)}
+                </td>
+                <td class="px-3 py-2 text-right font-mono">
+                  {formatSeconds(comparison.summary.medianWallS)}
+                </td>
+                <td class="px-3 py-2 text-right font-mono">
+                  {comparison.summary.totalRuns}
+                </td>
+                <td class="px-3 py-2 text-right font-mono">
+                  {lostRunsNote(
+                    comparison.summary.totalTimeouts,
+                    comparison.summary.totalErrors,
+                  )}
+                </td>
+              </tr>
+            )}
           </tfoot>
         </table>
       </div>
 
-      {series.points.length > 0 && (
+      {chartData.length > 0 && (
         <figure class="mt-6 rounded-lg border border-border bg-surface p-4 lg:p-6">
-          <Scatter series={series} />
-          <figcaption class="mt-3 border-t border-border pt-3 font-mono text-xs text-text-dim">
-            {series.axis === 'gap'
-              ? `Gap against known optimum, one point per instance. ${
-                  series.omitted.noOptimum > 0
-                    ? `${series.omitted.noOptimum} instance${
-                        series.omitted.noOptimum === 1 ? '' : 's'
-                      } without a published optimum ${series.omitted.noOptimum === 1 ? 'is' : 'are'} not plotted — a gap and a tour length are not the same axis.`
-                    : ''
-                }`
+          <Scatter
+            data={chartData}
+            axis={chartAxis}
+            axisLabel={chartAxisLabel}
+          />
+          <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 font-mono text-xs">
+            <Legend colour={POINT_COLOR} label={solverName(shard.solver)} />
+            {comparison && (
+              <Legend colour={COMPARED_COLOR} label={comparison.name} />
+            )}
+          </div>
+          <figcaption class="mt-3 font-mono text-xs text-text-dim">
+            {chartAxis === 'gap'
+              ? comparison
+                ? 'Gap against known optimum, one point per instance per solver.'
+                : `Gap against known optimum, one point per instance. ${
+                    chartOmitted.noOptimum > 0
+                      ? `${chartOmitted.noOptimum} point${
+                          chartOmitted.noOptimum === 1 ? '' : 's'
+                        } without a published optimum ${chartOmitted.noOptimum === 1 ? 'is' : 'are'} not plotted — a gap and a tour length are not the same axis.`
+                      : ''
+                  }`
               : 'Tour length against instance size, because none of these instances has a published optimum. Lower is better for a given size, but the values are not comparable across instances.'}
-            {series.omitted.noResult > 0
-              ? ` ${series.omitted.noResult} cell${
-                  series.omitted.noResult === 1 ? '' : 's'
-                } had no completed run and ${series.omitted.noResult === 1 ? 'is' : 'are'} not plotted.`
+            {chartOmitted.noResult > 0
+              ? ` ${chartOmitted.noResult} cell${
+                  chartOmitted.noResult === 1 ? '' : 's'
+                } had no completed run and ${chartOmitted.noResult === 1 ? 'is' : 'are'} not plotted.`
+              : ''}
+            {comparison && chartOmitted.comparator > 0
+              ? ` ${comparison.name} has no value to plot for ${chartOmitted.comparator} of these instance${
+                  chartOmitted.comparator === 1 ? '' : 's'
+                }.`
               : ''}
             {summary.configs.length > 1
               ? ' One point per instance per config.'
@@ -299,12 +639,62 @@ export default function AlgorithmBenchmarks({
             </div>
           ))}
         </dl>
+        {comparison && (
+          <dl class="mt-3 grid grid-cols-1 gap-x-6 gap-y-1 text-xs sm:grid-cols-2">
+            <div class="flex gap-2 sm:col-span-2">
+              <dt class="min-w-24 text-text-dim">{comparison.name}</dt>
+              <dd class="m-0 text-text-dim">
+                measured from its own build, not this solver's
+              </dd>
+            </div>
+            {comparison.lines.map((line) => (
+              <div key={line.label} class="flex gap-2">
+                <dt class="min-w-24 text-text-dim">{line.label}</dt>
+                <dd class="m-0 font-mono">{line.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         <p class="mt-2 text-xs text-text-dim">
-          These numbers were measured from this solver's own build. Another
-          algorithm's page may legitimately show a different commit.
+          These numbers were measured from each solver's own build. Two
+          algorithms may legitimately show different commits.
+        </p>
+        {/* Cross-origin `download` is ignored, so the header link opens the shard rather than
+            promising a save. This line is the rest of the tree: the manifest and the contract. */}
+        <p class="mt-2 font-mono text-xs text-text-dim">
+          data:{' '}
+          <a
+            class="text-accent no-underline hover:underline"
+            href={indexUrl(dev)}
+            target="_blank"
+            rel="noopener"
+          >
+            index.json ↗
+          </a>{' '}
+          (the manifest, with the per-family budgets) ·{' '}
+          <a
+            class="text-accent no-underline hover:underline"
+            href={SCHEMA_URL}
+            target="_blank"
+            rel="noopener"
+          >
+            contract ↗
+          </a>{' '}
+          (docs/benchmarks/schema.md)
         </p>
       </div>
     </section>
+  )
+}
+
+function Legend({ colour, label }: { colour: string; label: string }) {
+  return (
+    <span class="inline-flex items-center gap-2">
+      <svg class="inline-block h-2 w-2" viewBox="0 0 8 8" aria-hidden="true">
+        <circle cx="4" cy="4" r="4" fill={colour} />
+      </svg>
+      <span class="text-text">{label}</span>
+    </span>
   )
 }
 
@@ -333,12 +723,17 @@ function Row({
   hasTour,
   hasWall,
   multiConfig,
+  comparing = false,
+  compared = null,
 }: {
   row: BenchmarkRow
   columns: { gap: boolean; optimal: boolean; spread: boolean }
   hasTour: boolean
   hasWall: boolean
   multiConfig: boolean
+  comparing?: boolean
+  /** The comparator's cell for this instance and config, or null when it has none. */
+  compared?: BenchmarkRow | null
 }) {
   return (
     <tr class="border-b border-border last:border-b-0">
@@ -394,6 +789,20 @@ function Row({
           {formatSeconds(row.wall?.median ?? null)}
         </td>
       )}
+      {comparing && (
+        <td class="px-3 py-2 text-right font-mono">
+          {compared === null
+            ? 'not measured'
+            : formatGapPct(compared.gap?.median ?? null)}
+        </td>
+      )}
+      {comparing && (
+        <td class="px-3 py-2 text-right font-mono">
+          {compared === null
+            ? 'not measured'
+            : formatSeconds(compared.wall?.median ?? null)}
+        </td>
+      )}
       <td class="px-3 py-2 text-right font-mono">{row.runs}</td>
       <td class="px-3 py-2 text-right font-mono">{timeoutNote(row)}</td>
     </tr>
@@ -403,18 +812,26 @@ function Row({
 /**
  * Instance size against quality.
  *
- * The y value is whatever chartSeries chose — never both. Points are labelled with their
- * dataset id because there are few of them and a legend would be longer than the chart.
+ * The y value is whatever the caller chose — never both, and never one series of each. Points
+ * carry their own colour so the same component draws one solver or two.
  */
-function Scatter({ series }: { series: ChartSeries }) {
+function Scatter({
+  data,
+  axis,
+  axisLabel,
+}: {
+  data: ChartDatum[]
+  axis: ChartAxis
+  axisLabel: string
+}) {
   const W = 720
   const H = 340
   const PAD = { left: 64, right: 28, top: 20, bottom: 44 }
   const plotW = W - PAD.left - PAD.right
   const plotH = H - PAD.top - PAD.bottom
 
-  const xs = series.points.map((point) => point.x)
-  const ys = series.points.map((point) => point.y)
+  const xs = data.map((datum) => datum.x)
+  const ys = data.map((datum) => datum.y)
   const xMin = Math.min(...xs)
   const xMax = Math.max(...xs)
   // Both axes start at zero: an axis that starts near the minimum would exaggerate the
@@ -432,18 +849,20 @@ function Scatter({ series }: { series: ChartSeries }) {
 
   const xTicks = [0, 0.5, 1].map((f) => xMin + f * (xMax - xMin))
   const yFormat =
-    series.axis === 'gap'
+    axis === 'gap'
       ? (v: number) => `${v.toFixed(1)}%`
       : (v: number) => v.toFixed(0)
 
-  // Every instance is labelled here: there are few of them, and a legend would be longer than
-  // the chart. Placement is shared with the landing chart so the two cannot drift.
+  // Placement is shared with the landing chart so the two cannot drift. A comparison labels
+  // only the primary's points, since both series sit on the same instances.
   const placements = placeLabels(
-    series.points.map((point) => ({
-      text: point.dataset,
-      x: sx(point.x),
-      y: sy(point.y),
-    })),
+    data
+      .filter((datum) => datum.label !== undefined)
+      .map((datum) => ({
+        text: datum.label!,
+        x: sx(datum.x),
+        y: sy(datum.y),
+      })),
     { width: W, height: H },
   )
 
@@ -452,7 +871,7 @@ function Scatter({ series }: { series: ChartSeries }) {
       viewBox={`0 0 ${W} ${H}`}
       class="h-auto w-full"
       role="img"
-      aria-label={series.axisLabel}
+      aria-label={axisLabel}
     >
       {yTicks.map((value) => (
         <g key={`y${value}`}>
@@ -507,19 +926,19 @@ function Scatter({ series }: { series: ChartSeries }) {
         fill={LABEL_COLOR}
         transform={`rotate(-90 14 ${PAD.top + plotH / 2})`}
       >
-        {series.axis === 'gap' ? 'gap vs optimal →' : 'tour length →'}
+        {axis === 'gap' ? 'gap vs optimal →' : 'tour length →'}
       </text>
-      {series.points.map((point) => (
+      {data.map((datum) => (
         <circle
-          key={`${point.dataset}/${point.config}`}
-          cx={sx(point.x)}
-          cy={sy(point.y)}
+          key={datum.key}
+          cx={sx(datum.x)}
+          cy={sy(datum.y)}
           r="4"
-          fill={POINT_COLOR}
+          fill={datum.colour}
         >
           <title>
-            {point.label}
-            {`: x ${point.x} cities, y ${yFormat(point.y)}`}
+            {datum.tooltip}
+            {` · ${datum.x} cities`}
           </title>
         </circle>
       ))}

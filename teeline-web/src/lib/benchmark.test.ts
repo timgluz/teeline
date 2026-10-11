@@ -31,6 +31,7 @@ import {
   buildRows,
   chartSeries,
   chooseColumns,
+  comparisonSeries,
   fetchAlgorithmShard,
   fetchBenchmarkIndex,
   fetchProblemShard,
@@ -40,10 +41,12 @@ import {
   formatTour,
   lostRunsNote,
   observations,
+  pairRows,
   parseAlgorithmShard,
   parseBenchmarkIndex,
   parseProblemShard,
   provenance,
+  sharedInstances,
   solverSeries,
   summarise,
   timeoutNote,
@@ -603,6 +606,91 @@ describe('problem shards and the landing chart', () => {
     // Two solvers in `local`, only the better one earns a label.
     expect(labelled).toContain('lk')
     expect(labelled).not.toContain('2opt')
+  })
+})
+
+describe('comparing two solvers', () => {
+  const twoOptRows = buildRows(twoOpt)
+  const branchBoundRows = buildRows(branchBound)
+
+  it('matches rows by instance and config together', () => {
+    const pairs = pairRows(twoOptRows, branchBoundRows)
+    // Only gr17 exists in both shards under the same config.
+    expect(sharedInstances(pairs)).toBe(1)
+    expect(
+      pairs.find((pair) => pair.dataset === 'gr17')?.comparator?.config,
+    ).toBe('budget')
+    // Never measured on these, which is not the same as scoring badly on them.
+    expect(
+      pairs.find((pair) => pair.dataset === 'berlin52')?.comparator,
+    ).toBeNull()
+    expect(
+      pairs.find((pair) => pair.dataset === 'eil76')?.comparator,
+    ).toBeNull()
+  })
+
+  it('refuses to pair a config the comparator does not publish', () => {
+    // branch_bound's `exact` run has no counterpart in 2opt's shard. Pairing it with a
+    // budget run would compare two experiments and present it as a comparison of algorithms.
+    const pairs = pairRows(branchBoundRows, twoOptRows)
+    expect(pairs.find((pair) => pair.config === 'exact')?.comparator).toBeNull()
+    expect(
+      pairs.find((pair) => pair.config === 'budget' && pair.dataset === 'gr17')
+        ?.comparator,
+    ).not.toBeNull()
+  })
+
+  it('decides one axis for the pair and counts what it cannot plot', () => {
+    const series = comparisonSeries(
+      pairRows(twoOptRows, branchBoundRows),
+      '2opt',
+      'branch_bound',
+    )
+    // 2opt has gaps, so the pair is plotted on gaps — never one series of each.
+    expect(series.axis).toBe('gap')
+    const perSolver = series.points.reduce<Record<string, number>>(
+      (counts, point) => {
+        counts[point.solver] = (counts[point.solver] ?? 0) + 1
+        return counts
+      },
+      {},
+    )
+    // gr17 and eil76 for 2opt, gr17 alone for branch_bound.
+    expect(perSolver).toEqual({ '2opt': 2, branch_bound: 1 })
+    // berlin52 has no optimum, so 2opt has no gap there; branch_bound is absent from two.
+    expect(series.omitted).toEqual({ '2opt': 1, branch_bound: 2 })
+  })
+
+  it('falls back to tour length when neither solver has a gap', () => {
+    const withTour = (dataset: string, tour: number): BenchmarkRow => ({
+      ...twoOptRows[0],
+      dataset,
+      name: dataset,
+      gap: null,
+      optimal: null,
+      tour: { median: tour, best: tour, worst: tour },
+    })
+    const series = comparisonSeries(
+      pairRows(
+        [withTour('gr17', 900), withTour('berlin52', 8000)],
+        [withTour('gr17', 950), withTour('berlin52', 8100)],
+      ),
+      'a',
+      'b',
+    )
+    expect(series.axis).toBe('tour')
+    expect(series.points).toHaveLength(4)
+  })
+
+  it('counts a killed run as unplottable rather than as a zero', () => {
+    const killed: BenchmarkRow = { ...twoOptRows[0], noResult: true, gap: null }
+    const series = comparisonSeries(
+      pairRows([killed], [twoOptRows[0]]),
+      'a',
+      'b',
+    )
+    expect(series.points.map((point) => point.solver)).not.toContain('a')
+    expect(series.omitted.a).toBe(1)
   })
 })
 
