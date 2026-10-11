@@ -37,7 +37,7 @@ fn make_problem(cities: &[kdtree::KDPoint]) -> TspProblem {
     TspProblem::new(cities.to_vec(), build_dm(cities))
 }
 
-/// The `tsp5_cities` fixture above is for tour mechanics, and under TSPLIB's rounded `EUC_2D` every
+/// The `tsp5_cities` fixture below is for tour mechanics, and under TSPLIB's rounded `EUC_2D` every
 /// one of its pairwise distances is 1 — so every tour costs the same and an "optimal tour" test
 /// cannot distinguish anything. Built with plain Euclidean distances instead.
 fn make_problem_unrounded(cities: &[kdtree::KDPoint]) -> TspProblem {

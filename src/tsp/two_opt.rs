@@ -97,36 +97,51 @@ mod tests {
         assert_eq!(vec![1, 2, 3, 4], path);
     }
 
+    /// A solver given a suboptimal starting tour must improve it.
+    ///
+    /// The fixture is ordered so the *default* start — the identity order — is not the optimum
+    /// (4.83 against 4.00). That is what makes the assertion falsifiable: previously the identity
+    /// order was already optimal, so the test passed for a solver that ignored its input.
     #[test]
     fn test_two_opt_respects_initial_tour() {
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
-            vec![0.0, 0.5],
-            vec![0.0, 1.0],
             vec![1.0, 1.0],
             vec![1.0, 0.0],
+            vec![0.0, 1.0],
+            vec![0.0, 0.5],
         ]);
         let dm = distance_matrix::from_cities_unrounded(&cities);
-        let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let start: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        let start_cost = dm.tour_length(&start);
+        assert!(start_cost > 4.0, "the fixture must start suboptimal");
+
         let problem = TspProblem::new(cities, dm);
-        let result = solve(&problem, &HeuristicOptions::default(), None, Some(&optimal));
-        assert_eq!(result.route(), optimal.as_slice());
+        let result = solve(&problem, &HeuristicOptions::default(), None, Some(&start));
+
+        assert!(
+            (result.total - 4.0).abs() < 1e-4,
+            "must reach the 4.00 perimeter from a {start_cost:.2} start, got {}",
+            result.total
+        );
     }
 
     #[test]
     fn test_solve_with_tsp5_example() {
         let cities = kdtree::build_points(&[
             vec![0.0, 0.0],
-            vec![0.0, 0.5],
-            vec![0.0, 1.0],
             vec![1.0, 1.0],
             vec![1.0, 0.0],
+            vec![0.0, 1.0],
+            vec![0.0, 0.5],
         ]);
 
         let dm = distance_matrix::from_cities_unrounded(&cities);
         let problem = TspProblem::new(cities, dm);
         let tour = solve(&problem, &HeuristicOptions::default(), None, None);
+
+        // The default start costs 4.83, so reaching 4.00 is a real improvement rather than the
+        // starting point restated.
         assert_eq!(4.0, tour.total);
-        assert_eq!(&[0, 1, 2, 3, 4], tour.route());
     }
 }

@@ -756,11 +756,15 @@ mod tests {
         assert!(is_single_cycle(tour[0], &new_next, 4));
     }
 
-    // ── depth-2 gadget: a move depth-1 cannot find ───────────────────────────
+    // ── hexagon fixture ──────────────────────────────────────────────────────
     //
     // 6 cities on a unit circle at 0°,60°,120°,180°,240°,300°.
-    // Tour [0,2,4,1,3,5] is 2-opt-optimal but a depth-2 LK move improves it.
-    // Verified by brute-force during development.
+    //
+    // The tour [0,2,4,1,3,5] used below is *not* 2-opt-optimal: a hexagon has exactly two such
+    // tours, the two perimeter traversals, costing 6.00 against its 9.93. An earlier comment
+    // claimed otherwise, and a "return early if a move is found" escape hid it — so the depth-1
+    // test uses the perimeter tour instead, and the test below asserts a valid improving chain
+    // rather than anything depth-2-specific.
 
     fn hexagon_pts() -> Vec<KDPoint> {
         use std::f32::consts::PI;
@@ -800,7 +804,7 @@ mod tests {
     }
 
     #[test]
-    fn find_lk_move_depth2_improves_gadget() {
+    fn find_lk_move_finds_an_improving_chain_that_stays_a_single_cycle() {
         let pts = hexagon_pts();
         let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 5);
@@ -813,7 +817,7 @@ mod tests {
         let city_ids: Vec<usize> = tour_mut.clone();
         // Try depth-2; if it finds a move, verify improvement
         let chain = find_lk_move(&next, &prev, &dm, &candidates, 2, &city_ids)
-            .expect("the gadget is built so depth-2 can improve it");
+            .expect("this tour is not 2-opt-optimal, so an improving move must exist");
         apply_lk_chain(&chain, &mut tour_mut, &mut pos);
         let after = tour_distance(&tour_mut, &dm);
         assert!(

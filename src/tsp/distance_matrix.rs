@@ -188,11 +188,7 @@ impl DistanceMatrix {
     /// so every tour costs the same and a test can no longer tell a good tour from a bad one.
     #[doc(hidden)]
     pub fn from_cities_unrounded(cities: &[KDPoint]) -> Result<Self, &'static str> {
-        Self::build_with(cities, |a, b| {
-            let dx = a.x() - b.x();
-            let dy = a.y() - b.y();
-            (dx * dx + dy * dy).sqrt()
-        })
+        Self::build_with(cities, |a, b| a.distance(b))
     }
 
     pub fn build(cities: &[KDPoint], distance_type: DistanceType) -> Result<Self, &'static str> {
