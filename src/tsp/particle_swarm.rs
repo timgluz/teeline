@@ -235,4 +235,35 @@ mod tests {
         assert_eq!(sol.route().len(), cities.len());
         assert!(sol.total > 0.0);
     }
+
+    /// An uncapped run (`epochs: 0`) must still terminate on the convergence limit, and must not
+    /// collapse its schedule. With the zero used as the denominator the inertia goes negative
+    /// within two epochs and the velocity trim saturates, so the search degenerates while the run
+    /// continues — the failure mode that made the cap fix more than a one-line change.
+    #[test]
+    fn test_pso_uncapped_epochs_converge_and_keep_their_schedule() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![0.0, 0.5],
+            vec![0.0, 1.0],
+            vec![1.0, 1.0],
+            vec![1.0, 0.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let problem = TspProblem::new(cities.clone(), dm);
+        let opts = HeuristicOptions {
+            epochs: 0,
+            stagnation_epochs: 10,
+            ..HeuristicOptions::default()
+        };
+
+        let result = solve(&problem, &opts, None, None);
+
+        assert!(result.total.is_finite() && result.total > 0.0);
+        let mut visited = result.route().to_vec();
+        visited.sort();
+        let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        expected.sort();
+        assert_eq!(visited, expected);
+    }
 }

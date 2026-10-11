@@ -261,4 +261,25 @@ mod tests {
         assert_eq!(sol.route().len(), cities.len());
         assert!(sol.total.is_finite());
     }
+
+    /// See the PSO equivalent: an uncapped run must terminate on the convergence limit without
+    /// letting the gravitational constant decay to nothing on the first epoch.
+    #[test]
+    fn test_gsa_uncapped_epochs_converge_and_keep_their_schedule() {
+        let (cities, problem) = five_city_problem();
+        let opts = HeuristicOptions {
+            epochs: 0,
+            stagnation_epochs: 10,
+            ..HeuristicOptions::default()
+        };
+
+        let result = solve(&problem, &opts, None, None);
+
+        assert!(result.total.is_finite() && result.total > 0.0);
+        let mut visited = result.route().to_vec();
+        visited.sort();
+        let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        expected.sort();
+        assert_eq!(visited, expected);
+    }
 }
