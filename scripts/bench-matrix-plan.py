@@ -177,10 +177,12 @@ def main() -> int:
 
     if not instances:
         fail(f"{args.tier} declares no [instances]")
-    if "default" not in configs:
-        # Every published cell carries a config; `default` is what a solver does out of the box
-        # and is what the contract's examples show.
-        fail(f"{args.tier} must declare [configs.default]")
+    if not configs:
+        # Every published cell carries a config name, and the publisher only falls back to
+        # "default" when a row omits the field. The name is a label, not a keyword: decision 13
+        # settled on `budget`/`converge` for Tier A, so requiring one called `default` would
+        # reject the tier the decision describes.
+        fail(f"{args.tier} declares no [configs.*], so there is nothing to measure")
 
     validate_groups(coverage, instances)
     validate_configs(configs, by_id, by_cli, instances)

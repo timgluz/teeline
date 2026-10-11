@@ -184,7 +184,7 @@ local = ["upto24", "all"]
 burma14 = "upto24"
 berlin52 = "all"
 
-[configs.default]
+[configs.budget]               # the budget-limited run: no args, the family timeout is the limit
 
 [configs.exact]                # a named set of extra CLI args
 solvers = ["branch_bound"]
@@ -194,6 +194,8 @@ args = ["--n_nearest", "100"]
 
 Rules the harness enforces, each because the alternative is a hole in the published corpus:
 
+- **A config name is a label, not a keyword.** The publisher falls back to `"default"` only when a
+  row omits the field, so a tier may name its configs anything; the tier must declare at least one.
 - **Every family must appear in `[coverage]`**, even if measured nowhere. A family that is
   simply absent is indistinguishable from one somebody forgot, so it is refused; `local = []`
   is how a tier says "deliberately not measured here".
