@@ -8,6 +8,7 @@ edgeWeightType: "ATT"
 optimalCost: 10628
 dataUrl: "https://static.tspsolver.com/tsplib/att48.tsp"
 minimapUrl: "https://static.tspsolver.com/minimaps/v1/att48.svg"
+ogImageUrl: "https://static.tspsolver.com/minimaps/v1/og/att48.png"
 minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

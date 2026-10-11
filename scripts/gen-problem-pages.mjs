@@ -112,7 +112,13 @@ for (const file of TSP_FILES) {
     undrawable.push(`${id} has no coordinates and no parseable ${header['EDGE_WEIGHT_TYPE'] || '?'} matrix`)
     continue
   }
-  minimaps.set(id, { url: `${MINIMAP_BASE}/${id}.svg`, derived })
+  // Both URLs assume the map has been published; gen-problem-minimaps.mjs renders the SVG and
+  // teeline-web/scripts/gen-og-images.mjs the social card (see scripts/publish-minimaps.sh).
+  minimaps.set(id, {
+    url: `${MINIMAP_BASE}/${id}.svg`,
+    ogUrl: `${MINIMAP_BASE}/og/${id}.png`,
+    derived,
+  })
 }
 
 if (undrawable.length > 0) {
@@ -168,6 +174,7 @@ edgeWeightType: "${ewt}"
 optimalCost: ${optimalCost !== null ? optimalCost : 'null'}
 dataUrl: "${dataUrl}"
 minimapUrl: "${map.url}"
+ogImageUrl: "${map.ogUrl}"
 minimapDerived: ${map.derived}
 source: "${SOURCE}"
 sourceUrl: "${SOURCE_URL}"

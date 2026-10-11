@@ -8,6 +8,7 @@ edgeWeightType: "EUC_2D"
 optimalCost: 1211
 dataUrl: "https://static.tspsolver.com/tsplib/rat99.tsp"
 minimapUrl: "https://static.tspsolver.com/minimaps/v1/rat99.svg"
+ogImageUrl: "https://static.tspsolver.com/minimaps/v1/og/rat99.png"
 minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
