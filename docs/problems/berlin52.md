@@ -5,7 +5,7 @@ description: "52 locations in Berlin (Groetschel)"
 cities: 52
 sizeGroup: "small"
 edgeWeightType: "EUC_2D"
-optimalCost: null
+optimalCost: 7542
 dataUrl: "https://static.tspsolver.com/tsplib/berlin52.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

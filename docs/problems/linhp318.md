@@ -5,7 +5,7 @@ description: "Original 318-city problem (Lin/Kernighan)"
 cities: 318
 sizeGroup: "medium"
 edgeWeightType: "EUC_2D"
-optimalCost: null
+optimalCost: 41345
 dataUrl: "https://static.tspsolver.com/tsplib/linhp318.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

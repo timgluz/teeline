@@ -5,7 +5,7 @@ description: "29 Cities in Bavaria, geographical distances (Groetschel,Juenger,R
 cities: 29
 sizeGroup: "small"
 edgeWeightType: "EXPLICIT"
-optimalCost: null
+optimalCost: 1610
 dataUrl: "https://static.tspsolver.com/tsplib/bayg29.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

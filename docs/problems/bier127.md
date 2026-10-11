@@ -5,7 +5,7 @@ description: "127 Biergaerten in Augsburg (Juenger/Reinelt)"
 cities: 127
 sizeGroup: "medium"
 edgeWeightType: "EUC_2D"
-optimalCost: null
+optimalCost: 118282
 dataUrl: "https://static.tspsolver.com/tsplib/bier127.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
