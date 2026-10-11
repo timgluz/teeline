@@ -1,0 +1,10 @@
+{
+  "$comment": "Optimal tour costs established locally, for instances TSPLIB ships no optimal tour for. `scripts/gen-problem-pages.mjs` reads this after it fails to derive a cost from a .opt.tour. Every entry MUST record how the value was established, because `optimal_cost` is a claim of proof, not of best-known: an entry with `method: \"exact\"` says a complete search settled it, while a value copied from a best-known list would need `method: \"best-known\"` and a source, and must not be published as optimal. Keys are instance ids as used by docs/problems/.",
+  "optima": {
+    "burma14": {
+      "cost": 3323,
+      "method": "exact",
+      "evidence": "teeline's bellman_karp (Held-Karp dynamic programming) over the full 14-city state space, which is exhaustive and so proves the optimum rather than approximating it. Agrees with the value TSPLIB documents for burma14, and GEO is one of the distance definitions teeline reproduces exactly, so it is also the optimum of the objective the solver is measured against. Reproduce with: teeline solve bhk -i data/tsplib/burma14.tsp"
+    }
+  }
+}

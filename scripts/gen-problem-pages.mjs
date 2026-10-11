@@ -20,6 +20,17 @@ mkdirSync(DOCS_DIR, { recursive: true })
 
 const TSP_FILES = readdirSync(TSP_DIR).filter(f => f.endsWith('.tsp'))
 
+// Optimal costs established locally, for instances TSPLIB ships no optimal tour for. Kept in a
+// committed file rather than inlined so each value carries how it was established — the schema
+// treats `optimal_cost` as a claim of proof, and a value with no evidence recorded is not one.
+const LOCALLY_PROVEN = (() => {
+  try {
+    return JSON.parse(readFileSync(join(import.meta.dirname, '..', 'bench', 'optima.json'), 'utf8')).optima || {}
+  } catch {
+    return {}
+  }
+})()
+
 // ── helpers ──────────────────────────────────────────────────────────
 
 function sizeGroup(cities) {
@@ -52,7 +63,7 @@ function getOptimalCost(name) {
   try {
     txt = readFileSync(join(TSP_DIR, `${name}.opt.tour`), 'utf8')
   } catch {
-    return null
+    return LOCALLY_PROVEN[name]?.cost ?? null
   }
   // The old fallback omitted the `m` flag, so a cost on any line but the last never matched and
   // `Length 6528` read as unknown.
@@ -64,7 +75,11 @@ function getOptimalCost(name) {
     const m = txt.match(re)
     if (m) return parseInt(m[1], 10)
   }
-  return tourLength(name, txt)
+  const derived = tourLength(name, txt)
+  if (derived !== null) return derived
+  // TSPLIB ships no optimal tour for this instance, or ships one whose cost cannot be derived
+  // under the metric the solver uses. A locally proved value is the remaining source.
+  return LOCALLY_PROVEN[name]?.cost ?? null
 }
 
 const nint = v => Math.floor(v + 0.5)
