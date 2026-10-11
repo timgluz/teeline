@@ -21,17 +21,12 @@ pub fn tour_cost(route: &[usize], cities: &[KDPoint]) -> f32 {
 
 /// Sum of plain Euclidean distances — **not** TSPLIB's `EUC_2D`, which rounds to the nearest
 /// integer. See `DistanceMatrix::from_cities_unrounded` for why a caller would want the raw form.
+#[doc(hidden)]
 pub fn tour_cost_unrounded(route: &[usize], cities: &[KDPoint]) -> f32 {
     let idx: HashMap<usize, &KDPoint> = cities.iter().map(|c| (c.id, c)).collect();
     let n = route.len();
     (0..n)
-        .map(|i| {
-            let a = idx[&route[i]];
-            let b = idx[&route[(i + 1) % n]];
-            let dx = a.x() - b.x();
-            let dy = a.y() - b.y();
-            (dx * dx + dy * dy).sqrt()
-        })
+        .map(|i| idx[&route[i]].distance(idx[&route[(i + 1) % n]]))
         .sum()
 }
 
@@ -66,6 +61,7 @@ pub fn compare_tours(solver: &[usize], optimal: &[usize], cities: &[KDPoint]) ->
 }
 
 /// `compare_tours` on plain Euclidean distances rather than TSPLIB's rounded `EUC_2D`.
+#[doc(hidden)]
 pub fn compare_tours_unrounded(
     solver: &[usize],
     optimal: &[usize],

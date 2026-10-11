@@ -132,6 +132,7 @@ pub fn from_cities(cities: &[KDPoint]) -> DistanceMatrix {
 }
 
 /// Plain Euclidean, unrounded — see `DistanceMatrix::from_cities_unrounded`. For tests.
+#[doc(hidden)]
 pub fn from_cities_unrounded(cities: &[KDPoint]) -> DistanceMatrix {
     DistanceMatrix::from_cities_unrounded(cities).unwrap()
 }
@@ -185,6 +186,7 @@ impl DistanceMatrix {
     /// This exists for tests that exercise tour *mechanics* on coordinates whose rounded distances
     /// collapse. The five-city chain the solver tests share has every pairwise distance round to 1,
     /// so every tour costs the same and a test can no longer tell a good tour from a bad one.
+    #[doc(hidden)]
     pub fn from_cities_unrounded(cities: &[KDPoint]) -> Result<Self, &'static str> {
         Self::build_with(cities, |a, b| {
             let dx = a.x() - b.x();
@@ -689,6 +691,39 @@ mod tests {
         let res = res.unwrap();
 
         assert_eq!(&[1.0], res.distances());
+    }
+
+    /// TSPLIB's EUC_2D is `nint(sqrt(dx^2 + dy^2))`. The rounding *is* the metric: unrounded,
+    /// teeline optimises a different objective than `EDGE_WEIGHT_TYPE` names and cannot reproduce
+    /// any published optimum. A regression to the raw square root has to fail here.
+    #[test]
+    fn euc_2d_rounds_to_the_nearest_integer() {
+        let origin = KDPoint::new(&[0.0, 0.0]);
+        for (target, expected) in [
+            ([1.0, 0.0], 1.0),
+            ([3.0, 4.0], 5.0), // exact
+            ([2.0, 1.0], 2.0), // sqrt(5) = 2.236 -> 2
+            ([1.0, 1.0], 1.0), // sqrt(2) = 1.414 -> 1
+            ([0.0, 0.5], 1.0), // exactly .5 rounds up, as nint does
+            ([0.0, 0.4], 0.0), // below .5 rounds down
+        ] {
+            assert_approx(expected, euc_2d_distance(&origin, &KDPoint::new(&target)));
+        }
+    }
+
+    /// Both builders must apply that same rounding, or a solver's reported cost would not be the
+    /// objective it optimised.
+    #[test]
+    fn the_matrix_builders_round_euc_2d() {
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![2.0, 1.0], vec![3.0, 4.0]]);
+        for dm in [
+            DistanceMatrix::from_cities(&cities).unwrap(),
+            DistanceMatrix::build(&cities, DistanceType::Euc2D).unwrap(),
+        ] {
+            assert_approx(2.0, dm.distance_between(0, 1).unwrap()); // sqrt(5)  = 2.236
+            assert_approx(3.0, dm.distance_between(1, 2).unwrap()); // sqrt(10) = 3.162
+            assert_approx(5.0, dm.distance_between(0, 2).unwrap()); // exact
+        }
     }
 
     #[test]

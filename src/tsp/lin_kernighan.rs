@@ -775,31 +775,34 @@ mod tests {
             .collect()
     }
 
+    /// LK at depth 1 must not "improve" a tour that is already 2-opt-optimal.
+    ///
+    /// The gadget this replaces used `[0, 2, 4, 1, 3, 5]` and claimed it was 2-opt-local. It is
+    /// not: a hexagon has exactly two 2-opt-optimal tours, the two perimeter traversals, and that
+    /// tour costs 9.93 against their 6.00. Depth-1 rightly improves it, and the test only passed
+    /// because it returned early whenever a move was found.
     #[test]
-    fn find_lk_move_depth1_cannot_improve_gadget() {
+    fn find_lk_move_depth1_finds_nothing_on_a_two_opt_optimal_tour() {
         let pts = hexagon_pts();
-        let dm = distance_matrix::from_cities(&pts);
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 5);
-        // This tour is constructed to be 2-opt-local but not LK-locally optimal
-        let tour = vec![0usize, 2, 4, 1, 3, 5];
+        let tour = vec![0usize, 1, 2, 3, 4, 5];
         let max_id = 5;
         let (next, prev) = flat_to_next_prev(&tour, max_id);
         let city_ids: Vec<usize> = tour.clone();
+
         let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &city_ids);
-        // depth-1 should find no improvement (tour is 2-opt optimal)
-        // Note: if this assertion fails, the gadget tour needs adjustment
-        if chain.is_some() {
-            // The tour may not be 2-opt-optimal for all configurations; skip rather than fail
-            // The important test is depth-2 finds something depth-1 doesn't
-            return;
-        }
-        assert!(chain.is_none(), "depth-1 should not improve this tour");
+
+        assert!(
+            chain.is_none(),
+            "depth-1 must not improve a 2-opt-optimal tour"
+        );
     }
 
     #[test]
     fn find_lk_move_depth2_improves_gadget() {
         let pts = hexagon_pts();
-        let dm = distance_matrix::from_cities(&pts);
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 5);
         let tour = vec![0usize, 2, 4, 1, 3, 5];
         let max_id = 5;
@@ -809,20 +812,19 @@ mod tests {
         let (next, prev) = flat_to_next_prev(&tour_mut, max_id);
         let city_ids: Vec<usize> = tour_mut.clone();
         // Try depth-2; if it finds a move, verify improvement
-        if let Some(chain) = find_lk_move(&next, &prev, &dm, &candidates, 2, &city_ids) {
-            apply_lk_chain(&chain, &mut tour_mut, &mut pos);
-            let after = tour_distance(&tour_mut, &dm);
-            assert!(
-                after < before,
-                "depth-2 move must improve tour: before={before} after={after}"
-            );
-            let (new_next, _) = flat_to_next_prev(&tour_mut, max_id);
-            assert!(
-                is_single_cycle(tour_mut[0], &new_next, 6),
-                "result must be a single cycle"
-            );
-        }
-        // If no depth-2 move found, the tour may already be LK-optimal — not a failure
+        let chain = find_lk_move(&next, &prev, &dm, &candidates, 2, &city_ids)
+            .expect("the gadget is built so depth-2 can improve it");
+        apply_lk_chain(&chain, &mut tour_mut, &mut pos);
+        let after = tour_distance(&tour_mut, &dm);
+        assert!(
+            after < before,
+            "depth-2 move must improve tour: before={before} after={after}"
+        );
+        let (new_next, _) = flat_to_next_prev(&tour_mut, max_id);
+        assert!(
+            is_single_cycle(tour_mut[0], &new_next, 6),
+            "result must be a single cycle"
+        );
     }
 
     // ── lk_pass ───────────────────────────────────────────────────────────────

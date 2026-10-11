@@ -106,7 +106,7 @@ mod tests {
             vec![1.0, 1.0],
             vec![1.0, 0.0],
         ]);
-        let dm = distance_matrix::from_cities(&cities);
+        let dm = distance_matrix::from_cities_unrounded(&cities);
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let problem = TspProblem::new(cities, dm);
         let result = solve(&problem, &HeuristicOptions::default(), None, Some(&optimal));
