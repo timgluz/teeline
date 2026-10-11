@@ -321,6 +321,29 @@ test.describe('algorithm benchmark section', () => {
     )
   })
 
+  test("shows the comparator's spread when its runs disagree", async ({
+    page,
+  }) => {
+    // 2opt is deterministic; aco is not, so its column cannot be a single number.
+    await fulfilPerSolver(page, {
+      '2opt': fixture('algorithm-2opt.json'),
+      aco: fixture('algorithm-synthetic.json'),
+    })
+    await page.goto('/algorithms/2opt/?compare=aco')
+    await scrollToSection(page)
+
+    const section = page.locator(
+      'section[aria-labelledby="benchmarks-heading"]',
+    )
+    await expect(section.locator('tfoot tr')).toHaveCount(2)
+    const eil76 = section.locator('tbody tr', { hasText: 'Eil 76' })
+    await expect(eil76).toContainText(/\d+\.\d+% \(\d+\.\d+%–\d+\.\d+%\)/)
+    // Its summary row carries the spread of the per-instance medians too.
+    await expect(section.locator('tfoot tr').nth(1)).toContainText(
+      /\d+\.\d+% \(\d+\.\d+%–\d+\.\d+%\)/,
+    )
+  })
+
   test('restores a comparison from ?compare=', async ({ page }) => {
     await fulfilPerSolver(page, {
       '2opt': fixture('algorithm-2opt.json'),
