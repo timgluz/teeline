@@ -43,18 +43,98 @@ function parseHeader(txt) {
   return fields
 }
 
-// Extract optimal cost from .opt.tour COMMENT field
+// TSPLIB ships the optimal *route* for many instances, and states its cost in the COMMENT only
+// sometimes. The forms vary — `(6528)`, `Length 6528`, `(Length 629)` — and some files carry no
+// COMMENT at all. Where the cost is missing it is still determined: the shipped route is optimal,
+// so its length under the instance's own distance definition *is* the optimum.
 function getOptimalCost(name) {
+  let txt
   try {
-    const path = join(TSP_DIR, `${name}.opt.tour`)
-    const txt = readFileSync(path, 'utf8')
-    const m = txt.match(/COMMENT\s*:\s*.*?\((\d+)\)/)
-    if (m) return parseInt(m[1])
-    // Alternative: single number at end of COMMENT
-    const m2 = txt.match(/COMMENT\s*:\s*.*?(\d+)\s*$/)
-    if (m2) return parseInt(m2[1])
-  } catch { return null }
-  return null
+    txt = readFileSync(join(TSP_DIR, `${name}.opt.tour`), 'utf8')
+  } catch {
+    return null
+  }
+  // The old fallback omitted the `m` flag, so a cost on any line but the last never matched and
+  // `Length 6528` read as unknown.
+  for (const re of [
+    /COMMENT\s*:\s*[^\n]*?\(Length\s+(\d+)\)/,
+    /COMMENT\s*:\s*[^\n]*?\((\d+)\)/,
+    /COMMENT\s*:\s*[^\n]*?Length\s+(\d+)/,
+  ]) {
+    const m = txt.match(re)
+    if (m) return parseInt(m[1], 10)
+  }
+  return tourLength(name, txt)
+}
+
+const nint = v => Math.floor(v + 0.5)
+
+// TSPLIB ATT: r = sqrt((dx^2 + dy^2) / 10), then nint(r), plus one when that rounding went down.
+function attDistance(a, b) {
+  const r = Math.sqrt(((a.x - b.x) ** 2 + (a.y - b.y) ** 2) / 10)
+  const t = nint(r)
+  return t < r ? t + 1 : t
+}
+
+// TSPLIB CEIL_2D: Euclidean distance rounded up.
+function ceilDistance(a, b) {
+  return Math.ceil(Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2))
+}
+
+// TSPLIB GEO: coordinates are (degrees, minutes) pairs, and the result is truncated, not rounded.
+function geoDistance(a, b) {
+  const toRad = v => {
+    const deg = Math.trunc(v)
+    return (Math.PI * (deg + (5 * (v - deg)) / 3)) / 180
+  }
+  const [latA, lonA, latB, lonB] = [toRad(a.x), toRad(a.y), toRad(b.x), toRad(b.y)]
+  const q1 = Math.cos(lonA - lonB)
+  const q2 = Math.cos(latA - latB)
+  const q3 = Math.cos(latA + latB)
+  return Math.floor(6378.388 * Math.acos(0.5 * ((1 + q1) * q2 - (1 - q1) * q3)) + 1)
+}
+
+// Score TSPLIB's optimal route under the instance's own distance definition.
+//
+// Restricted to the types whose definition can be reproduced exactly here. EUC_2D is deliberately
+// excluded: TSPLIB rounds it with nint() and teeline does not, so a length computed under our
+// metric would be neither TSPLIB's optimum nor the optimum of the metric teeline actually
+// optimises — and publishing it as `optimalCost` would be a claim nothing supports. See
+// tasks/fix-euc-2d-rounding.
+function tourLength(name, tourTxt) {
+  let tsp
+  try {
+    tsp = readFileSync(join(TSP_DIR, `${name}.tsp`), 'utf8')
+  } catch {
+    return null
+  }
+  const type = (parseHeader(tsp)['EDGE_WEIGHT_TYPE'] || '').toUpperCase()
+  const byType = { ATT: attDistance, CEIL_2D: ceilDistance, GEO: geoDistance }
+  const distance = byType[type]
+  if (!distance) return null
+
+  const coords = new Map()
+  const section = tsp.match(/NODE_COORD_SECTION\s*([\s\S]*?)(?:EOF|$)/)
+  if (!section) return null
+  for (const line of section[1].split('\n')) {
+    const parts = line.trim().split(/\s+/)
+    if (parts.length >= 3) {
+      const [id, x, y] = [parseInt(parts[0], 10), parseFloat(parts[1]), parseFloat(parts[2])]
+      if (Number.isInteger(id) && !isNaN(x) && !isNaN(y)) coords.set(id, { x, y })
+    }
+  }
+
+  const route = (tourTxt.match(/TOUR_SECTION\s*([\s\S]*?)(?:-1|EOF)/)?.[1] || '')
+    .split('\n')
+    .map(s => parseInt(s.trim(), 10))
+    .filter(Number.isInteger)
+  if (route.length < 2 || route.some(id => !coords.has(id))) return null
+
+  let total = 0
+  for (let i = 0; i < route.length; i++) {
+    total += distance(coords.get(route[i]), coords.get(route[(i + 1) % route.length]))
+  }
+  return Math.round(total)
 }
 
 // Parse NODE_COORD_SECTION for (x,y) pairs

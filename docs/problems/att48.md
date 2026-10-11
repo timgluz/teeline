@@ -5,7 +5,7 @@ description: "48 capitals of the US (Padberg/Rinaldi)"
 cities: 48
 sizeGroup: "small"
 edgeWeightType: "ATT"
-optimalCost: null
+optimalCost: 10628
 dataUrl: "https://static.tspsolver.com/tsplib/att48.tsp"
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
