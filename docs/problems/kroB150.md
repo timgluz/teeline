@@ -8,6 +8,7 @@ edgeWeightType: "EUC_2D"
 optimalCost: 26130
 dataUrl: "https://static.tspsolver.com/tsplib/kroB150.tsp"
 minimapUrl: "https://static.tspsolver.com/minimaps/v1/kroB150.svg"
+ogImageUrl: "https://static.tspsolver.com/minimaps/v1/og/kroB150.png"
 minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
