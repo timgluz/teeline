@@ -3,7 +3,7 @@ id: 01a12b6c-7972-75a3-8d90-7b09d57a8172
 slug: tasks/index-benchmark-markers
 title: "feat(web): mark instances and solvers that have published results on the index pages"
 type: task
-status: active
+status: completed
 priority: medium
 tags: [benchmarks, teeline-web, frontend]
 ---
@@ -102,3 +102,8 @@ the full non-auth suite at 67 passed with the 5 pre-existing `webmcp` failures t
 
 Mark this completed once #582 merges. Live behaviour at the time of writing: 12 of 111 instances
 marked, all 21 solvers marked.
+
+### 2026-10-11 — merged
+
+#582 merged, which is the condition this task set for itself. Live behaviour: 12 of 111 instances
+marked, all 21 solvers marked, one manifest request per page.
