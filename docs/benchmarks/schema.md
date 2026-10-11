@@ -42,6 +42,7 @@ Concretely, v2:
 | Public URL | `https://static.tspsolver.com/bench/v2/` | R2 custom domain |
 | Release snapshots | R2 bucket, prefix `bench/v2/snapshots/{tag}/` | `scripts/publish-benchmarks.sh --snapshot` |
 | Per-family budgets | `bench/budgets.json` | committed |
+| | | *(a publish aborts if this is missing: empty budgets would overwrite the live ones)* |
 | Archived observations | criteriondb, `tspsolver` profile | `scripts/publish-benchmarks.sh` |
 | Solver identity map | `bench/solvers.json` | committed |
 
@@ -116,6 +117,8 @@ that follow are tab-separated:
 # tier=a
 # timeout_s=180
 # measured_at=2026-10-12T09:00:00Z
+# os=linux
+# build=release
 solver <TAB> dataset <TAB> config <TAB> run <TAB> wall_s <TAB> peak_rss_kb <TAB> tour_cost <TAB> status
 nn <TAB> berlin52 <TAB> default <TAB> 1 <TAB> 0.0000 <TAB> 6720 <TAB> 8980.91797 <TAB> ok
 ```
@@ -168,10 +171,10 @@ nests variants of the same solver.
 | --- | --- |
 | `git_commit` | The commit the **measured binary** came from |
 | `git_commit_source` | `tsv` if the benchmark file recorded that commit; `publish-time` if it did not |
-| `dirty` | Whether the tree was dirty when the measurement was taken; `null` if the TSV did not record it |
+| `dirty` | Whether the tree was dirty when the measurement was taken. `true`/`false` only for the documented `0`/`1`; anything else, or absent, is `null` |
 | `teeline_version` | Version of the measured binary |
 | `measured_at` | When the measurement was taken (not when it was published); `null` if the TSV did not record it |
-| `environment` | `os`, `build`, `rust_version` |
+| `environment` | `os`, `build`, `rust_version` — describing the **measured** binary, so each is `null` when the TSV did not record it |
 
 Rules:
 
@@ -186,7 +189,13 @@ Rules:
   `--require-clean`.
 - `environment` is required. Wall-clock numbers are meaningless without it, and
   the page shows it beside the table.
-- Every field the TSV did not record is `null`, never the publisher's value. A header carrying
+- Every field the TSV did not record is `null`, never the publisher's value. This includes
+  `environment.os` and `environment.build`: inferring "linux/release" from the publishing machine
+  would attach the publisher's platform to a number measured elsewhere, and under the differential
+  cadence that shard is carried over unchanged. (The one exception is a TSV with **no** provenance
+  header at all, where the whole block is publish-time and `git_commit_source` says so.)
+- `dirty` accepts only the documented `0` and `1`. `# dirty=` empty, `yes`, `true` or a typo yield
+  `null` — unknown — rather than being read as "the tree was clean", which is a claim nobody checked. A header carrying
   `git_commit` but no `dirty` must not pair the measured commit with the publisher's dirty flag,
   version or rustc — that is the same false claim in miniature, and once written into a shard under
   the differential cadence it is permanent.

@@ -85,8 +85,40 @@ publish() {
     [ "$(jq -r '.measurement.git_commit_source' "$shard")" = "tsv" ]
     [ "$(jq -r '.measurement.dirty' "$shard")" = "false" ]
     [ "$(jq -r '.measurement.teeline_version' "$shard")" = "1.0.0" ]
-    [ "$(jq -r '.measurement.environment.build' "$shard")" = "release" ]
-    [ -n "$(jq -r '.measurement.measured_at' "$shard")" ]
+    # os/build describe the measured binary, so a fixture that does not record them yields
+    # null rather than the publisher's platform.
+    [ "$(jq -r '.measurement.environment.os' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.environment.build' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.environment.rust_version' "$shard")" = "1.90.0" ]
+    # No `# measured_at=` in this fixture, so it stays unknown.
+    [ "$(jq -r '.measurement.measured_at' "$shard")" = "null" ]
+}
+
+@test "the environment block describes the measured binary when the TSV records it" {
+    { echo "# os=freebsd"; echo "# build=debug"; cat "$TMPDIR/prev.tsv"; } > "$TMPDIR/env.tsv"
+    run publish --tsv "$TMPDIR/env.tsv"
+    [ "$status" -eq 0 ]
+    local shard="$TMPDIR/stage/v2/algorithms/nn.json"
+    [ "$(jq -r '.measurement.environment.os' "$shard")" = "freebsd" ]
+    [ "$(jq -r '.measurement.environment.build' "$shard")" = "debug" ]
+}
+
+@test "an unparseable dirty value is unknown, not a claim of a clean tree" {
+    # Appended, not prepended: the parser takes the last occurrence of a key, and the fixture
+    # already carries `# dirty=0`.
+    { cat "$TMPDIR/prev.tsv"; echo "# dirty=yes"; } > "$TMPDIR/baddirty.tsv"
+    run publish --tsv "$TMPDIR/baddirty.tsv"
+    [ "$status" -eq 0 ]
+    # Only the documented 0/1 are answers; "yes" must not be read as clean.
+    [ "$(jq -r '.measurement.dirty' "$TMPDIR/stage/v2/algorithms/nn.json")" = "null" ]
+}
+
+@test "a missing budgets file aborts rather than publishing an empty budget map" {
+    run publish --tsv "$TMPDIR/prev.tsv" --budgets "$TMPDIR/nope.json"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"budgets file not found"* ]]
+    # Publishing {} would overwrite the live budgets, leaving gaps without their allowance.
+    [ ! -f "$TMPDIR/stage/v2/index.json" ]
 }
 
 @test "index.json makes no dataset-level claim about the measured commit" {

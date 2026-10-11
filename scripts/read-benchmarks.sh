@@ -56,6 +56,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Validated here as well as in publish: a tag is interpolated into the object key, so `../x`
+# would escape the snapshots prefix. Read-only, but the rule should hold at every entry point.
+if [[ -n "$SNAPSHOT_TAG" && ! "$SNAPSHOT_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "ERROR: invalid snapshot tag '$SNAPSHOT_TAG'." >&2
+  echo "       Use letters, digits, dot, dash or underscore, starting with a letter or digit." >&2
+  exit 2
+fi
+
 if [[ -n "$SNAPSHOT_TAG" ]]; then
   PREFIX="${PREFIX%/}/snapshots/$SNAPSHOT_TAG"
 fi
@@ -122,6 +130,10 @@ case "$cmd" in
     # The snapshot's own manifest. Provenance is per shard here too, so there is no single
     # "measured with" value to print.
     tag="${ARGS[1]:?snapshot requires a tag, e.g. 'snapshot v1.0.0'}"
+    if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+      echo "ERROR: invalid snapshot tag '$tag'." >&2
+      exit 2
+    fi
     if [[ -n "$SNAPSHOT_TAG" ]]; then
       echo "ERROR: 'snapshot' already reads a snapshot; drop one of the two tags" >&2
       exit 2

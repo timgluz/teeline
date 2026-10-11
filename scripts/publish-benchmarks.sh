@@ -208,8 +208,10 @@ fetch_previous() {
   local base="$PUBLIC_BASE/${PREFIX}" dest="$PREVIOUS/v2"
   # Start clean. A shard left over from an earlier run must not be merged as if it had been
   # published, and the index fetched below is what defines which shards exist at all.
-  rm -rf "$dest"
-  mkdir -p "$dest/algorithms" "$dest/problems"
+  # `|| return 1` on each: bash suspends `set -e` inside a function invoked in a condition
+  # (`if ! fetch_previous`), so these would otherwise fail silently.
+  rm -rf "$dest" || return 1
+  mkdir -p "$dest/algorithms" "$dest/problems" || return 1
 
   # Capture the status rather than relying on curl's exit code: a 404 and a DNS failure both
   # fail, but only the first means there is nothing to merge with.
@@ -393,16 +395,22 @@ else:
 measurement = {
     "git_commit": git_commit,
     "git_commit_source": git_commit_source,
-    "dirty": None if dirty is None else dirty == "1",
+    # Only the documented 0/1 are answers. Anything else — an empty value, "true", a typo — is
+    # unknown, not a claim that the tree was clean.
+    "dirty": {"0": False, "1": True}.get(dirty),
     "teeline_version": teeline_version,
     # When the measurement was taken, which is not when it was published: a TSV carried forward
     # or republished would otherwise be stamped with today's date. The harness records this in
     # the TSV header; a file without it yields null rather than a publish-time stand-in that
     # would misdate the result.
     "measured_at": provenance.get("measured_at") or None,
+    # Everything here describes the *measured* binary, so like the fields above it comes from
+    # the TSV and is null when the file did not record it. `os` and `build` are not inferred
+    # from the publisher: a shard is carried over unchanged under the differential cadence, so
+    # a wrong "linux/release" would be permanent.
     "environment": {
-        "os": "linux",
-        "build": build_profile,
+        "os": provenance.get("os") or None,
+        "build": provenance.get("build") or None,
         "rust_version": rust_version,
     },
 }
@@ -420,7 +428,9 @@ try:
     budgets = budgets_doc.get("budgets", {})
     budgets_comment = budgets_doc.get("$comment", "")
 except FileNotFoundError:
-    print(f"    WARN: budgets file not found ({budgets_path}); budgets omitted", file=sys.stderr)
+    # Not a warning: publishing an empty budgets map would overwrite the live one, and a gap
+    # without its budget is uninterpretable. The file is committed, so its absence is a fault.
+    sys.exit(f"ERROR: budgets file not found: {budgets_path}")
 
 # --- parse the TSV ---------------------------------------------------------
 
@@ -730,6 +740,11 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
 
     # Solvers that only timed out never reach the leaderboard: there is nothing to rank.
     board = [b for b in board if b["runs"] > 0]
+    # A dataset absent from this TSV whose every entry belonged to a re-measured solver has an
+    # empty board. Publishing it would advertise a problem page with no results and list a
+    # dataset the replaced shards no longer reference.
+    if not board:
+        continue
     board.sort(key=rank_key)
     final_problems[dataset] = {
         "schema_version": SCHEMA_VERSION,
@@ -861,10 +876,12 @@ snapshot_stage() {
     esac
   fi
 
-  rm -rf "$snap"
-  mkdir -p "$snap"
-  cp "$STAGE/v2/index.json" "$snap/index.json"
-  cp -r "$STAGE/v2/algorithms" "$STAGE/v2/problems" "$snap/"
+  # Same reason as fetch_previous: this runs as `snapshot_stage ... || exit 1`, where `set -e`
+  # is off, and a partial copy must not be reported as a written snapshot.
+  rm -rf "$snap" || return 1
+  mkdir -p "$snap" || return 1
+  cp "$STAGE/v2/index.json" "$snap/index.json" || return 1
+  cp -r "$STAGE/v2/algorithms" "$STAGE/v2/problems" "$snap/" || return 1
   echo "==> Snapshot  snapshots/$tag ($(find "$snap" -name '*.json' | wc -l) object(s))"
 }
 
@@ -1101,7 +1118,14 @@ if [[ "$ONLY" == "criteriondb" || "$ONLY" == "both" ]]; then
   GIT_BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
   export GIT_COMMIT="${MEASURED_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo)}"
   export GIT_COMMIT_SOURCE="${MEASURED_SOURCE:-publish-time}"
-  export GIT_BRANCH="$GIT_BRANCH_NAME"
+  # The branch is the publisher's, so it may only accompany a commit that is also the
+  # publisher's. Pairing it with a measured commit would imply the measurement is on a branch
+  # it may never have been on.
+  if [[ "$GIT_COMMIT_SOURCE" == "publish-time" ]]; then
+    export GIT_BRANCH="$GIT_BRANCH_NAME"
+  else
+    export GIT_BRANCH=""
+  fi
   export BENCH_TIER="${TIER:-}"
   mirror_criteriondb
 fi
