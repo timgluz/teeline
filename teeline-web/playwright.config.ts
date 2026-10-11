@@ -5,7 +5,13 @@ export default defineConfig({
   // tests/auth runs under playwright.auth.config.ts (wrangler pages dev +
   // WebAuthn virtual authenticator) — not the astro dev server here.
   testIgnore: '**/auth/**',
-  timeout: 30_000,
+  // The explainer specs animate a whole solver run and legitimately take ~25s (bhk's DP run is the
+  // longest), so a 30s cap was one slow machine away from failing them.
+  timeout: 60_000,
+  // Animation timing under a loaded CI box is the one thing here that cannot be made
+  // deterministic from the test: a retry that passes is reported as flaky, so a real regression
+  // still fails twice.
+  retries: process.env.CI ? 1 : 0,
   use: {
     baseURL: 'http://localhost:4321',
     headless: true,
@@ -29,7 +35,9 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:4321',
     reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
+    // A cold Vite dependency optimisation on a fresh CI checkout regularly takes longer than the
+    // 30s this used to allow, and Playwright gives up before the first test runs.
+    timeout: 120_000,
     // Astro auto-detects it's running inside an AI coding agent environment
     // and silently daemonizes `astro dev` (returns immediately, server keeps
     // running detached) unless this is set — which breaks Playwright's

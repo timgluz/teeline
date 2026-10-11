@@ -1,9 +1,16 @@
 name: web-e2e
 
-# Browser-level e2e for the WebAuthn auth service (register → mint → verify →
-# revoke) against the local Pages stack with a virtual authenticator.
-# Runs only the web side (wrangler pages dev + local D1) — no Cloudflare auth,
-# no Rust build required.
+# Two browser jobs, split by what they need to run.
+#
+# `e2e` is the WebAuthn auth service (register → mint → verify → revoke) against
+# the local Pages stack with a virtual authenticator: wrangler pages dev + local
+# D1, its own config, no Cloudflare auth and no Rust build.
+#
+# `e2e-web` is every other spec — the explainers, the benchmark sections, the
+# landing chart, the problem pages — against `astro dev`. Until it existed, a
+# green `e2e` check meant "the auth flows still work", not "the site still
+# works", and the specs it was not running had rotted (webmcp still asserted
+# forms that had moved off the home page).
 
 "on":
   push:
@@ -41,3 +48,35 @@ jobs:
       - name: Run auth e2e
         working-directory: teeline-web
         run: npm run test:e2e:auth
+
+  # The rest of the suite. Splitting rather than extending the job above keeps the auth stack (and
+  # its 3-minute wrangler startup) out of the way of specs that only need `astro dev`, and leaves
+  # the existing check's name and meaning alone.
+  e2e-web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: teeline-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: teeline-web
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: teeline-web
+        run: npx playwright install chromium
+
+      # One project, not both: `chrome` selects the runner's own Google Chrome via `channel`, and
+      # only Chromium is installed here. The specs are browser-agnostic (WebMCP's agent event is
+      # simulated), and a developer still runs both with `npm run test:e2e`.
+      - name: Run the web e2e suite
+        working-directory: teeline-web
+        run: npx playwright test --project=chromium
+        env:
+          CI: true
