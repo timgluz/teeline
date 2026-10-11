@@ -40,6 +40,9 @@ import {
   formatSeconds,
   formatTour,
   lostRunsNote,
+  leaderboardAxis,
+  leaderboardFamilies,
+  leaderboardRows,
   observations,
   pairRows,
   parseAlgorithmShard,
@@ -92,7 +95,7 @@ describe('parseAlgorithmShard', () => {
   })
 
   it('reads a killed cell whose summaries are explicitly null', () => {
-    const cell = synthetic.results.a280.byConfig.default
+    const cell = synthetic.results.a280.byConfig.budget
     expect(cell.runs).toBe(0)
     expect(cell.timeouts).toBe(5)
     expect(cell.tourCost).toBeNull()
@@ -691,6 +694,69 @@ describe('comparing two solvers', () => {
     )
     expect(series.points.map((point) => point.solver)).not.toContain('a')
     expect(series.omitted.a).toBe(1)
+  })
+})
+
+describe('the problem-page leaderboard', () => {
+  const berlin = parseProblemShard(JSON.parse(berlinRaw))
+  const noOptimum = parseProblemShard(JSON.parse(noOptimumRaw))
+  // The hand-written shard is the only one with a row that has no completed run, and with two
+  // configs of one solver.
+  const mixed = parseProblemShard(JSON.parse(problemSyntheticRaw))
+
+  it('ranks on gaps when the instance has a published optimum', () => {
+    expect(leaderboardAxis(berlin)).toBe('gap')
+    const rows = leaderboardRows(berlin)
+    const gaps = rows
+      .filter((row) => row.rank !== null)
+      .map((row) => row.gap!.median)
+    expect(gaps).toEqual([...gaps].sort((a, b) => a - b))
+    expect(rows.filter((row) => row.rank !== null)[0].rank).toBe(1)
+  })
+
+  it('ranks on tour cost, and shows no gap, when no optimum is published', () => {
+    expect(leaderboardAxis(noOptimum)).toBe('tour')
+    const rows = leaderboardRows(noOptimum)
+    expect(rows.every((row) => row.gap === null)).toBe(true)
+    const tours = rows.map((row) => row.tour!.median)
+    expect(tours).toEqual([...tours].sort((a, b) => a - b))
+  })
+
+  it('puts a row with no completed run last and unranked, rather than scoring it', () => {
+    const rows = leaderboardRows(mixed)
+    const killed = rows.find((row) => row.solver === 'gsa')!
+    expect(killed.noResult).toBe(true)
+    expect(killed.rank).toBeNull()
+    expect(killed.gap).toBeNull()
+    expect(killed.tour).toBeNull()
+    // Last, and behind every ranked row rather than mixed in among them.
+    expect(rows[rows.length - 1].solver).toBe('gsa')
+    expect(rows.filter((row) => row.rank !== null)).toHaveLength(
+      rows.length - 1,
+    )
+  })
+
+  it('keeps two configs of one solver as two ranked rows', () => {
+    const rows = leaderboardRows(mixed).filter(
+      (row) => row.solver === 'branch_bound',
+    )
+    expect(rows.map((row) => row.config).sort()).toEqual(['budget', 'exact'])
+    expect(rows.every((row) => row.rank !== null)).toBe(true)
+    // Distinct ranks: collapsing them would rank a beam search and an exact run as one entry.
+    expect(new Set(rows.map((row) => row.rank)).size).toBe(2)
+  })
+
+  it('names the families a board mixes, and invents none for an unknown solver', () => {
+    const families = leaderboardFamilies(leaderboardRows(mixed))
+    expect(families).toContain('exact')
+    expect(families).toContain('local')
+    expect(families).not.toContain(null)
+  })
+
+  it('carries determinism through, so a spread can be shown where it exists', () => {
+    const rows = leaderboardRows(mixed)
+    expect(rows.find((row) => row.solver === 'aco')?.deterministic).toBe(false)
+    expect(rows.find((row) => row.solver === '2opt')?.deterministic).toBe(true)
   })
 })
 

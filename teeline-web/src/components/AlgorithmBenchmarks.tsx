@@ -10,7 +10,7 @@ import { useEffect, useState } from 'preact/hooks'
 
 import { niceTicks, placeLabels } from '../lib/chart-layout'
 import { SOLVER_INDEX, solverById } from '../lib/solver-index'
-import { SOLVER_META } from '../nav-data'
+import { solverLabel } from '../lib/solver-label'
 import {
   DASH,
   algorithmShardUrl,
@@ -83,11 +83,29 @@ const SOLVER_IDS = new Set(SOLVER_INDEX.map((solver) => solver.id))
 
 /** Every solver that publishes a shard, by display name — the picker's options. */
 const COMPARE_OPTIONS = [...SOLVER_INDEX]
-  .map((solver) => ({ id: solver.id, name: solverName(solver.id) }))
+  .map((solver) => ({ id: solver.id, name: solverLabel(solver.id) }))
   .sort((a, b) => a.name.localeCompare(b.name))
 
-function solverName(id: string): string {
-  return SOLVER_META[id]?.name ?? id
+/**
+ * A gap with its spread when the runs disagreed.
+ *
+ * A comparator whose tours vary must not be summarised as one number, the same rule the primary
+ * follows with its own best/worst columns. A deterministic solver's best and worst *are* its
+ * median, so the spread would only be noise in that cell.
+ */
+function gapWithSpread(row: BenchmarkRow): string {
+  if (row.gap === null) return DASH
+  if (row.deterministic) return formatGapPct(row.gap.median)
+  return `${formatGapPct(row.gap.median)} (${formatGapPct(
+    row.gap.best,
+  )}–${formatGapPct(row.gap.worst)})`
+}
+
+function summaryGapWithSpread(summary: Summary): string {
+  if (summary.deterministic) return formatGapPct(summary.medianGapPct)
+  return `${formatGapPct(summary.medianGapPct)} (${formatGapPct(
+    summary.medianGapBestPct,
+  )}–${formatGapPct(summary.medianGapWorstPct)})`
 }
 
 interface Comparison {
@@ -116,7 +134,7 @@ function buildComparison(
   const pairs = pairRows(primaryRows, rows)
   return {
     solver: compared.solver,
-    name: solverName(compared.solver),
+    name: solverLabel(compared.solver),
     rows,
     budget,
     summary: summarise(rows, budget),
@@ -307,7 +325,7 @@ export default function AlgorithmBenchmarks({
       : null
   const compareNote =
     compare.kind === 'absent'
-      ? `${solverName(compareId ?? '')} has no published shard, so there is nothing to compare.`
+      ? `${solverLabel(compareId ?? '')} has no published shard, so there is nothing to compare.`
       : compare.kind === 'error'
         ? `The comparison could not be read (${compare.message}).`
         : compare.kind === 'loading'
@@ -491,7 +509,7 @@ export default function AlgorithmBenchmarks({
             <tr class="border-t-2 border-border font-medium">
               <td class="px-3 py-2">
                 {comparison
-                  ? solverName(shard.solver)
+                  ? solverLabel(shard.solver)
                   : `All ${summary.instances} instances`}
               </td>
               <td class="px-3 py-2 text-right font-mono">{DASH}</td>
@@ -565,7 +583,7 @@ export default function AlgorithmBenchmarks({
                   <td class="px-3 py-2 text-right font-mono">{DASH}</td>
                 )}
                 <td class="px-3 py-2 text-right font-mono">
-                  {formatGapPct(comparison.summary.medianGapPct)}
+                  {summaryGapWithSpread(comparison.summary)}
                 </td>
                 <td class="px-3 py-2 text-right font-mono">
                   {formatSeconds(comparison.summary.medianWallS)}
@@ -593,7 +611,7 @@ export default function AlgorithmBenchmarks({
             axisLabel={chartAxisLabel}
           />
           <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-3 font-mono text-xs">
-            <Legend colour={POINT_COLOR} label={solverName(shard.solver)} />
+            <Legend colour={POINT_COLOR} label={solverLabel(shard.solver)} />
             {comparison && (
               <Legend colour={COMPARED_COLOR} label={comparison.name} />
             )}
@@ -791,9 +809,7 @@ function Row({
       )}
       {comparing && (
         <td class="px-3 py-2 text-right font-mono">
-          {compared === null
-            ? 'not measured'
-            : formatGapPct(compared.gap?.median ?? null)}
+          {compared === null ? 'not measured' : gapWithSpread(compared)}
         </td>
       )}
       {comparing && (

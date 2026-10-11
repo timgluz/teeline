@@ -15,7 +15,7 @@
       "cities": 280,
       "optimal_cost": null,
       "by_config": {
-        "default": {
+        "budget": {
           "runs": 0,
           "timeouts": 5,
           "errors": 1,
@@ -28,7 +28,7 @@
       "cities": 52,
       "optimal_cost": null,
       "by_config": {
-        "default": {
+        "budget": {
           "runs": 5,
           "timeouts": 0,
           "errors": 0,
@@ -56,7 +56,7 @@
       "cities": 76,
       "optimal_cost": 538.0,
       "by_config": {
-        "default": {
+        "budget": {
           "runs": 5,
           "timeouts": 0,
           "errors": 0,
