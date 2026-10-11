@@ -12,9 +12,10 @@ import { minimapPoints, parseHeader } from './lib/problem-minimap.mjs'
 const TSP_DIR = join(import.meta.dirname, '..', 'data', 'tsplib')
 const DOCS_DIR = join(import.meta.dirname, '..', 'docs', 'problems')
 const DATA_BASE = 'https://static.tspsolver.com/tsplib'
-// Versioned so that changing how a map is drawn is a prefix bump rather than a cache purge; see
-// scripts/publish-minimaps.sh.
-const MINIMAP_BASE = 'https://static.tspsolver.com/tsplib/minimaps/v1'
+// Deliberately outside the `tsplib/` dataset prefix — the images and the instances they draw
+// should not share a listing — and versioned so that changing how a map is drawn is a prefix bump
+// rather than a cache purge. See scripts/publish-minimaps.sh.
+const MINIMAP_BASE = 'https://static.tspsolver.com/minimaps/v1'
 const SOURCE = 'TSPLIB95'
 const SOURCE_URL = 'https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/'
 // Dataset structured data (schema.org) needs an explicit creator and license.

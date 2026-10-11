@@ -7,7 +7,7 @@ sizeGroup: "small"
 edgeWeightType: "EXPLICIT"
 optimalCost: 1273
 dataUrl: "https://static.tspsolver.com/tsplib/swiss42.tsp"
-minimapUrl: "https://static.tspsolver.com/tsplib/minimaps/v1/swiss42.svg"
+minimapUrl: "https://static.tspsolver.com/minimaps/v1/swiss42.svg"
 minimapDerived: true
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

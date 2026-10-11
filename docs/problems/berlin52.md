@@ -7,7 +7,7 @@ sizeGroup: "small"
 edgeWeightType: "EUC_2D"
 optimalCost: 7542
 dataUrl: "https://static.tspsolver.com/tsplib/berlin52.tsp"
-minimapUrl: "https://static.tspsolver.com/tsplib/minimaps/v1/berlin52.svg"
+minimapUrl: "https://static.tspsolver.com/minimaps/v1/berlin52.svg"
 minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

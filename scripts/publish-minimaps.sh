@@ -14,9 +14,12 @@
 # The prefix is versioned, and that version is what makes the objects safe to cache for as long as
 # Cloudflare will: a change to how a map is drawn (the density threshold, the MDS layout) is a
 # prefix bump, not a cache purge, and the pages carry the matching URL in their frontmatter, so the
-# two move together. No Cache-Control header is set: `cf r2 objects put` has no flag for one, and
-# setting it only on the wrangler path would make the same publish cache differently depending on
-# which client a machine has. A Cache Rule on the bucket can set the lifetime.
+# two move together. It sits at the bucket root rather than under `tsplib/`, so a listing of the
+# datasets never returns images and vice versa.
+#
+# No Cache-Control header is set: `cf r2 objects put` has no flag for one, and setting it only on
+# the wrangler path would make the same publish cache differently depending on which client a
+# machine has. A Cache Rule on the bucket can set the lifetime.
 
 set -euo pipefail
 
@@ -28,7 +31,7 @@ cd "$ROOT"
 # shellcheck disable=SC1091
 source "$ROOT/scripts/lib/r2.sh"
 
-PREFIX="tsplib/minimaps/v1"
+PREFIX="minimaps/v1"
 STAGE="build/minimaps"
 PUBLIC_BASE="${PUBLIC_BASE:-https://static.tspsolver.com}"
 CF_R2_BUCKET="${CF_R2_BUCKET:-}"
@@ -47,7 +50,7 @@ Usage: scripts/publish-minimaps.sh [options]
 
 Options:
   --bucket <name>       R2 bucket name (default: $CF_R2_BUCKET)
-  --prefix <key>        R2 key prefix (default: tsplib/minimaps/v1)
+  --prefix <key>        R2 key prefix (default: minimaps/v1)
   --public-base <url>   Base URL (default: https://static.tspsolver.com)
   --stage <dir>         Staging dir holding index.json (default: build/minimaps)
   --only <ids>          Comma-separated instance ids to publish

@@ -7,7 +7,7 @@ sizeGroup: "medium"
 edgeWeightType: "EUC_2D"
 optimalCost: 118282
 dataUrl: "https://static.tspsolver.com/tsplib/bier127.tsp"
-minimapUrl: "https://static.tspsolver.com/tsplib/minimaps/v1/bier127.svg"
+minimapUrl: "https://static.tspsolver.com/minimaps/v1/bier127.svg"
 minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

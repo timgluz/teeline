@@ -7,7 +7,7 @@ sizeGroup: "small"
 edgeWeightType: "EUC_2D"
 optimalCost: 538
 dataUrl: "https://static.tspsolver.com/tsplib/eil76.tsp"
-minimapUrl: "https://static.tspsolver.com/tsplib/minimaps/v1/eil76.svg"
+minimapUrl: "https://static.tspsolver.com/minimaps/v1/eil76.svg"
 minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"

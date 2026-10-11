@@ -6,7 +6,7 @@ import { expect, test, type Page } from '@playwright/test'
 // The minimaps are R2 objects, not inline SVG, so the contract this file pins is the one that can
 // silently break: the URL shape the page emits has to be the one scripts/publish-minimaps.sh
 // writes, and a derived layout has to keep saying that it is derived.
-const MINIMAP_BASE = 'https://static.tspsolver.com/tsplib/minimaps/v1'
+const MINIMAP_BASE = 'https://static.tspsolver.com/minimaps/v1'
 
 const stagedSvg = (id: string): string | null => {
   const path = fileURLToPath(

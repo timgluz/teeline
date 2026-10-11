@@ -72,9 +72,9 @@ stage() {
 
     run "$PUBLISH" --dry-run --first-publish --stage "$STAGE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"would put tsplib/minimaps/v1/alpha.svg (image/svg+xml)"* ]]
-    [[ "$output" == *"would put tsplib/minimaps/v1/beta.svg (image/svg+xml)"* ]]
-    [[ "$output" == *"would put tsplib/minimaps/v1/index.json (application/json)"* ]]
+    [[ "$output" == *"would put minimaps/v1/alpha.svg (image/svg+xml)"* ]]
+    [[ "$output" == *"would put minimaps/v1/beta.svg (image/svg+xml)"* ]]
+    [[ "$output" == *"would put minimaps/v1/index.json (application/json)"* ]]
     [[ "$output" == *"3 object(s) would be uploaded"* ]]
 }
 
@@ -96,10 +96,10 @@ stage() {
 
     run "$PUBLISH" --dry-run --previous "$TMPDIR/stale.json" --stage "$STAGE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"would put tsplib/minimaps/v1/alpha.svg"* ]]
-    [[ "$output" != *"would put tsplib/minimaps/v1/beta.svg"* ]]
+    [[ "$output" == *"would put minimaps/v1/alpha.svg"* ]]
+    [[ "$output" != *"would put minimaps/v1/beta.svg"* ]]
     # The index always follows the objects it describes.
-    [[ "$output" == *"would put tsplib/minimaps/v1/index.json"* ]]
+    [[ "$output" == *"would put minimaps/v1/index.json"* ]]
     [[ "$output" == *"2 object(s) would be uploaded, 1 unchanged"* ]]
 }
 
@@ -108,8 +108,8 @@ stage() {
 
     run "$PUBLISH" --dry-run --first-publish --only beta --stage "$STAGE"
     [ "$status" -eq 0 ]
-    [[ "$output" != *"would put tsplib/minimaps/v1/alpha.svg"* ]]
-    [[ "$output" == *"would put tsplib/minimaps/v1/beta.svg"* ]]
+    [[ "$output" != *"would put minimaps/v1/alpha.svg"* ]]
+    [[ "$output" == *"would put minimaps/v1/beta.svg"* ]]
 }
 
 @test "an unreadable published index fails instead of guessing" {
@@ -148,8 +148,8 @@ stage() {
 
     PATH="$FAKE_BIN:/usr/bin:/bin" run "$PUBLISH" --bucket test-bucket --first-publish --stage "$STAGE"
     [ "$status" -eq 0 ]
-    grep -q "cf r2 objects put tsplib/minimaps/v1/alpha.svg --bucket-name test-bucket --file $STAGE/alpha.svg --content-type image/svg+xml" "$CF_LOG"
-    grep -q "cf r2 objects put tsplib/minimaps/v1/index.json --bucket-name test-bucket --file $STAGE/index.json --content-type application/json" "$CF_LOG"
+    grep -q "cf r2 objects put minimaps/v1/alpha.svg --bucket-name test-bucket --file $STAGE/alpha.svg --content-type image/svg+xml" "$CF_LOG"
+    grep -q "cf r2 objects put minimaps/v1/index.json --bucket-name test-bucket --file $STAGE/index.json --content-type application/json" "$CF_LOG"
 }
 
 @test "wrangler is the fallback when cf is absent" {
@@ -157,8 +157,8 @@ stage() {
     # No `cf` on this PATH, but the fake `npx` satisfies the wrangler probe.
     PATH="$FAKE_BIN_NO_CF:/usr/bin:/bin" run env -u CF_R2_BUCKET "$PUBLISH" --bucket test-bucket --first-publish --stage "$STAGE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"put tsplib/minimaps/v1/alpha.svg"* ]]
-    grep -q "npx --no-install wrangler r2 object put test-bucket/tsplib/minimaps/v1/alpha.svg --file $STAGE/alpha.svg --content-type image/svg+xml" "$CF_LOG"
+    [[ "$output" == *"put minimaps/v1/alpha.svg"* ]]
+    grep -q "npx --no-install wrangler r2 object put test-bucket/minimaps/v1/alpha.svg --file $STAGE/alpha.svg --content-type image/svg+xml" "$CF_LOG"
 }
 
 @test "--verify reports objects the bucket is not serving" {
@@ -166,7 +166,7 @@ stage() {
 
     run "$PUBLISH" --verify --public-base "http://127.0.0.1:9/nothing" --stage "$STAGE"
     [ "$status" -eq 1 ]
-    [[ "$output" == *"MISSING http://127.0.0.1:9/nothing/tsplib/minimaps/v1/alpha.svg"* ]]
+    [[ "$output" == *"MISSING http://127.0.0.1:9/nothing/minimaps/v1/alpha.svg"* ]]
     [[ "$output" == *"are not published"* ]]
 }
 
@@ -174,8 +174,8 @@ stage() {
     stage "$STAGE" alpha
     # Serve the staging dir at the prefix path, the layout a published object ends up under.
     local root="$TMPDIR/served"
-    mkdir -p "$root/tsplib/minimaps"
-    ln -s "$STAGE" "$root/tsplib/minimaps/v1"
+    mkdir -p "$root/minimaps"
+    ln -s "$STAGE" "$root/minimaps/v1"
 
     local port=$((20000 + $$ % 20000))
     echo "$port" > "$TMPDIR/port"
@@ -183,7 +183,7 @@ stage() {
 
     local ready=0
     for _ in $(seq 1 50); do
-        if curl -sf -o /dev/null "http://127.0.0.1:$port/tsplib/minimaps/v1/index.json"; then
+        if curl -sf -o /dev/null "http://127.0.0.1:$port/minimaps/v1/index.json"; then
             ready=1
             break
         fi
