@@ -6,9 +6,11 @@
 > hand-recorded v1.0.1 snapshot for the record; retiring it is tracked in the GitKB task
 > `tasks/bench-docs-spec-update`.
 >
-> The optimum this file records is also the open EUC\_2D question: **7 544.37** is that route's
-> *unrounded* length, while `docs/problems/berlin52.md` publishes **7 542**, TSPLIB's `nint`-rounded
-> optimum. Which one the site states depends on `tasks/fix-euc-2d-rounding`.
+> The optimum this file records was the open EUC\_2D question, now settled: EUC\_2D rounds as
+> TSPLIB defines it (fixed in `fe89b6a9`), so berlin52's optimum is **7 542**, not the
+> **7 544.37** below, which was that route's *unrounded* length. Every gap in this table was
+> measured against the unrounded definition, so none of it is comparable with a published shard
+> — read it as a v1.0.1 record, not as current numbers.
 
 All solvers measured against the **berlin52** TSPLIB instance (52 cities, EUC\_2D).
 The known optimal tour cost is **7 544.37** (from `berlin52.opt.tour`).

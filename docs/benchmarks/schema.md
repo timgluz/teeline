@@ -232,7 +232,7 @@ Rules the harness enforces, each because the alternative is a hole in the publis
   "results": {
     "berlin52": {
       "cities": 52,
-      "optimal_cost": 7544.37,
+      "optimal_cost": 7542,
       "by_config": {
         "default": {
           "runs": 5,
@@ -297,23 +297,26 @@ Rules:
 The per-instance solver leaderboard, sorted by `gap_pct.median` ascending — or by
 `tour_cost.median` ascending when the optimal is unknown.
 
+The values below are drawn from the published berlin52 shard, so they can be checked against the
+live tree with `scripts/read-benchmarks.sh problem berlin52`.
+
 ```json
 {
   "schema_version": 2,
   "dataset": "berlin52",
   "cities": 52,
-  "optimal_cost": 7544.37,
+  "optimal_cost": 7542,
   "leaderboard": [
     {
       "solver": "lk",
-      "config": "default",
+      "config": "budget",
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
-      "gap_pct": { "median": 0.0, "best": 0.0, "worst": 0.0 },
-      "tour_cost": { "median": 7544.37, "best": 7544.37 },
-      "wall_s": { "median": 0.15 },
-      "peak_rss_kb": { "median": 6500 }
+      "gap_pct": { "median": 0.0, "best": 0.0, "worst": 3.3148 },
+      "tour_cost": { "median": 7542, "best": 7542, "worst": 7792 },
+      "wall_s": { "median": 0.112 },
+      "peak_rss_kb": { "median": 7040 }
     }
   ]
 }
