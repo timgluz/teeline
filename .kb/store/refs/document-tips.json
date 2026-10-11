@@ -330,6 +330,11 @@
       "document_id": "01a1273a-ef08-7462-b2da-bdef1659b8ba",
       "slug": "tasks/bench-lk-use-shared-plateau-option",
       "tip_commit_id": "01a1273b-010a-7d73-b30d-430172dc5719"
+    },
+    {
+      "document_id": "01a129e9-f1ca-7460-820b-95cd828a489e",
+      "slug": "tasks/ci-cli-e2e-bats-workflow",
+      "tip_commit_id": "01a129ea-162b-7da2-8d64-6e1697a84cbc"
     }
   ]
 }
