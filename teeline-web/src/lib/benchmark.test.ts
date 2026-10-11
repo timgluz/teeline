@@ -1,0 +1,412 @@
+import { describe, expect, it } from 'vitest'
+
+// Fixtures are pinned to the 2026-10-11 prelim publish (`index.json`
+// generated_at 2026-10-11T11:00:18Z, measurements at commit e4588d6f) and are trimmed
+// copies of the live shards. `algorithm-synthetic.json` is hand-written: it covers the
+// two cases the live tree cannot — a cell where every run was killed, and a
+// non-deterministic solver's spread — plus a shard whose provenance is publish-time
+// only. Read with `?raw`, as solver-index.test.ts does, so this test needs no Node
+// filesystem types.
+import twoOptRaw from './__fixtures__/algorithm-2opt.json?raw'
+import branchBoundRaw from './__fixtures__/algorithm-branch-bound.json?raw'
+import syntheticRaw from './__fixtures__/algorithm-synthetic.json?raw'
+
+import {
+  DASH,
+  SCHEMA_VERSION,
+  algorithmShardUrl,
+  benchmarkBaseUrl,
+  budgetFor,
+  buildRows,
+  chartSeries,
+  chooseColumns,
+  fetchAlgorithmShard,
+  fetchBenchmarkIndex,
+  formatDirty,
+  formatGapPct,
+  formatSeconds,
+  formatTour,
+  parseAlgorithmShard,
+  parseBenchmarkIndex,
+  provenance,
+  summarise,
+  timeoutNote,
+  type FetchLike,
+} from './benchmark'
+
+const twoOpt = parseAlgorithmShard(JSON.parse(twoOptRaw))
+const branchBound = parseAlgorithmShard(JSON.parse(branchBoundRaw))
+const synthetic = parseAlgorithmShard(JSON.parse(syntheticRaw))
+
+/** A fetch stub that answers every request with the same status and body. */
+function stubFetch(status: number, body: unknown): FetchLike {
+  return async () => ({
+    status,
+    ok: status >= 200 && status < 300,
+    json: async () => body,
+  })
+}
+
+const budget = { seconds: 300, agreed: false }
+
+describe('parseAlgorithmShard', () => {
+  it('normalises the wire field names', () => {
+    expect(twoOpt.solver).toBe('2opt')
+    expect(twoOpt.configs).toEqual(['budget'])
+    expect(twoOpt.results.eil76.byConfig.budget.gapPct?.median).toBe(15.2472)
+    expect(twoOpt.results.eil76.byConfig.budget.wallS?.median).toBeGreaterThan(
+      0,
+    )
+    expect(twoOpt.measurement.teelineVersion).toBe('1.0.12')
+    expect(twoOpt.measurement.gitCommit).toBe('e4588d6f')
+  })
+
+  it('keeps an unknown optimum as null rather than a zero gap', () => {
+    // berlin52 has no published optimum, so no gap exists for it. A 0 here would read
+    // as "reached the optimum", which is the opposite of what the data says.
+    expect(twoOpt.results.berlin52.optimalCost).toBeNull()
+    expect(twoOpt.results.berlin52.byConfig.budget.gapPct).toBeNull()
+    expect(
+      twoOpt.results.berlin52.byConfig.budget.tourCost?.median,
+    ).toBeGreaterThan(0)
+  })
+
+  it('reads a killed cell whose summaries are explicitly null', () => {
+    const cell = synthetic.results.a280.byConfig.default
+    expect(cell.runs).toBe(0)
+    expect(cell.timeouts).toBe(5)
+    expect(cell.tourCost).toBeNull()
+    expect(cell.wallS).toBeNull()
+  })
+
+  it('refuses a schema version it does not know', () => {
+    const future = {
+      ...JSON.parse(twoOptRaw),
+      schema_version: SCHEMA_VERSION + 1,
+    }
+    expect(() => parseAlgorithmShard(future)).toThrow(
+      /unsupported benchmark schema_version 3/,
+    )
+  })
+
+  it('refuses a measurement that cannot name the build', () => {
+    const nameless = { ...JSON.parse(twoOptRaw), measurement: {} }
+    expect(() => parseAlgorithmShard(nameless)).toThrow(/git_commit/)
+  })
+
+  it('rejects a shard whose results are not an object', () => {
+    const broken = { ...JSON.parse(twoOptRaw), results: [] }
+    expect(() => parseAlgorithmShard(broken)).toThrow(
+      /results is not an object/,
+    )
+  })
+})
+
+describe('fetchAlgorithmShard', () => {
+  it('treats 404 as absence, not as a failure', async () => {
+    expect(
+      await fetchAlgorithmShard('nope', false, stubFetch(404, null)),
+    ).toEqual({
+      kind: 'absent',
+    })
+  })
+
+  it('reports any other status as a real error', async () => {
+    const result = await fetchAlgorithmShard(
+      '2opt',
+      false,
+      stubFetch(500, null),
+    )
+    expect(result.kind).toBe('error')
+    if (result.kind === 'error') expect(result.status).toBe(500)
+  })
+
+  it('reports a transport failure without throwing', async () => {
+    const failing: FetchLike = async () => {
+      throw new Error('network down')
+    }
+    const result = await fetchAlgorithmShard('2opt', false, failing)
+    expect(result.kind).toBe('error')
+    if (result.kind === 'error') {
+      expect(result.status).toBeNull()
+      expect(result.message).toBe('network down')
+    }
+  })
+
+  it('reports an unreadable body as an error rather than a blank section', async () => {
+    const result = await fetchAlgorithmShard(
+      '2opt',
+      false,
+      stubFetch(200, { schema_version: 99 }),
+    )
+    expect(result.kind).toBe('error')
+  })
+
+  it('returns the parsed shard on success and reads the published URL', async () => {
+    let requested = ''
+    const ok: FetchLike = async (url) => {
+      requested = url
+      return { status: 200, ok: true, json: async () => JSON.parse(twoOptRaw) }
+    }
+    const result = await fetchAlgorithmShard('2opt', true, ok)
+    expect(requested).toBe('/bench/v2/algorithms/2opt.json')
+    expect(result.kind).toBe('ok')
+  })
+})
+
+describe('fetchBenchmarkIndex and budgetFor', () => {
+  const indexBody = {
+    schema_version: 2,
+    generated_at: '2026-10-11T11:00:18Z',
+    tier: 'a',
+    budgets: {
+      exact: { seconds: 60, agreed: false },
+      local: { seconds: 300, agreed: false },
+    },
+    solvers: [
+      { id: '2opt', name: '2-opt', family: 'local', configs: ['budget'] },
+    ],
+    problems: [{ id: 'eil76', cities: 76 }],
+  }
+
+  it('reads the per-family budgets the manifest publishes', () => {
+    const index = parseBenchmarkIndex(indexBody)
+    expect(index.tier).toBe('a')
+    expect(budgetFor(index, 'local')).toEqual({ seconds: 300, agreed: false })
+    expect(budgetFor(index, 'meta')).toBeNull()
+  })
+
+  it('returns null when the manifest cannot be read', async () => {
+    expect(await fetchBenchmarkIndex(false, stubFetch(404, null))).toBeNull()
+    expect(
+      await fetchBenchmarkIndex(false, stubFetch(200, { schema_version: 3 })),
+    ).toBeNull()
+    expect(budgetFor(null, 'local')).toBeNull()
+  })
+})
+
+describe('buildRows', () => {
+  it('orders rows by instance size', () => {
+    expect(buildRows(twoOpt).map((row) => row.dataset)).toEqual([
+      'gr17',
+      'berlin52',
+      'eil76',
+    ])
+  })
+
+  it('keeps two configs of one solver as separate rows', () => {
+    const rows = buildRows(branchBound)
+    expect(rows.map((row) => `${row.dataset}/${row.config}`)).toEqual([
+      'burma14/budget',
+      'burma14/exact',
+      'gr17/budget',
+      'gr17/exact',
+    ])
+    // A beam search and an exact run must not collapse into one entry.
+    expect(
+      rows.find((row) => row.dataset === 'gr17' && row.config === 'budget')?.gap
+        ?.median,
+    ).toBe(4.8921)
+    expect(
+      rows.find((row) => row.dataset === 'gr17' && row.config === 'exact')?.gap
+        ?.median,
+    ).toBe(0)
+  })
+
+  it('takes the display name and distance type from the problem collection', () => {
+    const rows = buildRows(twoOpt, {
+      eil76: { name: 'Eil 76', edgeWeightType: 'EUC_2D', cities: 76 },
+    })
+    const eil76 = rows.find((row) => row.dataset === 'eil76')!
+    expect(eil76.name).toBe('Eil 76')
+    expect(eil76.edgeWeightType).toBe('EUC_2D')
+    // A dataset with no problem doc still renders, under its own id.
+    expect(rows.find((row) => row.dataset === 'gr17')?.name).toBe('gr17')
+  })
+
+  it('takes determinism from bench/solvers.json', () => {
+    // 2opt is measured deterministic; aco is measured varying. The page must not be able
+    // to choose this per call site, or one of them will get it wrong.
+    expect(buildRows(twoOpt).every((row) => row.deterministic)).toBe(true)
+    expect(buildRows(synthetic).every((row) => !row.deterministic)).toBe(true)
+  })
+
+  it('marks a cell where nothing finished as having no result', () => {
+    const row = buildRows(synthetic).find((row) => row.dataset === 'a280')!
+    expect(row.noResult).toBe(true)
+    expect(row.gap).toBeNull()
+    expect(row.tour).toBeNull()
+    expect(row.wall).toBeNull()
+  })
+})
+
+describe('chooseColumns', () => {
+  it('shows a gap column when a row has a gap and the budget is known', () => {
+    expect(chooseColumns(buildRows(twoOpt), budget.seconds)).toEqual({
+      gap: true,
+      optimal: true,
+      spread: false,
+    })
+  })
+
+  it('drops the gap column when the budget is unknown', () => {
+    // A gap without the allowance it was measured under is uninterpretable, so the
+    // column goes rather than the budget (decision 4).
+    expect(chooseColumns(buildRows(twoOpt), null).gap).toBe(false)
+  })
+
+  it('drops the gap column when no row has one', () => {
+    const noOptimum = buildRows(twoOpt).filter((row) => row.optimal === null)
+    expect(noOptimum.length).toBeGreaterThan(0)
+    expect(chooseColumns(noOptimum, budget.seconds).gap).toBe(false)
+    expect(chooseColumns(noOptimum, budget.seconds).optimal).toBe(false)
+  })
+
+  it('asks for a spread only for a non-deterministic solver', () => {
+    expect(chooseColumns(buildRows(synthetic), budget.seconds).spread).toBe(
+      true,
+    )
+    expect(chooseColumns(buildRows(twoOpt), budget.seconds).spread).toBe(false)
+  })
+})
+
+describe('summarise', () => {
+  it('summarises one solver across its instances', () => {
+    const summary = summarise(buildRows(twoOpt), budget)
+    expect(summary.instances).toBe(3)
+    expect(summary.configs).toEqual(['budget'])
+    expect(summary.deterministic).toBe(true)
+    expect(summary.instancesWithOptimum).toBe(2)
+    expect(summary.medianGapPct).toBeCloseTo(7.6236, 4)
+    expect(summary.budgetSeconds).toBe(300)
+    expect(summary.budgetAgreed).toBe(false)
+    expect(summary.timeouts).toBe(0)
+  })
+
+  it('counts timeouts without letting them into the gaps', () => {
+    const rows = buildRows(synthetic)
+    const summary = summarise(rows, null)
+    expect(summary.timeouts).toBe(5)
+    // Only eil76 has a gap; the killed cell contributes nothing.
+    expect(summary.medianGapPct).toBe(3.5)
+    expect(summary.budgetSeconds).toBeNull()
+  })
+})
+
+describe('chartSeries', () => {
+  it('plots gaps when the shard has any, and counts what it left out', () => {
+    const series = chartSeries(buildRows(twoOpt))
+    expect(series.axis).toBe('gap')
+    expect(series.points.map((point) => point.dataset)).toEqual([
+      'gr17',
+      'eil76',
+    ])
+    // berlin52 has no optimum, so it is omitted rather than plotted as a zero gap.
+    expect(series.omitted.noOptimum).toBe(1)
+    expect(series.points.every((point) => Number.isFinite(point.y))).toBe(true)
+  })
+
+  it('falls back to tour length, and says so, when no instance has an optimum', () => {
+    const noOptimum = buildRows(synthetic).filter((row) => row.optimal === null)
+    const series = chartSeries(noOptimum)
+    expect(series.axis).toBe('tour')
+    expect(series.axisLabel).toMatch(/no published optimum/)
+    expect(series.points.map((point) => point.dataset)).toEqual(['berlin52'])
+    expect(series.omitted.noResult).toBe(1)
+  })
+
+  it('never plots a killed cell', () => {
+    const series = chartSeries(buildRows(synthetic))
+    expect(series.points.map((point) => point.dataset)).not.toContain('a280')
+    expect(series.omitted.noResult).toBe(1)
+  })
+
+  it('uses instance size for x', () => {
+    const series = chartSeries(buildRows(twoOpt))
+    expect(series.points.find((point) => point.dataset === 'gr17')?.x).toBe(17)
+  })
+})
+
+describe('timeoutNote', () => {
+  it('renders a killed cell as counts, never as a value', () => {
+    const row = buildRows(synthetic).find((row) => row.dataset === 'a280')!
+    expect(timeoutNote(row)).toBe('5 timeouts, 1 error')
+  })
+
+  it('renders nothing for a cell that finished', () => {
+    expect(timeoutNote(buildRows(twoOpt)[0])).toBe(DASH)
+  })
+
+  it('singularises one lost run', () => {
+    const row = { ...buildRows(twoOpt)[0], timeouts: 1, errors: 0 }
+    expect(timeoutNote(row)).toBe('1 timeout')
+  })
+})
+
+describe('provenance', () => {
+  it('names the commit the numbers came from', () => {
+    const lines = provenance(twoOpt.measurement)
+    const commit = lines.find((line) => line.label === 'measured at')!
+    expect(commit.value).toBe('e4588d6f (jsonl)')
+    expect(lines.find((line) => line.label === 'teeline')?.value).toBe('1.0.12')
+  })
+
+  it('flags a publish-time commit as not being the measured binary', () => {
+    const lines = provenance(synthetic.measurement)
+    expect(lines.find((line) => line.label === 'measured at')?.value).toMatch(
+      /publish-time, not the measured binary/,
+    )
+  })
+
+  it('does not read an unrecorded dirty flag as clean', () => {
+    expect(formatDirty(null)).toBe('dirty state not recorded')
+    expect(formatDirty(true)).toBe('dirty tree')
+    expect(formatDirty(false)).toBe('clean tree')
+    expect(
+      provenance(synthetic.measurement).find((line) => line.label === 'tree')
+        ?.value,
+    ).toBe('dirty state not recorded')
+  })
+
+  it('does not invent a version or an environment', () => {
+    const lines = provenance(synthetic.measurement)
+    expect(lines.find((line) => line.label === 'teeline')?.value).toBe(
+      'not recorded',
+    )
+    expect(lines.find((line) => line.label === 'environment')?.value).toBe(
+      'not recorded',
+    )
+  })
+})
+
+describe('formatting', () => {
+  it('formats gaps and tour costs', () => {
+    expect(formatGapPct(15.2472)).toBe('15.25%')
+    expect(formatGapPct(0)).toBe('0.00%')
+    expect(formatGapPct(null)).toBe(DASH)
+    expect(formatTour(8384.1885)).toBe('8384.19')
+    expect(formatTour(null)).toBe(DASH)
+  })
+
+  it('scales wall time to the magnitude', () => {
+    expect(formatSeconds(0.0129)).toBe('0.013 s')
+    expect(formatSeconds(27.8289)).toBe('27.83 s')
+    expect(formatSeconds(90)).toBe('1.5 min')
+    expect(formatSeconds(null)).toBe(DASH)
+  })
+})
+
+describe('URLs', () => {
+  it('proxies in dev and reads R2 in production', () => {
+    expect(benchmarkBaseUrl(true)).toBe('/bench/v2')
+    expect(benchmarkBaseUrl(false)).toBe(
+      'https://static.tspsolver.com/bench/v2',
+    )
+    expect(algorithmShardUrl('2opt', true)).toBe(
+      '/bench/v2/algorithms/2opt.json',
+    )
+    expect(algorithmShardUrl('a/b', false)).toBe(
+      'https://static.tspsolver.com/bench/v2/algorithms/a%2Fb.json',
+    )
+  })
+})
