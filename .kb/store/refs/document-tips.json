@@ -380,6 +380,11 @@
       "document_id": "01a12b43-c414-7e02-b8d9-42141ae3f5ee",
       "slug": "tasks/type-check-the-islands",
       "tip_commit_id": "01a12b43-e191-75a3-8bb4-639f68480e8f"
+    },
+    {
+      "document_id": "01a12b6c-7972-75a3-8d90-7b09d57a8172",
+      "slug": "tasks/index-benchmark-markers",
+      "tip_commit_id": "01a12b6c-9a50-76e2-80f8-bd7ac0761cad"
     }
   ]
 }
