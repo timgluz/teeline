@@ -3,7 +3,7 @@ id: 01a12b16-2fd0-7f11-abac-72499916b64e
 slug: tasks/bench-data-download
 title: "feat(web): offer the published benchmark data for download"
 type: task
-status: active
+status: completed
 priority: medium
 tags: [benchmarks, teeline-web, data]
 ---
@@ -65,3 +65,9 @@ with the section that renders the shard.
 
 `ProblemResults.tsx` links `problems/{id}.json`, the manifest and the contract from the leaderboard
 section's provenance block, so the last open criterion is met once #577 merges.
+
+### 2026-10-11 — completed (#577 merged)
+
+The task's own note said its last open criterion — the problem-page half, `ProblemResults.tsx`
+linking `problems/{id}.json`, the manifest and the contract — was met once #577 merged. It is
+(`e126ccc0`).

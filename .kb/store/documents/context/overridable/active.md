@@ -5,90 +5,69 @@ title: "Active Context"
 type: context
 status: active
 priority: medium
-tags: [auth, webauthn, web]
+tags: [web, publishing, benchmarks]
 ---
 
 ## Current Focus
 
-**Interactive explainers: series complete — every algorithm now has an explainer (2026-08-16).**
+**Problem pages now publish their own minimap and social card (2026-10-11).**
 
-All 21 explainers shipped (10 pre-Astro + 11 added in the #429–#434 series: greedy-edge,
-savings, aco, stochastic-hill, or-opt, 3-opt, christofides, branch-bound, bhk, 2-opt, nn),
-plus a new `/algorithms/` index page. Local `master` synced to `314c82e`; tree clean.
+Every `/problems/{id}/` page used to render its map as inline SVG in the markdown, which made a
+regeneration a 223k-line diff and gave all 111 pages the same `og:image`. The images are now R2
+objects (`minimaps/v1/{id}.svg`, `minimaps/v1/og/{id}.png`) and the docs are frontmatter-only.
 
-**Next session candidates (nothing claimed yet):**
-- **#438** — add a "Papers citing this dataset" section to problem pages (docs-algorithms
-  content work, same pipeline as the complexity-column work)
-- **#323** — teeline-excel Office Add-in (unrelated, untouched)
-- **WebAuthn auth Phase 0** — parked; design accepted in
-  `tasks/webauthn-auth-replace-clerk` (Pages Functions + D1 + `@simplewebauthn/server` scaffold)
+| PR | Merged | Change |
+|---|---|---|
+| #583 | `bd02f9ba` | `fix(tsplib)`: read all nine `EDGE_WEIGHT_FORMAT` layouts (was: `FULL_MATRIX`, `UPPER_ROW`, `LOWER_DIAG_ROW` only), which is what made `si175`/`si535`/`si1032` parse |
+| #584 | `674ccec3` | `feat(web)`: serve the minimaps from R2; docs drop 19.6 MB of inline SVG for 58 KB of frontmatter; MDS layout for the matrix-only instances, density grid above 3000 cities |
+| #585 | `b79b7c36` | `feat(web)`: a 1200x630 card per problem page, `og:image` + `Dataset.image` as a raster, publisher uploads **per object** |
+| #586 | `a96a42eb` | `ci(web)`: the non-auth Playwright suite runs in CI (`e2e-web`), not only the auth specs |
+| #587 | `350c5919` | `fix(scripts)`: the page generator scores `EUC_2D` tours with TSPLIB's `nint` rounding, and refuses a route that is not a permutation of the instance |
+| #588 | `dd0ee444` | `fix(web)`: the publisher refuses to publish (or verify) a page that links a card the bucket cannot serve |
 
-Process reminders: every change ships as its own PR, verified with astro check + tsc +
-vitest + **Playwright** (`.pw-browsers` chromium) + `ocr` review — see [[notes/agent-dev-notes]]
-for the environment gotchas before starting.
+Closed with them: `tasks/problem-minimaps-all-instances` (superseded), `problem-minimaps-as-r2-assets`,
+`problem-social-cards`, `tsplib-all-edge-weight-formats`, `ci-runs-only-auth-e2e`,
+`fix-euc-2d-rounding`, `minimap-pipeline-guards`, `gh-286-api-key-auth`, `gh-185-fourier-solver`.
 
-## Incoming focus: solver benchmarking (2026-10-12)
+Two content limitations are recorded rather than fixed: `brg180`'s derived layout is uninformative
+(its matrix has six distinct values; the page says the layout is derived), and `tsp225`'s route
+scores 3916 with f64 coordinates against 3919 under teeline's f32 storage, because 124 of its 225
+edges sit within 1e-6 of a `.5` rounding boundary.
 
-**In progress. First task done; two more prerequisites are next.**
+## Solver benchmarking (2026-10-11)
 
-Spec: `decisions/benchmarking-design`. Implementation plan (untracked, by design):
-`docs/superpowers/plans/2026-10-12-benchmark-all-algorithms.md`.
+**The pipeline is built and published.** `bench/v2/index.json` reports `tier: a`, 22 solvers,
+12 problems, measured at `fe89b6a9`; the algorithm and problem pages render it (#574, #576, #577),
+the index marks which instances have results (#582), and the raw runs are committed
+(`bench/runs/tier-a.jsonl`, 1245 rows with a per-row `status`).
 
-Goal: measure every solver on a capability-tiered instance set, publish versioned JSON, and
-render per-algorithm results on each algorithm page. Re-run differentially per release, keeping
-old versions for regression checking.
+The three prerequisites this section used to list are done: the SA epoch budget (`72007e0`), the
+plateau stop knob (`stagnation_epochs`), and `UPPER_DIAG_ROW` parsing (#583). Two lessons from that
+work are worth carrying forward:
 
-Nine tasks created, split from the plan:
+- **A bound that never takes effect is invisible unless you assert counts.** The SA budget could only
+  be observed by timing the process, where ~17ms of compute sat against ~180ms of fixed startup.
+- **Per-solver provenance is correctness-critical** — `algorithms/{id}.json` now records a
+  `measurement` block per solver (`git_commit`, `measured_at`, `version`, `os`, `rust_version`),
+  because a wrong provenance claim cannot be reconstructed after publication.
 
-| Task | Status / depends on |
-|---|---|
-| `tasks/bench-sa-honours-epoch-budget` | ✅ **completed** (`72007e0`) |
-| `tasks/bench-platoo-epochs-help-name` | ✅ **completed** (#563) |
-| `tasks/bench-plateau-stop-all-iterative` | **next** — plan written |
-| `tasks/bench-measurement-harness` | plateau only (other two landed) |
-| `tasks/bench-tier-a-campaign` | harness |
-| `tasks/bench-publish-provenance` | campaign |
-| `tasks/bench-algorithm-pages` | publish |
-| `tasks/bench-docs-spec-update` | publish |
-| `tasks/bench-single-solver-skill` | publish |
-| `tasks/bench-regression-history` | publish (optional, may stay unstarted) |
+Open benchmark tickets, by what they need: `bench-tier-a-campaign` (its raw data answers most of its
+criteria; one to-convergence config is unaccounted for), `bench-docs-spec-update` (`docs/benchmarks.md`
+is still not retired), `bench-single-solver-skill`, `bench-regression-history`,
+`bench-lk-use-shared-plateau-option` (`lin_kernighan` still does not use `stagnation_epochs`),
+`ci-cli-e2e-bats-workflow` (the suite runs inside `rust.yml`, not as its own workflow).
 
-Where to resume: **`tasks/bench-plateau-stop-all-iterative`** — the last prerequisite before the
-harness. Plan: `docs/superpowers/plans/2026-10-12-plateau-stop.md`.
+## Next session candidates (nothing claimed)
 
-Planning finding worth not rediscovering: the task says "reuse the existing `platoo_epochs`
-semantics", but the two implementations disagree — `lin_kernighan` **stops** on `platoo_epochs`,
-`stochastic_hill` **restarts**. The agreed resolution is a separate `stagnation_epochs` stop knob
-(decided with the user), leaving `platoo_epochs` as the restart threshold so hill climbing's search
-is unchanged. `lin_kernighan` migrates to the new knob.
+- **#438** — a "Papers citing this dataset" section on problem pages. Top web candidate; same
+  pipeline as the complexity-column and minimap work.
+- **#555** (open PR, mergeable, checks green) — renovate: ignore preact major updates. Needs a merge
+  decision, and its premise predates Astro 7.3.5.
+- The 11 open `draft` tickets listed above, plus `blog-passkeys-instead-of-clerk` (story post is
+  written and published; the technical-recipe follow-up is deliberately waiting on feedback) and
+  `ship-missing-optimal-tours` (25 problems publish an optimum but ship no `.opt.tour`).
 
-Cost driver: `platoo_epochs` has ~78 references across 9 files (lib, CLI, api models + service,
-wasm bindings + lib, qt), so a parallel field follows that whole path. Also note SOM is `som.rs`,
-not `kohonen_som.rs`, despite what the docs say.
-
-Lesson from the SA fix, worth applying to the plateau work: the iteration budget was only
-observable by timing the process, so a bound that never took effect went unnoticed — on a small
-instance the compute was ~17ms against ~180ms of fixed startup. Assert **counts**, not wall time.
-Also note `HeuristicOptions::from_cli` always returns the generic 10k `epochs`, overwriting
-anything set in a solver's `Default` impl; per-solver defaults belong in that solver's `from_cli`.
-
-Three things worth remembering when picking this up:
-
-1. **Per-solver provenance is correctness-critical and must land before the first differential
-   publish.** `algorithms/{id}.json` currently assumes one commit for the whole dataset, which
-   becomes a false claim once only some algorithms are re-measured — and unlike a wrong number it
-   cannot be reconstructed after publication.
-2. **"Convergence" is not yet measurable.** Only `lin_kernighan` and `stochastic_hill` have a
-   plateau stop, and `sa` ignores `--epochs` entirely (flat runtime at 10 vs 10000 epochs), so the
-   three prerequisite fixes gate everything downstream.
-3. **`si175` cannot be parsed** (`UPPER_DIAG_ROW` unsupported) — substitute rather than skip
-   silently when building the tier set.
-
-Related pre-existing gap: `gen-problem-pages.mjs` reads only the COMMENT line, so several problem
-pages show `optimalCost: null` despite a full `.opt.tour` being present.
-
-
-## Recent merges (master, 2026-08-16 session)
+## Recent merges (master, 2026-08-16 session, kept for history)
 
 | Commit | PR | Change |
 |---|---|---|
@@ -101,29 +80,26 @@ pages show `optimalCost: null` despite a full `.opt.tour` being present.
 | `e3fd1b3` | #474 | Branch & Bound explainer (#430) — tree viz, closed-cycle fix |
 | `314c82e` | #476 | topbar dropdown → `/algorithms/` index + Complexity column + aria-labels |
 
-Closed as redundant this session: **#473** (menubar PR — empty diff, content absorbed into
-the #475 squash). Docs consistency: `docs/algorithms/*.md` all carry a Complexity meta row;
-`nav-data.ts` mirrors it and a vitest test enforces the match.
-
-## Open PRs / queue
-
-- **#323** (open): teeline-excel Office Add-in — unrelated, untouched.
-- **#438** (open): "Papers citing this dataset" section on problem pages — top web candidate
-  for the next session.
-- **Blog follow-up** (planned, after auth ships): `tasks/blog-passkeys-instead-of-clerk` —
-  story post "Passkeys instead of Clerk" (no code, ~2000-2500 words) + later technical-recipe post.
-
 ## Local environment notes
 
-- Local `master` synced to `314c82e`; tree clean; `teeline-web` node_modules on astro 7.2.1.
-- SSH to GitHub is broken here — pushes/fetches need
-  `GIT_SSH_COMMAND="ssh -F /dev/null -i /home/timgluz/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new"`.
-- `npx` is unusable (read-only npm cache) — call `./node_modules/.bin/*` directly.
-- Playwright browsers live in the repo at `.pw-browsers` (gitignored); run e2e with
-  `PLAYWRIGHT_BROWSERS_PATH=/home/timgluz/repos/teeline/.pw-browsers` (+ `--project=chrome`).
-  `webmcp.spec.ts` requires a production build (WASM only in `dist/`).
-- Full gotcha list: [[notes/agent-dev-notes]].
-
+- Local `master` synced to `dd0ee444` (the #588 merge); `teeline-web` on astro 7.3.5, node 24.21.
+- Work in a worktree per task, and symlink the gitignored state it needs:
+  `ln -s /home/timgluz/repos/teeline/data <wt>/data` and the same for `teeline-web/node_modules`.
+  Remove the worktree when its PR merges — they carry a Rust `target/` (one was 4.6 GB).
+- **Playwright browsers are at `teeline-web/.e2e-state/browsers`** (not `.pw-browsers`, which is
+  gone): `PLAYWRIGHT_BROWSERS_PATH=/home/timgluz/repos/teeline/teeline-web/.e2e-state/browsers`.
+- **A killed `astro dev` leaves `.astro/dev.json` behind**, and the next run refuses to start with
+  "Another astro dev server is already running" naming a PID that no longer exists. `rm
+  teeline-web/.astro/dev.json` before a Playwright run; `pkill -f "[a]stro/bin/astro"` (brackets, or
+  it matches its own command line and kills the shell).
+- The WebMCP specs need the jco-transpiled bindings; a fresh worktree lacks them and those specs
+  fail there while CI passes. `tests/problem-minimaps.spec.ts` is self-contained.
+- `npx <installed tool>` works; installing a *new* package fails (read-only npm cache), so use the
+  binaries already in `node_modules`.
+- SSH to GitHub needs `git -c core.sshCommand="ssh -F /dev/null"` per command (a system
+  `ssh_config.d` file is owned by `nobody`).
+- Review every PR with `ocr` after opening it, and pass `--from origin/master` — a worktree's local
+  `master` is usually stale. Full gotcha list: [[notes/agent-dev-notes]].
 
 ## Older solver context (archived)
 

@@ -3,7 +3,7 @@ id: 01a12b43-c414-7e02-b8d9-42141ae3f5ee
 slug: tasks/type-check-the-islands
 title: "chore(web): type-check the Preact islands"
 type: task
-status: active
+status: completed
 priority: high
 tags: [teeline-web, typescript, testing]
 ---

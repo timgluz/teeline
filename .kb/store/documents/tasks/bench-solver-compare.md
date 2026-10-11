@@ -3,7 +3,7 @@ id: 01a12b16-2fb5-77a1-bda3-a36249775339
 slug: tasks/bench-solver-compare
 title: "feat(web): compare an algorithm's published results with another solver"
 type: task
-status: active
+status: completed
 priority: high
 tags: [benchmarks, teeline-web, frontend]
 ---
@@ -91,3 +91,8 @@ A non-deterministic comparator now renders its spread in its column and its summ
 (`8.18% (7.62%–8.92%)`), which is what the criterion asked for. This task can be marked completed
 once #577 merges; the fix landed on `feat/bench-problem-leaderboard` rather than a branch of its
 own, since both touch the same component.
+
+### 2026-10-11 — completed (#577 merged)
+
+The task's own note said it could be marked completed once #577 merged, since the missing
+non-deterministic-spread criterion was fixed there. #577 is merged (`e126ccc0`).

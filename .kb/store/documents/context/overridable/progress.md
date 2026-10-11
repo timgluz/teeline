@@ -10,13 +10,42 @@ tags: [161-]
 
 ## Current Status
 
-**Phase: Interactive-explainers series complete — all 21 explainers merged (2026-08-16).**
+**Phase: the problem-page publication pipeline shipped (2026-10-11).** Every `/problems/{id}/` page
+now carries a minimap and a 1200x630 social card served from R2 (`minimaps/v1/`), the docs are
+frontmatter-only, and the publisher refuses to publish a page whose card the bucket cannot serve.
 
-Local `master` synced to `314c82e` (PR #476 merge). Every algorithm on tspsolver.com now has
-an interactive explainer (10 pre-Astro + 11 added since: greedy-edge, savings, aco,
-stochastic-hill, or-opt, 3-opt, christofides, branch-bound, bhk, 2-opt, nn), plus an
-`/algorithms/` index page with complexity column. CI green; astro check + tsc + vitest +
-Playwright (chromium via `.pw-browsers`) all pass locally.
+Local `master` synced to `dd0ee444` (the #588 merge). `teeline-web` on astro 7.3.5, node 24.21.
+Verified on the merged heads: 165-page build, 588 vitest, `tsc`/`astro check` clean, 17 BATS for the
+publisher, the non-auth Playwright suite green in CI as the new `e2e-web` job. The solver side is
+unchanged except that `EUC_2D` now rounds as TSPLIB defines it (#575, followed by #587 in the page
+generator).
+
+Open tickets: **11 draft**, 1 active (`blog-passkeys-instead-of-clerk`, waiting on feedback for the
+recipe post), 0 blocked. One open PR (#555, renovate) and two open issues (#438, #323).
+
+## 2026-10-11
+
+- **Minimaps and social cards moved to R2** (#584, #585): 111 maps + 111 cards published under
+  `minimaps/v1/`, verified by reading all 223 objects back. `docs/problems/*.md` went from 19.6 MB of
+  inline SVG to 58 KB of frontmatter, so a regeneration is a reviewable diff rather than 223k lines.
+- **All nine `EDGE_WEIGHT_FORMAT` layouts parse** (#583), which unblocked `si175`/`si535`/`si1032`
+  and removed the one substitution the tier set needed.
+- **`EUC_2D` is TSPLIB-rounded everywhere it reports a cost**: #575 in the solver, #587 in the page
+  generator, which also had two latent defects the audit exposed — routes were parsed one id per
+  line (pr1002 scored a subset: 105695 against 259045) and nothing required a route to name every
+  city (rd100's 11-of-100 ids scored 4344 against a 7910 optimum).
+- **The non-auth Playwright suite runs in CI** (#586), as `e2e-web`, provisioning the released WASM
+  component. It immediately mattered: five WebMCP specs had been asserting the home page for forms
+  that live on `/solve/`.
+- **The publisher gained a guard that cannot pass over a 404** (#588): a page linking
+  `og/<id>.png` that the index has no `og` entry for stops both the publish and the `--verify` path.
+- Every PR was reviewed with `ocr` after opening it, which found real defects in two of them (the
+  permutation hole in #587, the card-404 hole in #585) and was wrong twice about #585's tests.
+- Tickets closed: `problem-minimaps-all-instances` (superseded), `problem-minimaps-as-r2-assets`,
+  `problem-social-cards`, `tsplib-all-edge-weight-formats`, `ci-runs-only-auth-e2e`,
+  `fix-euc-2d-rounding`, `minimap-pipeline-guards`, `gh-286-api-key-auth`, `gh-185-fourier-solver`.
+  Five benchmark tickets were closed earlier for the same reason: their PRs had merged while they sat
+  in `active`/`draft`.
 
 ## 2026-10-12
 
@@ -89,10 +118,26 @@ Playwright (chromium via `.pw-browsers`) all pass locally.
   - **Bellman–Held–Karp explainer (#429, PR #475)** — DP-over-subsets table animation, 6 cities; squash-merge absorbed the #473 menubar content
   - **Topbar dropdown → algorithms index + complexity column (PR #476)** — `/algorithms/` index with groups + Complexity column + aria-labels; `SOLVER_META.complexity` mirrors docs (21/21), enforced by a consistency test; all `docs/algorithms/*.md` gained a Complexity meta row
   - Every explainer: pure `*-algo.ts` sim + Preact `*.tsx` + vitest + Playwright e2e, verified with `ocr` review before merge
+- **Problem minimaps + social cards on R2 (PRs #583, #584, #585, #588) — 2026-10-11 (merged)**
+  - `scripts/lib/problem-minimap.mjs`: TSPLIB layout → classical MDS (double-centre + power
+    iteration with deflation), density grid above 3000 cities, standalone SVG 340x200
+  - `scripts/publish-minimaps.sh`: per-object upload, `index.json` hash manifest, `--verify` reads
+    every object back over the public URL, and a card check that fails loudly before either path
+  - `teeline-web/scripts/gen-og-images.mjs`: SVG → 1200x630 PNG with Playwright, hashes recorded in
+    the same index
+  - `BaseLayout`/`DocsLayout` take an optional card; problem pages pass it and advertise the raster
+    in `Dataset` JSON-LD
+  - 111 maps + 111 cards live under `minimaps/v1/`; 17 BATS, 10 Playwright scenarios, byte-identical
+    regeneration
+- **`EUC_2D` nint rounding (#575, #587) — 2026-10-11 (merged)** — the solver's metric and the page
+  generator's derivation now agree with TSPLIB, verified against all 32 shipped tours
+- **`EDGE_WEIGHT_FORMAT`: all nine layouts (#583) — 2026-10-11 (merged)** — table-driven parser tests
+- **`e2e-web` in CI (#586) — 2026-10-11 (merged)** — non-auth suite on every web PR
 
 ## In Progress
 
-- Session wrapped up 2026-08-16 (explainer series shipped). Next session: pick from Remaining Work — web candidates are #438 (papers citing dataset) and #323 (teeline-excel); auth Phase 0 is parked.
+- Nothing claimed. Session wrapped up 2026-10-11 with the problem-page pipeline shipped and the
+  board reconciled (every ticket whose PR had merged was closed; see the log above).
 
 ## Blocked
 
@@ -100,18 +145,26 @@ Playwright (chromium via `.pw-browsers`) all pass locally.
 
 ## Remaining Work (by issue)
 
-Rust solver side:
-- #85 Expand BATS e2e tests + wire into CI/CD
-- #86 Replace validate_options with garde derive macro on SolverOptions
-- #87 Solver-specific options structs (SAOptions, GAOptions) resolved by PipelineStage
-- #46 Z3 exact reference solver
+Web side:
+- **#438** — "Papers citing this dataset" section on problem pages (top candidate; same pipeline as
+  the complexity column and the minimaps)
+- **#555** — open PR (renovate: ignore preact major updates) — mergeable, checks green; its premise
+  predates astro 7.3.5
+- **#323** — teeline-excel Office Add-in (unrelated, untouched)
 
-Web side (open, untouched this session):
-- **#438** — feat(web): add "Papers citing this dataset" section to problem pages
-- **#323** — teeline-excel Office Add-in
+Open benchmark tickets (11 drafts): `bench-tier-a-campaign` (raw data answers most criteria; one
+to-convergence config unaccounted for), `bench-docs-spec-update` (`docs/benchmarks.md` still not
+retired), `bench-single-solver-skill`, `bench-regression-history`, `bench-lk-use-shared-plateau-option`,
+`ci-cli-e2e-bats-workflow` (the suite runs inside `rust.yml`, not as its own workflow),
+`migrate-jaq-for-toml-queries`, `solver-progress-listener`, `blog-benchmarks-duckdb`,
+`gh-66-pipeline-solver`, `ship-missing-optimal-tours` (25 problems publish an optimum but ship no
+`.opt.tour`)
 
-Parked:
-- WebAuthn auth (see `tasks/webauthn-auth-replace-clerk`) — design accepted; Phase 0 (Pages Functions scaffold) not started
+Rust side, older issues still open: #85 (BATS in CI/CD — partly overtaken by `rust.yml` running
+`tests/e2e/`), #86 (garde derive), #87 (solver-specific options structs), #46 (Z3 reference solver)
+
+Parked: WebAuthn auth ([[tasks/webauthn-auth-replace-clerk]]) — Phase 0 not started; the API-key
+line it relates to has moved on (#310, #313, #462)
 
 ## TSPLIB Known Optima (for regression tests)
 
@@ -121,3 +174,8 @@ Parked:
 | att48    | 48     | 10628   |
 | berlin52 | 52     | 7542    |
 | a280     | 280    | 2579    |
+| eil51    | 51     | 426     |
+| eil76    | 76     | 538     |
+| kroA100  | 100    | 21282   |
+| tsp225   | 225    | 3916    |
+| pr1002   | 1002   | 259045  |

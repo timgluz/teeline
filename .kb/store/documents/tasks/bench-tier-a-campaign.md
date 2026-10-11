@@ -58,6 +58,13 @@ unqualified as "exact" would misrepresent it.
 - [ ] Raw TSV committed to `bench/runs/` (or otherwise retained) so summaries stay recomputable
 - [ ] Known timeouts on the largest instances documented as findings, not hidden
 
+## Status
+
+The tier ran and published: `bench/v2/index.json` reports `tier: a` with 22 solvers and 12 problems
+(generated 2026-10-11). The checkboxes below were never ticked, and a few of them (the raw TSV
+retained in `bench/runs/`, both budgets per cell) are not verifiable from here — left unchecked
+rather than asserted, and the task stays open for its owner to close.
+
 ## Notes
 
 Estimated ~11h wall clock, dominated by the metaheuristics. The estimate is not a measurement;
@@ -90,3 +97,20 @@ ahead — cheaper than publishing an unverifiable reference or inventing a tag t
 
 Checked afterwards: the restarted run produced identical tour costs for the re-measured rows, so
 the restart cost wall-clock time and nothing else.
+
+### 2026-10-11 — what the committed raw data does and does not answer
+
+Checked while auditing the open tickets, so the owner can close this in one step:
+
+- **Answered.** `bench/runs/tier-a.jsonl` is committed: **1245 rows**, one per run, keyed
+  `(solver, config, run, dataset)`, with a recorded `status` on every row (`ok` 1235, `timeout` 10) —
+  so "a row for every cell, or a status explaining its absence" and "known timeouts documented as
+  findings, not hidden" both hold in the data. Both `branch_bound` configs are present and labelled
+  (`exact` 15 rows, `budget` 1230). Provenance and environment are in the published shards
+  (`bench/v2/algorithms/lk.json` carries `git_commit`, `measured_at`, `version`, `os`,
+  `rust_version`).
+- **Still to confirm.** The criterion "both budget-limited and to-convergence runs present per cell":
+  the configs in the raw data are `budget` and `exact`, with no to-convergence config — either the
+  campaign was scoped that way and the criterion is stale, or that run is missing. `bench/solvers.json`
+  should be diffed against the 22 solvers present before ticking "every solver appears, or is
+  explicitly excluded with a reason".

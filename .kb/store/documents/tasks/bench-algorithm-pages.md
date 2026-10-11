@@ -3,7 +3,7 @@ id: 01a12651-5646-7e10-ba40-b75b1a4fc3b2
 slug: tasks/bench-algorithm-pages
 title: "feat(web): render per-algorithm benchmark tables and graphs from published data"
 type: task
-status: draft
+status: completed
 priority: high
 tags: [benchmarks, teeline-web, frontend]
 ---
@@ -241,3 +241,12 @@ apart.
   agree; keep that invariant intact.
 - The dev proxy needs `/bench` alongside `/tsplib`, or local development silently renders no
   benchmarks and looks like a bug in the component.
+
+## Progress Log
+
+### 2026-10-11 — completed (#574)
+
+Algorithm and landing pages render from the published shards. Spot-checked the landmark criterion:
+the hand-maintained `BERLIN52_BENCHMARKS` array is gone (only a historical note in
+`family-palette.ts` mentions it). The body's checkboxes were never ticked during implementation, so
+reopen this if any criterion turns out not to have been delivered.

@@ -73,9 +73,42 @@ Re-exporting without importing gives TS2304 when the module body references `x`.
 
 - **Rust-faithful simulation as the explainer backbone** was the right call: the `*-algo.ts` files mirror move semantics, `-1e-3` thresholds, tie-breaks, and node/leaf logic exactly, so the demos behave like the real solver and are pure/deterministic (seeded RNG) — unit-testable without a DOM.
 - **The docs↔nav-data complexity consistency test** (nav-data.test.ts, `import.meta.glob` `?raw` over `docs/algorithms/*.md`) is a cheap guard that caught a real user-reported mismatch (NN page vs table). Worth extending to other frontmatter fields if the docs/nav drift again.
+- **Two people committing KB changes on separate lines makes the KB store disagree with itself.**
+  The symptom is `git-kb commit` failing with `... has previous_commit_id ... but current document tip
+  is ...; stale sibling histories must rebase before storage apply`. What fixed it: `git-kb repair
+  projection` (rebuilds the derived SQLite from the canonical file store — its own hint; it then
+  reports "SQLite projection matches the canonical file store"), then `git-kb reset <slug>`,
+  `git-kb checkout <slug>`, re-apply the edit and commit.
+- `git-kb doctor` still warns that three documents need lineage repair
+  (`bench-plateau-stop-all-iterative`, `gh372-lk-som-pipeline-toml`, `type-check-the-islands`); two of
+  them predate today. Its remedy, `git-kb repair canonicalize --json` then `--apply --yes`, is
+  documented as *offline emergency repair, only from the intended local authority copy* — do it
+  deliberately with `.kb` backed up, not at the end of a session.
+- **A conflicting PR gets no CI at all.** `pull_request` workflows run against `refs/pull/N/merge`,
+  which GitHub cannot build while the branch conflicts with its base — so the checks list shows
+  nothing, not even a queued job, and pushing again changes nothing. `gh pr view <n> --json
+  mergeStateStatus` says `DIRTY`; rebase and the runs appear. Also check `gh api
+  repos/OWNER/REPO/actions/runs?branch=<branch>` before blaming the branch: `total_count: 0` with a
+  green githubstatus means the events are not reaching Actions at all (an exhausted Actions spending
+  limit does this repo-wide, and raising it fixes it immediately).
 - **Playwright in every verification plan** (user directive) paid off repeatedly: hydration races, SSR crashes, and the Back-button ambiguity were all found by e2e, not by unit tests or type checks. The `waitHydrated` retry pattern is the key to stable island probes.
 - **Small instance sizes are a feature**: 8 cities for stochastic-hill (user: "you can decrease number of cities if epoch takes too long"), 6 for B&B/BHK, ≤10 with brute-forced OPT ratio for Christofides — demos stay snappy and exact algorithms remain legible on screen.
 - **`ocr` review loop** (open-code-review, always exits 1 on a benign session-write EROFS — read the output file anyway) caught real issues: shared `explainer-cities.ts` extraction (#471), nested-ternary/style violations, and a stochastic-hill step race. The `--from master --to <branch>` invocation is the reliable shape.
+
+  - Run it **after opening the PR** (user directive), and pass **`--from origin/master`**, not
+    `--from master`: local `master` in a worktree is often many commits behind, so the review would
+    cover everyone else's merged work as well as yours. Check the preview line (`ocr review
+    --preview`) lists only your files before paying for a run.
+  - It found real bugs in this repo's own fixes, so treat the output as a review rather than a
+    formality: #587's completeness check admitted a route that repeated a city (right length,
+    wrong tour — the test only covered a wrong-length route), and the merged #585 pipeline could
+    publish 111 `og:image` links to 404s while `--verify` reported success, because verify
+    enumerated the index instead of the pages.
+  - A second pass scoped to the fix commit (`--from <prev> --to HEAD`) is cheap and confirms the
+    findings are resolved; #588's fix commit came back with 0 findings.
+  - Reviewers can be wrong: on #585 it claimed `tests/e2e/publish-minimaps.bats` was untouched (it
+    was, +44 lines in the same commit) and that `Math.round` was a no-op. Verify before acting, and
+    record the refusals in the task so nobody "fixes" them later.
 
 ## Links
 

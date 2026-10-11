@@ -3,7 +3,7 @@ id: 01a12a7f-a6c5-7322-9471-5b900527510b
 slug: tasks/bench-problem-leaderboard
 title: "feat(web): render the per-instance leaderboard and graph on problem pages"
 type: task
-status: active
+status: completed
 priority: high
 tags: [benchmarks, teeline-web, frontend]
 ---
@@ -183,3 +183,11 @@ a contract change, and the reason this task is not marked completed.
   by a fixture that did not match the contract. The fixture now matches.
 - The bar chart's label gutter clipped the longest solver names ("Ant Colony Optimization" rendered
   as "t Colony Optimization"). 156px of gutter fits the longest label in the set.
+
+### 2026-10-11 — completed (#577, last criterion by #578)
+
+The "one criterion unreachable from the data" recorded above was the all-timeout cell: the publisher
+dropped `runs: 0` rows before ranking, so the page could not tell a solver that only timed out from
+one never measured. #578 fixed exactly that — keep the row, rank it last — and pinned it in
+`tests/e2e/publish-benchmarks.bats` ("a solver that only timed out keeps its row, ranked last"), so
+the criterion is reachable and this task is done.

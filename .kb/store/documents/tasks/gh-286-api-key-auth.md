@@ -3,7 +3,7 @@ id: 019f2c15-c403-7ff0-ae0b-e86edde6ab9e
 slug: tasks/gh-286-api-key-auth
 title: "GH #286: static bearer-token auth for teeline-api (+ #307 router dedup)"
 type: task
-status: review
+status: completed
 priority: high
 tags: [api, auth, mvp]
 ---
@@ -145,3 +145,10 @@ One of the last MVP-blocking tickets for `teeline-api`.
   round 2); commit 6338a3f pushed to PR #310
 
 Ready for merge, pending final PR approval.
+
+### 2026-10-11 — completed
+
+The implementation merged as **PR #310** (`feat(api): static bearer-token auth for teeline-api
+(#286)`), and the work it unblocked has since landed on top of it: #313 (self-serve keys via Clerk)
+and #462 (verifying keys against the WebAuthn auth service). Reopening would only make sense for a
+follow-up, which would be its own ticket.

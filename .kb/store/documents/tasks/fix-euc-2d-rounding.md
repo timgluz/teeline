@@ -3,7 +3,7 @@ id: 01a12a9f-cbab-71d0-9901-7aeb4b890f51
 slug: tasks/fix-euc-2d-rounding
 title: "fix(solvers): EUC_2D must use TSPLIB's nint rounding, as Att and Ceil2D already do"
 type: task
-status: draft
+status: completed
 priority: high
 tags: [solver, correctness, benchmarks, distance]
 ---
@@ -99,14 +99,68 @@ So the order is: land the fix → re-measure every EUC_2D instance (6 of the 12 
 `berlin52` and `eil76` in the current prelim set) → then publish. A republish alone is not enough and
 is worse than not publishing, because it attaches the new optima to old measurements.
 
+**Resolved.** That order was followed: the shards behind `bench/v2/` were measured at `fe89b6a9`, the
+fix commit itself, so no row mixes the two metrics.
+
 ## Acceptance Criteria
 
-- [ ] `EUC_2D` distances are `nint`-rounded in both `KDPoint::distance` and the comparison path
-- [ ] The optimal route for an EUC_2D instance scores its published optimum, verified for
-      `berlin52` (7542), `eil76` (538) and `kroA100` (21282)
-- [ ] `Att` and `Ceil2D` are unchanged; a test pins all three
-- [ ] The KD-tree's nearest-neighbour results stay correct with rounded distances
-- [ ] `scripts/gen-problem-pages.mjs` accepts `EUC_2D` in `tourLength`, and the regenerated docs
-      show `berlin52` 7542 and `a280` 2579
-- [ ] Affected `docs/` and web content numbers are found and corrected or noted
-- [ ] A benchmark re-run follows, since the previous EUC_2D rows are invalidated
+- [x] `EUC_2D` is `nint`-rounded wherever a *cost is reported*. Amended: the original wording asked
+      for rounding in `KDPoint::distance` too, and #575 deliberately left that one unrounded — it is
+      the spatial index's distance and the "are these the same point" check, where rounding would
+      make distinct points compare equal. The scoring path (`DistanceMatrix`) rounds, and that is what
+      a reported tour cost is computed from.
+- [x] The optimal route for an EUC_2D instance scores its published optimum: `berlin52` 7542,
+      `eil76` 538, `kroA100` 21282 and `a280` 2579, verified by scoring all 32 shipped tours with both
+      the JS scorer and the CLI's own metric.
+- [x] `ATT` and `CEIL_2D` are unchanged; `teeline-web/scripts/problem-tour.test.mjs` pins `EUC_2D`,
+      `ATT`, `CEIL_2D` and `GEO`.
+- [x] The KD-tree's nearest-neighbour results stay correct: its distance stays unrounded, so the
+      search is untouched by the rounding, and `tests/test_kdtree_and_distance_matrix.rs` covers it.
+- [x] `scripts/gen-problem-pages.mjs` accepts `EUC_2D` in `tourLength`, and the regenerated docs show
+      `berlin52` 7542 and `a280` 2579. Regenerating is a *no-op* — the fix removes the ability to
+      publish a wrong derived value rather than changing a published one.
+- [x] Affected numbers found and noted: the audit produced the two findings below.
+- [x] A benchmark re-run followed. The published shards were measured *at* this fix:
+      `bench/v2/algorithms/lk.json` records `git_commit: fe89b6a9`, `measured_at:
+      2026-10-11T11:58:20Z`, and `lk`'s best tour cost on `berlin52` is exactly 7542, the rounded
+      optimum.
+
+## Completion Evidence
+
+- Solver half: **#575** (`fe89b6a9`). Generator half: **PR #587**.
+- Audit behind #587: all 32 shipped `.opt.tour` files scored with the JS scorer and the CLI's
+  `--optimal-tour`. The 22 coordinate-type instances agree exactly with each other and with the docs;
+  eight EXPLICIT instances score `null` in JS by design, because the scorer handles coordinate types
+  and their pages take the cost from the tour's COMMENT.
+- The audit also found two defects in the fallback that no corpus instance could expose: routes read
+  one id per line (pr1002 writes 1002 across 64 lines) silently scored a *subset*, and nothing
+  checked that a route named every city (rd100's 11-of-100 ids scored 4344 against a 7910 optimum).
+  Both are fixed in #587; the scorer moved to `scripts/lib/problem-tour.mjs` with 8 unit tests,
+  because the corpus cannot exercise it.
+- Two findings left open, neither caused nor fixed by this work:
+  - **`rd100`'s tour file has no `DIMENSION` header.** The CLI's `--optimal-tour` requires one and
+    reports `DIMENSION=0 but parsed 100 cities`, so that page cannot overlay its optimal tour or show
+    a gap. The JS scorer takes the dimension from the `.tsp` and scores 7910, the published optimum.
+  - **`tsp225` is precision-sensitive.** Its route scores 3916 with f64 coordinates (the published
+    optimum, and what the docs publish via `bench/optima.json`) but 3919 with teeline's f32 storage:
+    124 of its 225 edges sit within 1e-6 of a `.5` rounding boundary and 3 flip. This is the case that
+    justifies consulting a published optimum before deriving one. Changing the solver's coordinate
+    precision would invalidate published rows, so it is recorded rather than done.
+
+## Progress Log
+
+### 2026-10-11 — generator half implemented, in review
+
+#575 fixed the metric; the remaining criterion was the generator's, and the audit behind it turned up
+the two latent defects above. Marked `review` rather than `completed` until #587 merges.
+
+### 2026-10-11 — solver half landed
+
+#575 made `EUC_2D` round as TSPLIB defines it, in the distance matrix that reported costs come from.
+The published shards were then re-measured at that commit.
+
+### 2026-10-11 — merged
+
+PR #587 merged as `350c5919`, on top of a second `ocr` pass that found a hole in the completeness
+check this branch added (a route of the right length that repeated a city scored a square as 18) and
+a missing `acos` clamp in the GEO metric. Both are in the branch; the merge commit is the evidence.
