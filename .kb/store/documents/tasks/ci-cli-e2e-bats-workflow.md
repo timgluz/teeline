@@ -5,7 +5,7 @@ title: "ci(bench): dedicated GitHub Action for the CLI e2e (BATS) suite"
 type: task
 status: draft
 priority: medium
-tags: [ci, bats, testing, tooling, quick-installation]
+tags: [ci, bats, testing, tooling]
 ---
 
 ## Overview
@@ -32,7 +32,7 @@ Recorded so this task is not spent rediscovering them:
   "Quick installation" prescribes (`https://github.com/bats-core/bats-core.git` →
   `tests/bats`, plus `bats-support` and `bats-assert` under `tests/test_helper/`). Pinned at
   bats-core v1.13.0-33, bats-assert v2.2.4-2, bats-support v0.3.0-37.
-  Tutorial: https://bats-core.readthedocs.io/en/stable/tutorial.html#quick-installation
+  Tutorial "Quick installation": https://bats-core.readthedocs.io/en/stable/tutorial.html
 - **A Taskfile target already runs them**: `test:e2e` in the root `Taskfile.yml`, with
   `deps: [build]` because most e2e files need the debug binary.
 - Every workflow that needs the submodules already passes `submodules: true` / `recursive`.

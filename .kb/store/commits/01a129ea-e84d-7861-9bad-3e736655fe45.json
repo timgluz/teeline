@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"b72434831d8ec7b1cc5d5924bbe4740c99e93847bc7611cb8831aa716d15dcef","doc_type":"task","document_id":"01a129e9-f1ca-7460-820b-95cd828a489e","new_version":3,"previous_commit_id":"01a129ea-162b-7da2-8d64-6e1697a84cbc","previous_hash":"b72434831d8ec7b1cc5d5924bbe4740c99e93847bc7611cb8831aa716d15dcef","previous_version":2,"slug":"tasks/ci-cli-e2e-bats-workflow","title":"ci(bench): dedicated GitHub Action for the CLI e2e (BATS) suite"}],"created_at":"2026-10-11T07:43:43.115880949Z","id":"01a129ea-e84d-7861-9bad-3e736655fe45","message":"Drop a tag the extractor picked up from a URL anchor"},
+  "content_hash": "201a97160869eb6e495255110fc01fc6da500f33c32a0f8ccffb54f1887f3fba",
+  "hash_version": 3
+}
