@@ -299,8 +299,10 @@ PY
 }
 
 @test "every instance in the tier parses" {
-    # si175 fails on the unsupported UPPER_DIAG_ROW format and is the reason gr120 is in the
-    # tier; a tier entry that cannot be read must be caught here, not three hours into a sweep.
+    # A tier entry that cannot be read must be caught here, not three hours into a sweep: si175
+    # was rejected for its UPPER_DIAG_ROW format, which is why gr120 stands in for it. That
+    # substitution outlives the gap — swapping the instance would break comparability with the
+    # published runs.
     run python3 - "$REPO_ROOT/bench/matrix/tier-a.toml" "$BIN" <<'PY'
 import subprocess, sys, tomllib
 from pathlib import Path

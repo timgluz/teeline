@@ -38,8 +38,9 @@ meta = ["upto24", "all"]
 utility = ["upto24", "all"]
 
 # Instances, grouped by what they are evidence for. Every entry is verified to parse.
-# `gr120` (LOWER_DIAG_ROW) stands in for `si175`, which fails on the unsupported
-# UPPER_DIAG_ROW format — substituted deliberately, not skipped silently.
+# `gr120` (LOWER_DIAG_ROW) stands in for `si175`: the substitution was made while si175's
+# UPPER_DIAG_ROW format was unsupported, and it stays now that si175 parses, because changing an
+# instance would break comparability with the published runs.
 #
 # The distance types are covered as: GEO (burma14, ulysses16, ulysses22), EXPLICIT (gr17,
 # gr120), ATT (att48), CEIL_2D (dsj1000), EUC_2D (berlin52, eil76, kroA100, ch150, a280).
