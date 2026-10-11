@@ -11,9 +11,12 @@
 # Reads:  build/minimaps/index.json and the .svg files it names
 # Writes: nothing locally; R2 objects under the prefix
 #
-# The prefix is versioned. Objects are immutable and served with a long cache lifetime, so a change
-# to how a map is drawn (the density threshold, the MDS layout) is a prefix bump, not a cache purge
-# — and the pages carry the matching URL in their frontmatter, so the two move together.
+# The prefix is versioned, and that version is what makes the objects safe to cache for as long as
+# Cloudflare will: a change to how a map is drawn (the density threshold, the MDS layout) is a
+# prefix bump, not a cache purge, and the pages carry the matching URL in their frontmatter, so the
+# two move together. No Cache-Control header is set: `cf r2 objects put` has no flag for one, and
+# setting it only on the wrangler path would make the same publish cache differently depending on
+# which client a machine has. A Cache Rule on the bucket can set the lifetime.
 
 set -euo pipefail
 
