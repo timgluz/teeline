@@ -796,6 +796,125 @@ function toPoint(row: BenchmarkRow, y: number): ChartPoint {
 }
 
 // ---------------------------------------------------------------------------
+// Comparing two solvers
+// ---------------------------------------------------------------------------
+
+export interface ComparisonPair {
+  dataset: string
+  name: string
+  cities: number | null
+  edgeWeightType: string | null
+  config: string
+  primary: BenchmarkRow
+  /** Null when the comparator published nothing for this instance *and* config. */
+  comparator: BenchmarkRow | null
+}
+
+/**
+ * Pair two solvers' rows by (instance, config).
+ *
+ * The key is the pair, not the instance: `branch_bound` publishes `budget` and `exact`, which
+ * answer different questions, so a row matches only when the config matches too. A comparator
+ * that publishes no such config reads as "not measured" rather than borrowing a number from
+ * another config, which would compare two experiments and call it a comparison of algorithms.
+ */
+export function pairRows(
+  primary: BenchmarkRow[],
+  comparator: BenchmarkRow[],
+): ComparisonPair[] {
+  const byKey = new Map(
+    comparator.map((row) => [`${row.dataset}/${row.config}`, row]),
+  )
+  return primary.map((row) => ({
+    dataset: row.dataset,
+    name: row.name,
+    cities: row.cities,
+    edgeWeightType: row.edgeWeightType,
+    config: row.config,
+    primary: row,
+    comparator: byKey.get(`${row.dataset}/${row.config}`) ?? null,
+  }))
+}
+
+export interface ComparisonPoint {
+  solver: string
+  dataset: string
+  config: string
+  x: number
+  y: number
+}
+
+export interface ComparisonSeries {
+  axis: ChartAxis
+  axisLabel: string
+  points: ComparisonPoint[]
+  /** Per solver: points left out because that solver has no value on the chosen axis. */
+  omitted: Record<string, number>
+}
+
+/**
+ * Both solvers on one axis, or neither.
+ *
+ * The axis is decided once for the pair — gaps when either solver has any, tour length when
+ * neither does — because two series on different quantities is exactly the mix the
+ * single-solver chart refuses. A pair with no value on the chosen axis is counted, not drawn.
+ */
+export function comparisonSeries(
+  pairs: ComparisonPair[],
+  primary: string,
+  comparator: string,
+): ComparisonSeries {
+  const axis: ChartAxis = pairs.some(
+    (pair) => pair.primary.gap !== null || pair.comparator?.gap != null,
+  )
+    ? 'gap'
+    : 'tour'
+
+  const value = (row: BenchmarkRow | null): number | null => {
+    if (row === null || row.noResult) return null
+    return axis === 'gap'
+      ? (row.gap?.median ?? null)
+      : (row.tour?.median ?? null)
+  }
+
+  const omitted: Record<string, number> = { [primary]: 0, [comparator]: 0 }
+  const points: ComparisonPoint[] = []
+
+  for (const pair of pairs) {
+    const series: [string, BenchmarkRow | null][] = [
+      [primary, pair.primary],
+      [comparator, pair.comparator],
+    ]
+    for (const [solver, row] of series) {
+      const y = value(row)
+      if (pair.cities === null || y === null) {
+        omitted[solver] += 1
+        continue
+      }
+      points.push({
+        solver,
+        dataset: pair.dataset,
+        config: pair.config,
+        x: pair.cities,
+        y,
+      })
+    }
+  }
+
+  return {
+    axis,
+    axisLabel: axis === 'gap' ? 'gap vs known optimum (%)' : 'tour length',
+    points,
+    omitted,
+  }
+}
+
+/** How many instances both solvers were measured on, under the same config. */
+export function sharedInstances(pairs: ComparisonPair[]): number {
+  return pairs.filter((pair) => pair.comparator !== null).length
+}
+
+// ---------------------------------------------------------------------------
 // The landing chart: one instance, every solver
 // ---------------------------------------------------------------------------
 

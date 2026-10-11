@@ -40,6 +40,28 @@ async function fulfil(page: Page, body: string): Promise<void> {
   )
 }
 
+/** One shard per solver id, so a comparison sees two different solvers. */
+async function fulfilPerSolver(
+  page: Page,
+  bySolver: Record<string, string>,
+): Promise<void> {
+  await page.route('**/bench/v2/index.json', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: INDEX,
+    }),
+  )
+  await page.route('**/bench/v2/algorithms/*.json', (route) => {
+    const id =
+      route.request().url().split('/').pop()?.replace('.json', '') ?? ''
+    const body = bySolver[id]
+    return body === undefined
+      ? route.fulfill({ status: 404, contentType: 'text/plain', body: 'none' })
+      : route.fulfill({ status: 200, contentType: 'application/json', body })
+  })
+}
+
 // The section is a `client:visible` island at the foot of a docs page, so it only hydrates
 // (and only fetches) once it is scrolled into view.
 async function scrollToSection(page: Page): Promise<void> {
@@ -211,5 +233,106 @@ test.describe('algorithm benchmark section', () => {
     await expect(section).toContainText('could not be read')
     // A broken shard is not silently rendered as "no results yet".
     await expect(section).toContainText('HTTP 500')
+  })
+
+  test('offers its own shard and the manifest without fetching either', async ({
+    page,
+  }) => {
+    await fulfil(page, fixture('algorithm-2opt.json'))
+
+    const shardRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/bench/v2/'))
+        shardRequests.push(request.url())
+    })
+
+    await page.goto('/algorithms/2opt/')
+    await scrollToSection(page)
+    const section = page.locator(
+      'section[aria-labelledby="benchmarks-heading"]',
+    )
+    await expect(section).toBeVisible()
+
+    // Cross-origin `download` is ignored, so the label says "shard", not "download".
+    await expect(
+      section.locator('a[href$="/bench/v2/algorithms/2opt.json"]'),
+    ).toHaveText(/shard/)
+    await expect(
+      section.locator('a[href$="/bench/v2/index.json"]'),
+    ).toBeVisible()
+    await expect(section.locator('a[href$="schema.md"]')).toBeVisible()
+
+    // The links are rendered, not followed: the page loads exactly one algorithm shard, its own.
+    const algorithmRequests = shardRequests.filter((url) =>
+      url.includes('/algorithms/'),
+    )
+    expect(algorithmRequests).toHaveLength(1)
+    expect(algorithmRequests[0]).toContain('/algorithms/2opt.json')
+  })
+
+  test('compares with another solver, keeping unlike things apart', async ({
+    page,
+  }) => {
+    // 2opt is `local search`, branch_bound is `exact`; they share gr17 and nothing else.
+    await fulfilPerSolver(page, {
+      '2opt': fixture('algorithm-2opt.json'),
+      branch_bound: fixture('algorithm-branch-bound.json'),
+    })
+    await page.goto('/algorithms/2opt/')
+    await scrollToSection(page)
+
+    const section = page.locator(
+      'section[aria-labelledby="benchmarks-heading"]',
+    )
+    await expect(section).toBeVisible()
+    // Wait for the table itself: the island renders a placeholder first, which has no columns.
+    await expect(section.locator('tfoot tr')).toHaveCount(1)
+    const columnsBefore = await section.locator('thead th').count()
+
+    await section.locator('select').selectOption('branch_bound')
+    // A second summary row is the signal that the comparison rendered.
+    await expect(section.locator('tfoot tr')).toHaveCount(2)
+    expect(await section.locator('thead th').count()).toBe(columnsBefore + 2)
+
+    // The comparison is a link someone can share.
+    await expect(page).toHaveURL(/[?&]compare=branch_bound/)
+
+    // Different families: both allowances are stated, because their gaps are not like-for-like.
+    await expect(section).toContainText('different families')
+
+    // branch_bound publishes an `exact` config that 2opt does not: it must not be paired with
+    // 2opt's budget run, so 2opt's own row stays the only thing in those columns.
+    await expect(section.locator('tfoot tr').nth(1)).toContainText(
+      'Branch & Bound',
+    )
+
+    // Never measured on berlin52 — reported as such, not as a zero or a blank.
+    const berlin = section.locator('tbody tr', { hasText: 'Berlin 52' })
+    await expect(berlin).toContainText('not measured')
+    // ...and the chart counts it rather than drawing it.
+    await expect(section.locator('figcaption')).toContainText(
+      /no value to plot for \d+ of these instances/,
+    )
+    // Both solvers are legended, and both provenances are shown as their own builds.
+    await expect(section).toContainText('Lin-Kernighan')
+    await expect(section).toContainText('Branch & Bound')
+    await expect(section).toContainText(
+      'measured from its own build, not this solver',
+    )
+  })
+
+  test('restores a comparison from ?compare=', async ({ page }) => {
+    await fulfilPerSolver(page, {
+      '2opt': fixture('algorithm-2opt.json'),
+      branch_bound: fixture('algorithm-branch-bound.json'),
+    })
+    await page.goto('/algorithms/2opt/?compare=branch_bound')
+    await scrollToSection(page)
+
+    const section = page.locator(
+      'section[aria-labelledby="benchmarks-heading"]',
+    )
+    await expect(section.locator('tfoot tr')).toHaveCount(2)
+    await expect(section.locator('select')).toHaveValue('branch_bound')
   })
 })
