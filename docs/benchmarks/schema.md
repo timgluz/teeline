@@ -37,7 +37,7 @@ Concretely, v2:
 
 | Artifact | Location | Written by |
 | --- | --- | --- |
-| Raw measurements | `bench/runs/<tier>.tsv` (git-ignored) | `scripts/bench-matrix.sh` |
+| Raw measurements | `bench/runs/<tier>.jsonl` (git-ignored) | `scripts/bench-matrix.sh` |
 | Published JSON | R2 bucket, prefix `bench/v2/` | `scripts/publish-benchmarks.sh` |
 | Public URL | `https://static.tspsolver.com/bench/v2/` | R2 custom domain |
 | Release snapshots | R2 bucket, prefix `bench/v2/snapshots/{tag}/` | `scripts/publish-benchmarks.sh --snapshot` |
@@ -103,29 +103,43 @@ Rules:
   basis. A gap is never shown without its budget.
 - `optimal_cost` is `null` — never `0` — when the instance has no known optimal tour.
 
-### TSV provenance header
+### Raw run log: JSONL
 
-`bench-matrix.sh` prefixes each output TSV with `#`-comment provenance lines, which
-`publish-benchmarks.sh` reads in preference to publish-time git state. The data rows
-that follow are tab-separated:
+`bench-matrix.sh` writes one JSON object per run, one run per line. Provenance travels
+**with each row** rather than in a file header:
 
-```text
-# git_commit=899de9d
-# dirty=0
-# teeline_version=1.0.1
-# rust_version=1.99.0
-# tier=a
-# timeout_s=180
-# measured_at=2026-10-12T09:00:00Z
-# os=linux
-# build=release
-solver <TAB> dataset <TAB> config <TAB> run <TAB> wall_s <TAB> peak_rss_kb <TAB> tour_cost <TAB> status
-nn <TAB> berlin52 <TAB> default <TAB> 1 <TAB> 0.0000 <TAB> 6720 <TAB> 8980.91797 <TAB> ok
+```json
+{"solver":"nn","dataset":"eil51","config":"default","run":1,"wall_s":0.0000,"peak_rss_kb":6720,"tour_cost":8980.91797,"status":"ok","measurement":{"git_commit":"899de9d","git_commit_source":"jsonl","dirty":0,"teeline_version":"1.0.1","measured_at":"2026-10-12T09:00:00Z","environment":{"os":"linux","build":"release","rust_version":"1.99.0"}}}
 ```
 
-A TSV without these lines still publishes, but is marked
-`git_commit_source: "publish-time"` so the weaker provenance is visible rather
-than implied.
+Required: `solver`, `dataset`, `run`, `wall_s`, `peak_rss_kb`, `tour_cost`. Optional:
+`config` (default `default`), `status` (default `ok`), `measurement`.
+
+Why JSONL and not a tab-separated file:
+
+- **A file-level provenance header cannot describe a resumable sweep.** The sweep merges
+  new rows into an existing file, so once the solver is rebuilt the file holds rows from
+  two builds. One header would silently stamp the older rows with the newer commit —
+  the same false claim this contract removes at the shard level, one layer down. Per-row
+  provenance makes that detectable, and the publisher **refuses** a file whose rows for
+  one solver disagree rather than choosing a winner.
+- **Types are enforced.** `status` must be one of `ok`, `timeout`, `error`; a typo like
+  `timout` is rejected instead of quietly counting as an error. `tour_cost` and friends
+  must be numbers — a missing one is an error, never defaulted to `0`, which would
+  fabricate a −100% gap ("twice as good as optimal").
+- **No positional columns.** Optional fields are named, so adding one does not break every
+  reader, and `measurement` may be omitted entirely.
+- **Append-safe.** One object per line keeps the write path a single append, which is what
+  makes the sweep safe to interrupt and resume.
+
+`measurement` is validated and normalised, never passed through: `dirty` must be `true`,
+`false` or `null`; the string fields must be strings or `null`; unknown keys are rejected;
+`git_commit_source` must be `jsonl`, `tsv` or `publish-time`.
+
+A row with **no** `measurement` is published with `git_commit_source: "publish-time"`: the
+commit is then only HEAD when the publish ran and does **not** identify the built binary.
+This is the one case where the block carries the publisher's version and tree state, and the
+label is what makes that legible — a consumer must not read those as the measured binary.
 
 ## `algorithms/{solver_id}.json`
 
@@ -170,39 +184,37 @@ nests variants of the same solver.
 | Field | Meaning |
 | --- | --- |
 | `git_commit` | The commit the **measured binary** came from |
-| `git_commit_source` | `tsv` if the benchmark file recorded that commit; `publish-time` if it did not |
-| `dirty` | Whether the tree was dirty when the measurement was taken. `true`/`false` only for the documented `0`/`1`; anything else, or absent, is `null` |
+| `git_commit_source` | `jsonl` if the run log recorded that commit; `publish-time` if it did not |
+| `dirty` | Whether the tree was dirty when the measurement was taken. `true`/`false`/`null` |
 | `teeline_version` | Version of the measured binary |
-| `measured_at` | When the measurement was taken (not when it was published); `null` if the TSV did not record it |
-| `environment` | `os`, `build`, `rust_version` — describing the **measured** binary, so each is `null` when the TSV did not record it |
+| `measured_at` | When the measurement was taken (not when it was published); `null` if the row did not record it |
+| `environment` | `os`, `build`, `rust_version` — describing the **measured** binary, so each is `null` when the row did not record it |
 
 Rules:
 
 - This block describes **only this solver**. A solver that was not re-measured
   keeps the block it already had, byte for byte, so its page keeps stating the
   version it was actually measured at.
+- It is built from the **rows that solver carries**, not from anything file-level and
+  not from the publisher. Rows for one solver must agree; the publisher refuses the
+  file otherwise, because one block cannot describe measurements from two builds.
 - `git_commit_source: "publish-time"` is a warning to the consumer: the commit is
   merely HEAD when the publish ran and does **not** identify the built binary, so
   it must not be presented as making those numbers reproducible. A dirty tree is
   recorded rather than treated as fatal — the tree state at publish time is not
   what makes a number reproducible. CI can demand the stricter behaviour with
   `--require-clean`.
-- `environment` is required. Wall-clock numbers are meaningless without it, and
-  the page shows it beside the table.
-- Every field the TSV did not record is `null`, never the publisher's value. This includes
+- Every field a row did not record is `null`, never the publisher's value. This includes
   `environment.os` and `environment.build`: inferring "linux/release" from the publishing machine
   would attach the publisher's platform to a number measured elsewhere, and under the differential
-  cadence that shard is carried over unchanged. (The one exception is a TSV with **no** provenance
-  header at all, where the whole block is publish-time and `git_commit_source` says so.)
-- `dirty` accepts only the documented `0` and `1`. `# dirty=` empty, `yes`, `true` or a typo yield
-  `null` — unknown — rather than being read as "the tree was clean", which is a claim nobody checked. A header carrying
-  `git_commit` but no `dirty` must not pair the measured commit with the publisher's dirty flag,
-  version or rustc — that is the same false claim in miniature, and once written into a shard under
-  the differential cadence it is permanent.
-- `measured_at` is `null` when the TSV recorded no `# measured_at=` line. It is
-  deliberately **not** filled in from the publish time: a file carried forward or
-  republished would then be stamped with today's date, which is the misdating this
-  contract exists to avoid. The harness records it; a missing value stays missing.
+  cadence that shard is carried over unchanged. (The one exception is a row carrying no
+  `measurement` at all, where the whole block is publish-time and `git_commit_source` says so.)
+- `dirty` must be a JSON boolean. A string or number is a malformed row and is **rejected**
+  rather than read as "the tree was clean", which would be a claim nobody checked.
+- `measured_at` is `null` when the row recorded none. It is deliberately **not** filled in
+  from the publish time: a file carried forward or republished would then be stamped with
+  today's date, which is the misdating this contract exists to avoid. The harness records
+  it; a missing value stays missing.
 - The provenance footer on an algorithm page is this block. Staleness is
   communicated this way rather than by a badge: being able to see which version
   produced a number is the requirement (design section 3.8).
@@ -280,7 +292,7 @@ The `config_label` field on the `tspsolver_observations` dimension carries the
 config (for example `default`, `no-seed`, `epochs=100k`), so
 `(solver, dataset, config_label, run_number)` is the unique case identity.
 
-The archived run records the commit **the TSV says the measurements came from**,
+The archived run records the commit **each cell's own `measurement` says it came from**,
 with `git_commit_source` alongside it — not whatever HEAD was when the publish
 ran. Stamping archived runs with the publish-time commit would attach the same
 false claim that per-solver provenance exists to prevent.
@@ -329,7 +341,7 @@ Under the per-release cadence only the algorithms that changed are re-measured, 
 the published tree is **completed from what is already live**: the solvers this run
 did not measure keep their shards (and therefore their `measurement` blocks), and
 the problem leaderboards keep the entries that rank them. A run that replaced the
-leaderboard from a one-solver TSV would silently drop every other solver from it.
+leaderboard from a one-solver run log would silently drop every other solver from it.
 
 There is no bucket listing, so the previous `index.json` is read first — it names
 the shards to fetch — into `build/bench-prev/`. Override with `--previous <dir>`, or
@@ -346,7 +358,7 @@ which is missing or unreadable **aborts the publish** rather than dropping that
 solver from the republished tree. For the same reason a partial run needs an
 explicit `--first-publish` when there is no previous tree at all, and only a
 confirmed `404` is read as "nothing to merge with": a network failure is not a
-licence to publish a tree holding only this TSV's solvers.
+licence to publish a tree holding only this run log's solvers.
 
 **A solver's shard is replaced wholesale when it is re-measured.** So a differential
 run must cover that solver's whole tier — every instance, every config — or the

@@ -15,54 +15,60 @@ setup() {
     # The transform resolves docs/problems/*.md and bench/solvers.json relative to the cwd.
     cd "$REPO_ROOT"
 
+    # The default per-row provenance. Rows carry it individually, so a fixture can vary it
+    # per row — which is the whole reason the raw format is JSONL: a sweep that merges new
+    # rows into an existing file would otherwise put rows from two builds under one header.
+    DEFAULT_MEASUREMENT='{"git_commit":"aaaaaaaa","git_commit_source":"jsonl","dirty":false,"teeline_version":"1.0.0","measured_at":"2026-01-02T03:04:05Z","environment":{"os":"linux","build":"release","rust_version":"1.90.0"}}'
+
+    # A second build's provenance, used by the differential fixtures.
+    ALT_MEASUREMENT='{"git_commit":"bbbbbbbb","git_commit_source":"jsonl","dirty":false,"teeline_version":"1.0.1","measured_at":"2026-01-02T03:04:05Z","environment":{"os":"linux","build":"release","rust_version":"1.90.0"}}'
+
+    # row SOLVER DATASET CONFIG RUN WALL RSS TOUR STATUS [MEASUREMENT_JSON|-]
+    #   '-' emits the row with no measurement at all, for the publish-time fallback.
+    row() {
+        local m="${9:-$DEFAULT_MEASUREMENT}"
+        if [ "$m" = "-" ]; then
+            jq -cn --arg s "$1" --arg d "$2" --arg c "$3" --argjson r "$4" --argjson w "$5" \
+                --argjson k "$6" --argjson t "$7" --arg st "$8" \
+                '{solver:$s,dataset:$d,config:$c,run:$r,wall_s:$w,peak_rss_kb:$k,tour_cost:$t,status:$st}'
+        else
+            jq -cn --arg s "$1" --arg d "$2" --arg c "$3" --argjson r "$4" --argjson w "$5" \
+                --argjson k "$6" --argjson t "$7" --arg st "$8" --argjson m "$m" \
+                '{solver:$s,dataset:$d,config:$c,run:$r,wall_s:$w,peak_rss_kb:$k,tour_cost:$t,status:$st,measurement:$m}'
+        fi
+    }
+
     # Two solvers over two instances: eil51 has a known optimal (426), zzz_unknown has no doc
     # at all and so no known optimal. `nn` is deterministic, `sa` is not.
     # berlin52 is deliberately NOT used: its doc records `optimalCost: null`, so it cannot
     # exercise the known-optimal path.
-    cat > "$TMPDIR/prev.tsv" <<'TSV'
-# git_commit=aaaaaaaa
-# dirty=0
-# teeline_version=1.0.0
-# rust_version=1.90.0
-# tier=a
-# timeout_s=180
-solver	dataset	config	run	wall_s	peak_rss_kb	tour_cost	status
-nn	eil51	default	1	0.01	6000	450.0	ok
-nn	eil51	default	2	0.01	6000	450.0	ok
-nn	zzz_unknown	default	1	0.02	6100	1234.0	ok
-nn	zzz_unknown	default	2	0.02	6100	1234.0	ok
-sa	eil51	default	1	0.30	8000	440.0	ok
-sa	eil51	default	2	0.31	8100	430.0	ok
-sa	zzz_unknown	default	1	0.40	8200	1200.0	ok
-sa	zzz_unknown	default	2	0.41	8200	1210.0	ok
-TSV
+    {
+        row nn eil51 default 1 0.01 6000 450.0 ok
+        row nn eil51 default 2 0.01 6000 450.0 ok
+        row nn zzz_unknown default 1 0.02 6100 1234.0 ok
+        row nn zzz_unknown default 2 0.02 6100 1234.0 ok
+        row sa eil51 default 1 0.30 8000 440.0 ok
+        row sa eil51 default 2 0.31 8100 430.0 ok
+        row sa zzz_unknown default 1 0.40 8200 1200.0 ok
+        row sa zzz_unknown default 2 0.41 8200 1210.0 ok
+    } > "$TMPDIR/prev.jsonl"
 
     # A later measurement of `sa` alone, at a different commit — the differential case.
-    cat > "$TMPDIR/sa-only.tsv" <<'TSV'
-# git_commit=bbbbbbbb
-# dirty=0
-# teeline_version=1.0.1
-# rust_version=1.90.0
-# tier=a
-# timeout_s=180
-solver	dataset	config	run	wall_s	peak_rss_kb	tour_cost	status
-sa	eil51	default	1	0.20	8000	428.0	ok
-sa	eil51	default	2	0.21	8100	427.0	ok
-sa	zzz_unknown	default	1	0.30	8200	1100.0	ok
-sa	zzz_unknown	default	2	0.31	8200	1110.0	ok
-TSV
+    {
+        row sa eil51 default 1 0.20 8000 428.0 ok "$ALT_MEASUREMENT"
+        row sa eil51 default 2 0.21 8100 427.0 ok "$ALT_MEASUREMENT"
+        row sa zzz_unknown default 1 0.30 8200 1100.0 ok "$ALT_MEASUREMENT"
+        row sa zzz_unknown default 2 0.31 8200 1110.0 ok "$ALT_MEASUREMENT"
+    } > "$TMPDIR/sa-only.jsonl"
 
     # Timeouts and an error must be counted, never averaged into the gap.
-    cat > "$TMPDIR/timeouts.tsv" <<'TSV'
-# git_commit=cccccccc
-# tier=a
-solver	dataset	config	run	wall_s	peak_rss_kb	tour_cost	status
-nn	eil51	default	1	0.01	6000	450.0	ok
-nn	eil51	default	2	180.0	6000	0.0	timeout
-nn	eil51	default	3	180.0	6000	0.0	timeout
-nn	eil51	default	4	0.02	6000	460.0	ok
-nn	eil51	default	5	0.01	6000	0.0	error
-TSV
+    {
+        row nn eil51 default 1 0.01 6000 450.0 ok
+        row nn eil51 default 2 180.0 6000 0.0 timeout
+        row nn eil51 default 3 180.0 6000 0.0 timeout
+        row nn eil51 default 4 0.02 6000 460.0 ok
+        row nn eil51 default 5 0.01 6000 0.0 error
+    } > "$TMPDIR/timeouts.jsonl"
 }
 
 teardown() {
@@ -76,45 +82,104 @@ publish() {
 }
 
 @test "algorithms/{id}.json carries a per-solver measurement block" {
-    run publish --tsv "$TMPDIR/prev.tsv"
+    run publish --runs "$TMPDIR/prev.jsonl"
     [ "$status" -eq 0 ]
 
     local shard="$TMPDIR/stage/v2/algorithms/nn.json"
     [ -f "$shard" ]
     [ "$(jq -r '.measurement.git_commit' "$shard")" = "aaaaaaaa" ]
-    [ "$(jq -r '.measurement.git_commit_source' "$shard")" = "tsv" ]
+    [ "$(jq -r '.measurement.git_commit_source' "$shard")" = "jsonl" ]
     [ "$(jq -r '.measurement.dirty' "$shard")" = "false" ]
     [ "$(jq -r '.measurement.teeline_version' "$shard")" = "1.0.0" ]
-    # os/build describe the measured binary, so a fixture that does not record them yields
-    # null rather than the publisher's platform.
-    [ "$(jq -r '.measurement.environment.os' "$shard")" = "null" ]
-    [ "$(jq -r '.measurement.environment.build' "$shard")" = "null" ]
+    # os/build describe the measured binary and come from the row's own measurement.
+    [ "$(jq -r '.measurement.environment.os' "$shard")" = "linux" ]
+    [ "$(jq -r '.measurement.environment.build' "$shard")" = "release" ]
     [ "$(jq -r '.measurement.environment.rust_version' "$shard")" = "1.90.0" ]
-    # No `# measured_at=` in this fixture, so it stays unknown.
-    [ "$(jq -r '.measurement.measured_at' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.measured_at' "$shard")" = "2026-01-02T03:04:05Z" ]
 }
 
-@test "the environment block describes the measured binary when the TSV records it" {
-    { echo "# os=freebsd"; echo "# build=debug"; cat "$TMPDIR/prev.tsv"; } > "$TMPDIR/env.tsv"
-    run publish --tsv "$TMPDIR/env.tsv"
+@test "the environment block describes the measured binary, per row" {
+    row nn eil51 default 1 0.01 6000 450.0 ok \
+        '{"git_commit":"eeee0001","git_commit_source":"jsonl","dirty":true,"teeline_version":"1.0.1","measured_at":"2026-01-02T03:04:05Z","environment":{"os":"freebsd","build":"debug","rust_version":"1.91.0"}}' \
+        > "$TMPDIR/env.jsonl"
+    run publish --runs "$TMPDIR/env.jsonl"
     [ "$status" -eq 0 ]
     local shard="$TMPDIR/stage/v2/algorithms/nn.json"
     [ "$(jq -r '.measurement.environment.os' "$shard")" = "freebsd" ]
     [ "$(jq -r '.measurement.environment.build' "$shard")" = "debug" ]
+    [ "$(jq -r '.measurement.dirty' "$shard")" = "true" ]
 }
 
-@test "an unparseable dirty value is unknown, not a claim of a clean tree" {
-    # Appended, not prepended: the parser takes the last occurrence of a key, and the fixture
-    # already carries `# dirty=0`.
-    { cat "$TMPDIR/prev.tsv"; echo "# dirty=yes"; } > "$TMPDIR/baddirty.tsv"
-    run publish --tsv "$TMPDIR/baddirty.tsv"
+@test "environment fields a row omits are null, never the publisher's" {
+    row nn eil51 default 1 0.01 6000 450.0 ok \
+        '{"git_commit":"ffff0001","git_commit_source":"jsonl"}' > "$TMPDIR/env-bare.jsonl"
+    run publish --runs "$TMPDIR/env-bare.jsonl"
     [ "$status" -eq 0 ]
-    # Only the documented 0/1 are answers; "yes" must not be read as clean.
-    [ "$(jq -r '.measurement.dirty' "$TMPDIR/stage/v2/algorithms/nn.json")" = "null" ]
+    local shard="$TMPDIR/stage/v2/algorithms/nn.json"
+    # Inferring "linux/release" from the publishing machine would attach the publisher's
+    # platform to a number measured elsewhere, in a shard carried over unchanged.
+    [ "$(jq -r '.measurement.environment.os' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.environment.build' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.environment.rust_version' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.dirty' "$shard")" = "null" ]
+}
+
+@test "a non-boolean dirty value is rejected, not read as a clean tree" {
+    row nn eil51 default 1 0.01 6000 450.0 ok \
+        '{"git_commit":"dddd0001","git_commit_source":"jsonl","dirty":"yes"}' \
+        > "$TMPDIR/baddirty.jsonl"
+    run publish --runs "$TMPDIR/baddirty.jsonl"
+    # `dirty` is a JSON boolean. A string is a malformed row, and accepting it would put a
+    # value nobody can interpret into a shard the differential cadence carries over unchanged.
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"measurement.dirty"* ]]
+    [ ! -f "$TMPDIR/stage/v2/index.json" ]
+}
+
+@test "an unknown field inside a row's measurement is rejected" {
+    row nn eil51 default 1 0.01 6000 450.0 ok \
+        '{"git_commit":"dddd0002","git_commit_source":"jsonl","cpu_name":"secret"}' \
+        > "$TMPDIR/badfield.jsonl"
+    run publish --runs "$TMPDIR/badfield.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"unknown measurement field"* ]]
+}
+
+@test "an unknown status is rejected rather than counted as an error" {
+    # A typed field is the point of leaving TSV: "timout" must not quietly become an error,
+    # which is what a bare string comparison would have done.
+    printf '%s\n' '{"solver":"nn","dataset":"eil51","run":1,"wall_s":1,"peak_rss_kb":1,"tour_cost":1,"status":"timout"}' \
+        > "$TMPDIR/badstatus.jsonl"
+    run publish --runs "$TMPDIR/badstatus.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"status must be one of"* ]]
+}
+
+@test "a row missing a required numeric field is rejected" {
+    # Defaulting tour_cost to 0 would fabricate a -100% gap, i.e. "twice as good as optimal".
+    printf '%s\n' '{"solver":"nn","dataset":"eil51","run":1,"wall_s":1,"peak_rss_kb":1}' \
+        > "$TMPDIR/short.jsonl"
+    run publish --runs "$TMPDIR/short.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"tour_cost"* ]]
+}
+
+@test "a file whose rows for one solver disagree on provenance is refused" {
+    # The defect this format change removes. A resumable sweep merges new rows into an
+    # existing file, so when the solver is rebuilt between runs the file holds rows from two
+    # builds. One shard cannot describe both honestly, so the publish must refuse rather than
+    # stamp the older rows with the newer commit.
+    row nn eil51 default 1 0.01 6000 450.0 ok > "$TMPDIR/mixed.jsonl"
+    row nn eil51 default 2 0.01 6000 450.0 ok "$ALT_MEASUREMENT" >> "$TMPDIR/mixed.jsonl"
+    run publish --runs "$TMPDIR/mixed.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"different provenance"* ]]
+    [[ "$output" == *"'nn'"* ]]
+    [ ! -f "$TMPDIR/stage/v2/index.json" ]
 }
 
 @test "a missing budgets file aborts rather than publishing an empty budget map" {
-    run publish --tsv "$TMPDIR/prev.tsv" --budgets "$TMPDIR/nope.json"
+    run publish --runs "$TMPDIR/prev.jsonl" --budgets "$TMPDIR/nope.json"
     [ "$status" -ne 0 ]
     [[ "$output" == *"budgets file not found"* ]]
     # Publishing {} would overwrite the live budgets, leaving gaps without their allowance.
@@ -122,7 +187,7 @@ publish() {
 }
 
 @test "index.json makes no dataset-level claim about the measured commit" {
-    run publish --tsv "$TMPDIR/prev.tsv"
+    run publish --runs "$TMPDIR/prev.jsonl"
     [ "$status" -eq 0 ]
 
     local idx="$TMPDIR/stage/v2/index.json"
@@ -134,7 +199,7 @@ publish() {
 }
 
 @test "the URL prefix and schema_version are bumped together" {
-    run publish --tsv "$TMPDIR/prev.tsv"
+    run publish --runs "$TMPDIR/prev.jsonl"
     [ "$status" -eq 0 ]
     # publish is invoked with the default --prefix bench/v2; the transform wrote under v2.
     [ -d "$TMPDIR/stage/v2" ]
@@ -143,7 +208,7 @@ publish() {
 }
 
 @test "per-family budgets are published with their agreed status" {
-    run publish --tsv "$TMPDIR/prev.tsv"
+    run publish --runs "$TMPDIR/prev.jsonl"
     [ "$status" -eq 0 ]
 
     local idx="$TMPDIR/stage/v2/index.json"
@@ -154,7 +219,7 @@ publish() {
 }
 
 @test "an unknown optimal stays null and yields no gap, never a zero gap" {
-    run publish --tsv "$TMPDIR/prev.tsv"
+    run publish --runs "$TMPDIR/prev.jsonl"
     [ "$status" -eq 0 ]
 
     local shard="$TMPDIR/stage/v2/algorithms/nn.json"
@@ -167,7 +232,7 @@ publish() {
 }
 
 @test "timeouts and errors are counted separately and kept out of the gap" {
-    run publish --tsv "$TMPDIR/timeouts.tsv"
+    run publish --runs "$TMPDIR/timeouts.jsonl"
     [ "$status" -eq 0 ]
 
     local cell
@@ -184,11 +249,11 @@ publish() {
 }
 
 @test "re-measuring one solver leaves the other solvers' provenance untouched" {
-    publish --tsv "$TMPDIR/prev.tsv"
+    publish --runs "$TMPDIR/prev.jsonl"
     cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
 
     run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage2" \
-        --tsv "$TMPDIR/sa-only.tsv"
+        --runs "$TMPDIR/sa-only.jsonl"
     [ "$status" -eq 0 ]
 
     # `sa` was re-measured: new commit.
@@ -199,14 +264,14 @@ publish() {
 }
 
 @test "a differential republish keeps unmeasured solvers on the problem leaderboard" {
-    publish --tsv "$TMPDIR/prev.tsv"
+    publish --runs "$TMPDIR/prev.jsonl"
     cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
 
     local before after
     before="$(jq -r '[.leaderboard[].solver] | sort | join(",")' "$TMPDIR/prev-tree/v2/problems/eil51.json")"
 
     run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage2" \
-        --tsv "$TMPDIR/sa-only.tsv"
+        --runs "$TMPDIR/sa-only.jsonl"
     [ "$status" -eq 0 ]
 
     after="$(jq -r '[.leaderboard[].solver] | sort | join(",")' "$TMPDIR/stage2/v2/problems/eil51.json")"
@@ -216,11 +281,11 @@ publish() {
 }
 
 @test "a differential republish uploads only the shard it re-measured" {
-    publish --tsv "$TMPDIR/prev.tsv"
+    publish --runs "$TMPDIR/prev.jsonl"
     cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
 
     run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage2" \
-        --tsv "$TMPDIR/sa-only.tsv"
+        --runs "$TMPDIR/sa-only.jsonl"
     [ "$status" -eq 0 ]
 
     # nn's shard is unchanged, so it must not be re-uploaded; sa's must be.
@@ -231,7 +296,7 @@ publish() {
 }
 
 @test "a release snapshot is written as a complete immutable copy" {
-    run publish --tsv "$TMPDIR/prev.tsv" --snapshot v1.0.0
+    run publish --runs "$TMPDIR/prev.jsonl" --snapshot v1.0.0
     [ "$status" -eq 0 ]
 
     local snap="$TMPDIR/stage/v2/snapshots/v1.0.0"
@@ -244,44 +309,48 @@ publish() {
     cmp -s "$TMPDIR/stage/v2/index.json" "$snap/index.json"
 }
 
-@test "publish-time provenance is labelled rather than implied when the TSV has none" {
-    # A TSV with no # header: the commit can only be HEAD at publish time and does not
+@test "rows carrying no measurement are labelled publish-time, not implied" {
+    # No measurement on the row: the commit can only be HEAD at publish time and does not
     # necessarily identify the binary, so the source must say so.
-    printf 'solver\tdataset\tconfig\trun\twall_s\tpeak_rss_kb\ttour_cost\tstatus\nnn\tberlin52\tdefault\t1\t0.01\t6000\t8980.0\tok\n' \
-        > "$TMPDIR/bare.tsv"
-    run publish --tsv "$TMPDIR/bare.tsv"
+    row nn eil51 default 1 0.01 6000 450.0 ok - > "$TMPDIR/bare.jsonl"
+    run publish --runs "$TMPDIR/bare.jsonl"
     [ "$status" -eq 0 ]
 
     local shard="$TMPDIR/stage/v2/algorithms/nn.json"
     [ "$(jq -r '.measurement.git_commit_source' "$shard")" = "publish-time" ]
+    # `measured_at` cannot be inferred from publishing, so it stays null rather than being
+    # stamped with today's date. The version and tree state ARE the publisher's, which is why
+    # the block is labelled publish-time: a consumer must not read them as the measured binary.
+    [ "$(jq -r '.measurement.measured_at' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.git_commit | length > 0' "$shard")" = "true" ]
 }
 
-@test "a TSV without a measured_at yields null rather than the publish time" {
-    run publish --tsv "$TMPDIR/prev.tsv"
+@test "a measurement without measured_at yields null rather than the publish time" {
+    row nn eil51 default 1 0.01 6000 450.0 ok \
+        '{"git_commit":"1234567","git_commit_source":"jsonl","dirty":false}' > "$TMPDIR/nostamp.jsonl"
+    run publish --runs "$TMPDIR/nostamp.jsonl"
     [ "$status" -eq 0 ]
-    # The fixture records no `# measured_at=`, and stamping it with the publish time would
-    # misdate a result that may have been carried forward from an earlier run.
+    # Stamping it with the publish time would misdate a result carried forward from elsewhere.
     [ "$(jq -r '.measurement.measured_at' "$TMPDIR/stage/v2/algorithms/nn.json")" = "null" ]
 }
 
-@test "a TSV that records measured_at has it published" {
-    { echo "# measured_at=2026-01-02T03:04:05Z"; cat "$TMPDIR/prev.tsv"; } > "$TMPDIR/stamped.tsv"
-    run publish --tsv "$TMPDIR/stamped.tsv"
+@test "measured_at is published when the row records it" {
+    run publish --runs "$TMPDIR/prev.jsonl"
     [ "$status" -eq 0 ]
     [ "$(jq -r '.measurement.measured_at' "$TMPDIR/stage/v2/algorithms/nn.json")" = "2026-01-02T03:04:05Z" ]
 }
 
 @test "a partial publish with no previous tree is refused unless stated" {
     # This is the guard that stops a differential run from quietly replacing the live manifest
-    # and leaderboards with a tree holding only this TSV's solvers.
-    run "$PUBLISH" --dry-run --no-fetch-previous --stage "$TMPDIR/nostage" --tsv "$TMPDIR/prev.tsv"
+    # and leaderboards with a tree holding only this run log's solvers.
+    run "$PUBLISH" --dry-run --no-fetch-previous --stage "$TMPDIR/nostage" --runs "$TMPDIR/prev.jsonl"
     [ "$status" -ne 0 ]
     [[ "$output" == *"--first-publish"* ]]
     [ ! -f "$TMPDIR/nostage/v2/index.json" ]
 }
 
 @test "an invalid snapshot tag is refused before it reaches the filesystem" {
-    run publish --tsv "$TMPDIR/prev.tsv" --snapshot "../escape"
+    run publish --runs "$TMPDIR/prev.jsonl" --snapshot "../escape"
     [ "$status" -ne 0 ]
     [[ "$output" == *"invalid snapshot tag"* ]]
     # Nothing outside the snapshots directory may be touched.
@@ -289,18 +358,14 @@ publish() {
 }
 
 @test "a differential republish drops entries for a re-measured solver on other datasets" {
-    publish --tsv "$TMPDIR/prev.tsv"
+    publish --runs "$TMPDIR/prev.jsonl"
     cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
 
     # Measure sa on eil51 only, so its replacement shard no longer covers zzz_unknown.
-    cat > "$TMPDIR/sa-partial.tsv" <<'TSV'
-# git_commit=bbbbbbbb
-solver	dataset	config	run	wall_s	peak_rss_kb	tour_cost	status
-sa	eil51	default	1	0.20	8000	428.0	ok
-TSV
+    row sa eil51 default 1 0.20 8000 428.0 ok "$ALT_MEASUREMENT" > "$TMPDIR/sa-partial.jsonl"
 
     run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage3" \
-        --tsv "$TMPDIR/sa-partial.tsv"
+        --runs "$TMPDIR/sa-partial.jsonl"
     [ "$status" -eq 0 ]
 
     # sa's shard no longer has zzz_unknown, so the leaderboard must not still rank it there.
@@ -314,9 +379,9 @@ TSV
     # git_commit present, everything else absent. Pairing that commit with the publisher's
     # dirty flag, version and rustc would be a provenance claim the file does not support —
     # and once written into a shard it is permanent.
-    printf '# git_commit=dddddddd\nsolver\tdataset\tconfig\trun\twall_s\tpeak_rss_kb\ttour_cost\tstatus\nnn\teil51\tdefault\t1\t0.01\t6000\t450.0\tok\n' \
-        > "$TMPDIR/partial-header.tsv"
-    run publish --tsv "$TMPDIR/partial-header.tsv"
+    row nn eil51 default 1 0.01 6000 450.0 ok \
+        '{"git_commit":"dddddddd","git_commit_source":"jsonl"}' > "$TMPDIR/partial-header.jsonl"
+    run publish --runs "$TMPDIR/partial-header.jsonl"
     [ "$status" -eq 0 ]
 
     local shard="$TMPDIR/stage/v2/algorithms/nn.json"
@@ -327,20 +392,20 @@ TSV
 }
 
 @test "a previous manifest naming a shard that is not on disk is refused" {
-    publish --tsv "$TMPDIR/prev.tsv"
+    publish --runs "$TMPDIR/prev.jsonl"
     cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
 
     # The manifest still lists sa, but its shard is gone. Merging would drop sa from the
     # republished tree without a word, so this must abort instead.
     rm "$TMPDIR/prev-tree/v2/algorithms/sa.json"
     run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage-missing" \
-        --tsv "$TMPDIR/sa-only.tsv"
+        --runs "$TMPDIR/sa-only.jsonl"
     [ "$status" -ne 0 ]
     [[ "$output" == *"not present in the tree"* ]]
 }
 
 @test "a shard the previous manifest does not name is not merged" {
-    publish --tsv "$TMPDIR/prev.tsv"
+    publish --runs "$TMPDIR/prev.jsonl"
     cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
 
     # A stray shard was never live: resurrecting it would republish something no reader
@@ -349,7 +414,7 @@ TSV
         > "$TMPDIR/prev-tree/v2/algorithms/zzz_stray.json"
 
     run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage-stray" \
-        --tsv "$TMPDIR/sa-only.tsv"
+        --runs "$TMPDIR/sa-only.jsonl"
     [ "$status" -eq 0 ]
     [ ! -f "$TMPDIR/stage-stray/v2/algorithms/zzz_stray.json" ]
     [ "$(jq -r '[.solvers[].id] | index("zzz_stray") == null' "$TMPDIR/stage-stray/v2/index.json")" = "true" ]
@@ -387,7 +452,7 @@ PY
     local port
     port="$(cat "$portfile")"
     run "$PUBLISH" --dry-run --first-publish --stage "$TMPDIR/first" \
-        --public-base "http://127.0.0.1:$port" --tsv "$TMPDIR/prev.tsv"
+        --public-base "http://127.0.0.1:$port" --runs "$TMPDIR/prev.jsonl"
 
     kill "$SERVER_PID" 2>/dev/null || true
 
