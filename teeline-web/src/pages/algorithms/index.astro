@@ -2,6 +2,8 @@
 // Index page for all algorithms — replaces the topbar's algorithms
 // drop-down with a browsable destination, mirroring the Problems page.
 import BaseLayout from '../../layouts/BaseLayout.astro'
+import BenchmarkMarker from '../../components/BenchmarkMarker.astro'
+import BenchmarkMarkers from '../../components/BenchmarkMarkers.astro'
 import { SOLVER_GROUPS, SOLVER_META } from '../../nav-data'
 import { EXPLAINER_META } from '../../explainers/registry'
 
@@ -25,6 +27,7 @@ const groupDesc: Record<string, string> = {
   <main class="mx-auto max-w-content px-6 py-8">
     <h1 class="text-2xl font-semibold tracking-tight lg:text-3xl">Algorithms</h1>
     <p class="mt-3 text-text-dim">{description}</p>
+    <BenchmarkMarkers kind="solver" />
 
     {
       SOLVER_GROUPS.map((g) => (
@@ -45,9 +48,9 @@ const groupDesc: Record<string, string> = {
                   const meta = SOLVER_META[id]
                   if (!meta) return null
                   return (
-                    <tr class="border-b border-border last:border-b-0">
+                    <tr class="border-b border-border last:border-b-0" data-solver={id}>
                       <td class="px-4 py-2">
-                        <a href={`/algorithms/${id}/`} class="text-accent no-underline hover:underline">{meta.name}</a>
+                        <a href={`/algorithms/${id}/`} class="text-accent no-underline hover:underline">{meta.name}</a><BenchmarkMarker id={id} kind="solver" />
                       </td>
                       <td class="px-4 py-2 font-mono text-xs text-text-dim">{meta.complexity}</td>
                       <td class="px-4 py-2">

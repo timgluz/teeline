@@ -24,11 +24,15 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
+  /* Astro owns pages, layouts and content: they import the `astro:*` virtual modules and `.astro`
+     files, which only its language server resolves. The components are plain Preact and are checked
+     here — excluding them hid an undefined identifier in an island for as long as the exclusion
+     existed. Astro components under src/components are not TypeScript, so this program ignores them
+     and `astro check` covers those. */
   "exclude": [
     "src/content.config.ts",
     "src/content/**",
     "src/pages/**",
-    "src/layouts/**",
-    "src/components/**"
+    "src/layouts/**"
   ]
 }
