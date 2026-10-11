@@ -6,6 +6,7 @@
 // Every number comes from the solver's own shard; only display metadata (a problem's name
 // and distance type, which the shard does not carry) arrives as a build-time prop.
 
+import type { ComponentChildren } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 
 import { niceTicks, placeLabels } from '../lib/chart-layout'
@@ -720,7 +721,7 @@ function Th({
   children,
   right = false,
 }: {
-  children: unknown
+  children: ComponentChildren
   right?: boolean
 }) {
   return (

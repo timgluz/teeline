@@ -6,6 +6,7 @@
 // doc, so a disagreement between what the page claims and what the shard ranked on can be stated
 // rather than silently shown twice.
 
+import type { ComponentChildren } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 
 import { niceTicks } from '../lib/chart-layout'
@@ -338,7 +339,7 @@ function Th({
   children,
   right = false,
 }: {
-  children: unknown
+  children: ComponentChildren
   right?: boolean
 }) {
   return (
