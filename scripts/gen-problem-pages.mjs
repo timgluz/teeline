@@ -330,6 +330,41 @@ function minimapPoints(txt, dim, format) {
   return { points: mdsLayout(D, dim), derived: true }
 }
 
+// Above this many cities the dots cost megabytes without showing more: the viewBox is 340x200,
+// so past a few thousand points they are already sharing pixels. `pla85900` is 5.8 MB of
+// `<circle>` markup for a picture whose structure a grid carries in a fraction of that.
+const DENSITY_THRESHOLD = 3000
+const DENSITY_CELL = 2
+
+// One <rect> per occupied cell. Opacity grows with the count on a log scale, so the few cells
+// holding most of the points do not saturate the picture and hide the sparse edges.
+function densityRects(projected, viewW, viewH) {
+  const cols = Math.ceil(viewW / DENSITY_CELL)
+  const rows = Math.ceil(viewH / DENSITY_CELL)
+  const counts = new Map()
+
+  for (const p of projected) {
+    const col = Math.min(cols - 1, Math.max(0, Math.floor(p.x / DENSITY_CELL)))
+    const row = Math.min(rows - 1, Math.max(0, Math.floor(p.y / DENSITY_CELL)))
+    const key = row * cols + col
+    counts.set(key, (counts.get(key) || 0) + 1)
+  }
+
+  let max = 0
+  for (const count of counts.values()) max = Math.max(max, count)
+
+  const rects = []
+  for (const [key, count] of counts) {
+    const col = key % cols
+    const row = (key - col) / cols
+    const opacity = (0.45 + 0.55 * (Math.log1p(count) / Math.log1p(max))).toFixed(2)
+    rects.push(
+      `<rect x="${(col * DENSITY_CELL).toFixed(1)}" y="${(row * DENSITY_CELL).toFixed(1)}" width="${DENSITY_CELL}" height="${DENSITY_CELL}" fill="#0d9488" opacity="${opacity}"/>`
+    )
+  }
+  return rects.join('\n    ')
+}
+
 // Generate inline SVG minimap
 function generateMinimap(coords, derived = false) {
   if (!coords || coords.length === 0) return ''
@@ -349,22 +384,26 @@ function generateMinimap(coords, derived = false) {
   const offX = (VIEW_W - w * scale) / 2
   const offY = (VIEW_H - h * scale) / 2
 
-  function sx(x) { return ((x - minX) * scale + offX).toFixed(1) }
-  function sy(y) { return ((y - minY) * scale + offY).toFixed(1) }
+  const projected = coords.map(p => ({
+    x: (p.x - minX) * scale + offX,
+    y: (p.y - minY) * scale + offY,
+  }))
 
   // For large datasets, use smaller dots
   const r = coords.length > 2000 ? 0.8 : coords.length > 500 ? 1.2 : 2
 
-  const dots = coords.map(p =>
-    `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="${r}" fill="#0d9488" opacity="0.7"/>`
-  ).join('\n    ')
+  const marks = projected.length > DENSITY_THRESHOLD
+    ? densityRects(projected, VIEW_W, VIEW_H)
+    : projected.map(p =>
+        `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r}" fill="#0d9488" opacity="0.7"/>`
+      ).join('\n    ')
 
   const label = derived
     ? 'City layout derived from the distance matrix; this instance publishes no coordinates'
     : 'City map for this problem'
 
   return `<svg viewBox="0 0 ${VIEW_W} ${VIEW_H}" width="100%" style="max-width:${VIEW_W}px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="${label}">
-  ${dots}
+  ${marks}
 </svg>`
 }
 
