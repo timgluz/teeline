@@ -14,6 +14,7 @@ hasExplainer: true
 | **Type** | Heuristic — nature-inspired metaheuristic |
 | **Complexity** | O(epochs · nests · n) |
 | **Auto-seeds from** | `shuffle` (random nests) |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

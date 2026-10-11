@@ -92,6 +92,7 @@ export default function AlgorithmBenchmarks({
     // never start. The placeholder is what makes the deferral work at all.
     return (
       <section
+        id="benchmarks"
         class="mt-10"
         aria-busy="true"
         aria-labelledby="benchmarks-heading"
@@ -109,6 +110,7 @@ export default function AlgorithmBenchmarks({
   if (state.kind === 'error') {
     return (
       <section
+        id="benchmarks"
         class="mt-10 rounded-lg border border-border bg-surface p-4 lg:p-6"
         aria-labelledby="benchmarks-heading"
       >
@@ -143,7 +145,7 @@ export default function AlgorithmBenchmarks({
   const hasWall = rows.some((row) => row.wall !== null)
 
   return (
-    <section class="mt-10" aria-labelledby="benchmarks-heading">
+    <section id="benchmarks" class="mt-10" aria-labelledby="benchmarks-heading">
       <h2
         id="benchmarks-heading"
         class="text-lg font-semibold tracking-tight lg:text-xl"

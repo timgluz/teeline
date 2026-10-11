@@ -14,6 +14,7 @@ hasExplainer: true
 | **Type** | Heuristic — local search |
 | **Complexity** | O(epochs · n) |
 | **Auto-seeds from** | `shuffle` (random tour) |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

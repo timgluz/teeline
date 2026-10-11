@@ -14,6 +14,7 @@ hasExplainer: true
 | **Type** | Heuristic — iterated local search |
 | **Complexity** | O(epochs · n²) |
 | **Auto-seeds from** | `nn` (nearest neighbor) |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

@@ -13,6 +13,7 @@ hasExplainer: true
 | **Alias** | `branch_bound` |
 | **Type** | Exact — **only when `--n_nearest` ≥ the number of cities** |
 | **Complexity** | Exponential worst-case; effective pruning often makes it practical for small instances |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

@@ -107,6 +107,32 @@ test.describe('algorithm benchmark section', () => {
     await expect(summaryRow.locator('td').last()).toHaveText('—')
   })
 
+  test('the summary table jumps to the benchmark section, clear of the nav', async ({
+    page,
+  }) => {
+    await fulfil(page, fixture('algorithm-2opt.json'))
+    await page.goto('/algorithms/2opt/')
+
+    // The row is part of the doc's markdown summary table, above the fold.
+    const link = page.locator('a[href="#benchmarks"]').first()
+    await expect(link).toBeVisible()
+
+    // Hydrate the section first, so the layout has settled by the time we jump to it.
+    const section = page.locator('#benchmarks')
+    await section.scrollIntoViewIfNeeded()
+    await page.waitForSelector('#benchmarks tfoot tr', { timeout: 20000 })
+    await page.evaluate(() => window.scrollTo(0, 0))
+
+    await link.click()
+    await expect(page).toHaveURL(/#benchmarks$/)
+
+    // scroll-padding-top exists because the topbar is sticky (56px): without it the heading
+    // lands underneath the nav, which is the whole reason the offset is in global.css.
+    const box = await section.boundingBox()
+    expect(box?.y ?? 0).toBeGreaterThan(40)
+    expect(box?.y ?? 0).toBeLessThan(200)
+  })
+
   test('renders a killed cell as lost runs rather than as a result', async ({
     page,
   }) => {

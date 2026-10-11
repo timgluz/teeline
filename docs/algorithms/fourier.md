@@ -13,6 +13,7 @@ hasExplainer: true
 | **Alias** | `fourier` |
 | **Type** | Heuristic — constructive |
 | **Complexity** | O(K_max · epochs · (n + M) log M) per run |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 
