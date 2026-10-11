@@ -123,7 +123,7 @@ mod tests {
             vec![1.0, 0.0],
         ]);
 
-        let dm = distance_matrix::from_cities(&cities);
+        let dm = distance_matrix::from_cities_unrounded(&cities);
         let problem = TspProblem::new(cities, dm);
         let tour = solve(&problem, &HeuristicOptions::default(), None, None);
         assert_eq!(4.0, tour.total);

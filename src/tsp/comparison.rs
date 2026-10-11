@@ -19,6 +19,22 @@ pub fn tour_cost(route: &[usize], cities: &[KDPoint]) -> f32 {
     tour_cost_with_type(route, cities, DistanceType::Euc2D)
 }
 
+/// Sum of plain Euclidean distances — **not** TSPLIB's `EUC_2D`, which rounds to the nearest
+/// integer. See `DistanceMatrix::from_cities_unrounded` for why a caller would want the raw form.
+pub fn tour_cost_unrounded(route: &[usize], cities: &[KDPoint]) -> f32 {
+    let idx: HashMap<usize, &KDPoint> = cities.iter().map(|c| (c.id, c)).collect();
+    let n = route.len();
+    (0..n)
+        .map(|i| {
+            let a = idx[&route[i]];
+            let b = idx[&route[(i + 1) % n]];
+            let dx = a.x() - b.x();
+            let dy = a.y() - b.y();
+            (dx * dx + dy * dy).sqrt()
+        })
+        .sum()
+}
+
 /// Sum of distances along the tour using the given distance type.
 pub fn tour_cost_with_type(route: &[usize], cities: &[KDPoint], dt: DistanceType) -> f32 {
     let idx: HashMap<usize, &KDPoint> = cities.iter().map(|c| (c.id, c)).collect();
@@ -28,11 +44,7 @@ pub fn tour_cost_with_type(route: &[usize], cities: &[KDPoint], dt: DistanceType
             let a = idx[&route[i]];
             let b = idx[&route[(i + 1) % n]];
             match dt {
-                DistanceType::Euc2D => {
-                    let dx = a.x() - b.x();
-                    let dy = a.y() - b.y();
-                    (dx * dx + dy * dy).sqrt()
-                }
+                DistanceType::Euc2D => distance_matrix::euc_2d_distance(a, b),
                 DistanceType::Geo => distance_matrix::geo_distance(a, b),
                 DistanceType::Att => distance_matrix::att_distance(a, b),
                 DistanceType::Ceil2D => distance_matrix::ceil_2d_distance(a, b),
@@ -51,6 +63,17 @@ pub fn tour_cost_from_matrix(route: &[usize], dm: &DistanceMatrix) -> f32 {
 
 pub fn compare_tours(solver: &[usize], optimal: &[usize], cities: &[KDPoint]) -> ComparisonStats {
     compare_tours_with_type(solver, optimal, cities, DistanceType::Euc2D)
+}
+
+/// `compare_tours` on plain Euclidean distances rather than TSPLIB's rounded `EUC_2D`.
+pub fn compare_tours_unrounded(
+    solver: &[usize],
+    optimal: &[usize],
+    cities: &[KDPoint],
+) -> ComparisonStats {
+    let optimal_cost = tour_cost_unrounded(optimal, cities);
+    let solver_cost = tour_cost_unrounded(solver, cities);
+    build_stats(solver_cost, optimal_cost, solver, optimal)
 }
 
 pub fn compare_tours_with_type(
@@ -162,7 +185,7 @@ mod tests {
         let cities = square_cities();
         let optimal = vec![1, 2, 3, 4];
         let solver = vec![1, 2, 4, 3];
-        let stats = compare_tours(&solver, &optimal, &cities);
+        let stats = compare_tours_unrounded(&solver, &optimal, &cities);
 
         assert!(
             stats.gap_pct > 0.0,

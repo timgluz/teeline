@@ -84,6 +84,24 @@ pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     (RRR * cos_angle.acos() + 1.0).floor() as f32
 }
 
+/// TSPLIB EUC_2D: Euclidean distance rounded to the nearest integer.
+///
+/// Integer-valued, like `att_distance` and `ceil_2d_distance` below. Leaving it unrounded made
+/// teeline optimise a different objective than the one `EDGE_WEIGHT_TYPE: EUC_2D` names, so its
+/// costs were not comparable with any published optimum: `eil76`'s own optimal route scored 545.39
+/// against a published optimum of 538, a floor no solver could ever have beaten.
+///
+/// This is deliberately *not* `KDPoint::distance`, which stays the raw Euclidean distance: that one
+/// also answers "are these the same point" (`distance < f32::EPSILON`), where rounding would make
+/// distinct points coincide.
+pub(crate) fn euc_2d_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
+    // Widened before subtracting, for the same reason as the neighbours below: `round` sits on an
+    // integer boundary that an f32-rounded difference could cross.
+    let dx = p1.x() as f64 - p2.x() as f64;
+    let dy = p1.y() as f64 - p2.y() as f64;
+    (dx * dx + dy * dy).sqrt().round() as f32
+}
+
 /// TSPLIB ATT ("pseudo-Euclidean"): round `r = sqrt((dx^2 + dy^2) / 10)` to the nearest
 /// integer, then add one when rounding went *down*, so the result is never below `r`.
 pub(crate) fn att_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
@@ -111,6 +129,11 @@ pub(crate) fn ceil_2d_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
 // to have similar builder as kdtree
 pub fn from_cities(cities: &[KDPoint]) -> DistanceMatrix {
     DistanceMatrix::from_cities(cities).unwrap()
+}
+
+/// Plain Euclidean, unrounded — see `DistanceMatrix::from_cities_unrounded`. For tests.
+pub fn from_cities_unrounded(cities: &[KDPoint]) -> DistanceMatrix {
+    DistanceMatrix::from_cities_unrounded(cities).unwrap()
 }
 
 pub fn build(cities: &[KDPoint], dt: DistanceType) -> DistanceMatrix {
@@ -153,7 +176,42 @@ impl DistanceMatrix {
         Self::build(cities, DistanceType::Euc2D)
     }
 
+    /// Plain Euclidean distances — **not** TSPLIB's `EUC_2D`, which rounds to the nearest integer.
+    ///
+    /// An addition rather than a change, so `from_cities` keeps building the metric that
+    /// `EDGE_WEIGHT_TYPE: EUC_2D` names; `teeline-api` and `teeline-wasm` call it directly and must
+    /// stay conformant.
+    ///
+    /// This exists for tests that exercise tour *mechanics* on coordinates whose rounded distances
+    /// collapse. The five-city chain the solver tests share has every pairwise distance round to 1,
+    /// so every tour costs the same and a test can no longer tell a good tour from a bad one.
+    pub fn from_cities_unrounded(cities: &[KDPoint]) -> Result<Self, &'static str> {
+        Self::build_with(cities, |a, b| {
+            let dx = a.x() - b.x();
+            let dy = a.y() - b.y();
+            (dx * dx + dy * dy).sqrt()
+        })
+    }
+
     pub fn build(cities: &[KDPoint], distance_type: DistanceType) -> Result<Self, &'static str> {
+        if distance_type == DistanceType::Explicit {
+            return Err(
+                "cannot build distance matrix from coordinates for EXPLICIT type — use DistanceMatrix::new() with precomputed distances",
+            );
+        }
+        Self::build_with(cities, |pt1, pt2| match distance_type {
+            DistanceType::Euc2D => euc_2d_distance(pt1, pt2),
+            DistanceType::Geo => geo_distance(pt1, pt2),
+            DistanceType::Att => att_distance(pt1, pt2),
+            DistanceType::Ceil2D => ceil_2d_distance(pt1, pt2),
+            DistanceType::Explicit => unreachable!("rejected above"),
+        })
+    }
+
+    fn build_with(
+        cities: &[KDPoint],
+        distance: impl Fn(&KDPoint, &KDPoint) -> f32,
+    ) -> Result<Self, &'static str> {
         let n = cities.len();
         if n < 2 {
             return Err("distance matrix requires at least 2 points");
@@ -168,18 +226,7 @@ impl DistanceMatrix {
             city_table.insert(i, *pt1);
 
             for pt2 in cities.iter().take(i) {
-                let d = match distance_type {
-                    DistanceType::Euc2D => pt1.distance(pt2),
-                    DistanceType::Geo => geo_distance(pt1, pt2),
-                    DistanceType::Att => att_distance(pt1, pt2),
-                    DistanceType::Ceil2D => ceil_2d_distance(pt1, pt2),
-                    DistanceType::Explicit => {
-                        return Err(
-                            "cannot build distance matrix from coordinates for EXPLICIT type — use DistanceMatrix::new() with precomputed distances",
-                        );
-                    }
-                };
-                distances.push(d);
+                distances.push(distance(pt1, pt2));
             }
         }
 
@@ -648,7 +695,7 @@ mod tests {
     fn test_build_distance_matrix_from_3_item_list() {
         let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![0.0, 1.0], vec![2.0, 0.0]]);
 
-        let res = DistanceMatrix::from_cities(&cities);
+        let res = DistanceMatrix::from_cities_unrounded(&cities);
 
         assert!(res.is_ok());
         let res = res.unwrap();
@@ -662,7 +709,7 @@ mod tests {
     #[test]
     fn test_distance_matrix_distance_between_with_3_cities_example() {
         let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![0.0, 1.0], vec![2.0, 0.0]]);
-        let res = DistanceMatrix::from_cities(&cities);
+        let res = DistanceMatrix::from_cities_unrounded(&cities);
 
         assert!(res.is_ok());
         let dm = res.unwrap();
@@ -685,7 +732,7 @@ mod tests {
             vec![2.0, 0.0],
             vec![4.0, 0.0],
         ]);
-        let res = DistanceMatrix::from_cities(&cities);
+        let res = DistanceMatrix::from_cities_unrounded(&cities);
 
         assert!(res.is_ok());
         let dm = res.unwrap();
@@ -732,7 +779,7 @@ mod tests {
         ]);
 
         let route = vec![0, 1, 2, 3, 4];
-        let dm = DistanceMatrix::from_cities(&cities).unwrap();
+        let dm = DistanceMatrix::from_cities_unrounded(&cities).unwrap();
 
         assert_approx(4.0, dm.tour_length(&route));
     }
@@ -747,7 +794,7 @@ mod tests {
             vec![1.0, 0.0],
         ]);
 
-        let dm = from_cities(&cities);
+        let dm = from_cities_unrounded(&cities);
 
         let res = dm.nearest(&cities[0], 3);
         assert_eq!(cities[1].id, res.closest_point().unwrap().id);

@@ -37,6 +37,14 @@ fn make_problem(cities: &[kdtree::KDPoint]) -> TspProblem {
     TspProblem::new(cities.to_vec(), build_dm(cities))
 }
 
+/// The five-city fixture above is for tour mechanics, and under TSPLIB's rounded `EUC_2D` every
+/// one of its pairwise distances is 1 — so every tour costs the same and an "optimal tour" test
+/// cannot distinguish anything. Built with plain Euclidean distances instead.
+fn make_problem_unrounded(cities: &[kdtree::KDPoint]) -> TspProblem {
+    let dm = distance_matrix::from_cities_unrounded(cities);
+    TspProblem::new(cities.to_vec(), dm)
+}
+
 fn tsp5_cities() -> Vec<kdtree::KDPoint> {
     kdtree::build_points(&[
         vec![0.0, 0.0],
@@ -265,7 +273,7 @@ fn cuckoo_search_valid_tour_berlin52() {
 fn bellman_karp_optimal_tour_tsp5() {
     let cities = tsp5_cities();
     let tour = bellman_karp::solve(
-        &make_problem(&cities),
+        &make_problem_unrounded(&cities),
         &HeuristicOptions::default(),
         None,
         None,
@@ -287,7 +295,7 @@ fn bellman_karp_optimal_tour_tsp5() {
 fn branch_bound_optimal_tour_tsp5() {
     let cities = tsp5_cities();
     let tour = branch_bound::solve(
-        &make_problem(&cities),
+        &make_problem_unrounded(&cities),
         &HeuristicOptions::default(),
         None,
         None,

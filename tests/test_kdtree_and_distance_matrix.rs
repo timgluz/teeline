@@ -185,7 +185,11 @@ fn test_kdtree_vs_distance_matrix() {
     ]);
 
     let kd = kdtree::from_cities(&cities);
-    let dm = distance_matrix::from_cities(&cities);
+    // Plain Euclidean on both sides, so this compares the two structures rather than two metrics.
+    // The KD-tree is metric-agnostic — it cannot know whether the instance is EUC_2D, GEO or
+    // ATT — and always measures raw Euclidean, while the matrix now carries the instance's
+    // TSPLIB definition. They agree in ordering, since rounding is monotone, but not in value.
+    let dm = distance_matrix::from_cities_unrounded(&cities);
 
     let pt1 = KDPoint::new(&[0.0, 0.0]);
     let kd_res1 = kd.nearest(&pt1, 1);

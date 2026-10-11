@@ -672,7 +672,10 @@ mod tests {
                 coords: [0.0, 1.0],
             },
         ];
-        let dm = distance_matrix::from_cities(&pts);
+        // Plain Euclidean: on a unit square the sides and both diagonals all round to 1 under
+        // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
+        // property under test — that LK removes the crossing — would be untestable.
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 3);
         let tour = vec![0usize, 1, 3, 2]; // crossed
         let max_id = 3;
@@ -726,7 +729,10 @@ mod tests {
                 coords: [0.0, 1.0],
             },
         ];
-        let dm = distance_matrix::from_cities(&pts);
+        // Plain Euclidean: on a unit square the sides and both diagonals all round to 1 under
+        // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
+        // property under test — that LK removes the crossing — would be untestable.
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 3);
         let mut tour = vec![0usize, 1, 3, 2];
         let mut pos = make_pos(&tour);
@@ -841,7 +847,10 @@ mod tests {
                 coords: [0.0, 1.0],
             },
         ];
-        let dm = distance_matrix::from_cities(&pts);
+        // Plain Euclidean: on a unit square the sides and both diagonals all round to 1 under
+        // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
+        // property under test — that LK removes the crossing — would be untestable.
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let cands = build_candidates(&pts, 3);
         let mut tour = vec![0usize, 1, 3, 2];
         let mut pos = make_pos(&tour);
