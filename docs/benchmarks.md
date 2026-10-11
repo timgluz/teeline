@@ -1,5 +1,15 @@
 # Algorithm Benchmarks — berlin52
 
+> **Not the website's source any more.** The landing chart and the per-algorithm pages read the
+> published shards under `bench/v2/` (contract: `docs/benchmarks/schema.md`; publisher:
+> `scripts/publish-benchmarks.sh`), so no page renders from the table below. It is kept as a
+> hand-recorded v1.0.1 snapshot for the record; retiring it is tracked in the GitKB task
+> `tasks/bench-docs-spec-update`.
+>
+> The optimum this file records is also the open EUC\_2D question: **7 544.37** is that route's
+> *unrounded* length, while `docs/problems/berlin52.md` publishes **7 542**, TSPLIB's `nint`-rounded
+> optimum. Which one the site states depends on `tasks/fix-euc-2d-rounding`.
+
 All solvers measured against the **berlin52** TSPLIB instance (52 cities, EUC\_2D).
 The known optimal tour cost is **7 544.37** (from `berlin52.opt.tour`).
 
