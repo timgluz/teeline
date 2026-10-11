@@ -563,3 +563,39 @@ PY
     [ "$(jq -r '.solver' "$TMPDIR/stage/v2/algorithms/nn.json")" = "nn" ]
     [ "$(jq -r '.measurement.git_commit' "$TMPDIR/stage/v2/algorithms/nn.json")" = "899de9d" ]
 }
+
+@test "a solver that only timed out keeps its row, ranked last" {
+    # A timeout is a fact about the instance. Dropping the row makes "could not finish inside the
+    # budget" indistinguishable from "was never measured here", and those are different statements
+    # about a solver — the algorithm shard keeps the first, so the leaderboard must not lose it.
+    {
+        row nn eil51 default 1 0.01 6000 450.0 ok
+        row sa eil51 default 1 180.0 6000 0.0 timeout
+        row sa eil51 default 2 180.0 6000 0.0 timeout
+    } > "$TMPDIR/only-timeouts.jsonl"
+
+    run publish --runs "$TMPDIR/only-timeouts.jsonl"
+    [ "$status" -eq 0 ]
+
+    local board="$TMPDIR/stage/v2/problems/eil51.json"
+    # Both are on the board: the one with a result first, the one without last.
+    [ "$(jq -r '.leaderboard|length' "$board")" -eq 2 ]
+    [ "$(jq -r '.leaderboard[0].solver' "$board")" = "nn" ]
+    [ "$(jq -r '.leaderboard[1].solver' "$board")" = "sa" ]
+
+    # And it says why: no runs, no tour, but the timeouts are counted.
+    [ "$(jq -r '.leaderboard[1].runs' "$board")" -eq 0 ]
+    [ "$(jq -r '.leaderboard[1].timeouts' "$board")" -eq 2 ]
+    [ "$(jq -r '.leaderboard[1].tour_cost' "$board")" = "null" ]
+}
+
+@test "a board of nothing but timeouts is still published" {
+    # Every solver timing out is the record of that instance, not an absence of one. The page can
+    # then say so instead of showing an instance with no results at all.
+    row sa eil51 default 1 180.0 6000 0.0 timeout > "$TMPDIR/all-timeout.jsonl"
+
+    run publish --runs "$TMPDIR/all-timeout.jsonl"
+    [ "$status" -eq 0 ]
+    [ -f "$TMPDIR/stage/v2/problems/eil51.json" ]
+    [ "$(jq -r '.leaderboard[0].solver + " runs=" + (.leaderboard[0].runs|tostring) + " timeouts=" + (.leaderboard[0].timeouts|tostring)' "$TMPDIR/stage/v2/problems/eil51.json")" = "sa runs=0 timeouts=1" ]
+}

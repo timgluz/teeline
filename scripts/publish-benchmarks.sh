@@ -822,15 +822,24 @@ for sid, doc in sorted(final_algos.items()):
 # that measured only some of them: the entries for solvers not in this run are kept and the
 # fresh ones take their place, then the board is re-ranked.
 def rank_key(b: dict):
+    # A solver that produced no result still belongs on the board. A timeout is a fact about the
+    # instance — "could not finish in the budget" is not the same statement as "was never measured
+    # here" — and dropping the row leaves a reader unable to tell them apart. It sorts last,
+    # because there is no result to rank it by.
+    cost = b.get("tour_cost")
+    if cost is None:
+        return (float("inf"), float("inf"))
     return (
         b.get("gap_pct", {}).get("median", float("inf")) if "gap_pct" in b else float("inf"),
-        b["tour_cost"]["median"],
+        cost["median"],
     )
 
 final_problems: dict = {}
 for dataset in sorted(set(prev_problems) | set(per_problem)):
     if dataset in per_problem:
-        fresh = [b for b in per_problem[dataset] if b["runs"] > 0]
+        # Every entry is kept, including one whose runs all timed out; only the ranking
+        # excludes it, by sorting it last.
+        fresh = list(per_problem[dataset])
         kept = [
             b
             for b in prev_problems.get(dataset, {}).get("leaderboard", [])
@@ -853,8 +862,6 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
         ]
         cities, optimal = doc.get("cities"), doc.get("optimal_cost")
 
-    # Solvers that only timed out never reach the leaderboard: there is nothing to rank.
-    board = [b for b in board if b["runs"] > 0]
     # A dataset absent from this run log whose every entry belonged to a re-measured solver has an
     # empty board. Publishing it would advertise a problem page with no results and list a
     # dataset the replaced shards no longer reference.
