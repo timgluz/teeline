@@ -41,15 +41,15 @@ utility = ["upto24", "all"]
 # `gr120` (LOWER_DIAG_ROW) stands in for `si175`, which fails on the unsupported
 # UPPER_DIAG_ROW format — substituted deliberately, not skipped silently.
 #
-# The distance types are covered as: GEO (burma14, ulysses16), EXPLICIT (gr17, gr120),
-# ATT (att48), CEIL_2D (dsj1000), EUC_2D (the rest).
+# The distance types are covered as: GEO (burma14, ulysses16, ulysses22), EXPLICIT (gr17,
+# gr120), ATT (att48), CEIL_2D (dsj1000), EUC_2D (berlin52, eil76, kroA100, ch150, a280).
 [instances]
 # Small enough for an exponential solver within its budget.
 burma14 = "upto24"    # GEO, 14
 gr17 = "upto24"       # EXPLICIT, 17
 ulysses16 = "upto24"  # GEO, 16
 # The wider corpus.
-ulysses22 = "all"     # EUC_2D, 22
+ulysses22 = "all"     # GEO, 22
 att48 = "all"         # ATT, 48
 berlin52 = "all"      # EUC_2D, 52
 eil76 = "all"         # EUC_2D, 76
