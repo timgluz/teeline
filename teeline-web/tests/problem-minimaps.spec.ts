@@ -19,9 +19,13 @@ const stagedSvg = (id: string): string | null => {
 async function stubMinimaps(page: Page): Promise<void> {
   await page.route(`${MINIMAP_BASE}/*.svg`, async (route) => {
     const id = route.request().url().split('/').pop()!.replace('.svg', '')
+    // The fallback is a faithful stand-in for a published map: an SVG with no width/height has no
+    // intrinsic size, and the rendered check below would then see a default (255) rather than the
+    // 340x200 the page asks for. This suite has to pass in a checkout with no staging dir, which is
+    // exactly what CI has.
     const svg =
       stagedSvg(id) ??
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 200"><circle cx="10" cy="10" r="2"/></svg>'
+      '<svg xmlns="http://www.w3.org/2000/svg" width="340" height="200" viewBox="0 0 340 200"><circle cx="10" cy="10" r="2"/></svg>'
     await route.fulfill({ body: svg, contentType: 'image/svg+xml' })
   })
 }

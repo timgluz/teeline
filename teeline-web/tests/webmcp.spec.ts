@@ -53,10 +53,12 @@ async function invokeWebMCPTool(
 }
 
 // DOM test — forms are in the static HTML; no WASM init needed
+// They live on /solve/, which is where the solver UI moved; the suite kept passing locally only
+// because nothing ran it, so it went on asserting a home page that no longer had them.
 test('4 WebMCP forms are present in the DOM with toolname attributes', async ({
   page,
 }) => {
-  await page.goto('/')
+  await page.goto('/solve/')
   const forms = await page.locator('form[toolname]').all()
   expect(forms).toHaveLength(4)
 
@@ -70,7 +72,9 @@ test('4 WebMCP forms are present in the DOM with toolname attributes', async ({
 // Functional tests — WASM must be ready so initWebMCP has wired the forms
 test.describe('WebMCP tool invocation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/')
+    // The dot is rendered by the solve page's script once the WASM module has initialised — the
+    // same page that carries the forms these tests submit.
+    await page.goto('/solve/')
     await page.waitForSelector('.status-dot--ready', { timeout: 20_000 })
   })
 
