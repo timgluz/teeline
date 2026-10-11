@@ -198,7 +198,7 @@ mod tests {
             vec![1.0, 1.0],
             vec![1.0, 0.0],
         ]);
-        let dm = distance_matrix::from_cities(&cities);
+        let dm = distance_matrix::from_cities_unrounded(&cities);
         TspProblem::new(cities, dm)
     }
 
@@ -249,7 +249,7 @@ mod tests {
             .enumerate()
             .map(|(i, c)| kdtree::KDPoint::new_with_id(i + 1, c))
             .collect();
-        let dm = distance_matrix::from_cities(&cities);
+        let dm = distance_matrix::from_cities_unrounded(&cities);
         let problem = TspProblem::new(cities, dm);
 
         let solution = solve(&problem, &HeuristicOptions::default(), None, None);

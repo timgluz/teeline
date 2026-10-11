@@ -2519,7 +2519,7 @@ mod tests {
             cities[4].id,
         ];
 
-        let dm = distance_matrix::from_cities(&cities);
+        let dm = distance_matrix::from_cities_unrounded(&cities);
         let problem = TspProblem::new(cities, dm);
         let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
