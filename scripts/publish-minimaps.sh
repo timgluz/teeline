@@ -100,7 +100,10 @@ fi
 if [[ "$VERIFY" -eq 1 ]]; then
   # Read back what the bucket serves, not what we believe we wrote. Probing the public URL also
   # covers the CDN and the custom domain, which is what a page actually fetches.
-  keys="$(jq -r '.entries | keys[] | . + ".svg"' "$INDEX"; echo index.json)"
+  keys="$(
+    jq -r '.entries | to_entries[] | .key + ".svg", (select(.value.og != null) | "og/" + .key + ".png")' "$INDEX"
+    echo index.json
+  )"
   missing=0
   total=0
   while IFS= read -r key; do
@@ -137,8 +140,12 @@ sha256_of() {
 # which matters because the objects are immutable and cached hard.
 # ---------------------------------------------------------------------------
 
+# Every object the index describes, one key per line. The unit of upload is the object: a changed
+# social card must not drag an unchanged map along with it.
+ALL_KEYS_JQ='.entries | to_entries[] | .key + ".svg", (select(.value.og != null) | "og/" + .key + ".png")'
+
 if [[ "$ONLY_ALL" -eq 1 ]]; then
-  CHANGED="$(jq -r '.entries | keys[]' "$INDEX")"
+  CHANGED_KEYS="$(jq -r "$ALL_KEYS_JQ" "$INDEX")"
   REASON="--all"
 else
   PREVIOUS_INDEX="$PREVIOUS_INDEX_FILE"
@@ -158,14 +165,18 @@ else
 
   case "$STATUS" in
     200)
-      CHANGED="$(jq -r --slurpfile prev "$PREVIOUS_INDEX" '
-        .entries | to_entries[]
-        | select(($prev[0].entries[.key].sha256 // "") != .value.sha256)
-        | .key' "$INDEX")"
+      CHANGED_KEYS="$(jq -r --slurpfile prev "$PREVIOUS_INDEX" '
+        .entries | to_entries[] as $e
+        | (if ($prev[0].entries[$e.key].sha256 // "") != $e.value.sha256
+           then $e.key + ".svg" else empty end),
+          (if ($e.value.og != null)
+              and (($prev[0].entries[$e.key].og.sha256 // "") != $e.value.og.sha256)
+           then "og/" + $e.key + ".png" else empty end)
+      ' "$INDEX")"
       REASON="changed since the published index"
       ;;
     404)
-      CHANGED="$(jq -r '.entries | keys[]' "$INDEX")"
+      CHANGED_KEYS="$(jq -r "$ALL_KEYS_JQ" "$INDEX")"
       REASON="first publish (no index at $PUBLIC_BASE/$PREFIX)"
       ;;
     *)
@@ -174,22 +185,23 @@ else
         echo "Use --first-publish to publish everything anyway, or --all to skip the comparison." >&2
         exit 1
       fi
-      CHANGED="$(jq -r '.entries | keys[]' "$INDEX")"
+      CHANGED_KEYS="$(jq -r "$ALL_KEYS_JQ" "$INDEX")"
       REASON="--first-publish"
       ;;
   esac
 fi
 
 if [[ -n "$ONLY_IDS" ]]; then
-  SELECTED="$(echo "$ONLY_IDS" | tr ',' '\n')"
-  CHANGED="$(comm -12 <(echo "$CHANGED" | sort -u) <(echo "$SELECTED" | sort -u))"
+  CHANGED_KEYS="$(echo "$CHANGED_KEYS" | awk -v only="$ONLY_IDS" '
+    BEGIN { n = split(only, ids, ","); for (i = 1; i <= n; i++) want[ids[i]] = 1 }
+    { id = $0; sub(/^og\//, "", id); sub(/\.(svg|png)$/, "", id); if (want[id]) print }')"
 fi
 
-TOTAL="$(jq -r '.entries | length' "$INDEX")"
-CHANGED_COUNT="$(echo "$CHANGED" | grep -c . || true)"
+TOTAL="$(jq -r '.entries | to_entries | map(1 + (if .value.og != null then 1 else 0 end)) | add' "$INDEX")"
+CHANGED_COUNT="$(echo "$CHANGED_KEYS" | grep -c . || true)"
 UNCHANGED=$((TOTAL - CHANGED_COUNT))
 
-echo "==> $TOTAL minimap(s) staged; $CHANGED_COUNT to upload ($REASON), $UNCHANGED unchanged"
+echo "==> $TOTAL object(s) staged; $CHANGED_COUNT to upload ($REASON), $UNCHANGED unchanged"
 if [[ "$DRY_RUN" -eq 0 ]]; then
   r2_require_client
   echo "==> Uploading to R2 bucket '$CF_R2_BUCKET' prefix '$PREFIX' via $R2_CLIENT"
@@ -200,30 +212,49 @@ fi
 # Objects first, index last: a consumer that reads the index must never be pointed at a file that
 # has not been written yet.
 UPLOADED=0
-while IFS= read -r id; do
-  [[ -n "$id" ]] || continue
-  file="$STAGE/$id.svg"
+while IFS= read -r key; do
+  [[ -n "$key" ]] || continue
+  case "$key" in
+    *.svg)
+      id="${key%.svg}"
+      content_type="image/svg+xml"
+      hash_key=".entries[\"$id\"].sha256"
+      ;;
+    og/*.png)
+      id="${key#og/}"
+      id="${id%.png}"
+      content_type="image/png"
+      hash_key=".entries[\"$id\"].og.sha256"
+      ;;
+    *)
+      echo "ERROR: unexpected object key '$key' — the index describes .svg and og/*.png only." >&2
+      exit 1
+      ;;
+  esac
+  file="$STAGE/$key"
+
   if [[ ! -f "$file" ]]; then
     echo "ERROR: $file is named by the index but missing." >&2
     exit 1
   fi
   # The index is hashes; a file that no longer matches it means the staging dir was regenerated
-  # part-way or edited by hand, and publishing it would put content behind a URL the index describes.
-  expected="$(jq -r --arg id "$id" '.entries[$id].sha256' "$INDEX")"
+  # part-way or edited by hand, and publishing it would put content behind a URL the index
+  # describes. The SVG is written by gen-problem-minimaps.mjs and the PNG by gen-og-images.mjs.
+  expected="$(jq -r "$hash_key" "$INDEX")"
   actual="$(sha256_of "$file")"
   if [[ "$expected" != "$actual" ]]; then
-    echo "ERROR: $file does not match its index hash — re-run: node scripts/gen-problem-minimaps.mjs" >&2
+    echo "ERROR: $file does not match its index hash — re-run the generator that wrote it." >&2
     exit 1
   fi
 
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "    [dry-run] would put ${PREFIX}/${id}.svg (image/svg+xml)"
+    echo "    [dry-run] would put ${PREFIX}/${key} (${content_type})"
   else
-    r2_put "$CF_R2_BUCKET" "$PREFIX" "${id}.svg" "$file" "image/svg+xml" >/dev/null
-    echo "    put ${PREFIX}/${id}.svg"
+    r2_put "$CF_R2_BUCKET" "$PREFIX" "$key" "$file" "$content_type" >/dev/null
+    echo "    put ${PREFIX}/${key}"
   fi
   UPLOADED=$((UPLOADED + 1))
-done <<< "$CHANGED"
+done <<< "$CHANGED_KEYS"
 
 if [[ "$CHANGED_COUNT" -gt 0 ]]; then
   if [[ "$DRY_RUN" -eq 1 ]]; then

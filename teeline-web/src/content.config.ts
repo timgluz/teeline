@@ -31,6 +31,9 @@ const problems = defineCollection({
     // True where the instance publishes no coordinates and the layout was derived from its
     // distance matrix — the page has to say so rather than present a projection as a map.
     minimapDerived: z.boolean().default(false),
+    // The raster twin of minimapUrl, for og:image and for the Dataset JSON-LD: neither social
+    // clients nor structured-data consumers accept SVG.
+    ogImageUrl: z.url().optional(),
     source: z.string(),
     sourceUrl: z.string(),
     creator: z.string(),

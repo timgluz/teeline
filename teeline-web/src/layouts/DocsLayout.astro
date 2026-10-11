@@ -9,11 +9,35 @@ interface Props {
   currentId: string | null
   name: string
   currentType?: 'algorithm' | 'problem'
+  ogImage?: string
+  ogImageAlt?: string
+  ogImageWidth?: number
+  ogImageHeight?: number
 }
 
-const { title, description, path, currentId, name, currentType = 'algorithm' } = Astro.props
+const {
+  title,
+  description,
+  path,
+  currentId,
+  name,
+  currentType = 'algorithm',
+  ogImage,
+  ogImageAlt,
+  ogImageWidth,
+  ogImageHeight,
+} = Astro.props
 ---
-<BaseLayout title={title} description={description} path={path} ogType="article">
+<BaseLayout
+  title={title}
+  description={description}
+  path={path}
+  ogType="article"
+  ogImage={ogImage}
+  ogImageAlt={ogImageAlt}
+  ogImageWidth={ogImageWidth}
+  ogImageHeight={ogImageHeight}
+>
   <Fragment slot="head"><slot name="head" /></Fragment>
   <div class="mx-auto grid w-full max-w-content grid-cols-1 md:grid-cols-[220px_1fr]">
     <aside class="hidden border-r border-border md:block">

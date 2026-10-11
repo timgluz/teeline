@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:auth": "playwright test --config playwright.auth.config.ts",
-    "deploy": "npm run build && wrangler pages deploy dist/"
+    "deploy": "npm run build && wrangler pages deploy dist/",
+    "og:images": "node scripts/gen-og-images.mjs"
   },
   "dependencies": {
     "@astrojs/preact": "^6.0.5",
