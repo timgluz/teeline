@@ -30,7 +30,8 @@ const jsonLd = {
   description: `${data.description} — ${data.cities} cities, ${data.edgeWeightType}. TSPLIB95 TSP instance.`,
   identifier: data.id,
   url: canonicalUrl,
-  image: data.ogImageUrl ?? data.minimapUrl,
+  // Only the raster, and only when there is one: structured-data consumers reject SVG.
+  ...(data.ogImageUrl ? { image: data.ogImageUrl } : {}),
   creator: {
     '@type': 'Organization',
     name: data.creator,
@@ -61,11 +62,13 @@ const jsonLd = {
   name={data.name}
   currentType="problem"
   ogImage={data.ogImageUrl}
-  ogImageAlt={data.minimapDerived
-    ? `City layout for ${data.name}, derived from its distance matrix`
-    : `Map of ${data.name}`}
-  ogImageWidth={1200}
-  ogImageHeight={630}
+  ogImageAlt={data.ogImageUrl
+    ? data.minimapDerived
+      ? `City layout for ${data.name}, derived from its distance matrix`
+      : `Map of ${data.name}`
+    : undefined}
+  ogImageWidth={data.ogImageUrl ? 1200 : undefined}
+  ogImageHeight={data.ogImageUrl ? 630 : undefined}
 >
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

@@ -5,10 +5,14 @@
 #
 # Usage:
 #   scripts/gen-problem-minimaps.mjs          # render build/minimaps/*.svg + index.json
+#   npm --prefix teeline-web run og:images    # render build/minimaps/og/*.png (Playwright)
+#                                             # skipping this publishes pages whose card 404s, so
+#                                             # the publisher refuses it when the docs link one
 #   scripts/publish-minimaps.sh --dry-run     # no credentials, no network writes
 #   scripts/publish-minimaps.sh --bucket <name>
 #
-# Reads:  build/minimaps/index.json and the .svg files it names
+# Reads:  build/minimaps/index.json and the objects it names (.svg, og/*.png), plus
+#         docs/problems/*.md to learn which pages link a card
 # Writes: nothing locally; R2 objects under the prefix
 #
 # The prefix is versioned, and that version is what makes the objects safe to cache for as long as
@@ -34,6 +38,9 @@ source "$ROOT/scripts/lib/r2.sh"
 PREFIX="minimaps/v1"
 STAGE="build/minimaps"
 PUBLIC_BASE="${PUBLIC_BASE:-https://static.tspsolver.com}"
+# Where the pages are. A directory that does not exist skips the card check, which is how the tests
+# stage a bare index.
+DOCS_DIR="${DOCS_DIR:-$ROOT/docs/problems}"
 CF_R2_BUCKET="${CF_R2_BUCKET:-}"
 DRY_RUN=0
 FETCH_PREVIOUS=1
@@ -53,7 +60,8 @@ Options:
   --prefix <key>        R2 key prefix (default: minimaps/v1)
   --public-base <url>   Base URL (default: https://static.tspsolver.com)
   --stage <dir>         Staging dir holding index.json (default: build/minimaps)
-  --only <ids>          Comma-separated instance ids to publish
+  --only <ids>          Comma-separated instance ids; publishes both that instance's
+                        map and its social card
   --all                 Upload every object, not only the changed ones
   --previous <file>     Read the already-published index from a file instead of
                         fetching it (used by the tests; implies --first-publish is off)
@@ -62,6 +70,18 @@ Options:
   --verify              Read every expected object back over the public URL and
                         report the ones that are not there (no upload, no creds)
   -h, --help            This message
+
+Environment:
+  DOCS_DIR              Where the pages are, for the card check below (default:
+                        docs/problems). A directory that does not exist skips the
+                        check, which is what lets the tests stage a bare index.
+  CF_R2_BUCKET          R2 bucket name behind static.tspsolver.com
+
+A map is `<id>.svg`, a card is `og/<id>.png`. The unit of upload is the object, so a
+changed card never drags an unchanged map with it.
+
+The card check covers every page in DOCS_DIR, not only the ids --only selects: a publish
+is refused while any page links a card the index does not have.
 EOF
 }
 
@@ -97,11 +117,42 @@ if [[ ! -f "$INDEX" ]]; then
   exit 1
 fi
 
+# Every object the index describes, one key per line. The unit of upload is the object: a changed
+# social card must not drag an unchanged map along with it. Defined here because --verify and the
+# upload list must agree on what exists; two copies could drift into verifying a subset.
+ALL_KEYS_JQ='.entries | to_entries[] | .key + ".svg", (select(.value.og != null) | "og/" + .key + ".png")'
+
+# A page links `og/<id>.png` in its frontmatter and cannot check that it exists — the cards are
+# rendered after the pages are written. Without this, skipping the card step publishes 111 pages
+# pointing at 404s, and --verify passes because it enumerates the index rather than the pages. The
+# docs are the only declaration of what the pages link.
+assert_cards_exist() {
+  [[ -d "$DOCS_DIR" ]] || return 0
+  local with_og
+  with_og="$(jq -r '.entries | to_entries[] | select(.value.og.sha256 != null) | .key' "$INDEX")" || {
+    echo "ERROR: $INDEX is not a readable index — re-run scripts/gen-problem-minimaps.mjs." >&2
+    exit 1
+  }
+  local f id missing=""
+  for f in "$DOCS_DIR"/*.md; do
+    [[ -e "$f" ]] || continue
+    grep -q '^ogImageUrl:' "$f" || continue
+    id="$(basename "$f" .md)"
+    grep -qxF "$id" <<<"$with_og" || missing="$missing $id"
+  done
+  [[ -z "$missing" ]] && return 0
+  echo "ERROR: these pages link an Open Graph card the index has no 'og' entry for:$missing" >&2
+  echo "Render them first: npm --prefix teeline-web run og:images (needs 'npx playwright install chromium')" >&2
+  exit 1
+}
+
+assert_cards_exist
+
 if [[ "$VERIFY" -eq 1 ]]; then
   # Read back what the bucket serves, not what we believe we wrote. Probing the public URL also
   # covers the CDN and the custom domain, which is what a page actually fetches.
   keys="$(
-    jq -r '.entries | to_entries[] | .key + ".svg", (select(.value.og != null) | "og/" + .key + ".png")' "$INDEX"
+    jq -r "$ALL_KEYS_JQ" "$INDEX"
     echo index.json
   )"
   missing=0
@@ -139,10 +190,6 @@ sha256_of() {
 # already has. Comparing hashes is what makes a re-publish touch only the maps whose bytes changed,
 # which matters because the objects are immutable and cached hard.
 # ---------------------------------------------------------------------------
-
-# Every object the index describes, one key per line. The unit of upload is the object: a changed
-# social card must not drag an unchanged map along with it.
-ALL_KEYS_JQ='.entries | to_entries[] | .key + ".svg", (select(.value.og != null) | "og/" + .key + ".png")'
 
 if [[ "$ONLY_ALL" -eq 1 ]]; then
   CHANGED_KEYS="$(jq -r "$ALL_KEYS_JQ" "$INDEX")"
@@ -197,7 +244,7 @@ if [[ -n "$ONLY_IDS" ]]; then
     { id = $0; sub(/^og\//, "", id); sub(/\.(svg|png)$/, "", id); if (want[id]) print }')"
 fi
 
-TOTAL="$(jq -r '.entries | to_entries | map(1 + (if .value.og != null then 1 else 0 end)) | add' "$INDEX")"
+TOTAL="$(jq -r '.entries | to_entries | map(1 + (if .value.og != null then 1 else 0 end)) | add // 0' "$INDEX")"
 CHANGED_COUNT="$(echo "$CHANGED_KEYS" | grep -c . || true)"
 UNCHANGED=$((TOTAL - CHANGED_COUNT))
 
@@ -218,13 +265,16 @@ while IFS= read -r key; do
     *.svg)
       id="${key%.svg}"
       content_type="image/svg+xml"
-      hash_key=".entries[\"$id\"].sha256"
+      # `$id` is jq's variable, bound with --arg where this filter is used.
+      # shellcheck disable=SC2016
+      hash_filter='.entries[$id].sha256'
       ;;
     og/*.png)
       id="${key#og/}"
       id="${id%.png}"
       content_type="image/png"
-      hash_key=".entries[\"$id\"].og.sha256"
+      # shellcheck disable=SC2016
+      hash_filter='.entries[$id].og.sha256'
       ;;
     *)
       echo "ERROR: unexpected object key '$key' — the index describes .svg and og/*.png only." >&2
@@ -240,7 +290,7 @@ while IFS= read -r key; do
   # The index is hashes; a file that no longer matches it means the staging dir was regenerated
   # part-way or edited by hand, and publishing it would put content behind a URL the index
   # describes. The SVG is written by gen-problem-minimaps.mjs and the PNG by gen-og-images.mjs.
-  expected="$(jq -r "$hash_key" "$INDEX")"
+  expected="$(jq -r --arg id "$id" "$hash_filter" "$INDEX")"
   actual="$(sha256_of "$file")"
   if [[ "$expected" != "$actual" ]]; then
     echo "ERROR: $file does not match its index hash — re-run the generator that wrote it." >&2

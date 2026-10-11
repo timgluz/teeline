@@ -33,6 +33,9 @@ const problems = defineCollection({
     minimapDerived: z.boolean().default(false),
     // The raster twin of minimapUrl, for og:image and for the Dataset JSON-LD: neither social
     // clients nor structured-data consumers accept SVG.
+    // Optional because a page without a card is legitimate — the layout falls back to the brand image,
+    // and the problem page passes the card's dimensions and alt only when this is set. Required would
+    // mean every consumer of a problem entry had to invent a card.
     ogImageUrl: z.url().optional(),
     source: z.string(),
     sourceUrl: z.string(),

@@ -23,6 +23,11 @@ setup() {
     export CF_LOG="$TMPDIR/cf.log"
     : > "$CF_LOG"
 
+    # These fixtures stage a synthetic index, so the card check — which compares the repository's
+    # own docs against the index — must not see docs it does not describe. Its own tests point this
+    # at a directory they build.
+    export DOCS_DIR="$TMPDIR/no-docs"
+
     # A fake `cf` that records its argv. `$*` rather than `$@` so the assertion reads one line.
     cat > "$FAKE_BIN/cf" <<'FAKE'
 #!/usr/bin/env bash
@@ -239,4 +244,49 @@ stage_og() {
     run "$PUBLISH" --verify --public-base "http://127.0.0.1:$port" --stage "$STAGE"
     [ "$status" -eq 0 ]
     [[ "$output" == *"all 3 object(s) are published"* ]]
+}
+
+@test "a page linking a card the index lacks is refused, before --verify can pass" {
+    # The failure this exists for: the card step is skipped, so the index has maps only. The pages
+    # still point at og/<id>.png, and --verify enumerates the index rather than the pages, so it
+    # would happily report that everything the index names is published.
+    stage "$STAGE" alpha
+    mkdir -p "$TMPDIR/docs"
+    cat > "$TMPDIR/docs/alpha.md" <<'EOF'
+---
+minimapUrl: https://static.tspsolver.com/minimaps/v1/alpha.svg
+ogImageUrl: https://static.tspsolver.com/minimaps/v1/og/alpha.png
+---
+EOF
+
+    DOCS_DIR="$TMPDIR/docs" run "$PUBLISH" --dry-run --all --stage "$STAGE"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no 'og' entry for: alpha"* ]]
+    [[ "$output" == *"og:images"* ]]
+
+    # Same refusal on the read-back path, which takes no credentials.
+    DOCS_DIR="$TMPDIR/docs" run "$PUBLISH" --verify --public-base http://127.0.0.1:9/nothing --stage "$STAGE"
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"no 'og' entry for: alpha"* ]]
+}
+
+@test "a page whose card is in the index passes the check" {
+    stage_og "$STAGE" alpha
+    mkdir -p "$TMPDIR/docs"
+    printf -- '---\nogImageUrl: https://static.tspsolver.com/minimaps/v1/og/alpha.png\n---\n' \
+        > "$TMPDIR/docs/alpha.md"
+
+    DOCS_DIR="$TMPDIR/docs" run "$PUBLISH" --dry-run --all --stage "$STAGE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"2 object(s) staged"* ]]
+}
+
+@test "an empty index reports zero objects rather than failing arithmetic" {
+    # jq's `add` on an empty array is null, and `$((null - 0))` aborts under set -u.
+    mkdir -p "$STAGE"
+    jq -n '{generated_at:"2026-01-01T00:00:00Z", entries:{}}' > "$STAGE/index.json"
+
+    run "$PUBLISH" --dry-run --all --stage "$STAGE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"0 object(s) staged; 0 to upload"* ]]
 }
