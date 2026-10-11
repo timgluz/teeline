@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content'
 import DocsLayout from '../../../layouts/DocsLayout.astro'
+import ProblemResults from '../../../components/ProblemResults'
 
 export async function getStaticPaths() {
   const problems = await getCollection('problems')
@@ -70,6 +71,13 @@ const jsonLd = {
   </p>
 
   <Content />
+
+  <ProblemResults
+    id={data.id}
+    dev={import.meta.env.DEV}
+    optimalCost={data.optimalCost}
+    client:visible
+  />
 
   <table class="mt-6">
     <thead>

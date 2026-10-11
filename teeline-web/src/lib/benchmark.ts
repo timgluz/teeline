@@ -451,6 +451,99 @@ export function parseProblemShard(raw: unknown): ProblemShard {
   }
 }
 
+export interface LeaderboardRow {
+  solver: string
+  config: string
+  /** Null for a solver with no entry in bench/solvers.json. */
+  family: SolverFamily | null
+  deterministic: boolean
+  runs: number
+  timeouts: number
+  errors: number
+  gap: Stat | null
+  tour: Stat | null
+  wall: Stat | null
+  peakRssKb: Stat | null
+  /** No run completed: nothing to rank, and no gap or cost to show. */
+  noResult: boolean
+  /** Position on the instance's axis, or null when the row cannot be ranked at all. */
+  rank: number | null
+}
+
+/**
+ * What a leaderboard ranks on: gaps when the instance has a published optimum *and* a row has
+ * one, tour cost otherwise. Deciding it once per shard is what keeps a board from mixing two
+ * quantities into a single ordering.
+ */
+export function leaderboardAxis(shard: ProblemShard): ChartAxis {
+  const anyGap = shard.leaderboard.some((entry) => entry.gapPct !== null)
+  return shard.optimalCost !== null && anyGap ? 'gap' : 'tour'
+}
+
+/** The value a row is ranked on, or null when it has none. */
+function rankValue(entry: LeaderboardEntry, axis: ChartAxis): number | null {
+  // A killed run has no result: it belongs at the bottom because it has no value, not because
+  // its value was bad.
+  if (entry.runs === 0) return null
+  return axis === 'gap'
+    ? (entry.gapPct?.median ?? null)
+    : (entry.tourCost?.median ?? null)
+}
+
+/**
+ * One row per `(solver, config)`, ranked on the instance's axis.
+ *
+ * Rows that cannot be ranked keep a stable order rather than the shard's, so a republish cannot
+ * shuffle them: they are last because they have no value. A solver never measured on this
+ * instance has no row at all — absence is not a low rank.
+ */
+export function leaderboardRows(shard: ProblemShard): LeaderboardRow[] {
+  const axis = leaderboardAxis(shard)
+  const rows = shard.leaderboard.map((entry) => ({
+    solver: entry.solver,
+    config: entry.config,
+    family: solverById(entry.solver)?.family ?? null,
+    deterministic: isDeterministic(entry.solver),
+    runs: entry.runs,
+    timeouts: entry.timeouts,
+    errors: entry.errors,
+    gap: entry.gapPct,
+    tour: entry.tourCost,
+    wall: entry.wallS,
+    peakRssKb: entry.peakRssKb,
+    noResult: entry.runs === 0,
+    rank: null as number | null,
+    value: rankValue(entry, axis),
+  }))
+
+  const byName = (
+    a: { solver: string; config: string },
+    b: { solver: string; config: string },
+  ) => a.solver.localeCompare(b.solver) || a.config.localeCompare(b.config)
+
+  const ranked = rows
+    .filter((row) => row.value !== null)
+    .sort((a, b) => a.value! - b.value! || byName(a, b))
+  ranked.forEach((row, index) => {
+    row.rank = index + 1
+  })
+
+  const unranked = rows.filter((row) => row.value === null).sort(byName)
+
+  // `value` has done its job by here; the ranked shape is what consumers get.
+  return [...ranked, ...unranked].map(({ value: _value, ...row }) => row)
+}
+
+/** The families a board mixes, in a stable order, for the budget line and the legend. */
+export function leaderboardFamilies(rows: LeaderboardRow[]): SolverFamily[] {
+  const present = new Set(
+    rows
+      .map((row) => row.family)
+      .filter((family): family is SolverFamily => family !== null),
+  )
+  return [...present].sort()
+}
+
 // ---------------------------------------------------------------------------
 // The table
 // ---------------------------------------------------------------------------
