@@ -30,16 +30,46 @@ Reproduced deliberately afterwards: replacing a call with `definitelyNotDefined(
 
 ## Acceptance Criteria
 
-- [ ] Adding an undefined reference to a `.tsx` island fails a check that CI runs
-- [ ] The islands are type-checked, or the reason they cannot be is recorded here
-- [ ] The new check is wired in beside the existing `tsc`/prettier checks, so it cannot be skipped
-- [ ] Existing islands reach zero errors rather than the check shipping with a suppression list
+- [x] Adding an undefined reference to a `.tsx` island fails a check that CI runs
+- [x] The islands are type-checked, or the reason they cannot be is recorded here
+- [x] The new check is wired in beside the existing `tsc`/prettier checks, so it cannot be skipped
+- [x] Existing islands reach zero errors rather than the check shipping with a suppression list
 
 ## Notes
 
-- The likely cause is that `astro check` reports diagnostics only for `.astro` files while the
-  project's `tsconfig` keeps the component directory out of the program it builds. A second
-  `tsconfig` including `src/components`, `src/lib` and `src/nav-data.ts` run with `--noEmit` in CI
-  would close the gap without touching the Astro-side config.
+- The guess in this note was half right. `astro check` does honour the `exclude` list — so removing
+  `src/components/**` from it fixed both checks at once, and no second `tsconfig` was needed. What
+  the note missed: the exclusion was hiding an **`.astro`** error as well (`LandingHero.astro` keyed
+  its `<line>` elements, which Astro's JSX types reject), which only `astro check` could see.
 - Preact's JSX types are already available (`jsxImportSource: preact`), so this is about including
   the files, not about finding types.
+
+## Progress Log
+
+### 2026-10-11 — fixed in #580
+
+The fix is one line of config rather than a new check: `"src/components/**"` came out of `exclude`,
+so the `tsc --noEmit` that CI's `Lint (tsc)` step, the pre-commit hook and `npm run build:check`
+already run now covers the islands. Pages, layouts and content stay excluded — they need the
+`astro:*` virtual modules — and that reasoning is a comment in `tsconfig.json` now.
+
+Four errors had been hiding there, which is why this is a small PR rather than a rewrite: a
+`children` prop typed `unknown` in `AlgorithmBenchmarks` and `ProblemResults` (not renderable), an
+unused `ApiError` import in `ApiKeyManager`, and the keyed `<line>` elements in `LandingHero.astro`.
+
+Evidence for the first criterion, produced by reintroducing the class of bug that started this
+(a renamed helper leaving a call to the old name — the `buildComparison` incident):
+
+```
+src/components/AlgorithmBenchmarks.tsx(138,11): error TS2304: Cannot find name 'definitelyNotDefined'.
+```
+
+Before the change the same line passed `tsc --noEmit` **and** `astro check` with 0 errors.
+
+Verification: `tsc` and `astro check` 0 errors; 569 unit tests; the full non-auth e2e suite 63
+passed with the 5 pre-existing `webmcp` failures tracked in [[tasks/ci-runs-only-auth-e2e]]; 165-page
+build. The `teeline-web` CI job (which owns the tsc step) ran green on the PR.
+
+Mark this completed once #580 merges. The one thing still unguarded: someone could re-add the
+exclusion and CI would stay green while the islands went dark again — a comment is the only defence
+today, and a config assertion would be belt and braces if that is wanted.
