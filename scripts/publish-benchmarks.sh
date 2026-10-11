@@ -848,13 +848,16 @@ snapshot_stage() {
 }
 
 upload_r2() {
-  if [[ -z "$R2_CLIENT" ]]; then
+  # A dry run uploads nothing, so it must not require a client: CI has neither `cf` nor
+  # `wrangler`, and being able to build and inspect the tree without credentials is the point
+  # of --dry-run.
+  if [[ "$DRY_RUN" -eq 0 && -z "$R2_CLIENT" ]]; then
     echo "ERROR: no R2 client available — install the 'cf' CLI:" >&2
     echo "    npm i -g cf" >&2
     echo "('wrangler' also works as a fallback if 'cf' cannot be installed.)" >&2
     return 1
   fi
-  echo "==> Uploading to R2 bucket '$CF_R2_BUCKET' prefix '$PREFIX' via $R2_CLIENT"
+  echo "==> Uploading to R2 bucket '$CF_R2_BUCKET' prefix '$PREFIX' via ${R2_CLIENT:-nothing} (dry run)"
   local key file count=0
   # Shards first, index.json LAST.
   #
