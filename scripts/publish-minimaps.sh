@@ -79,6 +79,9 @@ Environment:
 
 A map is `<id>.svg`, a card is `og/<id>.png`. The unit of upload is the object, so a
 changed card never drags an unchanged map with it.
+
+The card check covers every page in DOCS_DIR, not only the ids --only selects: a publish
+is refused while any page links a card the index does not have.
 EOF
 }
 
@@ -125,12 +128,17 @@ ALL_KEYS_JQ='.entries | to_entries[] | .key + ".svg", (select(.value.og != null)
 # docs are the only declaration of what the pages link.
 assert_cards_exist() {
   [[ -d "$DOCS_DIR" ]] || return 0
+  local with_og
+  with_og="$(jq -r '.entries | to_entries[] | select(.value.og.sha256 != null) | .key' "$INDEX")" || {
+    echo "ERROR: $INDEX is not a readable index — re-run scripts/gen-problem-minimaps.mjs." >&2
+    exit 1
+  }
   local f id missing=""
   for f in "$DOCS_DIR"/*.md; do
     [[ -e "$f" ]] || continue
     grep -q '^ogImageUrl:' "$f" || continue
     id="$(basename "$f" .md)"
-    [[ -n "$(jq -r --arg id "$id" '.entries[$id].og.sha256 // ""' "$INDEX")" ]] || missing="$missing $id"
+    grep -qxF "$id" <<<"$with_og" || missing="$missing $id"
   done
   [[ -z "$missing" ]] && return 0
   echo "ERROR: these pages link an Open Graph card the index has no 'og' entry for:$missing" >&2

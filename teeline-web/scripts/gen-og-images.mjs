@@ -62,9 +62,12 @@ try {
     let svg
     try {
       svg = readFileSync(svgPath, 'utf8')
-    } catch {
+    } catch (err) {
+      // EACCES or EISDIR are not "missing", and losing the code turns a fixable permissions problem
+      // into a misleading instruction.
       throw new Error(
-        `${svgPath} is missing — re-run scripts/gen-problem-minimaps.mjs.`,
+        `${svgPath} could not be read (${err.code ?? 'unknown'}) — re-run scripts/gen-problem-minimaps.mjs if it is missing.`,
+        { cause: err },
       )
     }
     // Inline the SVG rather than pointing at the file: an about:blank page loading file:// resources
