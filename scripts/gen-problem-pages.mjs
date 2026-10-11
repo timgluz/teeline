@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 // Generate docs/problems/*.md from data/tsplib/*.tsp files.
-// Extracts TSPLIB header, parses coordinates for SVG minimap,
-// looks up optimal cost from .opt.tour files.
+// Extracts the TSPLIB header, the optimal cost from .opt.tour files, and the URL of the instance's
+// minimap — the image itself is generated separately (scripts/gen-problem-minimaps.mjs) and
+// published to R2, so a regeneration here is a one-line diff per page.
 // Run: node scripts/gen-problem-pages.mjs
 
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
+import { minimapPoints, parseHeader } from './lib/problem-minimap.mjs'
 
 const TSP_DIR = join(import.meta.dirname, '..', 'data', 'tsplib')
 const DOCS_DIR = join(import.meta.dirname, '..', 'docs', 'problems')
 const DATA_BASE = 'https://static.tspsolver.com/tsplib'
+// Deliberately outside the `tsplib/` dataset prefix — the images and the instances they draw
+// should not share a listing — and versioned so that changing how a map is drawn is a prefix bump
+// rather than a cache purge. See scripts/publish-minimaps.sh.
+const MINIMAP_BASE = 'https://static.tspsolver.com/minimaps/v1'
 const SOURCE = 'TSPLIB95'
 const SOURCE_URL = 'https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/'
 // Dataset structured data (schema.org) needs an explicit creator and license.
@@ -43,16 +49,6 @@ function sizeGroup(cities) {
 
 function iconForSize(group) {
   return { small: '🟢', medium: '🟡', large: '🟠', xl: '🔴' }[group] || ''
-}
-
-function parseHeader(txt) {
-  const fields = {}
-  const re = /^([A-Z_ ]+?)\s*:\s*(.+)$/gm
-  let m
-  while ((m = re.exec(txt)) !== null) {
-    fields[m[1].trim()] = m[2].trim()
-  }
-  return fields
 }
 
 // TSPLIB ships the optimal *route* for many instances, and states its cost in the COMMENT only
@@ -155,59 +151,35 @@ function tourLength(name, tourTxt) {
   return Math.round(total)
 }
 
-// Parse NODE_COORD_SECTION for (x,y) pairs
-function parseCoords(txt) {
-  const sectionMatch = txt.match(/NODE_COORD_SECTION\s*\n([\s\S]*?)(?:EOF|\n\s*\n|$)/i)
-  if (!sectionMatch) return null
-  const lines = sectionMatch[1].trim().split('\n').filter(l => l.trim())
-  const pts = []
-  for (const line of lines) {
-    const parts = line.trim().split(/\s+/)
-    // Format: index x y
-    if (parts.length >= 3) {
-      const x = parseFloat(parts[1])
-      const y = parseFloat(parts[2])
-      if (!isNaN(x) && !isNaN(y)) pts.push({ x, y })
-    }
-  }
-  return pts.length > 0 ? pts : null
-}
-
-// Generate inline SVG minimap
-function generateMinimap(coords) {
-  if (!coords || coords.length === 0) return ''
-
-  const xs = coords.map(p => p.x)
-  const ys = coords.map(p => p.y)
-  const minX = Math.min(...xs), maxX = Math.max(...xs)
-  const minY = Math.min(...ys), maxY = Math.max(...ys)
-  const w = (maxX - minX) || 1
-  const h = (maxY - minY) || 1
-
-  const PAD = 20
-  const VIEW_W = 340, VIEW_H = 200
-  const AREA_W = VIEW_W - PAD * 2, AREA_H = VIEW_H - PAD * 2
-
-  const scale = Math.min(AREA_W / w, AREA_H / h)
-  const offX = (VIEW_W - w * scale) / 2
-  const offY = (VIEW_H - h * scale) / 2
-
-  function sx(x) { return ((x - minX) * scale + offX).toFixed(1) }
-  function sy(y) { return ((y - minY) * scale + offY).toFixed(1) }
-
-  // For large datasets, use smaller dots
-  const r = coords.length > 2000 ? 0.8 : coords.length > 500 ? 1.2 : 2
-
-  const dots = coords.map(p =>
-    `<circle cx="${sx(p.x)}" cy="${sy(p.y)}" r="${r}" fill="#0d9488" opacity="0.7"/>`
-  ).join('\n    ')
-
-  return `<svg viewBox="0 0 ${VIEW_W} ${VIEW_H}" width="100%" style="max-width:${VIEW_W}px;border-radius:8px;border:1px solid #d0d7de;background:#f6f8fa;" role="img" aria-label="City map for this problem">
-  ${dots}
-</svg>`
-}
-
 // ── main ─────────────────────────────────────────────────────────────
+
+// Which map each instance has, resolved before anything is written.
+//
+// The two generators have to agree: a page linking an image the other one refused to draw would
+// 404, and a corpus gap should fail the run rather than leave the tree half-regenerated. This is
+// also the only reason the layout is computed here at all — the pages need `derived` and nothing
+// else, and it costs a second on `si1032`.
+const minimaps = new Map()
+const undrawable = []
+for (const file of TSP_FILES) {
+  const id = basename(file, '.tsp')
+  const txt = readFileSync(join(TSP_DIR, file), 'utf8')
+  const header = parseHeader(txt)
+  const dim = parseInt(header['DIMENSION'], 10) || 0
+  const format = (header['EDGE_WEIGHT_FORMAT'] || '').trim().toUpperCase()
+
+  const { points, derived } = minimapPoints(txt, dim, format)
+  if (!points) {
+    undrawable.push(`${id} has no coordinates and no parseable ${header['EDGE_WEIGHT_TYPE'] || '?'} matrix`)
+    continue
+  }
+  minimaps.set(id, { url: `${MINIMAP_BASE}/${id}.svg`, derived })
+}
+
+if (undrawable.length > 0) {
+  for (const item of undrawable) console.error(`Cannot draw ${item}`)
+  process.exit(1)
+}
 
 let count = 0
 const problemIds = []
@@ -230,9 +202,7 @@ for (const file of TSP_FILES.sort()) {
   const group = sizeGroup(cities)
   const optimalCost = getOptimalCost(name)
 
-  const hasCoords = !['EXPLICIT', 'MATRIX'].some(t => ewt.toUpperCase().includes(t))
-  const coords = hasCoords ? parseCoords(txt) : null
-  const minimap = generateMinimap(coords)
+  const map = minimaps.get(id)
 
   const dataUrl = `${DATA_BASE}/${name}.tsp`
 
@@ -258,15 +228,13 @@ sizeGroup: "${group}"
 edgeWeightType: "${ewt}"
 optimalCost: ${optimalCost !== null ? optimalCost : 'null'}
 dataUrl: "${dataUrl}"
+minimapUrl: "${map.url}"
+minimapDerived: ${map.derived}
 source: "${SOURCE}"
 sourceUrl: "${SOURCE_URL}"
 creator: "${CREATOR}"
 license: "${LICENSE}"
 ---
-
-${minimap}
-
-${title}
 `
 
   writeFileSync(join(DOCS_DIR, `${id}.md`), content)

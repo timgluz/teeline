@@ -19,6 +19,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# The path is computed at run time, so shellcheck cannot follow it; the file is small and
+# self-contained.
+# shellcheck disable=SC1091
+source "$ROOT/scripts/lib/r2.sh"
+
 # ---------------------------------------------------------------------------
 # Defaults / arguments
 # ---------------------------------------------------------------------------
@@ -163,33 +168,12 @@ BUILD_PROFILE="release"
 # beta. Both take the object body as a file.
 # ---------------------------------------------------------------------------
 
-R2_CLIENT=""
-if command -v cf >/dev/null 2>&1; then
-  R2_CLIENT="cf"
-elif command -v npx >/dev/null 2>&1 && npx --no-install wrangler --version >/dev/null 2>&1; then
-  R2_CLIENT="wrangler"
-fi
+r2_select_client
 
-r2_put() {
-  local key="$1" file="$2"
-  case "$R2_CLIENT" in
-    cf)
-      cf r2 objects put "${PREFIX}/${key}" \
-        --bucket-name "$CF_R2_BUCKET" \
-        --file "$file" \
-        --content-type "application/json"
-      ;;
-    wrangler)
-      npx --no-install wrangler r2 object put "${CF_R2_BUCKET}/${PREFIX}/${key}" \
-        --file "$file" \
-        --content-type "application/json"
-      ;;
-    *)
-      echo "ERROR: neither 'cf' nor 'wrangler' is available to upload to R2." >&2
-      echo "Install one: npm i -g cf   (or)   npm i -D wrangler" >&2
-      return 1
-      ;;
-  esac
+# Benchmark objects are JSON; the client itself now lives in scripts/lib/r2.sh, shared with the
+# minimap publisher, which is the only reason the content type is a parameter.
+r2_put_json() {
+  r2_put "$CF_R2_BUCKET" "$PREFIX" "$1" "$2" "application/json"
 }
 
 # ---------------------------------------------------------------------------
@@ -1077,7 +1061,7 @@ upload_r2() {
     if [[ "$DRY_RUN" -eq 1 ]]; then
       echo "    [dry-run] would put ${PREFIX}/${key}"
     else
-      r2_put "$key" "$file" >/dev/null
+      r2_put_json "$key" "$file" >/dev/null
       echo "    put ${PREFIX}/${key}"
     fi
     count=$((count + 1))
