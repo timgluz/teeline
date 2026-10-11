@@ -51,14 +51,14 @@ Neither is in this task.
 
 ## Acceptance Criteria
 
-- [ ] Problem-index rows for instances the manifest names carry a badge; other rows do not
-- [ ] Algorithm-index rows for solvers the manifest names carry a badge; other rows do not
-- [ ] Each badge links to that page's results section
-- [ ] Exactly one manifest request per page, not one per row
-- [ ] Both pages render their full lists with JS disabled, and the build needs no network
-- [ ] With the manifest unreachable, no badges appear and nothing claims a dataset has no results
-- [ ] The count is stated and attributed to the manifest
-- [ ] Unit test for "which ids does this manifest mark"; e2e for both indexes, including the
+- [x] Problem-index rows for instances the manifest names carry a badge; other rows do not
+- [x] Algorithm-index rows for solvers the manifest names carry a badge; other rows do not
+- [x] Each badge links to that page's results section
+- [x] Exactly one manifest request per page, not one per row
+- [x] Both pages render their full lists with JS disabled, and the build needs no network
+- [x] With the manifest unreachable, no badges appear and nothing claims a dataset has no results
+- [x] The count is stated and attributed to the manifest
+- [x] Unit test for "which ids does this manifest mark"; e2e for both indexes, including the
       unreachable-manifest case
 
 ## Open Questions
@@ -75,3 +75,30 @@ Neither is in this task.
 - Requested after the problem-page leaderboard shipped ([[tasks/bench-problem-leaderboard]]).
 - `/algorithms/` marks solvers, which is the symmetric case; the manifest carries `solvers[]` with
   ids and families.
+
+## Progress Log
+
+### 2026-10-11 — implemented in #582
+
+Settled the two questions this task left open. The marker is a simple bar-chart icon whose hover
+title reads "It has benchmark results" (the phrasing that prompted the task), and the count line
+appears only when it says something: `12 of 111 instances have published benchmark results` on
+`/problems/`, and **nothing** on `/algorithms/`, where every documented solver has a shard. The
+third question — an "only with results" filter — stays out of scope.
+
+The mechanism is a page-level `<script>` in `BenchmarkMarkers.astro`, not an island: the rows are
+server-rendered content, so an island per row would mean 111 hydrate points to draw 12 icons. The
+icons are rendered hidden and revealed by the script, which is also what makes the page claim
+nothing when JavaScript is off or the manifest cannot be read.
+
+`src/lib/benchmark-markers.ts` holds the testable part: which manifest field each row kind matches,
+the difference between an unreadable manifest (`null` → reveal nothing) and one that publishes
+nothing (empty set → the count may honestly say "0 of 111"), and the count wording.
+
+Verified: 574 unit tests (5 new); 4 new e2e specs covering both indexes, the tooltip and href, a
+single manifest request per page, the unreachable-manifest case and the JavaScript-disabled case;
+the full non-auth suite at 67 passed with the 5 pre-existing `webmcp` failures tracked in
+[[tasks/ci-runs-only-auth-e2e]]; `astro check` 0 errors; 165-page build.
+
+Mark this completed once #582 merges. Live behaviour at the time of writing: 12 of 111 instances
+marked, all 21 solvers marked.
