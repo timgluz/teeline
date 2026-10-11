@@ -109,7 +109,7 @@ Rules:
 **with each row** rather than in a file header:
 
 ```json
-{"solver":"nn","dataset":"eil51","config":"default","run":1,"wall_s":0.0000,"peak_rss_kb":6720,"tour_cost":8980.91797,"status":"ok","measurement":{"git_commit":"899de9d","git_commit_source":"jsonl","dirty":0,"teeline_version":"1.0.1","measured_at":"2026-10-12T09:00:00Z","environment":{"os":"linux","build":"release","rust_version":"1.99.0"}}}
+{"solver":"nn","dataset":"eil51","config":"default","run":1,"wall_s":0.0000,"peak_rss_kb":6720,"tour_cost":8980.91797,"status":"ok","measurement":{"git_commit":"899de9d","git_commit_source":"jsonl","dirty":false,"teeline_version":"1.0.1","measured_at":"2026-10-12T09:00:00Z","environment":{"os":"linux","build":"release","rust_version":"1.99.0"}}}
 ```
 
 Required: `solver`, `dataset`, `run`, `wall_s`, `peak_rss_kb`, `tour_cost`. Optional:

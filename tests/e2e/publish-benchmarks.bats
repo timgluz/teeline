@@ -542,3 +542,24 @@ PY
     [[ "$output" == *"different provenance"* ]]
     [[ "$output" == *"'bhk'"* ]]
 }
+
+@test "the example row in the schema doc is accepted by the parser" {
+    # A documented example that does not validate is worse than none: it was already wrong once
+    # (`dirty` was shown as `0` after the field became a JSON boolean). Extracting it from the
+    # contract and publishing it keeps the two in step.
+    python3 - "$REPO_ROOT/docs/benchmarks/schema.md" "$TMPDIR/doc-example.jsonl" <<'PY'
+import json, pathlib, re, sys
+doc = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+m = re.search(r'^\{"solver".*$', doc, re.M)
+if not m:
+    sys.exit("no example row found in the schema doc")
+row = m.group(0)
+json.loads(row)  # must be valid JSON before it is even handed to the publisher
+pathlib.Path(sys.argv[2]).write_text(row + "\n", encoding="utf-8")
+PY
+    run publish --runs "$TMPDIR/doc-example.jsonl"
+    [ "$status" -eq 0 ]
+    # ...and it must still be a row the contract can describe: one solver, one shard.
+    [ "$(jq -r '.solver' "$TMPDIR/stage/v2/algorithms/nn.json")" = "nn" ]
+    [ "$(jq -r '.measurement.git_commit' "$TMPDIR/stage/v2/algorithms/nn.json")" = "899de9d" ]
+}
