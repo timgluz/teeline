@@ -134,6 +134,29 @@ false claim to a number.
 miscalculated value it cannot be reconstructed afterwards — once published, the link between
 a solver's numbers and the commit that produced them is gone unless it was recorded.
 
+### 3.5a The raw run log is JSONL with per-row provenance
+
+The raw format was not previously decided: `bench/runs/<tier>.tsv` came from an ad-hoc perf
+script (PR #378) and this specification then described the file that already existed rather
+than choosing a format. It was reopened while the writer (`bench-matrix.sh`) still did not
+exist, which is the cheapest moment it will ever be.
+
+It is now **JSONL, one JSON object per run, with provenance on every row** rather than in a
+file-level `#` header.
+
+The deciding reason is section 3.5 applied one layer down. The sweep is resumable and
+`--solver <id>` merges new rows into an existing file, so once the solver is rebuilt the file
+holds rows from two builds. A file-level header cannot describe that — it would stamp the older
+rows with the newer commit, which is exactly the false claim 3.5 removes at the shard level.
+Per-row provenance makes it detectable, and the publisher **refuses** a file whose rows for one
+solver disagree rather than choosing a winner.
+
+Secondary: positional columns made `config` and `status` optional and the old script omitted
+them; `status` was an untyped string where a typo counted as an error; provenance had to be
+bolted on as an out-of-band channel needing its own parser. JSONL is typed, self-describing and
+append-safe, which preserves the one real advantage of TSV — single-append resumability. TOML
+was rejected as a configuration format with no streaming story for row-oriented data.
+
 ### 3.6 Historical versions retained
 
 Each release retains an immutable snapshot, and raw per-run observations are mirrored to

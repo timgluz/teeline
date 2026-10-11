@@ -13,23 +13,44 @@ blocked_by: [tasks/bench-sa-honours-epoch-budget, tasks/bench-plateau-stop-all-i
 
 The measurement harness named by the data contract does not exist. `docs/benchmarks/schema.md`
 and `scripts/publish-benchmarks.sh` both reference `scripts/bench-matrix.sh` and
-`bench/runs/tier-<tier>.tsv`, but the only script present is `scripts/bench-solvers.sh`, which:
+`bench/runs/tier-<tier>.jsonl`, but the only script present is `scripts/bench-solvers.sh`,
+which:
 
 - runs 4 of 22 solvers (`nn lk fourier branch_bound`) with hardcoded dataset lists
-- writes 6 columns — `solver dataset run wall_s peak_rss_kb tour_cost` — while the contract
-  requires 7, omitting `config` and `status`
-- enforces no timeout, though the contract has `default_timeout_s`
+- writes six columns with no `config` and no `status`, and no provenance at all
+- enforces no timeout
 - cannot resume, though the schema calls the sweep "resumable; safe to interrupt and re-run"
 
-The consumer half already expects the target contract, so this task completes the producer half.
+The consumer half already expects the target contract, so this task completes the producer
+half. It is also the last moment at which the raw format is cheap to settle: the writer does
+not exist yet, so there is no legacy data and no second writer.
+
+## The raw format is JSONL, and provenance is per row
+
+Headline decision, already implemented on the consumer side:
+
+- **One JSON object per run, one run per line.** Required `solver`, `dataset`, `run`,
+  `wall_s`, `peak_rss_kb`, `tour_cost`; optional `config`, `status`, `measurement`.
+- **`measurement` on every row**, not in a file header: `git_commit`, `git_commit_source`,
+  `dirty`, `teeline_version`, `measured_at`, `environment{os,build,rust_version}`.
+
+This matters because of how the harness resumes. A resumed or `--solver` run **merges new
+rows into an existing file**, so once the solver is rebuilt the file holds rows from two
+builds. With a file-level header, one commit would silently stamp the older rows — the same
+false-provenance bug the publish contract just removed, one layer down. Per-row provenance
+makes it detectable, and `publish-benchmarks.sh` now **refuses** a file whose rows for one
+solver disagree rather than picking a winner.
+
+The previous TSV plan was inherited from an ad-hoc perf script (PR #378) rather than chosen;
+it could not represent per-row provenance, had positional columns, and left `status` an
+untyped string where a typo counted as an error.
 
 ## Goals
 
 - `scripts/bench-matrix.sh` driven by a tier config file rather than bash arrays
-- Emit the 7-column TSV plus the `#`-provenance header the publisher prefers
-  (`git_commit`, `dirty`, `teeline_version`, `rust_version`, `tier`, `timeout_s`)
-- Enforce the per-family timeout; record `status=timeout` for a killed run
-- Resume by skipping cells already present in the tier TSV
+- Emit JSONL with a complete `measurement` on every row
+- Enforce the per-family timeout; record `status: "timeout"` for a killed run
+- Resume by skipping cells already present in the tier file
 - `--solver <id>` filter, required by the single-algorithm skill
 - Retire `scripts/bench-solvers.sh`
 
@@ -45,12 +66,19 @@ unsupported `UPPER_DIAG_ROW` format and must be substituted, not silently skippe
 
 ## Acceptance Criteria
 
-- [ ] `scripts/bench-matrix.sh` reads a tier config and writes `bench/runs/tier-<tier>.tsv`
-- [ ] Output has all 7 columns including `config` and `status`
-- [ ] Provenance header written and readable by `publish-benchmarks.sh`
-- [ ] Per-family timeout enforced; a killed run is recorded as `status=timeout`, not `ok`
+- [ ] `scripts/bench-matrix.sh` reads a tier config and writes `bench/runs/tier-<tier>.jsonl`
+- [ ] Every row is a single-line JSON object with the required fields; `status` is one of
+      `ok`, `timeout`, `error`
+- [ ] Every row carries a validated `measurement`, accepted by `publish-benchmarks.sh`
+- [ ] `measurement` is written once per run and is identical across the rows of one build, so
+      the publisher's per-solver agreement check passes
+- [ ] Per-family timeout enforced; a killed run is recorded with `status: "timeout"` and no
+      fabricated `tour_cost`
 - [ ] Re-running after interruption skips completed cells (verified by interrupting once)
-- [ ] `--solver <id>` measures exactly one solver and merges into the existing TSV
+- [ ] `--solver <id>` measures exactly one solver and appends to the existing file, and the
+      resulting file still passes the publisher's agreement check
+- [ ] A rebuild between runs produces rows that disagree, and the publisher **refuses** them —
+      verified as part of this task, since it is the case the format exists for
 - [ ] `--dry-run` lists what would run without running it
 - [ ] A missing or unparseable instance fails loudly rather than being skipped silently
 - [ ] `scripts/bench-solvers.sh` removed and references to it updated (Taskfile, docs)
@@ -58,5 +86,8 @@ unsupported `UPPER_DIAG_ROW` format and must be substituted, not silently skippe
 
 ## Notes
 
-`scripts/publish-benchmarks.sh` already reads this path and already points at
-`scripts/bench-matrix.sh`, so no publisher change is needed for the basic flow.
+- `scripts/publish-benchmarks.sh` already reads this path via `--runs` and already points at
+  `scripts/bench-matrix.sh`, so no publisher change is needed for the basic flow. It validates
+  the file more strictly than the old TSV path did: unknown keys, a non-boolean `dirty`, a
+  non-numeric required field and a mixed-provenance file are all hard errors.
+- The 7-column TSV and its `#`-provenance header are gone; `--tsv` is now `--runs`.
