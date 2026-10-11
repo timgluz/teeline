@@ -1,0 +1,53 @@
+---
+// Page-level companion to BenchmarkMarker: the count line, and the one script that reveals the
+// markers of the rows the published manifest names.
+//
+// A page-level script rather than an island because the rows are server-rendered content — the list
+// has to be in the HTML for readers without JavaScript and for search engines — and a marker is a
+// hint layered on top of it, not the content itself.
+import { indexUrl } from '../lib/benchmark'
+
+interface Props {
+  kind: 'dataset' | 'solver'
+}
+
+const { kind } = Astro.props
+---
+
+<p class="mt-2 font-mono text-xs text-text-dim" data-bench-count data-bench-kind={kind} hidden>
+  <span data-bench-count-text></span>
+  {' · '}
+  <a href={indexUrl(import.meta.env.DEV)} target="_blank" rel="noopener">manifest ↗</a>
+</p>
+
+<script>
+  import { fetchBenchmarkIndex } from '../lib/benchmark'
+  import { markerAttribute, markerCount, publishedIds } from '../lib/benchmark-markers'
+
+  void (async () => {
+    const line = document.querySelector<HTMLElement>('[data-bench-kind]')
+    const kind = line?.dataset.benchKind === 'solver' ? 'solver' : 'dataset'
+    const attribute = markerAttribute(kind)
+    const rows = [...document.querySelectorAll<HTMLElement>(`[${attribute}]`)]
+
+    const ids = publishedIds(await fetchBenchmarkIndex(import.meta.env.DEV), kind)
+    // No manifest, no markers: the page then claims nothing, which is not the same as claiming
+    // that nothing has been measured.
+    if (ids === null) return
+
+    let marked = 0
+    for (const row of rows) {
+      const id = row.getAttribute(attribute)
+      if (id === null || !ids.has(id)) continue
+      row.querySelector('[data-bench-marker]')?.removeAttribute('hidden')
+      marked += 1
+    }
+
+    const text = markerCount(marked, rows.length, kind)
+    const target = line?.querySelector('[data-bench-count-text]')
+    if (text !== null && line && target) {
+      target.textContent = text
+      line.hidden = false
+    }
+  })()
+</script>
