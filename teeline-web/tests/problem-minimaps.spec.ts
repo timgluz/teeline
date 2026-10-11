@@ -69,14 +69,60 @@ test.describe('problem minimaps', () => {
     )
   })
 
-  test('the Dataset JSON-LD advertises the map', async ({ page }) => {
+  test('structured data points at the raster, not the SVG', async ({
+    page,
+  }) => {
     await page.goto('/problems/berlin52/')
 
+    // Social clients and structured-data consumers reject SVG, so the card is what they get.
     const jsonLd = await page
       .locator('script[type="application/ld+json"]')
       .textContent()
     expect(JSON.parse(jsonLd ?? '{}').image).toBe(
-      `${MINIMAP_BASE}/berlin52.svg`,
+      `${MINIMAP_BASE}/og/berlin52.png`,
+    )
+  })
+
+  test('crawlers are given the card, sized and with an alt', async ({
+    page,
+  }) => {
+    await page.goto('/problems/berlin52/')
+
+    const card = `${MINIMAP_BASE}/og/berlin52.png`
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      card,
+    )
+    await expect(
+      page.locator('meta[property="og:image:width"]'),
+    ).toHaveAttribute('content', '1200')
+    await expect(
+      page.locator('meta[property="og:image:height"]'),
+    ).toHaveAttribute('content', '630')
+    await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
+      'content',
+      'Map of Berlin 52',
+    )
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      'content',
+      'summary_large_image',
+    )
+    await expect(page.locator('meta[name="twitter:image"]')).toHaveAttribute(
+      'content',
+      card,
+    )
+  })
+
+  test('pages without a card keep the site default', async ({ page }) => {
+    await page.goto('/problems/')
+
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      'https://tspsolver.com/og-image.png',
+    )
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      'content',
+      'summary',
     )
   })
 })
