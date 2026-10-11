@@ -23,6 +23,14 @@ const problems = defineCollection({
     edgeWeightType: z.string(),
     optimalCost: z.number().nullable(),
     dataUrl: z.string(),
+    // Published to R2 by scripts/publish-minimaps.sh, not committed: the maps totalled 19.6 MB of
+    // inline SVG in this collection before they moved out. Optional so that this schema and the
+    // regeneration of 111 pages that sets it are separable — the deletion of the old inline maps
+    // is a large mechanical diff and does not belong in the same review as the code.
+    minimapUrl: z.url().optional(),
+    // True where the instance publishes no coordinates and the layout was derived from its
+    // distance matrix — the page has to say so rather than present a projection as a map.
+    minimapDerived: z.boolean().default(false),
     source: z.string(),
     sourceUrl: z.string(),
     creator: z.string(),

@@ -30,6 +30,7 @@ const jsonLd = {
   description: `${data.description} — ${data.cities} cities, ${data.edgeWeightType}. TSPLIB95 TSP instance.`,
   identifier: data.id,
   url: canonicalUrl,
+  image: data.minimapUrl,
   creator: {
     '@type': 'Organization',
     name: data.creator,
@@ -69,6 +70,26 @@ const jsonLd = {
   <p class="-mt-2 mb-6">
     <strong>{data.description}</strong>
   </p>
+
+  {data.minimapUrl && (
+    <figure class="mt-0 mb-6">
+      <img
+        src={data.minimapUrl}
+        width="340"
+        height="200"
+        loading="lazy"
+        decoding="async"
+        alt={data.minimapDerived
+          ? `City layout for ${data.name}, derived from its distance matrix`
+          : `Map of ${data.name}`}
+      />
+      {data.minimapDerived && (
+        <figcaption class="mt-2 text-xs text-text-dim">
+          Layout derived from the distance matrix — this instance publishes no coordinates.
+        </figcaption>
+      )}
+    </figure>
+  )}
 
   <Content />
 
