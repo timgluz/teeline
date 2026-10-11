@@ -7,12 +7,10 @@ sizeGroup: "small"
 edgeWeightType: "EXPLICIT"
 optimalCost: 1610
 dataUrl: "https://static.tspsolver.com/tsplib/bayg29.tsp"
+minimapUrl: "https://static.tspsolver.com/tsplib/minimaps/v1/bayg29.svg"
+minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 creator: "TSPLIB — Gerhard Reinelt, University of Heidelberg"
 license: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
-
-
-
-29 Cities in Bavaria, geographical distances (Groetschel,Juenger,Reinelt)
