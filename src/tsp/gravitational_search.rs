@@ -206,7 +206,10 @@ mod tests {
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
         let opts = HeuristicOptions {
-            epochs: 0,
+            // A real budget on purpose: `epochs: 0` means *unbounded*, not "do nothing",
+            // and the property under test is that the solver returns a tour no worse than
+            // the one it was seeded with — not that it declines to run.
+            epochs: 5,
             ..HeuristicOptions::default()
         };
         let result = solve(&problem, &opts, None, Some(&optimal));

@@ -384,7 +384,10 @@ mod tests {
         let optimal_cost = dm.tour_length(&optimal);
         let opts = AcoOptions {
             heuristic: HeuristicOptions {
-                epochs: 0,
+                // A real budget on purpose: `epochs: 0` means *unbounded*, not "do nothing",
+                // and the property under test is that the solver returns a tour no worse than
+                // the one it was seeded with — not that it declines to run.
+                epochs: 5,
                 ..HeuristicOptions::default()
             },
             ..AcoOptions::default()
