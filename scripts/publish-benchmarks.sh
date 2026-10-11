@@ -7,9 +7,9 @@
 #   scripts/publish-benchmarks.sh --tier a --dry-run
 #   scripts/publish-benchmarks.sh --tier a --only r2
 #   scripts/publish-benchmarks.sh --tier a --only criteriondb
-#   scripts/publish-benchmarks.sh --tsv bench/runs/custom.tsv --prefix bench/v2 --dry-run
+#   scripts/publish-benchmarks.sh --runs bench/runs/custom.jsonl --dry-run
 #
-# Reads:  bench/runs/<tier>.tsv   (or --tsv), bench/solvers.json, docs/problems/*.md
+# Reads:  bench/runs/<tier>.jsonl (or --runs), bench/solvers.json, docs/problems/*.md
 # Writes: build/bench-json/v2/**  (local staging), then R2
 #
 # The JSON contract is documented in docs/benchmarks/schema.md — read that first.
