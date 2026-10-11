@@ -8,15 +8,19 @@
 //
 // Social clients and structured-data consumers do not accept SVG, so the map has to exist as a
 // raster to be shareable at all. It is the same picture: the SVG is inlined into a 1200x630 page
-// and screenshotted, which is why this lives in teeline-web (Playwright is already a dev
-// dependency here) rather than in the root scripts, which have none.
+// and screenshotted, which is why this lives in teeline-web (Playwright is a dev dependency here)
+// rather than in the root scripts, which have none.
+//
+// Needs the browser once: npx playwright install chromium
 
 import { createHash } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { chromium } from 'playwright'
+// `@playwright/test` is what package.json declares and it re-exports chromium; importing the
+// bare `playwright` package worked only because npm hoists it as a transitive dependency.
+import { chromium } from '@playwright/test'
 
 const WIDTH = 1200
 const HEIGHT = 630
@@ -42,40 +46,55 @@ if (ids.length === 0) {
 mkdirSync(outDir, { recursive: true })
 
 const browser = await chromium.launch()
-const page = await browser.newPage({
-  viewport: { width: WIDTH, height: HEIGHT },
-  deviceScaleFactor: 1,
-})
 
 let rendered = 0
 let totalBytes = 0
-for (const id of ids) {
-  const svg = readFileSync(join(minimapsDir, `${id}.svg`), 'utf8')
-  // Inline the SVG rather than pointing at the file: an about:blank page loading file:// resources
-  // is a browser-policy question, and inlining removes it entirely.
-  await page.setContent(
-    `<!doctype html><html><body style="margin:0;width:${WIDTH}px;height:${HEIGHT}px;background:#f6f8fa;display:flex;align-items:center;justify-content:center">
+try {
+  const page = await browser.newPage({
+    viewport: { width: WIDTH, height: HEIGHT },
+    deviceScaleFactor: 1,
+  })
+
+  for (const id of ids) {
+    // A staged index whose SVG is gone is a half-generated tree; naming the file is what makes it
+    // fixable, and the finally below is what keeps a Chromium from surviving the throw.
+    const svgPath = join(minimapsDir, `${id}.svg`)
+    let svg
+    try {
+      svg = readFileSync(svgPath, 'utf8')
+    } catch {
+      throw new Error(
+        `${svgPath} is missing — re-run scripts/gen-problem-minimaps.mjs.`,
+      )
+    }
+    // Inline the SVG rather than pointing at the file: an about:blank page loading file:// resources
+    // is a browser-policy question, and inlining removes it entirely.
+    await page.setContent(
+      `<!doctype html><html><body style="margin:0;width:${WIDTH}px;height:${HEIGHT}px;background:#f6f8fa;display:flex;align-items:center;justify-content:center">
 <style>svg{height:${MAP_HEIGHT}px;width:auto;display:block}</style>
 ${svg}
 </body></html>`,
-    { waitUntil: 'load' },
-  )
+      { waitUntil: 'load' },
+    )
 
-  const png = await page.screenshot({
-    type: 'png',
-    clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT },
-  })
-  writeFileSync(join(outDir, `${id}.png`), png)
+    const png = await page.screenshot({
+      type: 'png',
+      clip: { x: 0, y: 0, width: WIDTH, height: HEIGHT },
+    })
+    writeFileSync(join(outDir, `${id}.png`), png)
 
-  index.entries[id].og = {
-    sha256: createHash('sha256').update(png).digest('hex'),
-    bytes: png.length,
+    index.entries[id].og = {
+      sha256: createHash('sha256').update(png).digest('hex'),
+      bytes: png.length,
+    }
+    rendered++
+    totalBytes += png.length
   }
-  rendered++
-  totalBytes += png.length
+} finally {
+  // The index is only rewritten after every card renders, so a failure here leaves the previous
+  // index intact and the next run re-renders — but never leaves a browser behind.
+  await browser.close()
 }
-
-await browser.close()
 
 // The index is the publisher's manifest, so the PNGs are recorded in it rather than in a second
 // file the publisher would have to know about.
