@@ -277,3 +277,48 @@ TSV
     # nn was not re-measured, so it stays.
     [ "$(jq -r '[.leaderboard[].solver] | index("nn") != null' "$TMPDIR/stage3/v2/problems/zzz_unknown.json")" = "true" ]
 }
+
+@test "a partial TSV header does not inherit the publisher's version and rustc" {
+    # git_commit present, everything else absent. Pairing that commit with the publisher's
+    # dirty flag, version and rustc would be a provenance claim the file does not support —
+    # and once written into a shard it is permanent.
+    printf '# git_commit=dddddddd\nsolver\tdataset\tconfig\trun\twall_s\tpeak_rss_kb\ttour_cost\tstatus\nnn\teil51\tdefault\t1\t0.01\t6000\t450.0\tok\n' \
+        > "$TMPDIR/partial-header.tsv"
+    run publish --tsv "$TMPDIR/partial-header.tsv"
+    [ "$status" -eq 0 ]
+
+    local shard="$TMPDIR/stage/v2/algorithms/nn.json"
+    [ "$(jq -r '.measurement.git_commit' "$shard")" = "dddddddd" ]
+    [ "$(jq -r '.measurement.dirty' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.teeline_version' "$shard")" = "null" ]
+    [ "$(jq -r '.measurement.environment.rust_version' "$shard")" = "null" ]
+}
+
+@test "a previous manifest naming a shard that is not on disk is refused" {
+    publish --tsv "$TMPDIR/prev.tsv"
+    cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
+
+    # The manifest still lists sa, but its shard is gone. Merging would drop sa from the
+    # republished tree without a word, so this must abort instead.
+    rm "$TMPDIR/prev-tree/v2/algorithms/sa.json"
+    run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage-missing" \
+        --tsv "$TMPDIR/sa-only.tsv"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not present in the tree"* ]]
+}
+
+@test "a shard the previous manifest does not name is not merged" {
+    publish --tsv "$TMPDIR/prev.tsv"
+    cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
+
+    # A stray shard was never live: resurrecting it would republish something no reader
+    # could have seen, including one deliberately withdrawn.
+    jq '.solver = "zzz_stray"' "$TMPDIR/prev-tree/v2/algorithms/nn.json" \
+        > "$TMPDIR/prev-tree/v2/algorithms/zzz_stray.json"
+
+    run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage-stray" \
+        --tsv "$TMPDIR/sa-only.tsv"
+    [ "$status" -eq 0 ]
+    [ ! -f "$TMPDIR/stage-stray/v2/algorithms/zzz_stray.json" ]
+    [ "$(jq -r '[.solvers[].id] | index("zzz_stray") == null' "$TMPDIR/stage-stray/v2/index.json")" = "true" ]
+}

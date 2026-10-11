@@ -6,8 +6,8 @@
 # Usage:
 #   scripts/read-benchmarks.sh index                    # manifest + freshness
 #   scripts/read-benchmarks.sh algorithm lk             # one algorithm shard
-#   scripts/read-benchmarks.sh problem berlin52
-#   scripts/read-benchmarks.sh snapshot v1.0.0         # one problem leaderboard
+#   scripts/read-benchmarks.sh problem berlin52         # one problem leaderboard
+#   scripts/read-benchmarks.sh snapshot v1.0.0          # a release snapshot's manifest
 #   scripts/read-benchmarks.sh list                     # every key under the prefix
 #   scripts/read-benchmarks.sh check                    # verify every shard parses
 #   scripts/read-benchmarks.sh raw <key>                # fetch any key verbatim
@@ -28,7 +28,7 @@ CF_R2_BUCKET="${CF_R2_BUCKET:-}"
 SNAPSHOT_TAG=""
 
 usage() {
-  sed -n '2,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   cat <<'EOF'
 
 Options:

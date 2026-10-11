@@ -168,7 +168,7 @@ nests variants of the same solver.
 | --- | --- |
 | `git_commit` | The commit the **measured binary** came from |
 | `git_commit_source` | `tsv` if the benchmark file recorded that commit; `publish-time` if it did not |
-| `dirty` | Whether the tree was dirty when the measurement was taken |
+| `dirty` | Whether the tree was dirty when the measurement was taken; `null` if the TSV did not record it |
 | `teeline_version` | Version of the measured binary |
 | `measured_at` | When the measurement was taken (not when it was published); `null` if the TSV did not record it |
 | `environment` | `os`, `build`, `rust_version` |
@@ -186,6 +186,10 @@ Rules:
   `--require-clean`.
 - `environment` is required. Wall-clock numbers are meaningless without it, and
   the page shows it beside the table.
+- Every field the TSV did not record is `null`, never the publisher's value. A header carrying
+  `git_commit` but no `dirty` must not pair the measured commit with the publisher's dirty flag,
+  version or rustc — that is the same false claim in miniature, and once written into a shard under
+  the differential cadence it is permanent.
 - `measured_at` is `null` when the TSV recorded no `# measured_at=` line. It is
   deliberately **not** filled in from the publish time: a file carried forward or
   republished would then be stamped with today's date, which is the misdating this
@@ -326,6 +330,14 @@ re-run, wrong for a differential one).
 Only objects whose bytes changed are uploaded, which is what makes re-publishing a
 single solver touch only that solver's shard. `index.json` and any affected
 `problems/*.json` legitimately change too.
+
+The merge is strict about the tree it is given. Only shards the previous manifest
+names are merged — a stray file was never live — and a manifest that names a shard
+which is missing or unreadable **aborts the publish** rather than dropping that
+solver from the republished tree. For the same reason a partial run needs an
+explicit `--first-publish` when there is no previous tree at all, and only a
+confirmed `404` is read as "nothing to merge with": a network failure is not a
+licence to publish a tree holding only this TSV's solvers.
 
 **A solver's shard is replaced wholesale when it is re-measured.** So a differential
 run must cover that solver's whole tier — every instance, every config — or the

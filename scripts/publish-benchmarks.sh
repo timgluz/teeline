@@ -213,7 +213,9 @@ fetch_previous() {
 
   # Capture the status rather than relying on curl's exit code: a 404 and a DNS failure both
   # fail, but only the first means there is nothing to merge with.
-  PREVIOUS_STATUS="$(curl -sS -o "$dest/index.json" -w '%{http_code}' "$base/index.json" || echo 000)"
+  PREVIOUS_STATUS="$(curl -sS -o "$dest/index.json" -w '%{http_code}' "$base/index.json" || true)"
+  # curl prints 000 itself on a transport failure; normalise an empty result the same way.
+  PREVIOUS_STATUS="${PREVIOUS_STATUS:-000}"
   case "$PREVIOUS_STATUS" in
     200) ;;
     404) rm -f "$dest/index.json"; return 0 ;;
@@ -278,14 +280,14 @@ elif [[ "$FETCH_PREVIOUS" -eq 1 && "$ONLY" != "criteriondb" ]]; then
   else
     echo "    no previously published tree under ${PREFIX} (HTTP 404)"
   fi
-elif [[ -s "$PREVIOUS/v2/index.json" ]]; then
+elif [[ "$ONLY" != "criteriondb" && -s "$PREVIOUS/v2/index.json" ]]; then
   MERGE_PREVIOUS=1
   echo "==> Previous  $PREVIOUS/v2 (not fetched)"
 fi
 
 # Publishing a tree that only contains this TSV's solvers is legitimate for a first publish
 # and destructive otherwise, so it needs saying out loud rather than being the silent default.
-if [[ "$MERGE_PREVIOUS" -eq 0 && "$FIRST_PUBLISH" -eq 0 ]]; then
+if [[ "$ONLY" != "criteriondb" && "$MERGE_PREVIOUS" -eq 0 && "$FIRST_PUBLISH" -eq 0 ]]; then
   echo "ERROR: there is no previous tree to merge with." >&2
   echo "       Without one, only this TSV's solvers and problems would be published, and any" >&2
   echo "       solver already live would drop out of the manifest and the leaderboards." >&2
@@ -366,12 +368,13 @@ with open(tsv_path, "r", encoding="utf-8") as fh:
 if "git_commit" in provenance:
     git_commit = provenance["git_commit"]
     git_commit_source = "tsv"
-    if "dirty" in provenance:
-        dirty = provenance["dirty"]
-    if "teeline_version" in provenance:
-        teeline_version = provenance["teeline_version"]
-    if "rust_version" in provenance:
-        rust_version = provenance["rust_version"]
+    # Anything the TSV did not record becomes unknown rather than inheriting the publisher's
+    # values. Pairing a measured commit with the publisher's dirty flag, version or rustc would
+    # be a provenance claim the file does not support — and once written into a shard under the
+    # differential cadence it is permanent.
+    dirty = provenance.get("dirty")
+    teeline_version = provenance.get("teeline_version")
+    rust_version = provenance.get("rust_version")
 else:
     git_commit_source = "publish-time"
 
@@ -382,7 +385,7 @@ else:
 measurement = {
     "git_commit": git_commit,
     "git_commit_source": git_commit_source,
-    "dirty": dirty == "1",
+    "dirty": None if dirty is None else dirty == "1",
     "teeline_version": teeline_version,
     # When the measurement was taken, which is not when it was published: a TSV carried forward
     # or republished would otherwise be stamped with today's date. The harness records this in
@@ -619,30 +622,41 @@ def load_previous(kind: str) -> dict:
     # Only the shards the previous manifest names count as published state. A stray file in
     # the directory was never live, and merging it would resurrect something no reader could
     # have seen — including a shard deliberately withdrawn.
-    listed = None
     manifest = root / "index.json"
-    if manifest.is_file():
-        try:
-            doc = json.loads(manifest.read_text(encoding="utf-8"))
-            field = "solvers" if kind == "algorithms" else "problems"
-            listed = {e["id"] for e in doc.get(field, []) if "id" in e}
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"    WARN: previous index.json unreadable ({exc}); merging every shard on disk",
-                  file=sys.stderr)
+    if not manifest.is_file():
+        sys.exit(
+            f"ERROR: previous tree has no index.json ({manifest}); cannot tell which shards "
+            f"were published"
+        )
+    try:
+        doc = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        sys.exit(f"ERROR: previous index.json is unreadable: {exc}")
+
+    field = "solvers" if kind == "algorithms" else "problems"
+    listed = {e["id"] for e in doc.get(field, []) if "id" in e}
 
     for f in sorted(d.glob("*.json")):
         try:
             doc = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
-            print(f"    WARN: ignoring unreadable previous shard {f}: {exc}", file=sys.stderr)
-            continue
+            # Not a warning: this shard is live, and dropping it would remove the solver or the
+            # leaderboard from the republished tree without anyone noticing.
+            sys.exit(f"ERROR: previous shard {f} is unreadable: {exc}")
         key = doc.get("solver") if kind == "algorithms" else doc.get("dataset")
         if not key:
-            continue
-        if listed is not None and key not in listed:
-            print(f"    WARN: ignoring {f.name}: not named by the previous manifest", file=sys.stderr)
+            sys.exit(f"ERROR: previous shard {f} has no {'solver' if kind == 'algorithms' else 'dataset'} key")
+        # A file the manifest does not name was never live, so it is not published state.
+        if key not in listed:
             continue
         prev[key] = doc
+
+    missing = listed - set(prev)
+    if missing:
+        sys.exit(
+            f"ERROR: the previous manifest names {kind} that are not present in the tree: "
+            f"{sorted(missing)}. Republishing would drop them."
+        )
     return prev
 
 measured = set(per_solver)
@@ -728,13 +742,12 @@ for dataset, doc in sorted(final_problems.items()):
 # measured at different commits as if they shared one. The manifest says what exists; the
 # shards say when each thing was measured.
 def solver_meta(sid: str) -> dict:
-    try:
-        entry = solver_entry(sid)
-        return {"name": entry["name"], "family": entry.get("family")}
-    except (KeyError, SystemExit):
+    entry = solver_entry(sid)
+    if entry is None:
         # A shard carried over from a previous publish whose solver is no longer in
         # solvers.json: keep listing it rather than dropping data silently.
         return {"name": sid, "family": None}
+    return {"name": entry["name"], "family": entry.get("family")}
 
 write_json(out / "index.json", {
     "schema_version": SCHEMA_VERSION,
@@ -818,12 +831,13 @@ snapshot_stage() {
   # Kept as two statements: `local tag="$1" snap=...$tag` reads $tag before it is bound.
   local snap="$STAGE/v2/snapshots/$tag"
 
-  if [[ "$DRY_RUN" -eq 0 && "$FORCE_SNAPSHOT" -eq 0 ]]; then
+  if [[ "$DRY_RUN" -eq 0 && "$ONLY" != "criteriondb" && "$FORCE_SNAPSHOT" -eq 0 ]]; then
     # Fail closed. A network error or a 5xx must not be read as "the tag is free", because
     # then a transient failure would authorise overwriting an immutable snapshot.
     local status
     status="$(curl -sS -o /dev/null -w '%{http_code}' --head \
-      "$PUBLIC_BASE/${PREFIX}/snapshots/$tag/index.json" || echo 000)"
+      "$PUBLIC_BASE/${PREFIX}/snapshots/$tag/index.json" || true)"
+    status="${status:-000}"
     case "$status" in
       404) ;;
       200)
@@ -857,7 +871,7 @@ upload_r2() {
     echo "('wrangler' also works as a fallback if 'cf' cannot be installed.)" >&2
     return 1
   fi
-  echo "==> Uploading to R2 bucket '$CF_R2_BUCKET' prefix '$PREFIX' via ${R2_CLIENT:-nothing} (dry run)"
+  echo "==> Uploading to R2 bucket '$CF_R2_BUCKET' prefix '$PREFIX' via ${R2_CLIENT:-nothing}$([[ "$DRY_RUN" -eq 1 ]] && echo ' (dry run)')"
   local key file count=0
   # Shards first, index.json LAST.
   #
