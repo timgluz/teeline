@@ -90,6 +90,21 @@ test.describe('algorithm benchmark section', () => {
     await expect(section.locator('figcaption')).toContainText(
       'not plotted — a gap and a tour length are not the same axis',
     )
+
+    // The prose carries the reading of the table, not the aggregates: those belong to the
+    // summary row, and a figure in two places is a figure that can disagree with itself.
+    const prose = section.locator('p').first()
+    await expect(prose).toContainText('small fraction of its budget')
+    await expect(prose).not.toContainText('Median gap')
+    await expect(prose).not.toContainText('Median wall time')
+
+    // And the summary row carries them, as medians of the per-instance medians.
+    const summaryRow = section.locator('tfoot tr')
+    await expect(summaryRow).toContainText('All 3 instances')
+    await expect(summaryRow).toContainText('7.62%')
+    // Runs and lost runs are totals in that row, not medians.
+    await expect(summaryRow).toContainText('15')
+    await expect(summaryRow.locator('td').last()).toHaveText('—')
   })
 
   test('renders a killed cell as lost runs rather than as a result', async ({

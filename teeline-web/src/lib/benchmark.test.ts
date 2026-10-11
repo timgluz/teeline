@@ -26,11 +26,14 @@ import {
   formatGapPct,
   formatSeconds,
   formatTour,
+  lostRunsNote,
+  observations,
   parseAlgorithmShard,
   parseBenchmarkIndex,
   provenance,
   summarise,
   timeoutNote,
+  type BenchmarkRow,
   type FetchLike,
 } from './benchmark'
 
@@ -280,16 +283,91 @@ describe('summarise', () => {
     expect(summary.medianGapPct).toBeCloseTo(7.6236, 4)
     expect(summary.budgetSeconds).toBe(300)
     expect(summary.budgetAgreed).toBe(false)
-    expect(summary.timeouts).toBe(0)
+    expect(summary.totalTimeouts).toBe(0)
+  })
+
+  it('carries the aggregates the table summary row renders', () => {
+    const summary = summarise(buildRows(twoOpt), budget)
+    // Best/worst medians, so a varying solver's summary row is a spread too.
+    expect(summary.medianGapBestPct).toBeCloseTo(7.6236, 4)
+    expect(summary.medianGapWorstPct).toBeCloseTo(7.6236, 4)
+    expect(summary.medianWallS).toBeGreaterThan(0)
+    expect(summary.medianPeakRssKb).toBeGreaterThan(0)
+    // Counts are totals, not medians.
+    expect(summary.totalRuns).toBe(15)
+    expect(summary.totalErrors).toBe(0)
   })
 
   it('counts timeouts without letting them into the gaps', () => {
     const rows = buildRows(synthetic)
     const summary = summarise(rows, null)
-    expect(summary.timeouts).toBe(5)
+    expect(summary.totalTimeouts).toBe(5)
     // Only eil76 has a gap; the killed cell contributes nothing.
     expect(summary.medianGapPct).toBe(3.5)
     expect(summary.budgetSeconds).toBeNull()
+  })
+})
+
+describe('observations', () => {
+  // Plain rows, so the trend rules can be driven past the thresholds the real fixtures do
+  // not reach.
+  function rowWithGap(cities: number, gapMedian: number): BenchmarkRow {
+    return {
+      ...buildRows(twoOpt)[0],
+      dataset: `d${cities}`,
+      name: `d${cities}`,
+      cities,
+      gap: { median: gapMedian, best: gapMedian, worst: gapMedian },
+    }
+  }
+
+  it('says nothing it cannot support', () => {
+    // Two instances with a gap is below the threshold for a size trend, and nothing else
+    // fires for this fixture beyond the budget remark.
+    const rows = buildRows(twoOpt)
+    const notes = observations(rows, summarise(rows, budget))
+    expect(
+      notes.some((note) => /smaller instances|larger instances/.test(note)),
+    ).toBe(false)
+  })
+
+  it('reads a size trend only when the halves are far enough apart', () => {
+    const rows = [
+      rowWithGap(10, 1),
+      rowWithGap(20, 2),
+      rowWithGap(30, 10),
+      rowWithGap(40, 20),
+    ]
+    const growing = observations(rows, summarise(rows, budget))
+    expect(growing.join(' ')).toMatch(/closest to the optimum on the smaller/)
+
+    const flat = [10, 20, 30, 40].map((cities) => rowWithGap(cities, 5))
+    expect(observations(flat, summarise(flat, budget)).join(' ')).toMatch(
+      /broadly flat/,
+    )
+  })
+
+  it('reports lost runs first, because they are missing data', () => {
+    const rows = buildRows(synthetic)
+    const notes = observations(rows, summarise(rows, null))
+    expect(notes[0]).toMatch(/exhausted the budget and produced no tour/)
+    expect(notes[1]).toMatch(/failed outright/)
+    expect(notes.length).toBeLessThanOrEqual(3)
+  })
+
+  it('notes varying tours', () => {
+    const rows = buildRows(synthetic)
+    const summary = summarise(rows, { seconds: 1, agreed: true })
+    expect(observations(rows, summary).join(' ')).toMatch(
+      /tours vary between runs/,
+    )
+  })
+
+  it('notes memory character', () => {
+    const rows = buildRows(twoOpt)
+    expect(observations(rows, summarise(rows, budget)).join(' ')).toMatch(
+      /Memory stays in the tens of megabytes/,
+    )
   })
 })
 
@@ -340,6 +418,12 @@ describe('timeoutNote', () => {
   it('singularises one lost run', () => {
     const row = { ...buildRows(twoOpt)[0], timeouts: 1, errors: 0 }
     expect(timeoutNote(row)).toBe('1 timeout')
+  })
+
+  it('describes the summary row with the same function as a data row', () => {
+    // The aggregate row and a data row must not describe the same losses differently.
+    expect(lostRunsNote(5, 1)).toBe('5 timeouts, 1 error')
+    expect(lostRunsNote(0, 0)).toBe(DASH)
   })
 })
 

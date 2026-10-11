@@ -20,6 +20,8 @@ import {
   formatGapPct,
   formatSeconds,
   formatTour,
+  lostRunsNote,
+  observations,
   provenance,
   summarise,
   timeoutNote,
@@ -132,6 +134,7 @@ export default function AlgorithmBenchmarks({
   const budget = family ? budgetFor(index, family) : null
   const columns = chooseColumns(rows, budget?.seconds ?? null)
   const summary = summarise(rows, budget)
+  const notes = observations(rows, summary)
   const series = chartSeries(rows)
   const lines = provenance(shard.measurement)
 
@@ -147,6 +150,9 @@ export default function AlgorithmBenchmarks({
         Benchmarks
       </h2>
 
+      {/* The prose says what the numbers amount to; the numbers themselves are in the table
+          below, including its summary row. Repeating aggregates here would give the reader two
+          places to read the same figure from and one more place for them to disagree. */}
       <p class="mt-2 text-sm text-text-dim">
         {summary.instances} instance{summary.instances === 1 ? '' : 's'}{' '}
         measured under the{' '}
@@ -156,21 +162,9 @@ export default function AlgorithmBenchmarks({
             }`
           : 'published budget, which could not be read'}
         .{' '}
-        {columns.gap
-          ? `Median gap ${formatGapPct(summary.medianGapPct)} across ${
-              summary.instancesWithOptimum
-            } instance${
-              summary.instancesWithOptimum === 1 ? '' : 's'
-            } with a known optimum.`
-          : 'No instance here has a published optimum, so there is no gap to show.'}{' '}
-        {hasWall && summary.medianWallS !== null
-          ? `Median wall time ${formatSeconds(summary.medianWallS)}.`
-          : ''}
-        {summary.timeouts > 0
-          ? ` ${summary.timeouts} run${
-              summary.timeouts === 1 ? '' : 's'
-            } did not finish within the budget.`
-          : ''}
+        {!columns.gap &&
+          'No instance here has a published optimum, so there is no gap to show. '}
+        {notes.join(' ')}
       </p>
 
       {!columns.gap && summary.instancesWithOptimum > 0 && (
@@ -188,6 +182,9 @@ export default function AlgorithmBenchmarks({
             {columns.spread
               ? '; median, best and worst over the runs of a solver whose tours vary between runs'
               : ''}
+            . The summary row reports the median of the per-instance medians;
+            run counts are totals, and tour length is left blank there because
+            it is not comparable between instances.
           </caption>
           <thead>
             <tr class="border-b border-border">
@@ -217,6 +214,48 @@ export default function AlgorithmBenchmarks({
               />
             ))}
           </tbody>
+          <tfoot>
+            <tr class="border-t-2 border-border font-medium">
+              <td class="px-3 py-2">All {summary.instances} instances</td>
+              <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+              <td class="px-3 py-2 font-mono text-xs">{DASH}</td>
+              {columns.optimal && (
+                <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+              )}
+              {columns.gap && (
+                <td class="px-3 py-2 text-right font-mono">
+                  {formatGapPct(summary.medianGapPct)}
+                </td>
+              )}
+              {columns.gap && columns.spread && (
+                <td class="px-3 py-2 text-right font-mono">
+                  {formatGapPct(summary.medianGapBestPct)}
+                </td>
+              )}
+              {columns.gap && columns.spread && (
+                <td class="px-3 py-2 text-right font-mono">
+                  {formatGapPct(summary.medianGapWorstPct)}
+                </td>
+              )}
+              {hasTour && (
+                <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+              )}
+              {hasTour && columns.spread && (
+                <td class="px-3 py-2 text-right font-mono">{DASH}</td>
+              )}
+              {hasWall && (
+                <td class="px-3 py-2 text-right font-mono">
+                  {formatSeconds(summary.medianWallS)}
+                </td>
+              )}
+              <td class="px-3 py-2 text-right font-mono">
+                {summary.totalRuns}
+              </td>
+              <td class="px-3 py-2 text-right font-mono">
+                {lostRunsNote(summary.totalTimeouts, summary.totalErrors)}
+              </td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 

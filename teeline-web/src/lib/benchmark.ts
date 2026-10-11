@@ -482,8 +482,18 @@ export interface Summary {
   instancesWithOptimum: number
   /** Median of the per-instance median gaps, over the instances that have one. */
   medianGapPct: number | null
+  medianGapBestPct: number | null
+  medianGapWorstPct: number | null
+  /** Median of the per-instance median wall times: a typical run on a typical instance. */
   medianWallS: number | null
-  timeouts: number
+  medianPeakRssKb: number | null
+  /**
+   * Totals, not medians. Tour length is deliberately absent: it is not comparable between
+   * instances, so a median across them would be a number that means nothing.
+   */
+  totalRuns: number
+  totalTimeouts: number
+  totalErrors: number
 }
 
 export function summarise(
@@ -502,9 +512,98 @@ export function summarise(
       rows.filter((row) => row.gap !== null).map((row) => row.dataset),
     ).size,
     medianGapPct: median(gaps),
+    medianGapBestPct: median(
+      rows.flatMap((row) => (row.gap ? [row.gap.best] : [])),
+    ),
+    medianGapWorstPct: median(
+      rows.flatMap((row) => (row.gap ? [row.gap.worst] : [])),
+    ),
     medianWallS: median(walls),
-    timeouts: rows.reduce((total, row) => total + row.timeouts, 0),
+    medianPeakRssKb: median(
+      rows.flatMap((row) => (row.peakRssKb ? [row.peakRssKb.median] : [])),
+    ),
+    totalRuns: rows.reduce((total, row) => total + row.runs, 0),
+    totalTimeouts: rows.reduce((total, row) => total + row.timeouts, 0),
+    totalErrors: rows.reduce((total, row) => total + row.errors, 0),
   }
+}
+
+/**
+ * Short, high-level readings of the table, so the prose above it can say what the numbers
+ * amount to instead of repeating them.
+ *
+ * Each rule fires only on evidence that would distinguish it from noise and stays silent
+ * otherwise: a page claiming "scales well" from four points that do not support it is the same
+ * class of false claim as a fabricated gap. Capped, because a paragraph that mentions
+ * everything is a paragraph nobody reads.
+ */
+export function observations(rows: BenchmarkRow[], summary: Summary): string[] {
+  const out: string[] = []
+
+  if (summary.totalTimeouts > 0) {
+    out.push(
+      `${summary.totalTimeouts} run${
+        summary.totalTimeouts === 1 ? '' : 's'
+      } exhausted the budget and produced no tour.`,
+    )
+  }
+  if (summary.totalErrors > 0) {
+    out.push(
+      `${summary.totalErrors} run${
+        summary.totalErrors === 1 ? '' : 's'
+      } failed outright.`,
+    )
+  }
+
+  // Instance size against gap, split into halves rather than fitted: with a handful of
+  // instances a slope would be noise dressed up as a finding.
+  const withGap = rows
+    .filter((row) => row.gap !== null && row.cities !== null)
+    .sort((a, b) => a.cities! - b.cities!)
+  if (withGap.length >= 4) {
+    const mid = Math.floor(withGap.length / 2)
+    const smaller = median(withGap.slice(0, mid).map((row) => row.gap!.median))
+    const larger = median(withGap.slice(mid).map((row) => row.gap!.median))
+    if (smaller !== null && larger !== null) {
+      if (larger - smaller > Math.max(1, larger * 0.25)) {
+        out.push(
+          'It stays closest to the optimum on the smaller instances and loses ground as they grow.',
+        )
+      } else if (smaller - larger > Math.max(1, smaller * 0.25)) {
+        out.push('It does better on the larger instances here.')
+      } else {
+        out.push('Its gap is broadly flat across the instance sizes measured.')
+      }
+    }
+  }
+
+  if (summary.budgetSeconds !== null && summary.medianWallS !== null) {
+    const used = summary.medianWallS / summary.budgetSeconds
+    if (used < 0.05) {
+      out.push(
+        'A typical run finishes in a small fraction of its budget, so the allowance is not what limits it.',
+      )
+    } else if (used > 0.5) {
+      out.push('A typical run spends most of its budget.')
+    }
+  }
+
+  if (!summary.deterministic) {
+    out.push(
+      'Its tours vary between runs, so the median is shown with the best and worst beside it.',
+    )
+  }
+
+  const rss = summary.medianPeakRssKb
+  if (rss !== null) {
+    if (rss > 200_000) {
+      out.push('It is memory-hungry, taking hundreds of megabytes per run.')
+    } else if (rss < 20_000) {
+      out.push('Memory stays in the tens of megabytes.')
+    }
+  }
+
+  return out.slice(0, 3)
 }
 
 export type ChartAxis = 'gap' | 'tour'
@@ -591,20 +690,25 @@ export function formatSeconds(value: number | null): string {
 }
 
 /**
- * The timeout text for a row.
+ * How many runs were lost, and to what.
  *
  * A killed run has no tour to report, so it is never rendered as a value: the column says how
- * many runs were lost instead (decision 5).
+ * many runs were lost instead (decision 5). One function for both a row and the table's
+ * summary row, so the two cannot describe the same losses differently.
  */
-export function timeoutNote(row: BenchmarkRow): string {
+export function lostRunsNote(timeouts: number, errors: number): string {
   const parts: string[] = []
-  if (row.timeouts > 0) {
-    parts.push(`${row.timeouts} timeout${row.timeouts === 1 ? '' : 's'}`)
+  if (timeouts > 0) {
+    parts.push(`${timeouts} timeout${timeouts === 1 ? '' : 's'}`)
   }
-  if (row.errors > 0) {
-    parts.push(`${row.errors} error${row.errors === 1 ? '' : 's'}`)
+  if (errors > 0) {
+    parts.push(`${errors} error${errors === 1 ? '' : 's'}`)
   }
   return parts.length > 0 ? parts.join(', ') : DASH
+}
+
+export function timeoutNote(row: BenchmarkRow): string {
+  return lostRunsNote(row.timeouts, row.errors)
 }
 
 export function formatDirty(dirty: boolean | null): string {
