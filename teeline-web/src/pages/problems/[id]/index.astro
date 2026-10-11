@@ -30,7 +30,7 @@ const jsonLd = {
   description: `${data.description} — ${data.cities} cities, ${data.edgeWeightType}. TSPLIB95 TSP instance.`,
   identifier: data.id,
   url: canonicalUrl,
-  image: data.minimapUrl,
+  image: data.ogImageUrl ?? data.minimapUrl,
   creator: {
     '@type': 'Organization',
     name: data.creator,
@@ -60,6 +60,12 @@ const jsonLd = {
   currentId={data.id}
   name={data.name}
   currentType="problem"
+  ogImage={data.ogImageUrl}
+  ogImageAlt={data.minimapDerived
+    ? `City layout for ${data.name}, derived from its distance matrix`
+    : `Map of ${data.name}`}
+  ogImageWidth={1200}
+  ogImageHeight={630}
 >
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

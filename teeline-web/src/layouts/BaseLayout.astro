@@ -14,9 +14,26 @@ interface Props {
   path?: string
   ogType?: 'website' | 'article'
   ogDescription?: string
+  // Per-page card: the site default is a single brand image, which says nothing about the page it
+  // is attached to. When a page passes its own, the dimensions and the Twitter card follow it.
+  ogImage?: string
+  ogImageAlt?: string
+  ogImageWidth?: number
+  ogImageHeight?: number
 }
 
-const { title, description, path, ogType = 'website', ogDescription } = Astro.props
+const {
+  title,
+  description,
+  path,
+  ogType = 'website',
+  ogDescription,
+  ogImage = 'https://tspsolver.com/og-image.png',
+  ogImageAlt = 'teeline — TSPSolver, find your path',
+  ogImageWidth = 540,
+  ogImageHeight = 630,
+} = Astro.props
+const isDefaultOgImage = ogImage === 'https://tspsolver.com/og-image.png'
 const canonicalUrl = path ? `https://tspsolver.com${path}` : undefined
 ---
 <html lang="en">
@@ -29,15 +46,15 @@ const canonicalUrl = path ? `https://tspsolver.com${path}` : undefined
     {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
     <meta property="og:title" content={title} />
     <meta property="og:description" content={ogDescription ?? description} />
-    <meta property="og:image" content="https://tspsolver.com/og-image.png" />
-    <meta property="og:image:width" content="540" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="teeline — TSPSolver, find your path" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content={String(ogImageWidth)} />
+    <meta property="og:image:height" content={String(ogImageHeight)} />
+    <meta property="og:image:alt" content={ogImageAlt} />
+    <meta name="twitter:card" content={isDefaultOgImage ? 'summary' : 'summary_large_image'} />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={ogDescription ?? description} />
-    <meta name="twitter:image" content="https://tspsolver.com/og-image.png" />
-    <meta name="twitter:image:alt" content="teeline — TSPSolver, find your path" />
+    <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={ogImageAlt} />
     {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <slot name="head" />

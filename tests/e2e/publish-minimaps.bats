@@ -67,6 +67,48 @@ stage() {
     done
 }
 
+# stage_og <dir> <id>... — the same, plus the 1200x630 raster and its index hash.
+stage_og() {
+    local dir="$1"; shift
+    stage "$dir" "$@"
+    mkdir -p "$dir/og"
+    local id hash bytes
+    for id in "$@"; do
+        printf '\x89PNG\r\n\x1a\n' > "$dir/og/$id.png"
+        hash="$(sha256sum "$dir/og/$id.png" | awk '{print $1}')"
+        bytes="$(wc -c < "$dir/og/$id.png" | tr -d ' ')"
+        jq --arg id "$id" --arg h "$hash" --argjson b "$bytes" \
+            '.entries[$id].og = {sha256:$h, bytes:$b}' \
+            "$dir/index.json" > "$dir/index.next" && mv "$dir/index.next" "$dir/index.json"
+    done
+}
+
+@test "the social card is uploaded as a PNG beside its map" {
+    stage_og "$STAGE" alpha beta
+
+    run "$PUBLISH" --dry-run --first-publish --stage "$STAGE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"would put minimaps/v1/alpha.svg (image/svg+xml)"* ]]
+    [[ "$output" == *"would put minimaps/v1/og/alpha.png (image/png)"* ]]
+    [[ "$output" == *"5 object(s) would be uploaded"* ]]
+}
+
+@test "a changed raster alone is enough to re-upload an instance" {
+    stage_og "$STAGE" alpha beta
+    cp "$STAGE/index.json" "$TMPDIR/published.json"
+    # Same SVG bytes, different card: only the PNG (and the index) should move.
+    jq '.entries.alpha.og.sha256 = "0000000000000000000000000000000000000000000000000000000000000000"' \
+        "$TMPDIR/published.json" > "$TMPDIR/stale-og.json"
+
+    run "$PUBLISH" --dry-run --previous "$TMPDIR/stale-og.json" --stage "$STAGE"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"would put minimaps/v1/og/alpha.png"* ]]
+    [[ "$output" != *"would put minimaps/v1/alpha.svg"* ]]
+    [[ "$output" != *"og/beta.png"* ]]
+    # 4 objects staged (2 maps + 2 cards); one card changed, so one object plus the index move.
+    [[ "$output" == *"2 object(s) would be uploaded, 3 unchanged"* ]]
+}
+
 @test "first publish lists every staged minimap with its content type" {
     stage "$STAGE" alpha beta
 
@@ -171,7 +213,7 @@ stage() {
 }
 
 @test "--verify passes when every object is served at its prefix" {
-    stage "$STAGE" alpha
+    stage_og "$STAGE" alpha
     # Serve the staging dir at the prefix path, the layout a published object ends up under.
     local root="$TMPDIR/served"
     mkdir -p "$root/minimaps"
@@ -196,5 +238,5 @@ stage() {
 
     run "$PUBLISH" --verify --public-base "http://127.0.0.1:$port" --stage "$STAGE"
     [ "$status" -eq 0 ]
-    [[ "$output" == *"all 2 object(s) are published"* ]]
+    [[ "$output" == *"all 3 object(s) are published"* ]]
 }

@@ -8,6 +8,7 @@ edgeWeightType: "EUC_2D"
 optimalCost: 41345
 dataUrl: "https://static.tspsolver.com/tsplib/linhp318.tsp"
 minimapUrl: "https://static.tspsolver.com/minimaps/v1/linhp318.svg"
+ogImageUrl: "https://static.tspsolver.com/minimaps/v1/og/linhp318.png"
 minimapDerived: false
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
