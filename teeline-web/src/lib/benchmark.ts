@@ -643,19 +643,35 @@ export function observations(rows: BenchmarkRow[], summary: Summary): string[] {
 
   // Instance size against gap, split into halves rather than fitted: with a handful of
   // instances a slope would be noise dressed up as a finding.
+  //
+  // A single instance far above the rest defeats that comparison, because the halves then
+  // differ by that one point rather than by scale — `lk` reaches the optimum on four
+  // instances and sits at 97.84% on `gr17`, and "better on the larger instances" would blame
+  // size for one bad EXPLICIT case. Name the outlier instead.
   const withGap = rows
     .filter((row) => row.gap !== null && row.cities !== null)
     .sort((a, b) => a.cities! - b.cities!)
-  if (withGap.length >= 4) {
+  const outlier = findOutlier(withGap)
+
+  if (outlier !== null) {
+    out.push(
+      `${outlier.row.name} is the outlier at ${outlier.gap.toFixed(
+        2,
+      )}%: every other instance is at or below ${outlier.restMax.toFixed(2)}%.`,
+    )
+  } else if (withGap.length >= 4) {
     const mid = Math.floor(withGap.length / 2)
     const smaller = median(withGap.slice(0, mid).map((row) => row.gap!.median))
     const larger = median(withGap.slice(mid).map((row) => row.gap!.median))
     if (smaller !== null && larger !== null) {
-      if (larger - smaller > Math.max(1, larger * 0.25)) {
+      // A three-point floor as well as the 25% one: measured across the published solvers, a
+      // median difference of two points over seven instances is the thinnest claim here (3opt
+      // at 0.00% against 2.24%), and it says more about seven noisy instances than about size.
+      if (larger - smaller > Math.max(3, larger * 0.25)) {
         out.push(
           'It stays closest to the optimum on the smaller instances and loses ground as they grow.',
         )
-      } else if (smaller - larger > Math.max(1, smaller * 0.25)) {
+      } else if (smaller - larger > Math.max(3, smaller * 0.25)) {
         out.push('It does better on the larger instances here.')
       } else {
         out.push('Its gap is broadly flat across the instance sizes measured.')
@@ -690,6 +706,31 @@ export function observations(rows: BenchmarkRow[], summary: Summary): string[] {
   }
 
   return out.slice(0, 3)
+}
+
+/**
+ * The one instance whose gap dwarfs every other, if there is one.
+ *
+ * Needs at least four instances, and a worst value both five times the overall median and more
+ * than ten points above it. That is a bar only a genuinely bad instance clears: an ordinary
+ * spread is never relabelled an outlier.
+ */
+function findOutlier(
+  rows: BenchmarkRow[],
+): { row: BenchmarkRow; gap: number; restMax: number } | null {
+  if (rows.length < 4) return null
+
+  const entries = rows.map((row) => ({ row, gap: row.gap!.median }))
+  const overall = median(entries.map((entry) => entry.gap))
+  if (overall === null) return null
+
+  const worst = entries.reduce((a, b) => (b.gap > a.gap ? b : a))
+  const rest = entries.filter((entry) => entry !== worst)
+  if (rest.length === 0) return null
+  const restMax = Math.max(...rest.map((entry) => entry.gap))
+
+  if (worst.gap <= Math.max(overall * 5, overall + 10)) return null
+  return { row: worst.row, gap: worst.gap, restMax }
 }
 
 export type ChartAxis = 'gap' | 'tour'
@@ -774,6 +815,8 @@ export interface SolverSeries {
   axis: ChartAxis
   axisLabel: string
   points: SolverPoint[]
+  /** Distinct solvers behind the points, which is fewer when one publishes two configs. */
+  solverCount: number
   /** The best point in each family, so the chart labels a few points rather than all of them. */
   labelled: { solver: string; config: string }[]
   omitted: { noResult: number; noTime: number; noQuality: number }
@@ -805,6 +848,7 @@ export function solverSeries(shard: ProblemShard): SolverSeries {
       axis: 'gap',
       axisLabel: 'gap vs known optimum (%)',
       points,
+      solverCount: distinctSolvers(points),
       labelled: bestPerFamily(points),
       omitted: { ...base.omitted, noQuality: timed.length - withGap.length },
     }
@@ -819,9 +863,14 @@ export function solverSeries(shard: ProblemShard): SolverSeries {
     axis: 'tour',
     axisLabel: 'tour length (no published optimum)',
     points,
+    solverCount: distinctSolvers(points),
     labelled: bestPerFamily(points),
     omitted: { ...base.omitted, noQuality: timed.length - withTour.length },
   }
+}
+
+function distinctSolvers(points: SolverPoint[]): number {
+  return new Set(points.map((point) => point.solver)).size
 }
 
 function toSolverPoint(entry: LeaderboardEntry, y: number): SolverPoint {

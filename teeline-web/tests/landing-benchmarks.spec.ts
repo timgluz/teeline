@@ -53,7 +53,7 @@ async function openLanding(page: Page, shard: string | null): Promise<void> {
 }
 
 test.describe('landing benchmark chart', () => {
-  test('plots the published solvers, and says the axis is tour length', async ({
+  test('plots gaps against the optimum and states the budgets', async ({
     page,
   }) => {
     await openLanding(page, fixture('problem-berlin52.json'))
@@ -69,13 +69,29 @@ test.describe('landing benchmark chart', () => {
     ).toBeVisible()
     await expect(section.locator('svg[role="img"]')).toBeVisible()
     await expect(section).toContainText('8 solvers')
-    // berlin52 has no published optimum, so the chart says what it plots instead of a gap.
+    // berlin52 has a published optimum since the EUC_2D fix, so this is the gap axis.
+    await expect(section).toContainText('gap from the known optimum')
+    // Cross-family gaps are what this chart shows, so the allowances are stated.
+    await expect(section).toContainText('Budgets differ by family')
+    await expect(section).toContainText('Local search 300 s (provisional)')
+  })
+
+  test('says so when the axis is tour length, and claims no budget for it', async ({
+    page,
+  }) => {
+    // Kept from the publish before the EUC_2D fix: `optimal_cost: null` is a documented
+    // contract case, and the current corpus happens to exercise it nowhere.
+    await openLanding(page, fixture('problem-no-optimum.json'))
+
+    const section = page.locator('#benchmarks')
+    await expect(section).toBeVisible()
+    await expect(section).toContainText('8 solvers')
     await expect(section).toContainText('no optimum is published')
     // No gap is plotted, so no budget is claimed for one.
     await expect(section).not.toContainText('Budgets differ by family')
   })
 
-  test('plots gaps and states the budgets when an optimum is published', async ({
+  test('keeps two configs apart and counts a solver that only timed out', async ({
     page,
   }) => {
     await openLanding(page, fixture('problem-synthetic.json'))
@@ -83,11 +99,10 @@ test.describe('landing benchmark chart', () => {
     const section = page.locator('#benchmarks')
     await expect(section).toBeVisible()
     await expect(section).toContainText('gap from the known optimum')
-    // Cross-family gaps are what this chart shows, so the allowances are stated.
-    await expect(section).toContainText('Budgets differ by family')
-    await expect(section).toContainText('Local search 300 s (provisional)')
     await expect(section).toContainText('Metaheuristic 300 s')
-    // A solver that only timed out is counted, not plotted.
+    // branch_bound publishes two configs, so it is two points but one solver; gsa only timed
+    // out, so it is counted rather than plotted.
+    await expect(section).toContainText('6 solvers · 7 results')
     await expect(section).toContainText('not plotted: 1 did not finish')
   })
 

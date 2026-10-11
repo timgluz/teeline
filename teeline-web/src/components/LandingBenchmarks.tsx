@@ -168,8 +168,14 @@ export default function LandingBenchmarks({
             </span>
           ))}
           <span class="ml-auto font-mono text-xs text-text-dim">
-            {series.points.length} solver
-            {series.points.length === 1 ? '' : 's'} · {instance}
+            {series.solverCount} solver
+            {series.solverCount === 1 ? '' : 's'}
+            {/* A solver publishing two configs is two points, so "solvers" must not be the
+                point count — branch_bound's beam search and exact runs are separate results. */}
+            {series.points.length > series.solverCount
+              ? ` · ${series.points.length} results`
+              : ''}{' '}
+            · {instance}
             {omitted.length > 0 ? ` · not plotted: ${omitted.join(', ')}` : ''}
           </span>
         </div>

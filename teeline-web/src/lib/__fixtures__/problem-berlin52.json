@@ -2,7 +2,7 @@
   "schema_version": 2,
   "dataset": "berlin52",
   "cities": 52,
-  "optimal_cost": null,
+  "optimal_cost": 7542.0,
   "leaderboard": [
     {
       "solver": "lk",
@@ -10,23 +10,29 @@
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
+      "gap_pct": {
+        "median": 0.0,
+        "best": 0.0,
+        "worst": 3.3148,
+        "mean": 0.663
+      },
       "tour_cost": {
-        "median": 7544.3657,
-        "best": 7544.3657,
-        "worst": 7658.9585,
-        "mean": 7567.2843
+        "median": 7542.0,
+        "best": 7542.0,
+        "worst": 7792.0,
+        "mean": 7592.0
       },
       "wall_s": {
-        "median": 0.0956,
-        "best": 0.0876,
-        "worst": 0.129,
-        "mean": 0.1021
+        "median": 0.112,
+        "best": 0.0783,
+        "worst": 0.1323,
+        "mean": 0.1111
       },
       "peak_rss_kb": {
-        "median": 7016.0,
-        "best": 6916.0,
-        "worst": 7104.0,
-        "mean": 7005.6
+        "median": 7040.0,
+        "best": 6944.0,
+        "worst": 7160.0,
+        "mean": 7041.6
       }
     },
     {
@@ -35,23 +41,29 @@
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
+      "gap_pct": {
+        "median": 2.1612,
+        "best": 1.7237,
+        "worst": 2.9303,
+        "mean": 2.3628
+      },
       "tour_cost": {
-        "median": 7681.75,
-        "best": 7663.8813,
-        "worst": 7817.4043,
-        "mean": 7705.4276
+        "median": 7705.0,
+        "best": 7672.0,
+        "worst": 7763.0,
+        "mean": 7720.2
       },
       "wall_s": {
-        "median": 0.0652,
-        "best": 0.0647,
-        "worst": 0.0669,
-        "mean": 0.0656
+        "median": 0.0662,
+        "best": 0.0627,
+        "worst": 0.0753,
+        "mean": 0.0689
       },
       "peak_rss_kb": {
-        "median": 7224.0,
-        "best": 6976.0,
-        "worst": 7264.0,
-        "mean": 7179.2
+        "median": 7132.0,
+        "best": 7052.0,
+        "worst": 7216.0,
+        "mean": 7131.2
       }
     },
     {
@@ -60,23 +72,29 @@
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
+      "gap_pct": {
+        "median": 2.6386,
+        "best": 2.6386,
+        "worst": 2.6386,
+        "mean": 2.6386
+      },
       "tour_cost": {
-        "median": 7742.647,
-        "best": 7742.647,
-        "worst": 7742.647,
-        "mean": 7742.647
+        "median": 7741.0,
+        "best": 7741.0,
+        "worst": 7741.0,
+        "mean": 7741.0
       },
       "wall_s": {
-        "median": 0.0805,
-        "best": 0.0765,
-        "worst": 0.0905,
-        "mean": 0.0833
+        "median": 0.0788,
+        "best": 0.0711,
+        "worst": 0.0823,
+        "mean": 0.0785
       },
       "peak_rss_kb": {
-        "median": 6856.0,
-        "best": 6844.0,
-        "worst": 6992.0,
-        "mean": 6904.8
+        "median": 6864.0,
+        "best": 6784.0,
+        "worst": 6996.0,
+        "mean": 6876.8
       }
     },
     {
@@ -85,23 +103,60 @@
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
+      "gap_pct": {
+        "median": 7.372,
+        "best": 7.372,
+        "worst": 7.372,
+        "mean": 7.372
+      },
       "tour_cost": {
-        "median": 8097.4761,
-        "best": 8097.4761,
-        "worst": 8097.4761,
-        "mean": 8097.4761
+        "median": 8098.0,
+        "best": 8098.0,
+        "worst": 8098.0,
+        "mean": 8098.0
       },
       "wall_s": {
-        "median": 0.0291,
+        "median": 0.0369,
         "best": 0.0244,
-        "worst": 0.0354,
-        "mean": 0.0302
+        "worst": 0.0412,
+        "mean": 0.0359
       },
       "peak_rss_kb": {
-        "median": 6976.0,
-        "best": 6812.0,
+        "median": 6936.0,
+        "best": 6844.0,
         "worst": 6984.0,
-        "mean": 6944.8
+        "mean": 6918.4
+      }
+    },
+    {
+      "solver": "ga",
+      "config": "budget",
+      "runs": 5,
+      "timeouts": 0,
+      "errors": 0,
+      "gap_pct": {
+        "median": 7.6637,
+        "best": 6.0594,
+        "worst": 12.4768,
+        "mean": 8.9844
+      },
+      "tour_cost": {
+        "median": 8120.0,
+        "best": 7999.0,
+        "worst": 8483.0,
+        "mean": 8219.6
+      },
+      "wall_s": {
+        "median": 1.1709,
+        "best": 1.1516,
+        "worst": 1.1911,
+        "mean": 1.1694
+      },
+      "peak_rss_kb": {
+        "median": 7004.0,
+        "best": 6904.0,
+        "worst": 7188.0,
+        "mean": 7034.4
       }
     },
     {
@@ -110,23 +165,29 @@
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
+      "gap_pct": {
+        "median": 8.4991,
+        "best": 5.476,
+        "worst": 9.109,
+        "mean": 7.6876
+      },
       "tour_cost": {
-        "median": 8107.2261,
-        "best": 7905.9453,
-        "worst": 8440.7402,
-        "mean": 8144.7368
+        "median": 8183.0,
+        "best": 7955.0,
+        "worst": 8229.0,
+        "mean": 8121.8
       },
       "wall_s": {
-        "median": 0.1736,
-        "best": 0.1584,
-        "worst": 0.1782,
-        "mean": 0.1715
+        "median": 0.1702,
+        "best": 0.1653,
+        "worst": 0.1885,
+        "mean": 0.1725
       },
       "peak_rss_kb": {
-        "median": 7284.0,
-        "best": 7244.0,
-        "worst": 7364.0,
-        "mean": 7298.4
+        "median": 7184.0,
+        "best": 7108.0,
+        "worst": 7304.0,
+        "mean": 7186.4
       }
     },
     {
@@ -135,23 +196,29 @@
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
+      "gap_pct": {
+        "median": 8.8173,
+        "best": 4.3755,
+        "worst": 11.1111,
+        "mean": 7.8494
+      },
       "tour_cost": {
-        "median": 8317.7686,
-        "best": 7749.7617,
-        "worst": 8506.29,
-        "mean": 8234.0929
+        "median": 8207.0,
+        "best": 7872.0,
+        "worst": 8380.0,
+        "mean": 8134.0
       },
       "wall_s": {
-        "median": 0.3296,
-        "best": 0.3197,
-        "worst": 0.3365,
-        "mean": 0.3295
+        "median": 0.3088,
+        "best": 0.3066,
+        "worst": 0.3292,
+        "mean": 0.3143
       },
       "peak_rss_kb": {
-        "median": 7152.0,
-        "best": 7112.0,
-        "worst": 7264.0,
-        "mean": 7179.2
+        "median": 7176.0,
+        "best": 6988.0,
+        "worst": 7316.0,
+        "mean": 7170.4
       }
     },
     {
@@ -160,48 +227,29 @@
       "runs": 5,
       "timeouts": 0,
       "errors": 0,
+      "gap_pct": {
+        "median": 11.0581,
+        "best": 11.0581,
+        "worst": 11.0581,
+        "mean": 11.0581
+      },
       "tour_cost": {
-        "median": 8378.9736,
-        "best": 8378.9736,
-        "worst": 8378.9736,
-        "mean": 8378.9736
+        "median": 8376.0,
+        "best": 8376.0,
+        "worst": 8376.0,
+        "mean": 8376.0
       },
       "wall_s": {
-        "median": 0.0133,
-        "best": 0.0099,
-        "worst": 0.0169,
-        "mean": 0.0131
+        "median": 0.009,
+        "best": 0.0085,
+        "worst": 0.0111,
+        "mean": 0.0096
       },
       "peak_rss_kb": {
-        "median": 7076.0,
-        "best": 6888.0,
-        "worst": 7124.0,
-        "mean": 7041.6
-      }
-    },
-    {
-      "solver": "2opt",
-      "config": "budget",
-      "runs": 5,
-      "timeouts": 0,
-      "errors": 0,
-      "tour_cost": {
-        "median": 8384.1885,
-        "best": 8384.1885,
-        "worst": 8384.1885,
-        "mean": 8384.1885
-      },
-      "wall_s": {
-        "median": 0.0194,
-        "best": 0.0151,
-        "worst": 0.0212,
-        "mean": 0.0182
-      },
-      "peak_rss_kb": {
-        "median": 6932.0,
-        "best": 6860.0,
-        "worst": 7000.0,
-        "mean": 6936.8
+        "median": 6964.0,
+        "best": 6876.0,
+        "worst": 7132.0,
+        "mean": 6984.0
       }
     }
   ]

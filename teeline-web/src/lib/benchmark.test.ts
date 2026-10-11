@@ -1,16 +1,25 @@
 import { describe, expect, it } from 'vitest'
 
-// Fixtures are pinned to the 2026-10-11 prelim publish (`index.json`
-// generated_at 2026-10-11T11:00:18Z, measurements at commit e4588d6f) and are trimmed
-// copies of the live shards. `algorithm-synthetic.json` is hand-written: it covers the
-// two cases the live tree cannot — a cell where every run was killed, and a
-// non-deterministic solver's spread — plus a shard whose provenance is publish-time
-// only. Read with `?raw`, as solver-index.test.ts does, so this test needs no Node
-// filesystem types.
+// Fixtures are trimmed copies of live shards, pinned so the assertions below stay stable:
+//
+// - `algorithm-*` and `problem-berlin52` are from the 2026-10-11 republish that followed the
+//   EUC_2D rounding fix (`index.json` generated_at 2026-10-11T12:05:56Z, measurements at
+//   commit fe89b6a9).
+// - `problem-no-optimum` is the earlier berlin52 shard, from before that fix, when berlin52
+//   had no published optimum. Kept because `optimal_cost: null` is a documented contract case
+//   — the current corpus happens to have an optimum for all 111 problems — and the tour-length
+//   axis is otherwise unreachable.
+// - `problem-synthetic` and `algorithm-synthetic` are hand-written: they cover what the live
+//   tree does not — a cell where every run was killed, a non-deterministic solver's spread, a
+//   solver with no entry in bench/solvers.json, and a shard whose provenance is publish-time
+//   only.
+//
+// Read with `?raw`, as solver-index.test.ts does, so this test needs no Node filesystem types.
 import twoOptRaw from './__fixtures__/algorithm-2opt.json?raw'
 import branchBoundRaw from './__fixtures__/algorithm-branch-bound.json?raw'
 import syntheticRaw from './__fixtures__/algorithm-synthetic.json?raw'
 import berlinRaw from './__fixtures__/problem-berlin52.json?raw'
+import noOptimumRaw from './__fixtures__/problem-no-optimum.json?raw'
 import problemSyntheticRaw from './__fixtures__/problem-synthetic.json?raw'
 
 import {
@@ -352,6 +361,47 @@ describe('observations', () => {
     )
   })
 
+  it('names one dominant instance instead of blaming the size trend', () => {
+    // `lk`'s real shape on the republished data: at or near the optimum on four instances and
+    // 97.84% on the 17-city EXPLICIT one. The halves comparison would otherwise report that it
+    // does better on the larger instances, blaming size for a single bad case.
+    const rows = [
+      rowWithGap(14, 6.62),
+      rowWithGap(16, 1.81),
+      rowWithGap(17, 97.84),
+      rowWithGap(22, 2.37),
+      rowWithGap(48, 0.66),
+      rowWithGap(52, 0),
+      rowWithGap(76, 0),
+    ]
+    const notes = observations(rows, summarise(rows, budget))
+    expect(notes[0]).toMatch(
+      /is the outlier at 97\.84%: every other instance is at or below 6\.62%/,
+    )
+    expect(notes.join(' ')).not.toMatch(/larger instances|smaller instances/)
+  })
+
+  it('does not call an ordinary spread an outlier', () => {
+    const rows = [20, 22, 25, 30, 35].map((gap, index) =>
+      rowWithGap(10 * (index + 1), gap),
+    )
+    expect(observations(rows, summarise(rows, budget)).join(' ')).not.toMatch(
+      /outlier/,
+    )
+  })
+
+  it('stays quiet about size when the difference is thin', () => {
+    // 3opt's real shape: 0.00% on the smaller half against 2.24% on the larger. Seven noisy
+    // instances, so the honest reading is nothing rather than a scaling claim.
+    const rows = [0, 0, 0, 2.24, 3.1, 2.4, 1.9].map((gap, index) =>
+      rowWithGap(10 * (index + 1), gap),
+    )
+    const notes = observations(rows, summarise(rows, budget)).join(' ')
+    // Broadly-flat is still a statement about the numbers, so it is allowed; a directional
+    // claim is what the floor suppresses.
+    expect(notes).not.toMatch(/smaller instances|loses ground/)
+  })
+
   it('reports lost runs first, because they are missing data', () => {
     const rows = buildRows(synthetic)
     const notes = observations(rows, summarise(rows, null))
@@ -470,15 +520,23 @@ describe('provenance', () => {
 
 describe('problem shards and the landing chart', () => {
   const berlin = parseProblemShard(JSON.parse(berlinRaw))
+  const noOptimum = parseProblemShard(JSON.parse(noOptimumRaw))
   const syntheticProblem = parseProblemShard(JSON.parse(problemSyntheticRaw))
 
-  it('parses a leaderboard and keeps an unknown optimum as null', () => {
+  it('parses a leaderboard with its published optimum', () => {
     expect(berlin.dataset).toBe('berlin52')
     expect(berlin.cities).toBe(52)
-    expect(berlin.optimalCost).toBeNull()
+    // 7542, TSPLIB's nint-rounded optimum, now that EUC_2D rounds (fe89b6a9).
+    expect(berlin.optimalCost).toBe(7542)
     expect(berlin.leaderboard[0].solver).toBe('lk')
-    expect(berlin.leaderboard[0].gapPct).toBeNull()
-    expect(berlin.leaderboard[0].tourCost?.median).toBeGreaterThan(0)
+    expect(berlin.leaderboard[0].gapPct?.median).toBe(0)
+    expect(berlin.leaderboard[0].tourCost?.median).toBe(7542)
+  })
+
+  it('keeps an unknown optimum as null rather than a zero gap', () => {
+    expect(noOptimum.optimalCost).toBeNull()
+    expect(noOptimum.leaderboard[0].gapPct).toBeNull()
+    expect(noOptimum.leaderboard[0].tourCost?.median).toBeGreaterThan(0)
   })
 
   it('treats one solver publishing two configs as two entries', () => {
@@ -501,15 +559,23 @@ describe('problem shards and the landing chart', () => {
   })
 
   it('plots tour length and says so when no optimum is published', () => {
-    const series = solverSeries(berlin)
+    const series = solverSeries(noOptimum)
     expect(series.axis).toBe('tour')
     expect(series.axisLabel).toMatch(/no published optimum/)
     // Serialised straight to JSON, so the fixture's null optimum is the real case.
-    expect(JSON.parse(berlinRaw).optimal_cost).toBeNull()
+    expect(JSON.parse(noOptimumRaw).optimal_cost).toBeNull()
     expect(series.points).toHaveLength(8)
     expect(series.points.every((point) => Number.isFinite(point.wallS))).toBe(
       true,
     )
+  })
+
+  it('plots gaps, and no tour length, once an optimum is published', () => {
+    const series = solverSeries(berlin)
+    expect(series.axis).toBe('gap')
+    expect(series.points.map((point) => point.solver)).toContain('lk')
+    // The axis is one or the other, never a mix: every point here is a gap.
+    expect(series.points.every((point) => point.y < 100)).toBe(true)
   })
 
   it('plots gaps, never a mix, when an optimum is published', () => {
