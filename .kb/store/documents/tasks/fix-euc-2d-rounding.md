@@ -78,6 +78,27 @@ rounded and unrounded lengths differ, using a route whose optimal score is publi
 - After the fix, `scripts/gen-problem-pages.mjs` should score EUC_2D routes too: allow `EUC_2D` in
   `tourLength`, and `berlin52`/`a280` fill in as 7542 and 2579 with no further work.
 
+## Publish ordering — do not publish between the fix and the re-run
+
+State as of 2026-10-11: the fix is in the working tree, and `36f80072` has already filled the EUC_2D
+optima in `docs/problems/*.md` from TSPLIB's published list (**`berlin52` 7542, `a280` 2579,
+`eil76` 538, `kroA100` 21282, `ch150` 6528**). Those are the *rounded* objectives, while every
+published shard was measured against the unrounded one, so publishing before re-measuring produces
+shards that mix two metrics:
+
+- `scripts/publish-benchmarks.sh:635-650` builds `instances` from `docs/problems/*.md`, so
+  `problems/{id}.json` takes `optimal_cost` from the docs regardless of how the rows were measured.
+- A solver in the run log is recomputed (gap from its fresh tour costs against that optimum), but a
+  solver **not** in the run log is carried over byte for byte (`:800-814`), keeping tour costs from
+  the old metric.
+- `:830-869` then merges the two sets into one leaderboard and re-ranks them together. The result
+  ranks rows measured under different objectives against each other — the mixed-metric ranking the
+  differential cadence is otherwise careful to avoid.
+
+So the order is: land the fix → re-measure every EUC_2D instance (6 of the 12 Tier A instances;
+`berlin52` and `eil76` in the current prelim set) → then publish. A republish alone is not enough and
+is worse than not publishing, because it attaches the new optima to old measurements.
+
 ## Acceptance Criteria
 
 - [ ] `EUC_2D` distances are `nint`-rounded in both `KDPoint::distance` and the comparison path

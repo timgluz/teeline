@@ -335,6 +335,14 @@ impl KDPoint {
         self.coords.get(dimension).copied()
     }
 
+    /// Plain Euclidean distance — **not** TSPLIB's `EUC_2D`, which rounds to the nearest integer.
+    ///
+    /// Deliberately left unrounded, and deliberately separate from
+    /// `distance_matrix::euc_2d_distance`: this one is used by the spatial index and by the
+    /// "are these the same point" check (`distance < f32::EPSILON`), where rounding would make
+    /// genuinely distinct points compare equal. The distance matrix that solvers are scored
+    /// against uses the rounded form, so a reported cost stays comparable with a published
+    /// optimum.
     pub fn distance(&self, other: &KDPoint) -> f32 {
         let dx = self.coords[0] - other.coords[0];
         let dy = self.coords[1] - other.coords[1];
