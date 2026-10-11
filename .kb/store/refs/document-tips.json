@@ -355,6 +355,21 @@
       "document_id": "01a12ab3-9a9d-7cb2-8df8-f77bd9e41ede",
       "slug": "tasks/ship-missing-optimal-tours",
       "tip_commit_id": "01a12ab6-0ba5-70d3-80ce-24d50c915215"
+    },
+    {
+      "document_id": "01a12b16-2fb5-77a1-bda3-a36249775339",
+      "slug": "tasks/bench-solver-compare",
+      "tip_commit_id": "01a12b16-c54e-7f00-be62-0b1d33af3ff2"
+    },
+    {
+      "document_id": "01a12b16-2fd0-7f11-abac-72499916b64e",
+      "slug": "tasks/bench-data-download",
+      "tip_commit_id": "01a12b16-c54e-7f00-be62-0b1d33af3ff2"
+    },
+    {
+      "document_id": "01a12b16-2fe4-7a20-b2f2-1c24f8526891",
+      "slug": "tasks/blog-benchmarks-duckdb",
+      "tip_commit_id": "01a12b16-c54e-7f00-be62-0b1d33af3ff2"
     }
   ]
 }
