@@ -464,3 +464,81 @@ PY
     # And the leftovers the failed attempt used to choke on must not be treated as a tree.
     [ ! -f "$TMPDIR/first/v2/../../bench-prev/v2/index.json" ]
 }
+
+@test "a timeout row needs no measurements of its own" {
+    # A killed run has no tour. Demanding one would force the harness to invent a 0, which is
+    # the fabricated measurement this parser exists to refuse. wall_s/tour_cost are omitted
+    # entirely here and the run must still publish, counted as a timeout.
+    printf '%s\n' '{"solver":"nn","dataset":"eil51","run":1,"status":"timeout"}' \
+        > "$TMPDIR/killed.jsonl"
+    run publish --runs "$TMPDIR/killed.jsonl"
+    [ "$status" -eq 0 ]
+
+    local cell
+    cell="$(jq -c '.results.eil51.by_config.default' "$TMPDIR/stage/v2/algorithms/nn.json")"
+    [ "$(jq -r '.timeouts' <<<"$cell")" = "1" ]
+    [ "$(jq -r '.runs' <<<"$cell")" = "0" ]
+    # Nothing in the summary may pretend the run produced a tour.
+    [ "$(jq -r '.tour_cost' <<<"$cell")" = "null" ]
+}
+
+@test "a zero or negative tour_cost on an ok run is rejected" {
+    # A 0 tour length yields a gap of -100%, i.e. "twice as good as optimal".
+    printf '%s\n' '{"solver":"nn","dataset":"eil51","run":1,"wall_s":1,"peak_rss_kb":1,"tour_cost":0}' \
+        > "$TMPDIR/zerocost.jsonl"
+    run publish --runs "$TMPDIR/zerocost.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"must be positive"* ]]
+}
+
+@test "a non-finite numeric field is rejected" {
+    # json.loads accepts bare Infinity/NaN, and json.dumps would write them back out as
+    # tokens that jq and JSON.parse reject — permanently, in a shard carried over unchanged.
+    printf '%s\n' '{"solver":"nn","dataset":"eil51","run":1,"wall_s":1,"peak_rss_kb":1,"tour_cost":Infinity}' \
+        > "$TMPDIR/inf.jsonl"
+    run publish --runs "$TMPDIR/inf.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"must be finite"* ]]
+}
+
+@test "a measurement that cannot name its build is rejected" {
+    printf '%s\n' '{"solver":"nn","dataset":"eil51","run":1,"wall_s":1,"peak_rss_kb":1,"tour_cost":450,"measurement":{}}' \
+        > "$TMPDIR/emptymeas.jsonl"
+    run publish --runs "$TMPDIR/emptymeas.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"non-empty 'git_commit'"* ]]
+}
+
+@test "a non-numeric status is rejected instead of defaulting to ok" {
+    # `obj.get("status") or "ok"` would turn false/0/"" into a successful measurement.
+    printf '%s\n' '{"solver":"nn","dataset":"eil51","run":1,"wall_s":1,"peak_rss_kb":1,"tour_cost":450,"status":false}' \
+        > "$TMPDIR/falsestatus.jsonl"
+    run publish --runs "$TMPDIR/falsestatus.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"'status' must be a string"* ]]
+}
+
+@test "CLI solver names are normalised to their doc id" {
+    # bench/solvers.json maps id `bhk` to CLI `bellman_karp`. Reading rows under one spelling
+    # and looking provenance up under another splits one solver in two.
+    row bellman_karp eil51 default 1 0.01 6000 450.0 ok > "$TMPDIR/cli.jsonl"
+    run publish --runs "$TMPDIR/cli.jsonl"
+    [ "$status" -eq 0 ]
+
+    [ -f "$TMPDIR/stage/v2/algorithms/bhk.json" ]
+    [ ! -f "$TMPDIR/stage/v2/algorithms/bellman_karp.json" ]
+    [ "$(jq -r '.measurement.git_commit' "$TMPDIR/stage/v2/algorithms/bhk.json")" = "aaaaaaaa" ]
+}
+
+@test "the same solver under two spellings must still agree on provenance" {
+    # Both spellings are `bhk`, so mixing builds across them must be caught — otherwise rows
+    # from two builds reach one shard unchecked.
+    {
+        row bhk eil51 default 1 0.01 6000 450.0 ok
+        row bellman_karp eil51 default 2 0.01 6000 450.0 ok "$ALT_MEASUREMENT"
+    } > "$TMPDIR/twospellings.jsonl"
+    run publish --runs "$TMPDIR/twospellings.jsonl"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"different provenance"* ]]
+    [[ "$output" == *"'bhk'"* ]]
+}

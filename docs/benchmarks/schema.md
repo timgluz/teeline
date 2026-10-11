@@ -134,7 +134,27 @@ Why JSONL and not a tab-separated file:
 
 `measurement` is validated and normalised, never passed through: `dirty` must be `true`,
 `false` or `null`; the string fields must be strings or `null`; unknown keys are rejected;
-`git_commit_source` must be `jsonl`, `tsv` or `publish-time`.
+`git_commit` must be a non-empty string and `git_commit_source` one of `jsonl`, `tsv` or
+`publish-time`. A row that cannot name the build has no provenance to record, so it must omit
+`measurement` entirely rather than send a partial one.
+
+Numeric requirements depend on the status, because a killed run has no tour:
+
+| status | `run` | `wall_s`, `peak_rss_kb`, `tour_cost` |
+| --- | --- | --- |
+| `ok` | required integer | required, finite, and `tour_cost` positive |
+| `timeout` / `error` | required integer | not required — omitted or `null` |
+
+`tour_cost` must be positive for an `ok` run: zero or negative gives a gap at or below −100%,
+"twice as good as optimal", which cannot describe a real tour. Non-finite values are rejected
+because `json.loads` accepts bare `Infinity`/`NaN` and `json.dumps` would then emit them as
+tokens that `jq` and browser `JSON.parse` reject — permanently, in a shard the differential
+cadence carries over.
+
+`status` must be a string; it is never defaulted from a falsy value, so `false` or `0` is an
+error rather than a successful measurement. `solver` may be either the doc id or the CLI name
+(`bhk` or `bellman_karp`) and is normalised to the id before anything else looks at it — both
+spellings are the same solver, including for the provenance agreement check.
 
 A row with **no** `measurement` is published with `git_commit_source: "publish-time"`: the
 commit is then only HEAD when the publish ran and does **not** identify the built binary.

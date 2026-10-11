@@ -158,15 +158,15 @@ case "$cmd" in
     # A separate jq for the provenance lines: mixing bare strings into the table expression
     # would leave the trailing `| .[]` iterating over them as well as the rows.
     echo "$body" | jq -r '
-      # `dirty` is tri-state: null means the TSV did not record it, which is not the same as
-      # clean — rendering null as false would claim a clean tree nobody verified.
+      # `dirty` is tri-state: null means the run log did not record it, which is not the same
+      # as clean — rendering null as false would claim a clean tree nobody verified.
       "measured at    : \(.measurement.git_commit)\(
                           if .measurement.dirty == true then " (DIRTY)"
                           elif .measurement.dirty == null then " (dirty state not recorded)"
                           else "" end)
                         source=\(.measurement.git_commit_source // "unknown")\(
                           if (.measurement.git_commit_source // "") == "publish-time"
-                          then " ⚠ not the measured binary — TSV carried no provenance"
+                          then " ⚠ not the measured binary — run log carried no provenance"
                           else "" end)",
       "measured when  : \(.measurement.measured_at // "not recorded")",
       "teeline        : \(.measurement.teeline_version // "not recorded")",

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# publish-benchmarks.sh — turn a benchmark TSV into the published JSON contract
+# publish-benchmarks.sh — turn a JSONL benchmark run log into the published JSON contract
 # and upload it to the R2 bucket behind static.tspsolver.com.
 #
 # Usage:
@@ -132,7 +132,7 @@ fi
 # usually the thing that is uncommitted, so "commit first, then publish" was
 # unsatisfiable for any change to this pipeline. Worse, "is the tree dirty *now*"
 # is the wrong question — what matters is what commit the measured binary came
-# from, and that is recorded in each TSV row's own provenance, not by the tree
+# from, and that is recorded in each row's own provenance, not by the tree
 # state at publish time.
 #
 # So: warn loudly, record `dirty: true` in index.json so consumers can see it, and
@@ -295,7 +295,7 @@ if [[ "$MERGE_PREVIOUS" -eq 0 ]]; then
   PREVIOUS_ARG="$STAGE/.no-previous-tree"
 fi
 
-# Publishing a tree that only contains this TSV's solvers is legitimate for a first publish
+# Publishing a tree that only contains this run log's solvers is legitimate for a first publish
 # and destructive otherwise, so it needs saying out loud rather than being the silent default.
 if [[ "$ONLY" != "criteriondb" && "$MERGE_PREVIOUS" -eq 0 && "$FIRST_PUBLISH" -eq 0 ]]; then
   echo "ERROR: there is no previous tree to merge with." >&2
@@ -307,17 +307,17 @@ if [[ "$ONLY" != "criteriondb" && "$MERGE_PREVIOUS" -eq 0 && "$FIRST_PUBLISH" -e
 fi
 
 # ---------------------------------------------------------------------------
-# Transform: TSV -> the published JSON contract
+# Transform: JSONL run log -> the published JSON contract
 # ---------------------------------------------------------------------------
 
 echo "==> Reading   $RUNS"
 echo "==> Staging   $STAGE/v2"
 # The definitive provenance is resolved inside the transform below, which prefers
-# the TSV's own header. This line reports the publish-time values as a fallback so
+# each row's own measurement. This line reports the publish-time values as a fallback so
 # it is clear which set the manifest ended up using.
 echo "==> Publish-time git state: commit=$GIT_COMMIT dirty=$DIRTY (used only for rows carrying no provenance)"
 
-# Clear the staged shards first. Leftovers from an earlier run or a different TSV would
+# Clear the staged shards first. Leftovers from an earlier run or a different run log would
 # otherwise be uploaded as orphans, and a stale snapshots/ tree would be re-uploaded on every
 # later run — overwriting an immutable snapshot and bypassing the guard in snapshot_stage.
 rm -rf "$STAGE/v2/algorithms" "$STAGE/v2/problems" "$STAGE/v2/snapshots"
@@ -336,6 +336,7 @@ Instances without a known optimal get `optimal_cost: null` and no gap at all —
 never a fabricated 0, which would read as "reached the optimum".
 """
 import json
+import math
 import re
 import statistics
 import sys
@@ -349,8 +350,8 @@ from pathlib import Path
 ) = sys.argv[1:14]
 
 ROOT = Path.cwd()
-REQUIRED = ["solver", "dataset", "run", "wall_s", "peak_rss_kb", "tour_cost"]
-OPTIONAL = ["config", "status"]
+# Field requirements are enforced per row below rather than through column lists: a run that
+# completed needs numbers, one that timed out does not, and JSONL says which is which.
 STATUSES = ("ok", "timeout", "error")
 SCHEMA_VERSION = 2
 PROVENANCE_FIELDS = (
@@ -446,27 +447,65 @@ def check_measurement(obj, lineno: int) -> dict | None:
                 )
             out[key] = value
 
-    source = out.get("git_commit_source")
-    if source is not None and source not in ("jsonl", "tsv", "publish-time"):
+    # `git_commit` first: an empty or partial `measurement` is most clearly reported as "this
+    # cannot name the build" rather than as a missing sub-field. A measurement that cannot name
+    # the build is not provenance — writing it into a shard would leave a block that looks like
+    # an answer and carries none, and the differential cadence then keeps it forever. Omit the
+    # field entirely for a run log that records no provenance.
+    if not out.get("git_commit"):
         sys.exit(
-            f"ERROR: {runs_path}:{lineno}: 'measurement.git_commit_source' must be jsonl, "
-            f"tsv or publish-time, got {source!r}"
+            f"ERROR: {runs_path}:{lineno}: 'measurement' must carry a non-empty 'git_commit'; "
+            f"omit the field entirely for a run log that records no provenance"
+        )
+    source = out.get("git_commit_source")
+    if source not in ("jsonl", "tsv", "publish-time"):
+        sys.exit(
+            f"ERROR: {runs_path}:{lineno}: 'measurement.git_commit_source' must be one of "
+            f"jsonl, tsv or publish-time, got {source!r}"
         )
     return out
 
-def number(obj, name: str, lineno: int) -> float:
-    """A required numeric field, rejected when absent, null or non-numeric.
+def finite_number(obj, name: str, lineno: int) -> float:
+    """A required finite number, rejected when absent, null, non-numeric or infinite.
 
-    Missing data must fail loudly. Defaulting `tour_cost` to 0 would fabricate a
-    measurement whose gap is -100% — "twice as good as optimal" — and a run whose
-    numbers were not captured belongs in the `errors` count instead.
+    Missing data must fail loudly. Defaulting `tour_cost` to 0 would fabricate a measurement
+    whose gap is -100% — "twice as good as optimal" — which is the opposite of failing loudly.
+    `NaN`/`Infinity` are rejected because `json.loads` accepts them and `json.dumps` would then
+    write them back out as bare tokens: invalid JSON for `jq` and `JSON.parse`, permanent in a
+    shard the differential cadence carries over.
     """
     if name not in obj:
         sys.exit(f"ERROR: {runs_path}:{lineno}: missing required field '{name}'")
     value = obj[name]
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         sys.exit(f"ERROR: {runs_path}:{lineno}: '{name}' must be a number, got {value!r}")
-    return float(value)
+    value = float(value)
+    if not math.isfinite(value):
+        sys.exit(f"ERROR: {runs_path}:{lineno}: '{name}' must be finite, got {value!r}")
+    return value
+
+# --- solver metadata from the canonical map -------------------------------
+#
+# Loaded before the rows are read because each row is normalised to the canonical solver
+# *id* as it is parsed. The raw log may use CLI names (`bellman_karp`) where the published
+# ids are short (`bhk`), and provenance is keyed by solver — so reading rows under one
+# spelling and looking them up under another splits one solver into two, defeating the
+# agreement check and raising KeyError at the shard.
+index = json.loads((ROOT / "bench" / "solvers.json").read_text(encoding="utf-8"))
+solvers = {s["id"]: s for s in index["solvers"]}
+by_cli = {s["cli"]: s for s in index["solvers"]}
+
+def solver_entry(name):
+    return solvers.get(name) or by_cli.get(name)
+
+def canonical_solver(name: str, lineno: int) -> str:
+    entry = solver_entry(name)
+    if entry is None:
+        sys.exit(
+            f"ERROR: {runs_path}:{lineno}: unknown solver '{name}'; "
+            f"not in bench/solvers.json under either its id or its CLI name"
+        )
+    return entry["id"]
 
 rows: list[dict] = []
 # solver id -> canonical provenance text, or None when the rows carried none.
@@ -488,10 +527,33 @@ with open(runs_path, "r", encoding="utf-8") as fh:
         if absent:
             sys.exit(f"ERROR: {runs_path}:{lineno}: missing required field(s): {', '.join(absent)}")
 
-        solver = str(obj["solver"])
+        # Normalised to the canonical id here, so the agreement check below and every later
+        # lookup see one solver however the log spelled it.
+        solver = canonical_solver(str(obj["solver"]), lineno)
         dataset = str(obj["dataset"])
-        config = str(obj.get("config") or "default")
-        status = str(obj.get("status") or "ok").lower()
+
+        # `or` would turn a falsy-but-wrong value (0, "", false, []) into the default, which is
+        # exactly the malformed row these checks exist to catch. Only absence means "default".
+        raw_config = obj.get("config")
+        if raw_config is None:
+            config = "default"
+        elif isinstance(raw_config, str) and raw_config:
+            config = raw_config
+        else:
+            sys.exit(
+                f"ERROR: {runs_path}:{lineno}: 'config' must be a non-empty string, "
+                f"got {raw_config!r}"
+            )
+
+        raw_status = obj.get("status")
+        if raw_status is None:
+            status = "ok"
+        elif isinstance(raw_status, str):
+            status = raw_status.lower()
+        else:
+            sys.exit(
+                f"ERROR: {runs_path}:{lineno}: 'status' must be a string, got {raw_status!r}"
+            )
         if status not in STATUSES:
             # A typed field is the point of leaving TSV: a typo like "timout" must not
             # quietly become an error, and an unknown status must not enter a summary.
@@ -517,16 +579,32 @@ with open(runs_path, "r", encoding="utf-8") as fh:
         else:
             solver_provenance[solver] = canon
 
-        rows.append({
+        entry = {
             "solver": solver,
             "dataset": dataset,
             "config": config,
             "run": run_no,
-            "wall_s": number(obj, "wall_s", lineno),
-            "peak_rss_kb": number(obj, "peak_rss_kb", lineno),
-            "tour_cost": number(obj, "tour_cost", lineno),
             "status": status,
-        })
+            # Only a completed run has numbers. A killed run has no tour to report, and
+            # demanding one would force the harness to invent a 0 — the fabricated measurement
+            # this parser exists to refuse. Non-ok rows are carried with nulls and are counted
+            # in `timeouts`/`errors` rather than entering the statistics.
+            "wall_s": None,
+            "peak_rss_kb": None,
+            "tour_cost": None,
+        }
+        if status == "ok":
+            entry["wall_s"] = finite_number(obj, "wall_s", lineno)
+            entry["peak_rss_kb"] = finite_number(obj, "peak_rss_kb", lineno)
+            entry["tour_cost"] = finite_number(obj, "tour_cost", lineno)
+            if entry["tour_cost"] <= 0:
+                # A zero or negative tour length gives a gap at or below -100% ("twice as good
+                # as optimal"), which cannot be a real measurement of a positive-length tour.
+                sys.exit(
+                    f"ERROR: {runs_path}:{lineno}: 'tour_cost' must be positive for an ok run, "
+                    f"got {entry['tour_cost']!r}"
+                )
+        rows.append(entry)
 
 if not rows:
     sys.exit(f"ERROR: {runs_path} contains no runs")
@@ -572,27 +650,6 @@ for doc in sorted((ROOT / "docs" / "problems").glob("*.md")):
         "optimal_cost": optimal,
     }
 
-# --- solver metadata from the canonical map -------------------------------
-
-index = json.loads((ROOT / "bench" / "solvers.json").read_text(encoding="utf-8"))
-solvers = {s["id"]: s for s in index["solvers"]}
-# The harness may be driven by CLI names; accept either spelling.
-by_cli = {s["cli"]: s for s in index["solvers"]}
-
-def solver_entry(name):
-    return solvers.get(name) or by_cli.get(name)
-
-unknown = sorted({r["solver"] for r in rows if solver_entry(r["solver"]) is None})
-if unknown:
-    sys.exit(
-        "ERROR: run log contains solver name(s) missing from bench/solvers.json: "
-        + ", ".join(unknown)
-        + "\nAdd them there (and to teeline-web/src/lib/solver-index.ts) first."
-    )
-
-def solver_id(name):
-    return solver_entry(name)["id"]
-
 # --- aggregate -------------------------------------------------------------
 
 def stats(values):
@@ -608,11 +665,12 @@ def stats(values):
         out["mean"] = round(statistics.fmean(values), 4)
     return out
 
-# (solver_id, dataset, config) -> {"ok": [rows], "timeouts": n, "errors": n}
+# (solver, dataset, config) -> {"ok": [rows], "timeouts": n, "errors": n}
+# Only `ok` rows carry measurements, so the statistics below read from `ok` alone and a
+# timeout contributes nothing to any aggregate.
 cells = defaultdict(lambda: {"ok": [], "timeouts": 0, "errors": 0})
 for r in rows:
-    key = (solver_id(r["solver"]), r["dataset"], r["config"])
-    bucket = cells[key]
+    bucket = cells[(r["solver"], r["dataset"], r["config"])]
     if r["status"] == "ok":
         bucket["ok"].append(r)
     elif r["status"] == "timeout":
@@ -676,7 +734,11 @@ for sub in ("algorithms", "problems"):
     (out / sub).mkdir(parents=True, exist_ok=True)
 
 def write_json(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=False) + "\n", encoding="utf-8")
+    # allow_nan=False: `NaN`/`Infinity` are not valid JSON, so writing them would produce
+    # shards that `jq` and browser JSON.parse reject.
+    path.write_text(
+        json.dumps(payload, indent=2, sort_keys=False, allow_nan=False) + "\n", encoding="utf-8"
+    )
 
 def load_previous(kind: str) -> dict:
     """Load the previously published shards, keyed by their `solver`/`dataset` field.
@@ -756,7 +818,7 @@ for sid, doc in sorted(final_algos.items()):
 
 # --- problems/{dataset}.json ----------------------------------------------
 #
-# A leaderboard lists every solver for that instance, so it cannot be replaced from a TSV
+# A leaderboard lists every solver for that instance, so it cannot be replaced from a run log
 # that measured only some of them: the entries for solvers not in this run are kept and the
 # fresh ones take their place, then the board is re-ranked.
 def rank_key(b: dict):
@@ -793,7 +855,7 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
 
     # Solvers that only timed out never reach the leaderboard: there is nothing to rank.
     board = [b for b in board if b["runs"] > 0]
-    # A dataset absent from this TSV whose every entry belonged to a re-measured solver has an
+    # A dataset absent from this run log whose every entry belonged to a re-measured solver has an
     # empty board. Publishing it would advertise a problem page with no results and list a
     # dataset the replaced shards no longer reference.
     if not board:
@@ -1203,6 +1265,8 @@ if [[ "$ONLY" == "criteriondb" || "$ONLY" == "both" ]]; then
   GIT_BRANCH_NAME="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
   export GIT_BRANCH="$GIT_BRANCH_NAME"
   export MIRROR_CELLS="$STAGE/_mirror.json"
+  # Read by the mirror when it tags each archived run; without it every run is tagged tier="".
+  export BENCH_TIER="${TIER:-}"
   mirror_criteriondb
 fi
 
