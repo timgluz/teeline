@@ -76,6 +76,14 @@ pub fn solve(
 
     let epochs = opts.epochs;
     let mut budget = Budget::new(epochs, opts.stagnation_epochs);
+    // Same horizon problem as PSO's inertia: with the zero left in place the denominator is
+    // `max(1)`, so `g` decays to nothing within a few epochs and the rest of the run is a random
+    // walk at a fixed near-zero gravitational constant.
+    let horizon = if epochs == 0 {
+        HeuristicOptions::default().epochs
+    } else {
+        epochs
+    };
     // Starts true so the first epoch runs, then carries the previous epoch's result into the
     // budget — one decision point for both the cap and the convergence threshold.
     let mut improved = true;
@@ -106,7 +114,7 @@ pub fn solve(
 
         // Decaying gravitational constant
         #[allow(clippy::cast_precision_loss)]
-        let g = G0 * (-(ALPHA * epoch as f64) / epochs.max(1) as f64).exp();
+        let g = G0 * (-(ALPHA * epoch as f64) / horizon as f64).exp();
 
         for i in 0..n_agents {
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
@@ -206,10 +214,26 @@ mod tests {
         let optimal: Vec<usize> = cities.iter().map(|c| c.id).collect();
         let optimal_cost = dm.tour_length(&optimal);
         let opts = HeuristicOptions {
-            epochs: 0,
+            epochs: 5,
             ..HeuristicOptions::default()
         };
-        let result = solve(&problem, &opts, None, Some(&optimal));
+
+        // The seed must be the solver's *initial* best, and that is what the first update carries:
+        // it is sent before any epoch runs. Comparing final costs cannot show this — on an
+        // instance this small the solver may reach the optimum on its own, seed or no seed.
+        let (tx, rx) = mpsc::channel();
+        let result = solve(&problem, &opts, Some(&tx), Some(&optimal));
+        match rx.try_recv() {
+            Ok(ProgressMessage::PathUpdate(route, cost)) => {
+                assert_eq!(
+                    route.route(),
+                    optimal.as_slice(),
+                    "the seeded tour must be the initial best"
+                );
+                assert!((cost - optimal_cost).abs() < 1e-4, "at the seed's cost");
+            }
+            other => panic!("expected the seeded tour as the first update, got {other:?}"),
+        }
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();

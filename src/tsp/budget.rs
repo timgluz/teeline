@@ -18,9 +18,14 @@ pub(crate) struct Budget {
 
 impl Budget {
     /// `epochs` is the hard cap, `limit` the convergence threshold; `0` disables convergence.
+    ///
+    /// `epochs: 0` means no cap, matching what `--epochs` documents ("0 is forever"). Resolving it
+    /// here rather than at each call site is the point of this type: when the meaning was left to
+    /// callers, six of them passed the raw value through, so `--epochs 0` silently ran a single
+    /// epoch and returned a near-seed tour instead of running until convergence.
     pub(crate) fn new(epochs: usize, limit: usize) -> Self {
         Budget {
-            epochs,
+            epochs: if epochs == 0 { usize::MAX } else { epochs },
             limit,
             epoch: 0,
             stale: 0,
@@ -215,12 +220,26 @@ mod tests {
         assert!(!converged);
     }
 
-    /// A cap of zero runs nothing. Callers that treat `epochs: 0` as "no cap" must resolve that
-    /// before constructing the budget, so the boundary is pinned rather than assumed.
+    /// `epochs: 0` is no cap, not zero epochs. Every caller passes the raw `--epochs` value, and
+    /// `--epochs` documents 0 as "forever"; treating it as a cap of zero makes that promise false
+    /// and returns a near-seed tour that still looks like a measurement.
     #[test]
-    fn zero_epoch_cap_stops_immediately() {
-        let mut b = Budget::new(0, 10);
-        assert!(!b.record(true));
-        assert_eq!(b.epoch(), 0);
+    fn zero_epoch_cap_is_unbounded() {
+        let mut b = Budget::new(0, 0);
+        for _ in 0..10_000 {
+            assert!(
+                b.record(true),
+                "an uncapped budget must keep admitting epochs"
+            );
+        }
+        assert_eq!(b.epoch(), 10_000);
+    }
+
+    /// The two controls stay independent: no cap does not mean no convergence stop.
+    #[test]
+    fn zero_epoch_cap_still_honours_the_convergence_limit() {
+        let (epochs, _, converged, _) = run(0, 5, &[false; 100]);
+        assert_eq!(epochs, 5, "the limit, not the absent cap, ends it");
+        assert!(converged);
     }
 }
