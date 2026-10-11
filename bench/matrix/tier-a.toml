@@ -14,13 +14,13 @@ tier = "a"
 # spread rather than a single number.
 runs = 5
 
-# Wall-clock ceiling for a run whose family has no budget below. Per-family budgets are
-# what a result must be read against; this is only the fallback.
-default_timeout_s = 300
-
-# Per-family wall-clock budget in seconds. A result is only comparable within its family,
-# and a gap figure without its budget is uninterpretable — these are published alongside
-# the numbers (see `bench/budgets.json`, which must agree with this table).
+# Per-family wall-clock budget in seconds. A result is only comparable within its family, and a
+# gap figure without its budget is uninterpretable — these are published alongside the numbers
+# (see `bench/budgets.json`, which must agree with this table, and which a test enforces).
+#
+# Every family named in [coverage] needs an entry: there is deliberately no fallback, because a
+# family measured under some default while the published budgets state another number would put
+# an allowance on the page that the data was not taken under.
 [budgets]
 exact = 60
 local = 300

@@ -22,12 +22,16 @@ setup() {
     cat > "$TMPDIR/tier.toml" <<'TOML'
 tier = "test"
 runs = 2
-default_timeout_s = 30
 
+# No default_timeout_s: there is deliberately no fallback, because a family measured under some
+# default while the published budgets state another number would put an allowance on the page
+# that the data was not taken under.
 [budgets]
 constructive = 30
 exact = 5
+local = 30
 meta = 1
+utility = 30
 
 # Every family is named, even the ones this tier measures nowhere: silence about a family is
 # indistinguishable from forgetting it, and the planner refuses the latter. The campaign's
@@ -162,10 +166,13 @@ PY
     cat > "$TMPDIR/tier-configs.toml" <<'TOML'
 tier = "test"
 runs = 1
-default_timeout_s = 5
 
 [budgets]
+constructive = 5
 exact = 5
+local = 5
+meta = 5
+utility = 5
 
 [coverage]
 constructive = []
@@ -199,11 +206,18 @@ TOML
     cat > "$TMPDIR/tier-missing.toml" <<'TOML'
 tier = "test"
 runs = 1
-default_timeout_s = 5
 [budgets]
 constructive = 5
+exact = 5
+local = 5
+meta = 5
+utility = 5
 [coverage]
 constructive = ["small"]
+exact = []
+local = []
+meta = []
+utility = []
 [instances]
 no_such_instance = "small"
 [configs.default]
@@ -245,7 +259,6 @@ TOML
     cat > "$TMPDIR/tier-silent.toml" <<'TOML'
 tier = "test"
 runs = 1
-default_timeout_s = 5
 [budgets]
 constructive = 5
 [coverage]
@@ -312,4 +325,129 @@ print("instances parse")
 PY
     [ "$status" -eq 0 ]
     [[ "$output" == *"instances parse"* ]]
+}
+
+@test "a resumed sweep keeps the measurement its earlier rows carry" {
+    # measured_at is resolved per process, so a resume in a fresh process would otherwise stamp
+    # the same solver's rows with a different time. The publisher compares the whole measurement
+    # and cannot tell a clock tick from a rebuild, so it would refuse the file — which would make
+    # resume, the feature the format exists for, unusable. The earlier block must be reused.
+    bench --runs 1 --solver nn
+    sleep 1.1                       # measured_at has one-second precision
+    bench --runs 2 --solver nn
+
+    [ "$(jq -r .measurement.measured_at "$OUT" | sort -u | wc -l)" -eq 1 ]
+    [ "$(wc -l < "$OUT")" -eq 4 ]   # run 1 from the first sweep, run 2 from the second
+
+    run "$PUBLISH" --dry-run --no-fetch-previous --first-publish \
+        --stage "$TMPDIR/stage-resume" --runs "$OUT"
+    [ "$status" -eq 0 ]
+}
+
+@test "a config naming a solver that does not exist is refused" {
+    # A typo here matches nothing, so those cells are silently never planned and the tier reads as
+    # if it measures something it does not.
+    cat > "$TMPDIR/tier-typo-solver.toml" <<'TOML'
+tier = "test"
+runs = 1
+[budgets]
+exact = 5
+[coverage]
+exact = ["small"]
+[instances]
+burma14 = "small"
+[configs.default]
+[configs.exact]
+solvers = ["branch-bound"]
+args = ["--n_nearest", "100"]
+TOML
+
+    run "$BENCH" "$TMPDIR/tier-typo-solver.toml" --binary "$BIN" --out "$TMPDIR/t1.jsonl" --dry-run
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"branch-bound"* ]]
+}
+
+@test "a config naming an instance that does not exist is refused" {
+    cat > "$TMPDIR/tier-typo-instance.toml" <<'TOML'
+tier = "test"
+runs = 1
+[budgets]
+constructive = 5
+[coverage]
+constructive = ["small"]
+[instances]
+burma14 = "small"
+[configs.default]
+[configs.onlyburma]
+instances = ["burma-14"]
+TOML
+
+    run "$BENCH" "$TMPDIR/tier-typo-instance.toml" --binary "$BIN" --out "$TMPDIR/t2.jsonl" --dry-run
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"burma-14"* ]]
+}
+
+@test "an instance group that no family names is refused" {
+    # Otherwise every instance in that group is never measured, and the tier still looks complete.
+    cat > "$TMPDIR/tier-orphan-group.toml" <<'TOML'
+tier = "test"
+runs = 1
+[budgets]
+constructive = 5
+[coverage]
+constructive = ["small"]
+[instances]
+burma14 = "small"
+gr17 = "smlal"
+[configs.default]
+TOML
+
+    run "$BENCH" "$TMPDIR/tier-orphan-group.toml" --binary "$BIN" --out "$TMPDIR/o.jsonl" --dry-run
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"smlal"* ]]
+}
+
+@test "a family in coverage with no budget is refused" {
+    # It would be measured under some fallback while bench/budgets.json states another number, so
+    # the page would report an allowance the data was not taken under.
+    cat > "$TMPDIR/tier-no-budget.toml" <<'TOML'
+tier = "test"
+runs = 1
+[budgets]
+constructive = 5
+[coverage]
+constructive = ["small"]
+meta = ["small"]
+[instances]
+burma14 = "small"
+[configs.default]
+TOML
+    # `nn` is constructive, which does have a budget...
+    run "$BENCH" "$TMPDIR/tier-no-budget.toml" --binary "$BIN" --out "$TMPDIR/b.jsonl" --dry-run --solver nn
+    [ "$status" -eq 0 ]
+    # ...while `sa` is meta, which [coverage] names but [budgets] does not.
+    run "$BENCH" "$TMPDIR/tier-no-budget.toml" --binary "$BIN" --out "$TMPDIR/b.jsonl" --dry-run --solver sa
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"no [budgets] entry"* ]]
+}
+
+@test "--help describes the options and is not truncated" {
+    run "$BENCH" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"--retry-errors"* ]]
+    [[ "$output" == *"--dry-run"* ]]
+    # The header's rationale must not bleed into the usage text.
+    [[ "$output" != *"Provenance travels"* ]]
+}
+
+@test "a dry run leaves an existing output file untouched" {
+    bench --solver nn
+    printf '{"solver":"nn","dataset":"burma1' >> "$OUT"     # as if killed mid-write
+    local before
+    before="$(wc -c < "$OUT")"
+
+    run bench --solver nn --dry-run
+    [ "$status" -eq 0 ]
+    # --dry-run promises to change nothing, so it must not repair the file either.
+    [ "$(wc -c < "$OUT")" -eq "$before" ]
 }
