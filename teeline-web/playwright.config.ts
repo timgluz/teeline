@@ -15,6 +15,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4321',
     headless: true,
+    // Only on a retry, so a passing run pays nothing; the artifact upload in web-e2e.yml is what
+    // makes a CI-only failure diagnosable after the runner is gone.
+    trace: 'on-first-retry',
   },
   projects: [
     {

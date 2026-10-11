@@ -12,6 +12,17 @@ name: web-e2e
 # works", and the specs it was not running had rotted (webmcp still asserted
 # forms that had moved off the home page).
 
+permissions:
+  # Both jobs only read the repo: the auth job runs against its local Pages stack and D1, the web
+  # job downloads a release asset. Scoped rather than left to the repository default.
+  contents: read
+
+# The web job downloads a component, transpiles it and boots a dev server, so a superseded push
+# should not keep a runner busy.
+concurrency:
+  group: web-e2e-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 "on":
   push:
     branches: [master]
@@ -54,6 +65,8 @@ jobs:
   # leaves the existing check's name and meaning alone.
   e2e-web:
     runs-on: ubuntu-latest
+    # A hung dev server or Playwright run would otherwise sit on the runner for the 6-hour default.
+    timeout-minutes: 20
 
     defaults:
       run:
@@ -72,6 +85,12 @@ jobs:
       # none — without it the solve page never reaches `.status-dot--ready` and the WebMCP tool
       # tests time out. Same source and same transpile step as deploy-web.yml, so this exercises the
       # artifact production actually serves.
+      #
+      # It is the *released* component, not this branch's: a PR touching the Rust solver or the WIT
+      # surface is tested against the last release, and the jobs that cover those changes are the
+      # Rust ones. Testing a freshly built component here would mean cargo-component and jco on this
+      # runner for a suite that exists to catch page regressions. A release without the asset fails
+      # here loudly, which is the intended outcome rather than a silent skip.
       - name: Download WASM component from latest release
         run: |
           mkdir -p ../teeline-wasm/js-bindings
@@ -93,5 +112,15 @@ jobs:
       # simulated), and a developer still runs both with `npm run test:e2e`.
       - name: Run the web e2e suite
         run: npx playwright test --project=chromium
-        env:
-          CI: true
+
+      # Retries are on in CI, so a failure that only reproduces there needs its trace and error
+      # context to be diagnosable after the runner is gone.
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-web
+          path: |
+            teeline-web/playwright-report
+            teeline-web/test-results
+          retention-days: 7
