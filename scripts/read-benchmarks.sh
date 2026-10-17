@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+#
+# read-benchmarks.sh — read benchmark data back from the R2 bucket behind
+# static.tspsolver.com, for humans and for verification after a publish.
+#
+# Usage:
+#   scripts/read-benchmarks.sh index                    # manifest + freshness
+#   scripts/read-benchmarks.sh algorithm lk             # one algorithm shard
+#   scripts/read-benchmarks.sh problem berlin52         # one problem leaderboard
+#   scripts/read-benchmarks.sh snapshot v1.0.0          # a release snapshot's manifest
+#   scripts/read-benchmarks.sh list                     # every key under the prefix
+#   scripts/read-benchmarks.sh check                    # verify every shard parses
+#   scripts/read-benchmarks.sh raw <key>                # fetch any key verbatim
+#
+# Reads the public HTTP endpoint by default (no credentials needed). Pass
+# --via r2 to read through the Cloudflare API (`cf r2 objects get`) instead,
+# which also works for objects not yet behind the custom domain.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+BASE_URL="${BENCH_BASE_URL:-https://static.tspsolver.com}"
+PREFIX="${BENCH_PREFIX:-bench/v2}"
+VIA="http"
+CF_R2_BUCKET="${CF_R2_BUCKET:-}"
+SNAPSHOT_TAG=""
+
+usage() {
+  sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  cat <<'EOF'
+
+Options:
+  --base-url <url>   Base URL (default: https://static.tspsolver.com)
+  --prefix <key>     R2 key prefix (default: bench/v2)
+  --snapshot <tag>   Read a release snapshot instead of the current tree
+  --via <http|r2>    Read over HTTP (default) or via the Cloudflare API
+  --bucket <name>    R2 bucket name, required for --via r2
+  -h, --help         Show this help
+EOF
+}
+
+ARGS=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --base-url) BASE_URL="${2:?}"; shift 2 ;;
+    --prefix) PREFIX="${2:?}"; shift 2 ;;
+    --via) VIA="${2:?}"; shift 2 ;;
+    --bucket) CF_R2_BUCKET="${2:?}"; shift 2 ;;
+    # A snapshot is a complete copy under the same prefix, so every command keeps working
+    # against it by prefixing the key path.
+    --snapshot) SNAPSHOT_TAG="${2:?}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+
+# Validated here as well as in publish: a tag is interpolated into the object key, so `../x`
+# would escape the snapshots prefix. Read-only, but the rule should hold at every entry point.
+if [[ -n "$SNAPSHOT_TAG" && ! "$SNAPSHOT_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "ERROR: invalid snapshot tag '$SNAPSHOT_TAG'." >&2
+  echo "       Use letters, digits, dot, dash or underscore, starting with a letter or digit." >&2
+  exit 2
+fi
+
+if [[ -n "$SNAPSHOT_TAG" ]]; then
+  PREFIX="${PREFIX%/}/snapshots/$SNAPSHOT_TAG"
+fi
+
+if [[ ${#ARGS[@]} -eq 0 ]]; then
+  usage >&2
+  exit 2
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq is required. Install it: apt install jq / brew install jq" >&2
+  exit 1
+fi
+
+fetch() {
+  local key="$1"
+  case "$VIA" in
+    http)
+      curl -fsS --max-time 30 "${BASE_URL%/}/${PREFIX}/${key}"
+      ;;
+    r2)
+      if [[ -z "$CF_R2_BUCKET" ]]; then
+        echo "ERROR: --via r2 requires --bucket <name> (or CF_R2_BUCKET)" >&2
+        return 2
+      fi
+      if ! command -v cf >/dev/null 2>&1; then
+        echo "ERROR: --via r2 requires the 'cf' CLI" >&2
+        return 2
+      fi
+      cf r2 objects get "${PREFIX}/${key}" --bucket-name "$CF_R2_BUCKET"
+      ;;
+    *)
+      echo "ERROR: --via must be http or r2 (got '$VIA')" >&2
+      return 2
+      ;;
+  esac
+}
+
+cmd="${ARGS[0]}"
+
+case "$cmd" in
+  index)
+    body="$(fetch index.json)"
+    echo "$body" | jq -r '
+      "schema_version : \(.schema_version)",
+      "generated_at   : \(.generated_at)",
+      "tier           : \(.tier // "-")",
+      "solvers        : \(.solvers | length)",
+      "problems       : \(.problems | length)",
+      # Deliberately no commit here: solvers are measured at different commits under the
+      # differential cadence, so a single value would be a claim the data cannot support.
+      # Each solver shard states when *it* was measured.
+      "",
+      "per-family budgets (s):",
+      (.budgets // {} | to_entries[] |
+        "  \(.key)\t\(.value.seconds)\t\(if .value.agreed then "" else "provisional" end)"),
+      "",
+      "solvers (provenance is per shard — see: read-benchmarks.sh algorithm <id>):",
+      (.solvers[] | "  \(.id)\t\(.name)\t\(.family // "-")\tconfigs=\(.configs | join(","))")
+    '
+    ;;
+
+  snapshot)
+    # The snapshot's own manifest. Provenance is per shard here too, so there is no single
+    # "measured with" value to print.
+    tag="${ARGS[1]:?snapshot requires a tag, e.g. 'snapshot v1.0.0'}"
+    if [[ ! "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+      echo "ERROR: invalid snapshot tag '$tag'." >&2
+      exit 2
+    fi
+    if [[ -n "$SNAPSHOT_TAG" ]]; then
+      echo "ERROR: 'snapshot' already reads a snapshot; drop one of the two tags" >&2
+      exit 2
+    fi
+    body="$(fetch "snapshots/${tag}/index.json")"
+    # --arg, not splicing: a tag containing a quote or backslash would otherwise break the
+    # program or inject jq of its own.
+    echo "$body" | jq -r --arg tag "$tag" '
+      "snapshot       : \($tag)",
+      "schema_version : \(.schema_version)",
+      "generated_at   : \(.generated_at)",
+      "solvers        : \(.solvers | length)",
+      "problems       : \(.problems | length)",
+      "",
+      "Read inside it with: scripts/read-benchmarks.sh --snapshot \($tag) index"
+    '
+    ;;
+
+  algorithm)
+    id="${ARGS[1]:?algorithm requires a solver id, e.g. 'algorithm lk'}"
+    body="$(fetch "algorithms/${id}.json")"
+    # A separate jq for the provenance lines: mixing bare strings into the table expression
+    # would leave the trailing `| .[]` iterating over them as well as the rows.
+    echo "$body" | jq -r '
+      # `dirty` is tri-state: null means the run log did not record it, which is not the same
+      # as clean — rendering null as false would claim a clean tree nobody verified.
+      "measured at    : \(.measurement.git_commit)\(
+                          if .measurement.dirty == true then " (DIRTY)"
+                          elif .measurement.dirty == null then " (dirty state not recorded)"
+                          else "" end)
+                        source=\(.measurement.git_commit_source // "unknown")\(
+                          if (.measurement.git_commit_source // "") == "publish-time"
+                          then " ⚠ not the measured binary — run log carried no provenance"
+                          else "" end)",
+      "measured when  : \(.measurement.measured_at // "not recorded")",
+      "teeline        : \(.measurement.teeline_version // "not recorded")",
+      "environment    : \(.measurement.environment.os // "?")/\(.measurement.environment.build // "?") rust \(.measurement.environment.rust_version // "not recorded")"
+    '
+    echo ""
+    echo "$body" | jq -r '
+      ([["\(.solver) — \(.results | length) instance(s), configs: \(.configs | join(", "))"],
+        [""],
+        ["instance", "config", "runs", "timeouts", "gap% med", "gap% best", "gap% worst", "wall_s med", "rss kb med"]]
+       + [.results | to_entries[] as $e |
+          $e.value.by_config | to_entries[] |
+          [$e.key, .key, (.value.runs | tostring), (.value.timeouts | tostring),
+           ((.value.gap_pct.median  // "-") | tostring),
+           ((.value.gap_pct.best    // "-") | tostring),
+           ((.value.gap_pct.worst   // "-") | tostring),
+           ((.value.wall_s.median   // "-") | tostring),
+           ((.value.peak_rss_kb.median // "-") | tostring)]]
+      ) | .[] | @tsv' | column -t -s$'\t'
+    ;;
+
+  problem)
+    id="${ARGS[1]:?problem requires a dataset id, e.g. 'problem berlin52'}"
+    body="$(fetch "problems/${id}.json")"
+    echo "$body" | jq -r '
+      ([["\(.dataset): \(.cities // "?") cities, optimal=\(.optimal_cost // "unknown")"],
+        [""],
+        ["#", "solver", "config", "runs", "gap% med", "gap% best", "tour med", "wall_s med"]]
+       + [.leaderboard | to_entries[] |
+         [(.key + 1 | tostring), .value.solver, .value.config, (.value.runs | tostring),
+          ((.value.gap_pct.median // "-") | tostring),
+          ((.value.gap_pct.best   // "-") | tostring),
+          ((.value.tour_cost.median // "-") | tostring),
+          ((.value.wall_s.median  // "-") | tostring)]]
+      ) | .[] | @tsv' | column -t -s$'\t'
+    ;;
+
+  list)
+    if [[ "$VIA" == "r2" ]]; then
+      [[ -n "$CF_R2_BUCKET" ]] || { echo "ERROR: --via r2 requires --bucket" >&2; exit 2; }
+      cf r2 objects list --bucket-name "$CF_R2_BUCKET" --prefix "$PREFIX/" |
+        jq -r '(.result // .objects // .)[]? | (.key // .name)' | sort
+    else
+      # The bucket serves objects but does not expose a listing over the custom
+      # domain, so enumerate from the manifest and probe each key.
+      manifest="$(fetch index.json)"
+      {
+        echo "index.json"
+        echo "$manifest" | jq -r '.solvers[] | "algorithms/\(.id).json"'
+        echo "$manifest" | jq -r '.problems[] | "problems/\(.id).json"'
+      } | while read -r key; do
+        if curl -fsS -o /dev/null --max-time 20 "${BASE_URL%/}/${PREFIX}/${key}"; then
+          printf 'ok    %s\n' "$key"
+        else
+          printf 'MISS  %s\n' "$key"
+        fi
+      done
+    fi
+    ;;
+
+  check)
+    manifest="$(fetch index.json)"
+    failures=0
+    # mapfile, not `for key in $(jq ...)`: unquoted substitution word-splits and
+    # glob-expands, so an id containing whitespace or a `*` would be mangled into
+    # bogus keys and reported as spurious failures.
+    keys=()
+    mapfile -t keys < <(
+      jq -r '.solvers[] | "algorithms/\(.id).json"' <<<"$manifest"
+      jq -r '.problems[] | "problems/\(.id).json"' <<<"$manifest"
+    )
+    for key in "${keys[@]}"; do
+      if ! body="$(fetch "$key" 2>/dev/null)" || ! jq -e '.schema_version' >/dev/null 2>&1 <<<"$body"; then
+        printf 'FAIL  %s\n' "$key"
+        failures=$((failures + 1))
+        continue
+      fi
+      # Provenance lives in the algorithm shards, so a shard that parses but carries no
+      # measurement block is still incomplete. Problem shards are aggregates and carry none.
+      case "$key" in
+        algorithms/*)
+          if jq -e '.measurement.git_commit' >/dev/null 2>&1 <<<"$body"; then
+            printf 'ok    %s  (%s)\n' "$key" "$(jq -r '.measurement.git_commit' <<<"$body")"
+          else
+            printf 'FAIL  %s  (no measurement block)\n' "$key"
+            failures=$((failures + 1))
+          fi
+          ;;
+        *) printf 'ok    %s\n' "$key" ;;
+      esac
+    done
+    echo
+    echo "manifest schema_version: $(jq -r '.schema_version' <<<"$manifest")"
+    echo "generated_at:            $(jq -r '.generated_at' <<<"$manifest")"
+    echo "tier:                    $(jq -r '.tier // "-"' <<<"$manifest")"
+    # No commit is printed: v2 carries provenance per solver shard, and a single value here
+    # would be the dataset-level claim this contract removes. The per-shard check below is
+    # the replacement.
+    if [[ "$failures" -gt 0 ]]; then
+      echo "FAILED: $failures shard(s) missing or unparseable" >&2
+      exit 1
+    fi
+    echo "all shards present and parseable"
+    ;;
+
+  raw)
+    key="${ARGS[1]:?raw requires a key, e.g. 'raw index.json'}"
+    fetch "$key"
+    ;;
+
+  *)
+    echo "unknown command: $cmd" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

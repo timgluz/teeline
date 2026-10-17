@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"eb0f0f2a77f6699d1bea1f4bd8550dcd6b5a1884dc668e341b66f9c8e1c86a2d","doc_type":"spec","document_id":"01a1264b-f469-78c0-b4f8-e4dfbd39a729","new_version":1,"previous_version":null,"slug":"decisions/benchmarking-design","title":"Solver Benchmarking: Design & Specification"}],"created_at":"2026-10-10T14:51:24.260883651Z","id":"01a1264c-1b31-7123-b360-432581cde94a","message":"spec(benchmarks): add solver benchmarking design & specification"},
+  "content_hash": "2a7f4d0e6e891826d6a25f0c3cd89d9743875d5775ff3b53e1faaeba8a59fdf9",
+  "hash_version": 3
+}

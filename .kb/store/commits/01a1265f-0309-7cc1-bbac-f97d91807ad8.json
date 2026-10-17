@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"d21f8e8e86d019132e33f8e0e360fcdec6a9c3de788ad28a874033b9059420e4","doc_type":"task","document_id":"01a12650-9cbe-7021-8707-f061aaa974e4","metadata_changes":[{"field":"blocks","old_value":["tasks/bench-plateau-stop-all-iterative","tasks/bench-platoo-epochs-help-name","tasks/bench-measurement-harness"]},{"field":"status","new_value":"completed","old_value":"active"}],"new_version":3,"previous_commit_id":"01a1265e-f4b0-7be1-a26a-c9a606467efe","previous_hash":"f0b403fcbc0b9a9dc9f9b4e5f813a919d401375d3454269f669a79cd8114346b","previous_version":2,"slug":"tasks/bench-sa-honours-epoch-budget","title":"fix(tsp): make simulated annealing honour its iteration budget"}],"created_at":"2026-10-10T15:12:03.211103885Z","id":"01a1265f-0309-7cc1-bbac-f97d91807ad8","message":"Set tasks/bench-sa-honours-epoch-budget to completed"},
+  "content_hash": "f32b6f83149c79870365b9de418a4051e21c15dd93f5c2293094bd8b5b26a272",
+  "hash_version": 3
+}

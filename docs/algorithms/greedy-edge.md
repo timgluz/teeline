@@ -13,6 +13,7 @@ hasExplainer: true
 | **Alias** | `greedy_edge`, `gec` |
 | **Type** | Heuristic — constructive |
 | **Complexity** | O(n² log n) edge sort + O(n² α(n)) scan |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

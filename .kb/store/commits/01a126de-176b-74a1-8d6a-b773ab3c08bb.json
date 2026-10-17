@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"8f7534691238ec5b7b46b2363620608479dda9bc401b63d0df826ce504b467f9","doc_type":"task","document_id":"01a126de-0734-7a40-b552-369ed5f2960b","new_version":1,"previous_version":null,"slug":"tasks/solver-progress-listener","title":"refactor(tsp): replace progress_tx channels with a listener seam"}],"created_at":"2026-10-10T17:30:51.586930660Z","id":"01a126de-176b-74a1-8d6a-b773ab3c08bb","message":"Register solver progress listener refactor task"},
+  "content_hash": "93f75e3cf9645b6002183bab4db9f042a6261bca142449142e82161da4ad4659",
+  "hash_version": 3
+}

@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::sync::mpsc;
 
+use super::budget::Budget;
 use super::distance_matrix::DistanceMatrix;
 use super::progress::ProgressMessage;
 use super::route::Route;
@@ -31,9 +32,24 @@ pub fn solve(
 
     let mut u = best_route.clone();
     let mut best_distance = distances.tour_length(u.route());
-    let mut done = false;
-    let mut epoch = 0;
-    while !done {
+    // Two translations of the old `update_terminate` convention, kept so that a caller who never asked
+    // for the plateau stop gets exactly the run they got before: `epochs == 0` meant unbounded, and
+    // `epoch > max_epochs` meant a budget of `epochs` admitted `epochs + 1` iterations. Both are
+    // surprising, but changing either here would silently alter those results.
+    //
+    // `epochs == 0` together with `stagnation_epochs == 0` therefore never terminates. That is
+    // pre-existing and left alone: unbounded is what the combination has always meant.
+    let epoch_cap = if opts.epochs == 0 {
+        usize::MAX
+    } else {
+        opts.epochs.saturating_add(1)
+    };
+    let mut budget = Budget::new(epoch_cap, opts.stagnation_epochs);
+    let mut improved = true;
+
+    while budget.record(improved) {
+        let epoch = budget.index();
+        let best_at_epoch_start = best_distance;
         let (local_best, local_distance) = select(distances, &u, &tabu_list);
         if local_distance < best_distance {
             best_route = local_best.clone();
@@ -52,8 +68,15 @@ pub fn solve(
         tabu_list.add(u.clone());
         u = local_best;
 
-        epoch += 1;
-        done = update_terminate(epoch, opts.epochs);
+        improved = best_distance < best_at_epoch_start;
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "tabu: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {
@@ -78,10 +101,6 @@ fn select(distances: &DistanceMatrix, route: &Route, tabu_list: &TabuList) -> (R
     }
 
     (candidate, candidate_distance)
-}
-
-fn update_terminate(epoch: usize, max_epochs: usize) -> bool {
-    max_epochs > 0 && epoch > max_epochs
 }
 
 struct TabuList {

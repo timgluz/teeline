@@ -1,6 +1,7 @@
 ---
 import { getCollection, render } from 'astro:content'
 import DocsLayout from '../../../layouts/DocsLayout.astro'
+import ProblemResults from '../../../components/ProblemResults'
 
 export async function getStaticPaths() {
   const problems = await getCollection('problems')
@@ -29,6 +30,8 @@ const jsonLd = {
   description: `${data.description} — ${data.cities} cities, ${data.edgeWeightType}. TSPLIB95 TSP instance.`,
   identifier: data.id,
   url: canonicalUrl,
+  // Only the raster, and only when there is one: structured-data consumers reject SVG.
+  ...(data.ogImageUrl ? { image: data.ogImageUrl } : {}),
   creator: {
     '@type': 'Organization',
     name: data.creator,
@@ -58,6 +61,14 @@ const jsonLd = {
   currentId={data.id}
   name={data.name}
   currentType="problem"
+  ogImage={data.ogImageUrl}
+  ogImageAlt={data.ogImageUrl
+    ? data.minimapDerived
+      ? `City layout for ${data.name}, derived from its distance matrix`
+      : `Map of ${data.name}`
+    : undefined}
+  ogImageWidth={data.ogImageUrl ? 1200 : undefined}
+  ogImageHeight={data.ogImageUrl ? 630 : undefined}
 >
   <Fragment slot="head">
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
@@ -69,7 +80,34 @@ const jsonLd = {
     <strong>{data.description}</strong>
   </p>
 
+  {data.minimapUrl && (
+    <figure class="mt-0 mb-6">
+      <img
+        src={data.minimapUrl}
+        width="340"
+        height="200"
+        loading="lazy"
+        decoding="async"
+        alt={data.minimapDerived
+          ? `City layout for ${data.name}, derived from its distance matrix`
+          : `Map of ${data.name}`}
+      />
+      {data.minimapDerived && (
+        <figcaption class="mt-2 text-xs text-text-dim">
+          Layout derived from the distance matrix — this instance publishes no coordinates.
+        </figcaption>
+      )}
+    </figure>
+  )}
+
   <Content />
+
+  <ProblemResults
+    id={data.id}
+    dev={import.meta.env.DEV}
+    optimalCost={data.optimalCost}
+    client:visible
+  />
 
   <table class="mt-6">
     <thead>

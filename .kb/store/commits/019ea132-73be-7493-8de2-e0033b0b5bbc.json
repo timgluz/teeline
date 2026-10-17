@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"976e58150dfd23b284a73571d8436b780d327bab786755080a5eb7bc1551dea0","doc_type":"task","document_id":"019e5085-8117-7f52-b375-3e528ff93520","metadata_changes":[{"field":"status","new_value":"completed","old_value":"active"}],"new_version":2,"previous_commit_id":"019e5086-1cd9-7bb1-9b65-fbb20e89ad6f","previous_hash":"7d8c7ffc07f69a93dcf76040b4a622d18b7c99e3a4ea692f33fc0fab8ac9322b","previous_version":1,"slug":"tasks/gh-81-pipeline-config","title":"feat: per-stage option overrides via TOML config file for pipeline"}],"created_at":"2026-06-07T08:28:18.665470703Z","id":"019ea132-73be-7493-8de2-e0033b0b5bbc","message":"Close stale task gh-81: PR #83 merged 2026-05-22"},
+  "content_hash": "e361257c5a40d354db8b433a58317dd73caf149a7bea1e2c68d2f20030eb7a87",
+  "hash_version": 3
+}

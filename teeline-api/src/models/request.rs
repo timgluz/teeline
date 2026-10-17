@@ -6,6 +6,13 @@ use utoipa::ToSchema;
 pub struct HeuristicConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub epochs: Option<usize>,
+    /// Stop after this many consecutive epochs without improvement; `0` means never stop early (the
+    /// epoch cap still applies). Defaults to 0 (disabled), so omitting it changes nothing. Honoured by
+    /// the solvers that read a `heuristic` block — `ga`, `pso`, `cs`, `fpa`, `gsa`, `sa`, `aco`,
+    /// `tabu`; solvers without one accept and ignore it. `som` and `fourier` take their own
+    /// `stagnation_epochs` in `SomConfig` and `FourierConfig` (fourier counts harmonic stages).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stagnation_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub platoo_epochs: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -137,6 +144,9 @@ pub struct SomConfig {
     pub radius_fraction: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub neuron_multiplier: Option<usize>,
+    /// Consecutive non-improving epochs before stopping early; 0 = never stop early.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stagnation_epochs: Option<usize>,
 }
 
 /// Fourier constructive solver. Mirrors `FourierOptions` (f64 fields match the lib).
@@ -154,6 +164,10 @@ pub struct FourierConfig {
     pub lambda_decay: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lr: Option<f64>,
+    /// Consecutive non-improving stages before stopping early; 0 = never stop early. Counts harmonic
+    /// stages rather than epochs, so a value at or above `k_max - 1` cannot fire.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stagnation_epochs: Option<usize>,
 }
 
 /// Per-solver optional configuration. Pass only the field matching your chosen solver.
@@ -313,6 +327,7 @@ mod tests {
             sa: Some(SaConfig {
                 heuristic: Some(HeuristicConfig {
                     epochs: Some(5000),
+                    stagnation_epochs: None,
                     platoo_epochs: None,
                     n_nearest: None,
                 }),
@@ -377,6 +392,7 @@ mod tests {
                 sa: Some(SaConfig {
                     heuristic: Some(HeuristicConfig {
                         epochs: Some(1000),
+                        stagnation_epochs: None,
                         platoo_epochs: None,
                         n_nearest: None,
                     }),
@@ -410,6 +426,7 @@ mod tests {
                 aco: Some(AcoConfig {
                     heuristic: Some(HeuristicConfig {
                         epochs: Some(300),
+                        stagnation_epochs: None,
                         platoo_epochs: None,
                         n_nearest: None,
                     }),

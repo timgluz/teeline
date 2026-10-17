@@ -26,7 +26,11 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   nn: {
     id: 'nn',
     name: 'Nearest Neighbor',
-    complexity: 'O(n log n) with KD-tree',
+    // Was 'O(n log n) with KD-tree', which was never true of the code path in use: the
+    // greedy step scans the distance-matrix row, so it is O(n) per city / O(n^2) per tour.
+    // Kept in sync with the Complexity row on docs/algorithms/nearest-neighbor.md, which
+    // nav-data.test.ts enforces.
+    complexity: 'O(n²) worst case',
   },
   fourier: {
     id: 'fourier',

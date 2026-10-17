@@ -74,6 +74,15 @@ export default defineConfig({
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/tsplib/, '/tsplib'),
         },
+        // Published benchmark shards (bench/v2/*): same origin and the same reason as
+        // /tsplib above, in its own entry so a failure in one is legible as a failure
+        // in that one. Without it, dev renders no benchmarks at all and reads as a bug
+        // in the component rather than a missing proxy.
+        '/bench': {
+          target: 'https://static.tspsolver.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/bench/, '/bench'),
+        },
       },
     },
   },

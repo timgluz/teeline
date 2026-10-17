@@ -13,6 +13,7 @@ hasExplainer: true
 | **Alias** | `bhk`, `bellman_karp` |
 | **Type** | Exact |
 | **Complexity** | O(2ⁿ · n²) time, O(2ⁿ · n) space |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

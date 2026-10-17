@@ -1,0 +1,11 @@
+{
+  "$comment": "Wall-clock budget in seconds per solver family, published with the benchmark data so a gap figure is never shown without the allowance it was measured under (decisions/benchmarking-design sections 3.2 and 4). These MUST match the [budgets] table of the tier the numbers came from — currently bench/matrix/tier-a.toml — or a page would state a budget the data was not measured under. tests/e2e/bench-matrix.bats fails if the two drift. 'agreed' records whether a figure is fixed by a decision or is still a provisional working value: only meta is settled (decision 10, 300s); exact, local, constructive and utility come from the Tier A plan and are not yet ratified by a decision.",
+  "schema_version": 1,
+  "budgets": {
+    "constructive": { "seconds": 30, "agreed": false },
+    "exact": { "seconds": 60, "agreed": false },
+    "local": { "seconds": 300, "agreed": false },
+    "meta": { "seconds": 300, "agreed": true },
+    "utility": { "seconds": 60, "agreed": false }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"b95eeb9c17dbbab1548c60be4dd0dd5e0f433968991099beb5e548253bb675a3","doc_type":"task","document_id":"019fe0ad-f5e7-7612-a803-b906e1dc94ae","new_version":1,"previous_version":null,"slug":"tasks/gh394-clarke-wright-savings","title":"GH #394: Clarke-Wright savings algorithm (cw) TSP solver"}],"created_at":"2026-08-08T09:22:17.596479268Z","id":"019fe0ae-283e-79d0-8452-4e1de62e6097","message":"Add GH #394 (Clarke-Wright savings solver) task — completed\n\nImplements [[tasks/gh394-clarke-wright-savings]]\n\nPR #402 (open). Follow-ups: #403 docs, #404 teeline-web nav, #405 WASM\nredeploy, #406 teeline-api verify, #407 explainer (deferred)."},
+  "content_hash": "7c49435017222d1fec9f54405aba68c7678f4f42862c48d78fc0d03721a08b27",
+  "hash_version": 3
+}

@@ -672,7 +672,10 @@ mod tests {
                 coords: [0.0, 1.0],
             },
         ];
-        let dm = distance_matrix::from_cities(&pts);
+        // Plain Euclidean: on a unit square the sides and both diagonals all round to 1 under
+        // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
+        // property under test — that LK removes the crossing — would be untestable.
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 3);
         let tour = vec![0usize, 1, 3, 2]; // crossed
         let max_id = 3;
@@ -726,7 +729,10 @@ mod tests {
                 coords: [0.0, 1.0],
             },
         ];
-        let dm = distance_matrix::from_cities(&pts);
+        // Plain Euclidean: on a unit square the sides and both diagonals all round to 1 under
+        // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
+        // property under test — that LK removes the crossing — would be untestable.
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 3);
         let mut tour = vec![0usize, 1, 3, 2];
         let mut pos = make_pos(&tour);
@@ -750,11 +756,15 @@ mod tests {
         assert!(is_single_cycle(tour[0], &new_next, 4));
     }
 
-    // ── depth-2 gadget: a move depth-1 cannot find ───────────────────────────
+    // ── hexagon fixture ──────────────────────────────────────────────────────
     //
     // 6 cities on a unit circle at 0°,60°,120°,180°,240°,300°.
-    // Tour [0,2,4,1,3,5] is 2-opt-optimal but a depth-2 LK move improves it.
-    // Verified by brute-force during development.
+    //
+    // The tour [0,2,4,1,3,5] used below is *not* 2-opt-optimal: a hexagon has exactly two such
+    // tours, the two perimeter traversals, costing 6.00 against its 9.93. An earlier comment
+    // claimed otherwise, and a "return early if a move is found" escape hid it — so the depth-1
+    // test uses the perimeter tour instead, and the test below asserts a valid improving chain
+    // rather than anything depth-2-specific.
 
     fn hexagon_pts() -> Vec<KDPoint> {
         use std::f32::consts::PI;
@@ -769,31 +779,34 @@ mod tests {
             .collect()
     }
 
+    /// LK at depth 1 must not "improve" a tour that is already 2-opt-optimal.
+    ///
+    /// The gadget this replaces used `[0, 2, 4, 1, 3, 5]` and claimed it was 2-opt-local. It is
+    /// not: a hexagon has exactly two 2-opt-optimal tours, the two perimeter traversals, and that
+    /// tour costs 9.93 against their 6.00. Depth-1 rightly improves it, and the test only passed
+    /// because it returned early whenever a move was found.
     #[test]
-    fn find_lk_move_depth1_cannot_improve_gadget() {
+    fn find_lk_move_depth1_finds_nothing_on_a_two_opt_optimal_tour() {
         let pts = hexagon_pts();
-        let dm = distance_matrix::from_cities(&pts);
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 5);
-        // This tour is constructed to be 2-opt-local but not LK-locally optimal
-        let tour = vec![0usize, 2, 4, 1, 3, 5];
+        let tour = vec![0usize, 1, 2, 3, 4, 5];
         let max_id = 5;
         let (next, prev) = flat_to_next_prev(&tour, max_id);
         let city_ids: Vec<usize> = tour.clone();
+
         let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &city_ids);
-        // depth-1 should find no improvement (tour is 2-opt optimal)
-        // Note: if this assertion fails, the gadget tour needs adjustment
-        if chain.is_some() {
-            // The tour may not be 2-opt-optimal for all configurations; skip rather than fail
-            // The important test is depth-2 finds something depth-1 doesn't
-            return;
-        }
-        assert!(chain.is_none(), "depth-1 should not improve this tour");
+
+        assert!(
+            chain.is_none(),
+            "depth-1 must not improve a 2-opt-optimal tour"
+        );
     }
 
     #[test]
-    fn find_lk_move_depth2_improves_gadget() {
+    fn find_lk_move_finds_an_improving_chain_that_stays_a_single_cycle() {
         let pts = hexagon_pts();
-        let dm = distance_matrix::from_cities(&pts);
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let candidates = build_candidates(&pts, 5);
         let tour = vec![0usize, 2, 4, 1, 3, 5];
         let max_id = 5;
@@ -803,20 +816,19 @@ mod tests {
         let (next, prev) = flat_to_next_prev(&tour_mut, max_id);
         let city_ids: Vec<usize> = tour_mut.clone();
         // Try depth-2; if it finds a move, verify improvement
-        if let Some(chain) = find_lk_move(&next, &prev, &dm, &candidates, 2, &city_ids) {
-            apply_lk_chain(&chain, &mut tour_mut, &mut pos);
-            let after = tour_distance(&tour_mut, &dm);
-            assert!(
-                after < before,
-                "depth-2 move must improve tour: before={before} after={after}"
-            );
-            let (new_next, _) = flat_to_next_prev(&tour_mut, max_id);
-            assert!(
-                is_single_cycle(tour_mut[0], &new_next, 6),
-                "result must be a single cycle"
-            );
-        }
-        // If no depth-2 move found, the tour may already be LK-optimal — not a failure
+        let chain = find_lk_move(&next, &prev, &dm, &candidates, 2, &city_ids)
+            .expect("this tour is not 2-opt-optimal, so an improving move must exist");
+        apply_lk_chain(&chain, &mut tour_mut, &mut pos);
+        let after = tour_distance(&tour_mut, &dm);
+        assert!(
+            after < before,
+            "depth-2 move must improve tour: before={before} after={after}"
+        );
+        let (new_next, _) = flat_to_next_prev(&tour_mut, max_id);
+        assert!(
+            is_single_cycle(tour_mut[0], &new_next, 6),
+            "result must be a single cycle"
+        );
     }
 
     // ── lk_pass ───────────────────────────────────────────────────────────────
@@ -841,7 +853,10 @@ mod tests {
                 coords: [0.0, 1.0],
             },
         ];
-        let dm = distance_matrix::from_cities(&pts);
+        // Plain Euclidean: on a unit square the sides and both diagonals all round to 1 under
+        // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
+        // property under test — that LK removes the crossing — would be untestable.
+        let dm = distance_matrix::from_cities_unrounded(&pts);
         let cands = build_candidates(&pts, 3);
         let mut tour = vec![0usize, 1, 3, 2];
         let mut pos = make_pos(&tour);

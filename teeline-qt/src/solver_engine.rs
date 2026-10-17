@@ -477,6 +477,7 @@ fn build_heuristic(v: &serde_json::Value) -> HeuristicOptions {
     let def = HeuristicOptions::default();
     HeuristicOptions {
         epochs: get_usize(v, "epochs", def.epochs),
+        stagnation_epochs: get_usize(v, "stagnation_epochs", def.stagnation_epochs),
         platoo_epochs: get_usize(v, "platoo_epochs", def.platoo_epochs),
         n_nearest: get_usize(v, "n_nearest", def.n_nearest),
         verbose: false,

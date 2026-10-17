@@ -6,9 +6,8 @@ use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings};
 use teeline::tsp::tsplib;
 use teeline::tsp::{
-    AcoOptions, AppOptions, CSOptions, DistanceType, FPAOptions, FourierOptions, GAOptions,
-    HeuristicOptions, LKOptions, SAOptions, SOMOptions, Solvers, TspProblem, find_solver,
-    solve_problem,
+    AcoOptions, AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
+    LKOptions, SAOptions, SOMOptions, Solvers, TspProblem, find_solver, solve_problem,
 };
 
 use super::TspSolverService;
@@ -31,17 +30,10 @@ pub struct TspService;
 fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicOptions {
     HeuristicOptions {
         epochs: h.epochs.unwrap_or(base.epochs),
+        stagnation_epochs: h.stagnation_epochs.unwrap_or(base.stagnation_epochs),
         platoo_epochs: h.platoo_epochs.unwrap_or(base.platoo_epochs),
         n_nearest: h.n_nearest.unwrap_or(base.n_nearest),
         verbose: false,
-    }
-}
-
-fn distance_type_str(dt: DistanceType) -> &'static str {
-    match dt {
-        DistanceType::Euc2D => "EUC_2D",
-        DistanceType::Explicit => "EXPLICIT",
-        DistanceType::Geo => "GEO",
     }
 }
 
@@ -203,6 +195,7 @@ fn make_app_options(
             lambda_decay: c.lambda_decay.unwrap_or(d.lambda_decay),
             lr: c.lr.unwrap_or(d.lr),
             epochs: c.epochs.unwrap_or(d.epochs),
+            stagnation_epochs: c.stagnation_epochs.unwrap_or(d.stagnation_epochs),
         }
     });
     if let Some(ref fr) = fourier {
@@ -216,6 +209,7 @@ fn make_app_options(
             learning_rate: c.learning_rate.unwrap_or(d.learning_rate),
             radius_fraction: c.radius_fraction.unwrap_or(d.radius_fraction),
             neuron_multiplier: c.neuron_multiplier.unwrap_or(d.neuron_multiplier),
+            stagnation_epochs: c.stagnation_epochs.unwrap_or(d.stagnation_epochs),
         }
     });
     if let Some(ref sm) = som {
@@ -258,7 +252,9 @@ impl TspSolverService for TspService {
             Ok(ParseResponse {
                 name: data.name.clone(),
                 comment: data.comment.clone(),
-                distance_type: distance_type_str(data.distance_type).to_string(),
+                // `as_str` is the shared spelling definition; a local wrapper would only
+                // be another thing to keep in sync when a variant is added.
+                distance_type: data.distance_type.as_str().to_string(),
                 cities,
             })
         } else {
@@ -860,5 +856,31 @@ EOF
             ..Default::default()
         };
         assert!(fpa.validate().is_err());
+    }
+
+    /// The mapping must carry `stagnation_epochs` through and keep the solver's own default when the
+    /// caller omits it — a dropped field or a wrong base would silently disable the feature.
+    #[test]
+    fn map_heuristic_onto_carries_stagnation_epochs() {
+        // Deliberately not the generic default: if the mapping took the wrong base or hard-coded the
+        // default, both assertions would still pass with an all-500 setup.
+        let mut base = SAOptions::default().heuristic;
+        base.stagnation_epochs = 123;
+        let defaulted = HeuristicConfig::default();
+        assert_eq!(
+            map_heuristic_onto(&defaulted, base.clone()).stagnation_epochs,
+            base.stagnation_epochs,
+            "omitting the field must preserve the solver-specific default"
+        );
+
+        let requested = HeuristicConfig {
+            stagnation_epochs: Some(7),
+            ..HeuristicConfig::default()
+        };
+        assert_eq!(
+            map_heuristic_onto(&requested, base).stagnation_epochs,
+            7,
+            "an explicit value must reach the solver options"
+        );
     }
 }

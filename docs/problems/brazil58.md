@@ -5,14 +5,13 @@ description: "58 cities in Brazil (Ferreira)"
 cities: 58
 sizeGroup: "small"
 edgeWeightType: "EXPLICIT"
-optimalCost: null
+optimalCost: 25395
 dataUrl: "https://static.tspsolver.com/tsplib/brazil58.tsp"
+minimapUrl: "https://static.tspsolver.com/minimaps/v1/brazil58.svg"
+ogImageUrl: "https://static.tspsolver.com/minimaps/v1/og/brazil58.png"
+minimapDerived: true
 source: "TSPLIB95"
 sourceUrl: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 creator: "TSPLIB — Gerhard Reinelt, University of Heidelberg"
 license: "https://comopt.ifi.uni-heidelberg.de/software/TSPLIB95/"
 ---
-
-
-
-58 cities in Brazil (Ferreira)

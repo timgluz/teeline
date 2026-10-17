@@ -2,6 +2,7 @@ use std::sync::mpsc;
 
 use rand::RngExt;
 
+use super::budget::Budget;
 use super::probability::levy_step;
 use super::progress::ProgressMessage;
 use super::route::Route;
@@ -74,7 +75,14 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&best), best_cost));
     }
 
-    for epoch in 0..opts.heuristic.epochs {
+    let mut budget = Budget::new(opts.heuristic.epochs, opts.heuristic.stagnation_epochs);
+    // Starts true so the first epoch runs, then carries the previous epoch's result into the
+    // budget — one decision point for both the cap and the convergence threshold.
+    let mut improved = true;
+
+    while budget.record(improved) {
+        let epoch = budget.index();
+        let best_at_epoch_start = best_cost;
         for cuckoo_idx in 0..n_nests {
             let levy = levy_step(&mut rng).abs();
             #[allow(
@@ -127,6 +135,18 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
         }
+
+        // A single comparison for the epoch, rather than a flag per improvement site: a solver
+        // with several such sites would otherwise assign the same value more than once.
+        improved = best_cost < best_at_epoch_start;
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "CS: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {
@@ -138,6 +158,9 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc;
+
+    use crate::tsp::progress::ProgressMessage;
     use crate::tsp::{CSOptions, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     #[test]
@@ -154,13 +177,30 @@ mod tests {
         let optimal_cost = dm.tour_length(&optimal);
         let opts = CSOptions {
             heuristic: HeuristicOptions {
-                epochs: 0,
+                epochs: 5,
                 ..HeuristicOptions::default()
             },
             ..CSOptions::default()
         };
         let problem = TspProblem::new(cities.clone(), dm);
-        let result = solve(&problem, &opts, None, Some(&optimal));
+
+        // The seed must be the solver's *initial* best, and that is what the first update carries:
+        // it is sent before any epoch runs. Comparing final costs cannot show this — on an
+        // instance this small the solver may reach the optimum on its own, seed or no seed.
+        let (tx, rx) = mpsc::channel();
+        let result = solve(&problem, &opts, Some(&tx), Some(&optimal));
+        match rx.try_recv() {
+            Ok(ProgressMessage::PathUpdate(route, cost)) => {
+                assert_eq!(
+                    route.route(),
+                    optimal.as_slice(),
+                    "the seeded tour must be the initial best"
+                );
+                assert!((cost - optimal_cost).abs() < 1e-4, "at the seed's cost");
+            }
+            other => panic!("expected the seeded tour as the first update, got {other:?}"),
+        }
+
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();

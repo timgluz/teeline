@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"c72aecae8f7196e7d98d7a2c98bad2268d8c0e5509ee89bc11769f3107588746","doc_type":"task","document_id":"01a12651-55eb-7e41-9ab3-08235b16bfab","metadata_changes":[{"field":"blocks","old_value":["tasks/bench-measurement-harness"]},{"field":"status","new_value":"completed","old_value":"draft"}],"new_version":3,"previous_commit_id":"01a1269a-8a53-7072-9b52-331c15c4c80d","previous_hash":"7de050217a723642a705c06a91f5f07f663d2ed2d464be9fb0d324505534842c","previous_version":2,"slug":"tasks/bench-platoo-epochs-help-name","title":"fix(cli): correct --platoo_epochs help text and naming"}],"created_at":"2026-10-10T16:17:08.212062345Z","id":"01a1269a-98ae-7bc2-9a47-3686fe106abf","message":"Mark plateau flag task completed"},
+  "content_hash": "394d06dade55d5a8d848b614c22688371ba35448957bc9885b699e7412e9073d",
+  "hash_version": 3
+}

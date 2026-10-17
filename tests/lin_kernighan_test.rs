@@ -33,6 +33,7 @@ fn lk_opts_fast() -> LKOptions {
     LKOptions {
         heuristic: HeuristicOptions {
             epochs: 5,
+            stagnation_epochs: 500,
             platoo_epochs: 5,
             n_nearest: 5,
             verbose: false,
@@ -114,6 +115,7 @@ fn lk_solve_quality_berlin52() {
     let opts = LKOptions {
         heuristic: HeuristicOptions {
             epochs: 200,
+            stagnation_epochs: 500,
             platoo_epochs: 20,
             n_nearest: 5,
             verbose: false,

@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"dc501b5c31e6cbfc7101a2061d542ba48f7a85364b65c7d2389e237ec2d8373b","doc_type":"task","document_id":"019e5f37-2412-79f1-9f8b-4c8d8b9b6319","new_version":1,"previous_version":null,"slug":"tasks/gh-95-kdtree-knn-fix","title":"fix: k-NN correctness and performance in kdtree (issue #95)"}],"created_at":"2026-05-25T12:58:33.199448398Z","id":"019e5f37-31a0-7af2-8fdd-d471335f82f6","message":"Add task for issue #95: kdtree k-NN correctness and performance fix"},
+  "content_hash": "7bfe3e7f89160b89c50f74bb74465ecad4f6cf2880701e4589993e0bcc33f56f",
+  "hash_version": 3
+}

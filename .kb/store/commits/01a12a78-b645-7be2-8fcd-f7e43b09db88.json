@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"e4f85e7a878068b4496881f8fc5caef9b7cccf8bab116222996386ec8460e0dd","doc_type":"task","document_id":"01a12a78-a413-7033-9744-876e15d07cd7","new_version":1,"previous_version":null,"slug":"tasks/migrate-jaq-for-toml-queries","title":"chore(tests): use jaq for TOML queries in shell and BATS, and wire the tooling into CI"}],"created_at":"2026-10-11T10:18:36.444671550Z","id":"01a12a78-b645-7be2-8fcd-f7e43b09db88","message":"Add follow-up task: migrate TOML queries in shell/BATS to jaq"},
+  "content_hash": "be71109e6fa189fd57b4b73777254dff51c9f6d210ffcca6d3c9f7a87eb7fac8",
+  "hash_version": 3
+}

@@ -1,3 +1,4 @@
 [tools]
+"github:gitkb/gitkb-releases" = "latest"
 hurl = "8.0.1"
 task = "3.51.1"

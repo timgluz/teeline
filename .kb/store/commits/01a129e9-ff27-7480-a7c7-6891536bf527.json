@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"b72434831d8ec7b1cc5d5924bbe4740c99e93847bc7611cb8831aa716d15dcef","doc_type":"task","document_id":"01a129e9-f1ca-7460-820b-95cd828a489e","new_version":1,"previous_version":null,"slug":"tasks/ci-cli-e2e-bats-workflow","title":"ci(bench): dedicated GitHub Action for the CLI e2e (BATS) suite"}],"created_at":"2026-10-11T07:42:43.448476935Z","id":"01a129e9-ff27-7480-a7c7-6891536bf527","message":"Add follow-up task: dedicated CLI e2e (BATS) workflow"},
+  "content_hash": "aa99cf9858e1a26682dad95ee5aeeb6e5564a7a6b9911557fefc7f5b32e8fba3",
+  "hash_version": 3
+}

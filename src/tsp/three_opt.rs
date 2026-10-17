@@ -235,7 +235,9 @@ mod tests {
     use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn build_dm(cities: &[kdtree::KDPoint]) -> DistanceMatrix {
-        distance_matrix::from_cities(cities)
+        // Plain Euclidean: this fixture is for tour mechanics, and under TSPLIB's rounded EUC_2D
+        // every one of its pairwise distances is 1, so every tour would cost the same.
+        distance_matrix::from_cities_unrounded(cities)
     }
 
     fn make_problem(cities: Vec<kdtree::KDPoint>) -> TspProblem {

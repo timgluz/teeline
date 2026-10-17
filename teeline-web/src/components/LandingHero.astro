@@ -8,7 +8,8 @@ import { berlin52 } from '../lib/hero-cities'
     <svg class="h-full w-full" viewBox="0 0 1800 1200" preserveAspectRatio="xMidYMid slice" fill="none" stroke="currentColor" stroke-width="3">
       {berlin52.map((c, i) => {
         const next = berlin52[(i + 1) % berlin52.length]
-        return <line key={i} x1={c.x} y1={c.y} x2={next.x} y2={next.y} />
+        // No `key`: Astro renders this to HTML, so there is no keyed diffing to key for.
+        return <line x1={c.x} y1={c.y} x2={next.x} y2={next.y} />
       })}
     </svg>
   </div>

@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"b67ac845f7ec92af3d950afcd95c3558312b39b8a1f982499880ef119d13b941","doc_type":"adr","document_id":"01a004be-9c4d-7290-b46c-3542a7931570","new_version":1,"previous_version":null,"slug":"decisions/adr-007-webauthn-auth","title":"ADR-007: Replace Clerk with WebAuthn (passkeys) + self-serve API keys"}],"created_at":"2026-08-15T09:26:57.754313892Z","id":"01a004be-f216-74a3-9b77-58265ff82e60","message":"ADR-007: replace Clerk with WebAuthn + self-serve API keys"},
+  "content_hash": "d3979f1a7b330d0f8df7f373d2c16b6254d4a74926fe626eeaec3183650c7f7e",
+  "hash_version": 3
+}

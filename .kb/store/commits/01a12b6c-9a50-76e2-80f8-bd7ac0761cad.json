@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"f484327512d6fd069e3ebdeac0fd9857c8db560b62e5befb34f7a2d95a8c181a","doc_type":"task","document_id":"01a12b6c-7972-75a3-8d90-7b09d57a8172","new_version":1,"previous_version":null,"slug":"tasks/index-benchmark-markers","title":"feat(web): mark instances and solvers that have published results on the index pages"}],"created_at":"2026-10-11T14:45:00.077526163Z","id":"01a12b6c-9a50-76e2-80f8-bd7ac0761cad","message":"Queue markers for the instances and solvers that have published results\n\nThe index pages list 111 instances and 21 solvers without saying which have results,\nwhile /bench/v2/ publishes 12 instances and 22 solver shards. Records the design: the\nmanifest is the only honest source (bench/matrix/tier-a.toml is intent, and a shard can\nanswer 200 after being retired), the pages stay server-rendered, and one script per page\nbadges the rows the manifest names — with no badges at all if it cannot be read."},
+  "content_hash": "cb09ff827e8c1bb9dd4eb785678e4235a42edce0a52884f1398efcebe73e3155",
+  "hash_version": 3
+}

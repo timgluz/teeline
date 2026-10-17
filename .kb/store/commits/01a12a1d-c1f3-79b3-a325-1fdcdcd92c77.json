@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"9ed6bf497ecbd01e4d84933fbd232e05fa419252ad22fb0251bd87c364b8de6e","doc_type":"task","document_id":"01a12651-5604-74c1-9e04-1a8d386a2ee9","metadata_changes":[{"field":"blocks","old_value":["tasks/bench-tier-a-campaign"]},{"field":"status","new_value":"completed","old_value":"draft"}],"new_version":5,"previous_commit_id":"01a12a1d-c0c1-7fe3-9af6-c8dfdb7a67ce","previous_hash":"ae365f2d9b10c9f560b41e3826b0c1cf82b6f507c08aebcf0a3b2015b46993b4","previous_version":4,"slug":"tasks/bench-measurement-harness","title":"feat(bench): bench-matrix.sh harness with tier config and resume"}],"created_at":"2026-10-11T08:39:15.630058621Z","id":"01a12a1d-c1f3-79b3-a325-1fdcdcd92c77","message":"Mark the measurement harness complete"},
+  "content_hash": "6c9834b1c5045725c49b794b6071ad5b2fb267cd12524ccfefe440d1bf8129dc",
+  "hash_version": 3
+}

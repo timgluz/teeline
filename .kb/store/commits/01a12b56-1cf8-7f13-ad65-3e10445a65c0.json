@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"d1126e4a907fa56a939dc89945dbd3553f5afabb7e03cf8a118f3f572b27ed3b","doc_type":"task","document_id":"01a12b55-d379-7202-be99-170112c8918d","new_version":1,"previous_version":null,"slug":"tasks/problem-minimaps-all-instances","title":"feat(web): a minimap on every problem page, not only the coordinate-bearing instances"}],"created_at":"2026-10-11T14:20:26.170401880Z","id":"01a12b56-1cf8-7f13-ad65-3e10445a65c0","message":"task(web): plan a minimap for every problem page\n\nCovers the 17 EXPLICIT pages with no image: 5 publish DISPLAY_DATA_SECTION the\ngenerator never reads, and 12 publish no coordinates, so their layout has to be\nderived from the distance matrix and labelled as derived. Also plans the\nlarge-instance page weight (pla85900 is 6.2 MB of inline SVG)."},
+  "content_hash": "ebbb5fc82bb6c41226738d3025acf884c1ec35f377f7c0c037bcef9c1f03bbf7",
+  "hash_version": 3
+}

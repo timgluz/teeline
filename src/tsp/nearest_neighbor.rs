@@ -7,19 +7,18 @@ use super::{HeuristicOptions, Solution, TspProblem};
 
 pub fn solve(
     problem: &TspProblem,
-    opts: &HeuristicOptions,
+    // `nn` reads nothing from HeuristicOptions; `n_nearest` is a candidate-list limit for
+    // solvers that trade exactness for speed. Kept for the uniform solver signature.
+    _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _init_tour: Option<&[usize]>,
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
-    tracing::info!(
-        n_nearest = opts.n_nearest,
-        cities = cities.len(),
-        "NN starting"
-    );
+    // Not logging `opts.n_nearest`: it has no effect here, and naming it invites
+    // misattribution when debugging reproducibility.
+    tracing::info!(cities = cities.len(), "NN starting");
 
-    let n_nearest = opts.n_nearest;
     let cities_table: HashMap<usize, _> = cities.iter().map(|c| (c.id, *c)).collect();
 
     let mut unvisited: HashSet<usize> = cities.iter().map(|c| c.id).collect();
@@ -41,26 +40,18 @@ pub fn solve(
             let _ = tx.send(ProgressMessage::CityChange(current_id));
         }
 
-        let frontier = distances.nearest(current_city, n_nearest);
-        let next_id = frontier
-            .nearest()
-            .iter()
-            .find(|item| unvisited.contains(&item.point.id))
-            .map(|item| item.point.id)
-            .unwrap_or_else(|| {
-                *unvisited
-                    .iter()
-                    .min_by(|&&a, &&b| {
-                        let da = distances
-                            .distance_between(current_id, a)
-                            .unwrap_or(f32::MAX);
-                        let db = distances
-                            .distance_between(current_id, b)
-                            .unwrap_or(f32::MAX);
-                        da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
-                    })
-                    .expect("unvisited is non-empty")
-            });
+        // No `n_nearest` here: greedy means the nearest unvisited, and a k-limited
+        // candidate set silently produced worse tours.
+        //
+        // `expect` rather than `break`: with `unvisited` non-empty and `current_city` from
+        // the matrix's own cities, `None` means an invariant broke, and a quiet break would
+        // return a truncated tour as if it were a solution.
+        let nearest = distances
+            .nearest_unvisited(current_city, |id| {
+                id != current_id && unvisited.contains(&id)
+            })
+            .expect("unvisited is non-empty and current_city came from the matrix's own cities");
+        let next_id = nearest.point.id;
 
         path.push(next_id);
         unvisited.remove(&next_id);

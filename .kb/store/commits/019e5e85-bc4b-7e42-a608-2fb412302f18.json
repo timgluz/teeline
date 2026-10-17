@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"434d33fd8690eac1f6c20906e0b8163460870c2b16fa076349b3f41f61145c3c","doc_type":"brief","document_id":"019e5e85-ac0c-7b93-89f6-be7621c2175b","new_version":1,"previous_version":null,"slug":"decisions/adr-006-teeline-gui-extraction","title":"ADR-006: Extract eframe GUI into teeline-gui workspace member"}],"created_at":"2026-05-25T09:44:43.264023632Z","id":"019e5e85-bc4b-7e42-a608-2fb412302f18","message":"Add ADR-006: Extract eframe GUI into teeline-gui workspace member"},
+  "content_hash": "5b1f15591372b7fa50cfde0a6f91ca066beac36ef8e0b736656a5ad149d61173",
+  "hash_version": 3
+}

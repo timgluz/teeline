@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"7caae0e0d5b8435119ba16e76d7b86e1cd4f06964e861f5fd0d049a6aa27b7cd","doc_type":"brief","document_id":"019e278a-f885-72a3-b5d4-3be20e4a88ae","new_version":1,"previous_version":null,"slug":"decisions/adr-004-egui-migration","title":"ADR-004: Replace piston_window with egui/eframe for visualization"}],"created_at":"2026-05-14T17:31:23.981231137Z","id":"019e278b-0a09-7f23-9483-2fa57b777985","message":"Add ADR-004: replace piston_window with egui/eframe"},
+  "content_hash": "2747362a8c6593f6a4e9cf8893f9363ed56c6b90ee7a0e44ecdb78cefaa52a25",
+  "hash_version": 3
+}

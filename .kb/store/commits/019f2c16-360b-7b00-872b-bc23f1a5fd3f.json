@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"e6464a536ae0ff44b9b3e2c4e061983aabe2f5edfbfb0782b2cac594920aa8b9","doc_type":"task","document_id":"019f2c15-c403-7ff0-ae0b-e86edde6ab9e","new_version":1,"previous_version":null,"slug":"tasks/gh-286-api-key-auth","title":"GH #286: static bearer-token auth for teeline-api (+ #307 router dedup)"}],"created_at":"2026-07-04T07:44:40.936414718Z","id":"019f2c16-360b-7b00-872b-bc23f1a5fd3f","message":"Add task for GH #286 api-key auth + #307 router dedup"},
+  "content_hash": "25287f488c795353e1c1381988ce413c3c12f15e3233ef655302a8aa4b88a58d",
+  "hash_version": 3
+}

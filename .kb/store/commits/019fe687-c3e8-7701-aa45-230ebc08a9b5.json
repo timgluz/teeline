@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"e39a758bb24eb364a681d2cf4a9a04363331aacc50d51a142b32e699f9741575","doc_type":"task","document_id":"019fe687-423a-7ac2-b95d-5ac52a5f6d9b","new_version":1,"previous_version":null,"slug":"gh-436-explicit-matrix-geo-distance-support-in-was","title":"GH #436: EXPLICIT/MATRIX + GEO distance support in WASM"}],"created_at":"2026-08-09T12:38:04.986864224Z","id":"019fe687-c3e8-7701-aa45-230ebc08a9b5","message":"Create and review GH #436 task — all criteria met, PR #439 open"},
+  "content_hash": "aa2566521b545dafd9d0688666af0c21aa13d8aa797d23b60bd18c15621c7879",
+  "hash_version": 3
+}

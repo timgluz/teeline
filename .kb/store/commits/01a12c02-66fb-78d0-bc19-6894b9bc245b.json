@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"286d60be375dcfba517a138e278ee0623a43456c527377b318d6c64c37313f4c","doc_type":"task","document_id":"01a12b43-c414-7e02-b8d9-42141ae3f5ee","metadata_changes":[{"field":"status","new_value":"completed","old_value":"active"}],"new_version":3,"previous_commit_id":"01a12b6d-1f58-7601-bfa0-1e64c787f688","previous_hash":"c7e071577b80d5be9ea994c395caea5d89b1e45f58f9feee373cf5f19283b168","previous_version":2,"slug":"tasks/type-check-the-islands","title":"chore(web): type-check the Preact islands"}],"created_at":"2026-10-11T17:28:37.335058714Z","id":"01a12c02-66fb-78d0-bc19-6894b9bc245b","message":"task(web): type-check-the-islands is done — #580 merged and its owner logged it\n\nThe document already carried the owner's findings and ticked criteria; only the\nstatus was left active."},
+  "content_hash": "67996b2fa4d0ee9602af8331795b02fe44a3dc4bc299ccb7dd5d950f2df7e0c2",
+  "hash_version": 3
+}

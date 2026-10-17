@@ -39,7 +39,11 @@ if [ -n "$RS_FILES" ]; then
 fi
 
 # ── Markdown ──────────────────────────────────────────────────────────────────
-MD_FILES=$(echo "$STAGED" | grep -E '\.md$' || true)
+# .kb/store/ is excluded: it is the GitKB document database (tracked so specs, ADRs and tasks
+# are versioned), and its documents are working notes written over many sessions rather than
+# hand-authored repo docs. Linting them would demand rewriting historical task notes and would
+# fail every commit that touches the KB. Repo markdown is still linted.
+MD_FILES=$(echo "$STAGED" | grep -E '\.md$' | grep -v '^\.kb/store/' || true)
 if [ -n "$MD_FILES" ]; then
     if ! command -v markdownlint &>/dev/null; then
         skip_notice "markdownlint"

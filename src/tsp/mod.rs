@@ -1,6 +1,7 @@
 pub mod ant_colony;
 pub mod bellman_karp;
 pub mod branch_bound;
+pub(crate) mod budget;
 pub mod christofides;
 pub mod comparison;
 pub use comparison::{ComparisonStats, compare_tours, tour_cost};
@@ -167,6 +168,58 @@ pub enum DistanceType {
     Euc2D,
     Explicit,
     Geo,
+    /// TSPLIB ATT (pseudo-Euclidean): `r = sqrt((dx^2 + dy^2) / 10)`, then `nint(r)`, plus
+    /// one when that rounding went down. Integer-valued.
+    Att,
+    /// TSPLIB CEIL_2D: Euclidean distance rounded up. Integer-valued.
+    Ceil2D,
+}
+
+impl DistanceType {
+    /// TSPLIB's canonical spelling, so the parser and every consumer reporting the type
+    /// back out agree. Shared because the per-consumer copies (api, wasm) drifted into
+    /// non-exhaustive matches as soon as a variant was added — and the wasm crate sits
+    /// outside the workspace, so `cargo clippy --workspace` never caught it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DistanceType::Euc2D => "EUC_2D",
+            DistanceType::Explicit => "EXPLICIT",
+            DistanceType::Geo => "GEO",
+            DistanceType::Att => "ATT",
+            DistanceType::Ceil2D => "CEIL_2D",
+        }
+    }
+}
+
+#[cfg(test)]
+mod distance_type_tests {
+    use super::*;
+
+    /// `as_str` is the single source of TSPLIB's spelling, consumed by teeline-api and
+    /// teeline-wasm. Both are outside this crate's coverage run (the wasm crate is not even
+    /// in the workspace), so without this test the arms are only exercised incidentally.
+    #[test]
+    fn as_str_covers_every_variant() {
+        assert_eq!(DistanceType::Euc2D.as_str(), "EUC_2D");
+        assert_eq!(DistanceType::Explicit.as_str(), "EXPLICIT");
+        assert_eq!(DistanceType::Geo.as_str(), "GEO");
+        assert_eq!(DistanceType::Att.as_str(), "ATT");
+        assert_eq!(DistanceType::Ceil2D.as_str(), "CEIL_2D");
+    }
+
+    /// Round-trip: every spelling `as_str` emits must parse back to the same variant.
+    #[test]
+    fn as_str_round_trips_through_from_str() {
+        for dt in [
+            DistanceType::Euc2D,
+            DistanceType::Explicit,
+            DistanceType::Geo,
+            DistanceType::Att,
+            DistanceType::Ceil2D,
+        ] {
+            assert_eq!(dt.as_str().parse::<DistanceType>().unwrap(), dt);
+        }
+    }
 }
 
 impl FromStr for DistanceType {
@@ -176,6 +229,8 @@ impl FromStr for DistanceType {
             "EUC_2D" | "EUC2D" => Ok(DistanceType::Euc2D),
             "EXPLICIT" => Ok(DistanceType::Explicit),
             "GEO" => Ok(DistanceType::Geo),
+            "ATT" => Ok(DistanceType::Att),
+            "CEIL_2D" | "CEIL2D" => Ok(DistanceType::Ceil2D),
             other => Err(format!("unsupported distance type: {other}")),
         }
     }
@@ -596,6 +651,13 @@ impl FromStr for Solvers {
 #[derive(Clone, Debug, PartialEq)]
 pub struct HeuristicOptions {
     pub epochs: usize,
+    /// Stop after this many consecutive epochs without improvement; `0` disables the check.
+    ///
+    /// Disabled by default, because early stopping changes results — a caller opts in explicitly.
+    ///
+    /// Distinct from `platoo_epochs`, which some solvers use as a *restart* threshold rather than a
+    /// stopping rule — conflating the two would change `stochastic_hill`'s search.
+    pub stagnation_epochs: usize,
     pub platoo_epochs: usize,
     pub n_nearest: usize,
     pub verbose: bool,
@@ -605,6 +667,9 @@ impl Default for HeuristicOptions {
     fn default() -> Self {
         HeuristicOptions {
             epochs: 10_000,
+            // Disabled by default: the plateau stop changes results, so it is opt-in until the
+            // benchmark harness asks for it.
+            stagnation_epochs: 0,
             platoo_epochs: 500,
             n_nearest: 3,
             verbose: false,
@@ -623,7 +688,10 @@ impl HeuristicOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
-                "platoo_epochs" => {
+                "stagnation_epochs" => {
+                    h.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
+                "platoo_epochs" | "plateau_epochs" => {
                     h.platoo_epochs = v.as_integer().ok_or_else(|| {
                         format!("config: `platoo_epochs` must be an integer, got {v}")
                     })? as usize;
@@ -641,7 +709,7 @@ impl HeuristicOptions {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [heuristic] — valid: epochs, platoo_epochs, n_nearest, verbose"
+                        "config: unknown field `{other}` in [heuristic] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose"
                     ));
                 }
             }
@@ -657,10 +725,15 @@ impl HeuristicOptions {
                 .parse()
                 .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
         }
+        if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            h.stagnation_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
+        }
         if let Some(v) = args.get_one::<String>("platoo_epochs") {
             h.platoo_epochs = v
                 .parse()
-                .map_err(|_| format!("--platoo-epochs: invalid integer `{v}`"))?;
+                .map_err(|_| format!("--plateau_epochs: invalid integer `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("n_nearest") {
             h.n_nearest = v
@@ -697,7 +770,13 @@ pub struct SAOptions {
 impl Default for SAOptions {
     fn default() -> Self {
         SAOptions {
-            heuristic: HeuristicOptions::default(),
+            // A placeholder, not a cap: `usable_epochs` resolves any value at or below the cooling
+            // schedule length to the schedule length. Must be non-zero, because 0 means unbounded
+            // and `SAOptions::default()` running forever would be a worse surprise than truncation.
+            heuristic: HeuristicOptions {
+                epochs: 150_000,
+                ..HeuristicOptions::default()
+            },
             cooling_rate: 0.0001,
             min_temperature: 0.001,
             max_temperature: 1_000.0,
@@ -726,9 +805,12 @@ impl SAOptions {
                 self.max_temperature
             ));
         }
-        if self.min_temperature < 0.0 {
+        // Must be > 0, not >= 0: the loop stops when `temperature <= min_temperature`, and the
+        // f32 cooling step bottoms out at the smallest denormal rather than reaching 0. A
+        // min_temperature of exactly 0 therefore never terminates the loop.
+        if self.min_temperature <= 0.0 {
             return Err(format!(
-                "min_temperature must be >= 0 (got {})",
+                "min_temperature must be > 0 (got {})",
                 self.min_temperature
             ));
         }
@@ -751,7 +833,10 @@ impl SAOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
-                "platoo_epochs" => {
+                "stagnation_epochs" => {
+                    sa.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
+                "platoo_epochs" | "plateau_epochs" => {
                     sa.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
                         format!("config: `platoo_epochs` must be an integer, got {v}")
                     })? as usize;
@@ -778,7 +863,7 @@ impl SAOptions {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [sa] — valid: epochs, platoo_epochs, n_nearest, verbose, cooling_rate, max_temperature, min_temperature"
+                        "config: unknown field `{other}` in [sa] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, cooling_rate, max_temperature, min_temperature"
                     ));
                 }
             }
@@ -792,6 +877,12 @@ impl SAOptions {
             heuristic: HeuristicOptions::from_cli(args)?,
             ..SAOptions::default()
         };
+        // `HeuristicOptions::from_cli` always yields the generic 10k default, which for this
+        // solver means "below the schedule" and would be raised by `usable_epochs` anyway. Set it
+        // to the SA placeholder explicitly so the resolved value is stated in one place.
+        if args.get_one::<String>("epochs").is_none() {
+            sa.heuristic.epochs = SAOptions::default().heuristic.epochs;
+        }
         if let Some(v) = args.get_one::<String>("cooling_rate") {
             sa.cooling_rate = v
                 .parse()
@@ -854,7 +945,10 @@ impl GAOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
-                "platoo_epochs" => {
+                "stagnation_epochs" => {
+                    ga.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
+                "platoo_epochs" | "plateau_epochs" => {
                     ga.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
                         format!("config: `platoo_epochs` must be an integer, got {v}")
                     })? as usize;
@@ -880,7 +974,7 @@ impl GAOptions {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [ga] — valid: epochs, platoo_epochs, n_nearest, verbose, mutation_probability, n_elite"
+                        "config: unknown field `{other}` in [ga] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, mutation_probability, n_elite"
                     ));
                 }
             }
@@ -949,7 +1043,10 @@ impl CSOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
-                "platoo_epochs" => {
+                "stagnation_epochs" => {
+                    cs.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
+                "platoo_epochs" | "plateau_epochs" => {
                     cs.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
                         format!("config: `platoo_epochs` must be an integer, got {v}")
                     })? as usize;
@@ -970,7 +1067,7 @@ impl CSOptions {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [cs] — valid: epochs, platoo_epochs, n_nearest, verbose, mutation_probability"
+                        "config: unknown field `{other}` in [cs] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, mutation_probability"
                     ));
                 }
             }
@@ -1034,7 +1131,10 @@ impl FPAOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
-                "platoo_epochs" => {
+                "stagnation_epochs" => {
+                    fpa.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
+                "platoo_epochs" | "plateau_epochs" => {
                     fpa.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
                         format!("config: `platoo_epochs` must be an integer, got {v}")
                     })? as usize;
@@ -1055,7 +1155,7 @@ impl FPAOptions {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [fpa] — valid: epochs, platoo_epochs, n_nearest, verbose, mutation_probability"
+                        "config: unknown field `{other}` in [fpa] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, mutation_probability"
                     ));
                 }
             }
@@ -1099,6 +1199,7 @@ impl Default for AcoOptions {
             // override pattern).
             heuristic: HeuristicOptions {
                 epochs: 150,
+                stagnation_epochs: 0,
                 platoo_epochs: 20,
                 n_nearest: 3,
                 verbose: false,
@@ -1159,7 +1260,10 @@ impl AcoOptions {
                 "epochs" => {
                     aco.heuristic.epochs = parse_nonneg_usize(v, "epochs")?;
                 }
-                "platoo_epochs" => {
+                "stagnation_epochs" => {
+                    aco.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
+                "platoo_epochs" | "plateau_epochs" => {
                     aco.heuristic.platoo_epochs = parse_nonneg_usize(v, "platoo_epochs")?;
                 }
                 "n_nearest" => {
@@ -1184,7 +1288,7 @@ impl AcoOptions {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [aco] — valid: epochs, platoo_epochs, n_nearest, verbose, alpha, beta, evaporation_rate, num_ants"
+                        "config: unknown field `{other}` in [aco] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, alpha, beta, evaporation_rate, num_ants"
                     ));
                 }
             }
@@ -1208,10 +1312,15 @@ impl AcoOptions {
                 .parse()
                 .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
         }
+        if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            aco.heuristic.stagnation_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
+        }
         if let Some(v) = args.get_one::<String>("platoo_epochs") {
             aco.heuristic.platoo_epochs = v
                 .parse()
-                .map_err(|_| format!("--platoo-epochs: invalid integer `{v}`"))?;
+                .map_err(|_| format!("--plateau_epochs: invalid integer `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("n_nearest") {
             aco.heuristic.n_nearest = v
@@ -1257,6 +1366,7 @@ impl Default for LKOptions {
         LKOptions {
             heuristic: HeuristicOptions {
                 epochs: 100,
+                stagnation_epochs: 0,
                 platoo_epochs: 10,
                 n_nearest: 5,
                 verbose: false,
@@ -1285,7 +1395,10 @@ impl LKOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
-                "platoo_epochs" => {
+                "stagnation_epochs" => {
+                    lk.heuristic.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
+                "platoo_epochs" | "plateau_epochs" => {
                     lk.heuristic.platoo_epochs = v.as_integer().ok_or_else(|| {
                         format!("config: `platoo_epochs` must be an integer, got {v}")
                     })? as usize;
@@ -1309,7 +1422,7 @@ impl LKOptions {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [lk] — valid: epochs, platoo_epochs, n_nearest, verbose, max_depth"
+                        "config: unknown field `{other}` in [lk] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, max_depth"
                     ));
                 }
             }
@@ -1345,6 +1458,13 @@ pub struct FourierOptions {
     pub lambda_decay: f64, // tension decay multiplier per k_active stage, default 0.5
     pub lr: f64,           // gradient learning rate, default 0.05
     pub epochs: usize,     // gradient steps per k_active stage, default 400
+    /// Consecutive non-improving harmonic stages before stopping early; 0 = never stop early.
+    ///
+    /// Counts *stages*, not epochs — the outer loop runs once per harmonic and `epochs` above is the
+    /// number of gradient steps within a stage. At or above `k_max - 1` the plateau can never fire:
+    /// stage 1 always improves and the final stage's outcome is never recorded, leaving at most
+    /// `k_max - 2` consecutive stale stages. Carried here because fourier has no `HeuristicOptions`.
+    pub stagnation_epochs: usize,
 }
 
 impl Default for FourierOptions {
@@ -1356,6 +1476,7 @@ impl Default for FourierOptions {
             lambda_decay: 0.5,
             lr: 0.05,
             epochs: 400,
+            stagnation_epochs: 0,
         }
     }
 }
@@ -1425,9 +1546,12 @@ impl FourierOptions {
                         .ok_or_else(|| format!("config: `epochs` must be an integer, got {v}"))?
                         as usize;
                 }
+                "stagnation_epochs" => {
+                    f.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [fourier] — valid: k_max, m, lambda, lambda_decay, lr, epochs"
+                        "config: unknown field `{other}` in [fourier] — valid: k_max, m, lambda, lambda_decay, lr, epochs, stagnation_epochs"
                     ));
                 }
             }
@@ -1453,6 +1577,11 @@ impl FourierOptions {
                 .parse::<usize>()
                 .map_err(|_| format!("--m: invalid integer `{v}`"))?;
         }
+        if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            f.stagnation_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
+        }
         f.validate()?;
         Ok(f)
     }
@@ -1468,6 +1597,10 @@ pub struct SOMOptions {
     pub learning_rate: f64,       // η₀ — initial learning rate, default 0.8
     pub radius_fraction: f64,     // σ₀ = radius_fraction × N neurons, default 0.1
     pub neuron_multiplier: usize, // N = n_cities × neuron_multiplier, default 8
+    /// Consecutive non-improving epochs before stopping early; 0 = never stop early. Carried here
+    /// rather than in a `HeuristicOptions` because SOM has no such field and does not use the other
+    /// heuristics; its epoch cap lives in this struct too.
+    pub stagnation_epochs: usize,
 }
 
 impl Default for SOMOptions {
@@ -1477,6 +1610,7 @@ impl Default for SOMOptions {
             learning_rate: 0.8,
             radius_fraction: 0.1,
             neuron_multiplier: 8,
+            stagnation_epochs: 0,
         }
     }
 }
@@ -1538,9 +1672,12 @@ impl SOMOptions {
                     }
                     s.neuron_multiplier = raw as usize;
                 }
+                "stagnation_epochs" => {
+                    s.stagnation_epochs = parse_nonneg_usize(v, "stagnation_epochs")?;
+                }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [som] — valid: epochs, learning_rate, radius_fraction, neuron_multiplier"
+                        "config: unknown field `{other}` in [som] — valid: epochs, learning_rate, radius_fraction, neuron_multiplier, stagnation_epochs"
                     ));
                 }
             }
@@ -1570,6 +1707,11 @@ impl SOMOptions {
             s.neuron_multiplier = v
                 .parse::<usize>()
                 .map_err(|_| format!("--neuron_multiplier: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            s.stagnation_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
         }
         s.validate()?;
         Ok(s)
@@ -1710,7 +1852,7 @@ pub fn solve_with_context(
         Solvers::SimulatedAnnealing => {
             let sa = opts.sa.as_ref().cloned().unwrap_or_default();
             sa.validate()?;
-            simulated_annealing::solve(problem, &sa, tx, init_tour)
+            simulated_annealing::solve(problem, &sa, tx, init_tour).0
         }
         Solvers::StochasticHill => stochastic_hill::solve(problem, &h, tx, init_tour),
         Solvers::TabuSearch => tabu_search::solve(problem, &h, tx, init_tour),
@@ -1889,7 +2031,7 @@ impl NearestResult {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct NearestResultItem {
     pub distance: f32,
     pub point: KDPoint,
@@ -1922,6 +2064,7 @@ mod tests {
     fn test_heuristic_options_has_expected_fields() {
         let h = HeuristicOptions {
             epochs: 100,
+            stagnation_epochs: 500,
             platoo_epochs: 10,
             n_nearest: 3,
             verbose: false,
@@ -1967,6 +2110,7 @@ mod tests {
     fn test_heuristic_validate_rejects_n_nearest_zero() {
         let h = HeuristicOptions {
             epochs: 100,
+            stagnation_epochs: 500,
             platoo_epochs: 50,
             n_nearest: 0,
             verbose: false,
@@ -1983,6 +2127,7 @@ mod tests {
         // epochs=0 is "run forever"; platoo_epochs=0 disables plateau restarts — both valid.
         let h = HeuristicOptions {
             epochs: 0,
+            stagnation_epochs: 0,
             platoo_epochs: 0,
             n_nearest: 1,
             verbose: false,
@@ -1998,6 +2143,11 @@ mod tests {
             .arg(
                 Arg::new("platoo_epochs")
                     .long("platoo_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
                     .action(ArgAction::Set),
             )
             .arg(
@@ -2022,6 +2172,11 @@ mod tests {
             .arg(
                 Arg::new("platoo_epochs")
                     .long("platoo_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
                     .action(ArgAction::Set),
             )
             .arg(
@@ -2079,6 +2234,184 @@ mod tests {
         let sa = SAOptions::from_toml(&t).unwrap();
         assert_eq!(sa.heuristic.epochs, 5000);
         assert!((sa.cooling_rate - 0.0005).abs() < 1e-6);
+    }
+
+    /// The new stop knob must be settable from a solver config table, not only from the CLI.
+    ///
+    /// Every solver that owns a `[name]` table has its own match arm, so this walks them all: an arm
+    /// that silently forgot the key would leave that solver unable to opt in.
+    #[test]
+    fn test_stagnation_epochs_config_key_parses_for_every_solver() {
+        let t: toml::Table = toml::from_str("stagnation_epochs=42").unwrap();
+        assert_eq!(
+            HeuristicOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[heuristic]"
+        );
+        assert_eq!(
+            GAOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[ga]"
+        );
+        assert_eq!(
+            SAOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[sa]"
+        );
+        assert_eq!(
+            CSOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[cs]"
+        );
+        assert_eq!(
+            FPAOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[fpa]"
+        );
+        assert_eq!(
+            AcoOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[aco]"
+        );
+        assert_eq!(
+            LKOptions::from_toml(&t)
+                .unwrap()
+                .heuristic
+                .stagnation_epochs,
+            42,
+            "[lk]"
+        );
+        // `som` and `fourier` carry the option on their own struct, not in a `heuristic` sub-table.
+        assert_eq!(
+            SOMOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[som]"
+        );
+        assert_eq!(
+            FourierOptions::from_toml(&t).unwrap().stagnation_epochs,
+            42,
+            "[fourier]"
+        );
+    }
+
+    /// The "valid fields" hints name the accepted keys, so they must mention the new option —
+    /// otherwise a user who typos it is told a list that omits the key they wanted.
+    #[test]
+    fn test_unknown_field_hint_lists_stagnation_epochs() {
+        let t: toml::Table = toml::from_str("bogus=1").unwrap();
+        for (label, err) in [
+            ("[heuristic]", HeuristicOptions::from_toml(&t).unwrap_err()),
+            ("[ga]", GAOptions::from_toml(&t).unwrap_err()),
+            ("[cs]", CSOptions::from_toml(&t).unwrap_err()),
+            ("[fpa]", FPAOptions::from_toml(&t).unwrap_err()),
+            ("[lk]", LKOptions::from_toml(&t).unwrap_err()),
+            ("[som]", SOMOptions::from_toml(&t).unwrap_err()),
+            ("[fourier]", FourierOptions::from_toml(&t).unwrap_err()),
+        ] {
+            assert!(
+                err.contains("stagnation_epochs"),
+                "{label} hint should list stagnation_epochs, got: {err}"
+            );
+        }
+    }
+
+    /// `fourier` and `som` build their options independently of `HeuristicOptions`, so each needs its
+    /// own check that a bad value is reported rather than quietly defaulted.
+    #[test]
+    fn test_fourier_and_som_cli_reject_bad_stagnation_epochs() {
+        use clap::{Arg, ArgAction, Command};
+        // Every argument either `from_cli` reads, since both are handed the same command.
+        let mk = || {
+            let mut cmd = Command::new("t").arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            );
+            for id in [
+                "epochs",
+                "k_max",
+                "m",
+                "learning_rate",
+                "radius_fraction",
+                "neuron_multiplier",
+            ] {
+                cmd = cmd.arg(Arg::new(id).long(id).action(ArgAction::Set));
+            }
+            cmd
+        };
+
+        let fourier = mk().get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = FourierOptions::from_cli(&fourier).unwrap_err();
+        assert!(err.contains("--stagnation_epochs"), "fourier: got {err}");
+
+        let som = mk().get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = SOMOptions::from_cli(&som).unwrap_err();
+        assert!(err.contains("--stagnation_epochs"), "som: got {err}");
+    }
+
+    /// A non-numeric value must be rejected with a message naming the flag, rather than silently
+    /// falling back to the default — the error path is the only thing standing between a typo and a
+    /// run that quietly ignores what the caller asked for.
+    #[test]
+    fn test_stagnation_epochs_cli_rejects_non_numeric() {
+        use clap::{Arg, ArgAction, Command};
+        let cmd = Command::new("t")
+            .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
+            .arg(
+                Arg::new("platoo_epochs")
+                    .long("platoo_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("n_nearest")
+                    .long("n_nearest")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("verbose")
+                    .long("verbose")
+                    .action(ArgAction::SetTrue),
+            );
+        let args = cmd.get_matches_from(["t", "--stagnation_epochs", "abc"]);
+        let err = HeuristicOptions::from_cli(&args).unwrap_err();
+        assert!(
+            err.contains("--stagnation_epochs"),
+            "the error should name the flag, got: {err}"
+        );
+    }
+
+    /// Both spellings must parse as config keys: the misspelled `platoo_epochs` is retained so
+    /// existing solver configs keep loading, and `plateau_epochs` is the spelling to document.
+    #[test]
+    fn test_plateau_epochs_config_key_accepts_both_spellings() {
+        for key in ["plateau_epochs", "platoo_epochs"] {
+            let t: toml::Table = toml::from_str(&format!("{key}=250")).unwrap();
+            let sa = SAOptions::from_toml(&t).unwrap();
+            assert_eq!(
+                sa.heuristic.platoo_epochs, 250,
+                "`{key}` should set the plateau threshold"
+            );
+        }
     }
 
     #[test]
@@ -2186,7 +2519,7 @@ mod tests {
             cities[4].id,
         ];
 
-        let dm = distance_matrix::from_cities(&cities);
+        let dm = distance_matrix::from_cities_unrounded(&cities);
         let problem = TspProblem::new(cities, dm);
         let sol = Solution::new(&route, &problem);
         assert_approx(4.0, sol.total);
@@ -2293,6 +2626,11 @@ mod tests {
             .arg(
                 Arg::new("platoo_epochs")
                     .long("platoo_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
                     .action(ArgAction::Set),
             )
             .arg(
@@ -2406,6 +2744,11 @@ mod tests {
                     .action(ArgAction::Set),
             )
             .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            )
+            .arg(
                 Arg::new("n_nearest")
                     .long("n_nearest")
                     .action(ArgAction::Set),
@@ -2423,7 +2766,7 @@ mod tests {
                     .action(ArgAction::Set),
             )
             .arg(Arg::new("num_ants").long("num-ants").action(ArgAction::Set));
-        let args = cmd.get_matches_from([
+        let args = cmd.clone().get_matches_from([
             "t",
             "--alpha",
             "2.0",
@@ -2438,6 +2781,18 @@ mod tests {
         assert!((opts.alpha - 2.0).abs() < 1e-6);
         assert!((opts.beta - 4.0).abs() < 1e-6);
         assert!((opts.evaporation_rate - 0.3).abs() < 1e-6);
+
+        // ACO builds `heuristic` field by field rather than delegating to
+        // `HeuristicOptions::from_cli`, so it needs its own error path for the new flag: a bad value
+        // must be reported rather than silently falling back to the default.
+        let bad = cmd
+            .clone()
+            .get_matches_from(["t", "--stagnation_epochs", "nope"]);
+        let err = AcoOptions::from_cli(&bad).unwrap_err();
+        assert!(
+            err.contains("--stagnation_epochs"),
+            "the error should name the flag, got: {err}"
+        );
         assert_eq!(opts.num_ants, 12);
     }
 
@@ -2447,6 +2802,11 @@ mod tests {
             .arg(Arg::new("epochs").long("epochs").action(ArgAction::Set))
             .arg(Arg::new("k_max").long("k-max").action(ArgAction::Set)) // hyphen matches production CLI
             .arg(Arg::new("m").long("m").action(ArgAction::Set))
+            .arg(
+                Arg::new("stagnation_epochs")
+                    .long("stagnation_epochs")
+                    .action(ArgAction::Set),
+            )
     }
 
     #[test]

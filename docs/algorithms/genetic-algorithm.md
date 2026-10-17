@@ -14,6 +14,7 @@ hasExplainer: true
 | **Type** | Heuristic — evolutionary metaheuristic |
 | **Complexity** | O(epochs · pop · n) |
 | **Auto-seeds from** | `shuffle` (random population) |
+| **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 

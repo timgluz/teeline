@@ -1,0 +1,51 @@
+# Preliminary tier — every solver, small instances only.
+#
+# Exists to get first tables and graphs in front of readers (and the page work) without waiting
+# for the full Tier A sweep, which is dominated by 300s timeouts on `dsj1000`. Results land in the
+# same file as Tier A, so the full sweep later fills in the remaining instances rather than
+# replacing anything: a cell already measured is skipped.
+#
+# The budgets are deliberately the same as `bench/matrix/tier-a.toml`. A cheaper allowance here
+# would be published as the family budget while the numbers were taken under a shorter one — the
+# exact mismatch `bench/budgets.json` and its test exist to prevent.
+
+tier = "prelim"
+
+runs = 5
+
+# Per-family wall-clock budget in seconds; must match bench/budgets.json.
+[budgets]
+exact = 60
+local = 300
+meta = 300
+constructive = 30
+utility = 60
+
+# Exact solvers are exponential, so they get only the three instances they can finish.
+[coverage]
+exact = ["upto24"]
+constructive = ["upto24", "small"]
+local = ["upto24", "small"]
+meta = ["upto24", "small"]
+utility = ["upto24", "small"]
+
+[instances]
+burma14 = "upto24"    # GEO, 14
+gr17 = "upto24"       # EXPLICIT, 17
+ulysses16 = "upto24"  # GEO, 16
+# The most-cited small instances, spanning GEO, EUC_2D, ATT and EXPLICIT.
+ulysses22 = "small"   # GEO, 22
+att48 = "small"       # ATT, 48
+berlin52 = "small"    # EUC_2D, 52
+eil76 = "small"       # EUC_2D, 76
+
+# The budget-limited run: the solver as configured, with the family's wall-clock budget as the
+# only limit.
+[configs.budget]
+
+# `branch_bound` is exact only when `--n_nearest` is at least the city count; at its default of 3
+# it is a beam search, so the exact run is labelled separately.
+[configs.exact]
+solvers = ["branch_bound"]
+instances = ["burma14", "gr17", "ulysses16"]
+args = ["--n_nearest", "100"]

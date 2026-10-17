@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"modified","content_hash":"78218bbc2cc4c0be914bf1b8247b9efa63edea2b4bf18844a60e5992ac6aa073","doc_type":"task","document_id":"01a12651-55d5-7f71-84c7-360c3a0086fa","metadata_changes":[{"field":"blocks","old_value":["tasks/bench-measurement-harness"]},{"field":"status","new_value":"completed","old_value":"active"}],"new_version":6,"previous_commit_id":"01a1273b-010a-7d73-b30d-430172dc5719","previous_hash":"47f87903afd8d760dbce771841a5d3659df916d29d6417104e415bdef1a1e055","previous_version":5,"slug":"tasks/bench-plateau-stop-all-iterative","title":"feat(tsp): shared plateau stop for all iterative solvers"}],"created_at":"2026-10-10T19:12:20.973513762Z","id":"01a1273b-0227-7112-b968-39df2ba0ad09","message":"Mark the plateau solver wiring task complete"},
+  "content_hash": "048beccefe4c84a7136aa042a4001de2616f2ce89e4065c3d4b063ec6180cae1",
+  "hash_version": 3
+}

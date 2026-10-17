@@ -1,0 +1,415 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "document_id": "019e2683-3831-7cb0-95d3-6d480b6ff5be",
+      "slug": "context/immutable/project-brief",
+      "tip_commit_id": "019e2684-b729-7b12-b898-984089d45107"
+    },
+    {
+      "document_id": "019e2683-384c-7543-9573-cfc2edc3b01b",
+      "slug": "context/immutable/patterns",
+      "tip_commit_id": "019e2684-b729-7b12-b898-984089d45107"
+    },
+    {
+      "document_id": "019e2683-385c-7580-a0e5-45bb169cbea2",
+      "slug": "context/immutable/architecture",
+      "tip_commit_id": "019e2684-b729-7b12-b898-984089d45107"
+    },
+    {
+      "document_id": "019e2683-3887-71e1-b766-b2f0d7df0b53",
+      "slug": "context/extensible/product",
+      "tip_commit_id": "019e2684-b729-7b12-b898-984089d45107"
+    },
+    {
+      "document_id": "019e2683-389f-78b2-9ffa-11f7e331658f",
+      "slug": "context/extensible/tech",
+      "tip_commit_id": "019e2684-b729-7b12-b898-984089d45107"
+    },
+    {
+      "document_id": "019e2683-38ae-7bc2-8884-87a795ed4eef",
+      "slug": "context/overridable/active",
+      "tip_commit_id": "01a12c01-8fe2-7f92-87a5-cacc37f5e31f"
+    },
+    {
+      "document_id": "019e2683-38bd-7a40-b44d-1c29e6e3eaf6",
+      "slug": "context/overridable/progress",
+      "tip_commit_id": "01a12c01-8fe2-7f92-87a5-cacc37f5e31f"
+    },
+    {
+      "document_id": "019e26ee-2f93-7ee1-8d94-0cbd729cf553",
+      "slug": "tasks/gh-50-clippy-warnings",
+      "tip_commit_id": "019e26f7-3437-7882-8476-376e96d4ba20"
+    },
+    {
+      "document_id": "019e272b-7c4f-7e62-96bb-99c0d8880b8a",
+      "slug": "decisions/adr-001-tracing",
+      "tip_commit_id": "019e272b-aee3-73b2-aa15-ac5f00bbec6a"
+    },
+    {
+      "document_id": "019e2745-c75c-7343-ba85-11a67407fb08",
+      "slug": "decisions/adr-003-coverage",
+      "tip_commit_id": "019e2745-d6d8-7a20-ad47-56b35dac7479"
+    },
+    {
+      "document_id": "019e278a-f885-72a3-b5d4-3be20e4a88ae",
+      "slug": "decisions/adr-004-egui-migration",
+      "tip_commit_id": "019e278b-0a09-7f23-9483-2fa57b777985"
+    },
+    {
+      "document_id": "019e2c4c-ce2d-7533-a9b2-a559a5be3922",
+      "slug": "tasks/gh-39-optimal-tour",
+      "tip_commit_id": "019e2c58-ea45-7bd3-90d1-f190b8d6189b"
+    },
+    {
+      "document_id": "019e31aa-108a-7153-ab9e-e723a72c7045",
+      "slug": "decisions/adr-wasm-component-model",
+      "tip_commit_id": "019e31aa-7d67-7f70-8f89-27292007e158"
+    },
+    {
+      "document_id": "019e4612-51df-7853-a829-5c3805f56f1d",
+      "slug": "tasks/gh-66-pipeline-solver",
+      "tip_commit_id": "019e4612-5e3c-73c1-a2a7-5cb83a473ba2"
+    },
+    {
+      "document_id": "019e5085-8117-7f52-b375-3e528ff93520",
+      "slug": "tasks/gh-81-pipeline-config",
+      "tip_commit_id": "019ea132-73be-7493-8de2-e0033b0b5bbc"
+    },
+    {
+      "document_id": "019e5e39-0e33-7a42-a8f5-7714e1db8a6f",
+      "slug": "decisions/adr-005-validation-approach",
+      "tip_commit_id": "019e5e39-1c2b-7863-946a-f6bcee1a5676"
+    },
+    {
+      "document_id": "019e5e6b-6d53-7f42-8c59-d83e6001c699",
+      "slug": "decisions/adr-002-taskfile",
+      "tip_commit_id": "019e5e6b-8ec4-7e23-a6db-ff997544db24"
+    },
+    {
+      "document_id": "019e5e85-ac0c-7b93-89f6-be7621c2175b",
+      "slug": "decisions/adr-006-teeline-gui-extraction",
+      "tip_commit_id": "019e5e85-bc4b-7e42-a608-2fb412302f18"
+    },
+    {
+      "document_id": "019e5f37-2412-79f1-9f8b-4c8d8b9b6319",
+      "slug": "tasks/gh-95-kdtree-knn-fix",
+      "tip_commit_id": "019e5f4b-5a42-7e30-a77b-731847394849"
+    },
+    {
+      "document_id": "019e5f6f-52e3-7860-93c5-a084a5417500",
+      "slug": "tasks/gh-97-distance-matrix-fix",
+      "tip_commit_id": "019e5f74-a676-7ca0-9259-5c24a98d9b41"
+    },
+    {
+      "document_id": "019ea11d-5980-7fe3-827a-113a54fd73a1",
+      "slug": "tasks/gh-133-solver-config-ui",
+      "tip_commit_id": "019ea132-0eec-7fe1-a65e-1958cc05ec0c"
+    },
+    {
+      "document_id": "019ea137-8f57-7720-b053-9dc4e25addfb",
+      "slug": "tasks/gh-134-run-results-ui",
+      "tip_commit_id": "019ea220-6003-74f2-ab48-ca59790f359f"
+    },
+    {
+      "document_id": "019ea7f8-e660-7d02-b7e4-d16c34d43f28",
+      "slug": "tasks/gh-177-dynamic-solver-list",
+      "tip_commit_id": "01a12662-f14e-7893-af0d-18aeecc0df11"
+    },
+    {
+      "document_id": "019eb74a-50cb-7d20-9a5b-f240c8ec160f",
+      "slug": "tasks/gh-45-lin-kernighan",
+      "tip_commit_id": "019ebc73-4038-7310-9249-08373a266ecb"
+    },
+    {
+      "document_id": "019ebc73-3281-7360-803c-06dbaded69e8",
+      "slug": "tasks/gh-48-or-opt",
+      "tip_commit_id": "019ebc7b-fe9b-74e0-aeb8-398d70fc8fe3"
+    },
+    {
+      "document_id": "019ebfd9-6c05-7ac0-9d3b-ee9ca71279f8",
+      "slug": "tasks/gh-73-gsa-solver",
+      "tip_commit_id": "019ebfe7-cac8-7663-988a-2602a0a7f60c"
+    },
+    {
+      "document_id": "019ec00f-ab67-7dc0-8c4b-4d222e99743b",
+      "slug": "tasks/gh-185-fourier-solver",
+      "tip_commit_id": "01a12bfe-e078-7d73-af12-ed2a7054804d"
+    },
+    {
+      "document_id": "019f2c15-c403-7ff0-ae0b-e86edde6ab9e",
+      "slug": "tasks/gh-286-api-key-auth",
+      "tip_commit_id": "01a12bfe-e078-7d73-af12-ed2a7054804d"
+    },
+    {
+      "document_id": "019f2c32-1589-7803-825f-6212073de7f8",
+      "slug": "task-api-serve-kills-backgrounded-server-on-task-e",
+      "tip_commit_id": "019f2c34-d107-71e2-a61e-ee6fad94dcdd"
+    },
+    {
+      "document_id": "019f98f1-f78b-7fc1-9708-2bcd7968894b",
+      "slug": "tasks/teeline-web-astro7-migration",
+      "tip_commit_id": "019f99ba-1cf9-7320-b711-18c32ec1f05a"
+    },
+    {
+      "document_id": "019fbdbc-55d2-7072-9057-89ab286fddfb",
+      "slug": "tasks/fourier-scaling-optimizer-experiments",
+      "tip_commit_id": "019fbeb6-d4bf-79a0-ab0e-969440cb61e4"
+    },
+    {
+      "document_id": "019fbe77-e1b2-7611-a40a-3b8abccc499f",
+      "slug": "tasks/gh371-fourier-cli-flags",
+      "tip_commit_id": "019fbe92-627f-7740-ba9a-816d55629008"
+    },
+    {
+      "document_id": "019fbea3-7db3-72c3-838e-fbf13faf09a3",
+      "slug": "tasks/gh372-lk-som-pipeline-toml",
+      "tip_commit_id": "019fbeae-cd83-7381-b48a-5036ec947e5a"
+    },
+    {
+      "document_id": "019fc17c-4e1e-75f0-b066-954f0e322d8a",
+      "slug": "tasks/gh374-lk-kdtree-candidates",
+      "tip_commit_id": "019fc189-e02f-73a0-bc97-f5cfb42e5e20"
+    },
+    {
+      "document_id": "019fdd09-4d32-7c72-84b2-f52f5a1d0b5a",
+      "slug": "tasks/greedy-edge-construction",
+      "tip_commit_id": "019fdd56-12fe-7661-8031-8dc7d56484c3"
+    },
+    {
+      "document_id": "019fe03e-555f-7d12-bdd2-4821e6d268a0",
+      "slug": "tasks/gh395-ant-colony-optimization",
+      "tip_commit_id": "019fe057-3e3c-7542-bf8b-6b8e3882436f"
+    },
+    {
+      "document_id": "019fe0ad-f5e7-7612-a803-b906e1dc94ae",
+      "slug": "tasks/gh394-clarke-wright-savings",
+      "tip_commit_id": "019fe0ae-283e-79d0-8452-4e1de62e6097"
+    },
+    {
+      "document_id": "019fe687-423a-7ac2-b95d-5ac52a5f6d9b",
+      "slug": "gh-436-explicit-matrix-geo-distance-support-in-was",
+      "tip_commit_id": "019fe687-c3e8-7701-aa45-230ebc08a9b5"
+    },
+    {
+      "document_id": "019fe69a-73aa-7682-af0f-11d9b21a4464",
+      "slug": "gh-436-follow-up-verify-cli-api-qt-for-explicit-ge",
+      "tip_commit_id": "019fe69a-852b-7352-ac1d-2722b54984c8"
+    },
+    {
+      "document_id": "019fe738-4d62-73c3-9cdd-795b94276505",
+      "slug": "context/immutable/web-design",
+      "tip_commit_id": "019fe738-9443-7383-9738-e87a3aeef8af"
+    },
+    {
+      "document_id": "01a004be-9c4d-7290-b46c-3542a7931570",
+      "slug": "decisions/adr-007-webauthn-auth",
+      "tip_commit_id": "01a004be-f216-74a3-9b77-58265ff82e60"
+    },
+    {
+      "document_id": "01a004bf-067a-7af0-ae9c-668dc0b8f347",
+      "slug": "decisions/webauthn-auth-design",
+      "tip_commit_id": "01a004bf-321a-70f0-b549-f90a0f0a4aec"
+    },
+    {
+      "document_id": "01a004bf-5da8-7722-9400-a265afff5984",
+      "slug": "tasks/webauthn-auth-replace-clerk",
+      "tip_commit_id": "01a00692-9a33-7f02-92d6-59737a3f6ed9"
+    },
+    {
+      "document_id": "01a00502-b3f9-74a0-9886-3e9dffa5a2df",
+      "slug": "tasks/blog-passkeys-instead-of-clerk",
+      "tip_commit_id": "01a006ee-eb69-7bc0-8615-cf162eece271"
+    },
+    {
+      "document_id": "01a0067d-f8fa-7343-91c7-d74619ba3dbc",
+      "slug": "tasks/banned-flag",
+      "tip_commit_id": "01a00689-59ad-78d0-803e-a34633b6b4ed"
+    },
+    {
+      "document_id": "01a00bed-75c8-77c0-8903-67d87b300df3",
+      "slug": "tasks/gh-433-stochastic-hill-explainer",
+      "tip_commit_id": "01a00bef-815a-7380-980e-3d9eaa104b5f"
+    },
+    {
+      "document_id": "01a00bed-75e5-7251-ab45-89a53088d79a",
+      "slug": "tasks/gh-432-or-opt-explainer",
+      "tip_commit_id": "01a00bef-815a-7380-980e-3d9eaa104b5f"
+    },
+    {
+      "document_id": "01a00bed-7604-73b1-b4b7-14a3f9e6f118",
+      "slug": "tasks/gh-434-three-opt-explainer",
+      "tip_commit_id": "01a00bef-815a-7380-980e-3d9eaa104b5f"
+    },
+    {
+      "document_id": "01a00bed-81cb-7e93-87ed-ad219b25b15d",
+      "slug": "tasks/gh-431-christofides-explainer",
+      "tip_commit_id": "01a00bef-815a-7380-980e-3d9eaa104b5f"
+    },
+    {
+      "document_id": "01a00bed-81ec-7ae3-8432-7e634f4b7342",
+      "slug": "tasks/gh-430-branch-bound-explainer",
+      "tip_commit_id": "01a00bef-815a-7380-980e-3d9eaa104b5f"
+    },
+    {
+      "document_id": "01a00bed-820a-70c3-be36-a94003cd7bfe",
+      "slug": "tasks/gh-429-bhk-explainer",
+      "tip_commit_id": "01a00bef-815a-7380-980e-3d9eaa104b5f"
+    },
+    {
+      "document_id": "01a00bed-8225-75d1-8c61-4376d440f4b0",
+      "slug": "tasks/gh-476-algorithms-index",
+      "tip_commit_id": "01a00bef-815a-7380-980e-3d9eaa104b5f"
+    },
+    {
+      "document_id": "01a00bed-8240-7f70-8b8c-a080825810e6",
+      "slug": "notes/agent-dev-notes",
+      "tip_commit_id": "01a12c02-86be-7ea2-9ffc-d4a2f552d4ba"
+    },
+    {
+      "document_id": "01a1264b-f469-78c0-b4f8-e4dfbd39a729",
+      "slug": "decisions/benchmarking-design",
+      "tip_commit_id": "01a129da-c549-7d60-be18-8384986d8dd2"
+    },
+    {
+      "document_id": "01a12650-9cbe-7021-8707-f061aaa974e4",
+      "slug": "tasks/bench-sa-honours-epoch-budget",
+      "tip_commit_id": "01a12694-4374-7501-b6ad-3c2943d4ecec"
+    },
+    {
+      "document_id": "01a12651-55d5-7f71-84c7-360c3a0086fa",
+      "slug": "tasks/bench-plateau-stop-all-iterative",
+      "tip_commit_id": "01a1273b-0227-7112-b968-39df2ba0ad09"
+    },
+    {
+      "document_id": "01a12651-55eb-7e41-9ab3-08235b16bfab",
+      "slug": "tasks/bench-platoo-epochs-help-name",
+      "tip_commit_id": "01a1269a-98ae-7bc2-9a47-3686fe106abf"
+    },
+    {
+      "document_id": "01a12651-5604-74c1-9e04-1a8d386a2ee9",
+      "slug": "tasks/bench-measurement-harness",
+      "tip_commit_id": "01a12a1d-c1f3-79b3-a325-1fdcdcd92c77"
+    },
+    {
+      "document_id": "01a12651-561a-7fc0-8f40-23bcf5a773ba",
+      "slug": "tasks/bench-tier-a-campaign",
+      "tip_commit_id": "01a12bfe-e078-7d73-af12-ed2a7054804d"
+    },
+    {
+      "document_id": "01a12651-5631-7b92-b921-802fa80a731d",
+      "slug": "tasks/bench-publish-provenance",
+      "tip_commit_id": "01a129f6-6eb8-73f2-8e9f-82b0a95faf5a"
+    },
+    {
+      "document_id": "01a12651-5646-7e10-ba40-b75b1a4fc3b2",
+      "slug": "tasks/bench-algorithm-pages",
+      "tip_commit_id": "01a12bc6-4c68-72b3-9d63-2ac38bc85c11"
+    },
+    {
+      "document_id": "01a12651-565c-7183-9d74-562a67e27df0",
+      "slug": "tasks/bench-docs-spec-update",
+      "tip_commit_id": "01a12651-aa71-7630-9ae4-047807590611"
+    },
+    {
+      "document_id": "01a12651-5672-75e3-9298-3919b51d636a",
+      "slug": "tasks/bench-single-solver-skill",
+      "tip_commit_id": "01a12651-aa71-7630-9ae4-047807590611"
+    },
+    {
+      "document_id": "01a12651-5689-7883-ab53-7ff7bb70901e",
+      "slug": "tasks/bench-regression-history",
+      "tip_commit_id": "01a12651-aa71-7630-9ae4-047807590611"
+    },
+    {
+      "document_id": "01a126de-0734-7a40-b552-369ed5f2960b",
+      "slug": "tasks/solver-progress-listener",
+      "tip_commit_id": "01a126de-176b-74a1-8d6a-b773ab3c08bb"
+    },
+    {
+      "document_id": "01a1273a-ef08-7462-b2da-bdef1659b8ba",
+      "slug": "tasks/bench-lk-use-shared-plateau-option",
+      "tip_commit_id": "01a1273b-010a-7d73-b30d-430172dc5719"
+    },
+    {
+      "document_id": "01a129e9-f1ca-7460-820b-95cd828a489e",
+      "slug": "tasks/ci-cli-e2e-bats-workflow",
+      "tip_commit_id": "01a129eb-23c9-7fc1-87b0-fae3900dda6b"
+    },
+    {
+      "document_id": "01a12a78-a413-7033-9744-876e15d07cd7",
+      "slug": "tasks/migrate-jaq-for-toml-queries",
+      "tip_commit_id": "01a12a78-b645-7be2-8fcd-f7e43b09db88"
+    },
+    {
+      "document_id": "01a12a7f-a6c5-7322-9471-5b900527510b",
+      "slug": "tasks/bench-problem-leaderboard",
+      "tip_commit_id": "01a12bc6-4c68-72b3-9d63-2ac38bc85c11"
+    },
+    {
+      "document_id": "01a12a9f-cbab-71d0-9901-7aeb4b890f51",
+      "slug": "tasks/fix-euc-2d-rounding",
+      "tip_commit_id": "01a12bf4-b9ca-7120-a222-68bd1ff058ea"
+    },
+    {
+      "document_id": "01a12ab3-9a9d-7cb2-8df8-f77bd9e41ede",
+      "slug": "tasks/ship-missing-optimal-tours",
+      "tip_commit_id": "01a12ab6-0ba5-70d3-80ce-24d50c915215"
+    },
+    {
+      "document_id": "01a12b16-2fb5-77a1-bda3-a36249775339",
+      "slug": "tasks/bench-solver-compare",
+      "tip_commit_id": "01a12bc6-4c68-72b3-9d63-2ac38bc85c11"
+    },
+    {
+      "document_id": "01a12b16-2fd0-7f11-abac-72499916b64e",
+      "slug": "tasks/bench-data-download",
+      "tip_commit_id": "01a12bc6-4c68-72b3-9d63-2ac38bc85c11"
+    },
+    {
+      "document_id": "01a12b16-2fe4-7a20-b2f2-1c24f8526891",
+      "slug": "tasks/blog-benchmarks-duckdb",
+      "tip_commit_id": "01a12b16-c54e-7f00-be62-0b1d33af3ff2"
+    },
+    {
+      "document_id": "01a12b43-c3f8-7071-b11a-8f3a2d452632",
+      "slug": "tasks/ci-runs-only-auth-e2e",
+      "tip_commit_id": "01a12be8-4da1-7673-a8c4-0d5e7d795858"
+    },
+    {
+      "document_id": "01a12b43-c414-7e02-b8d9-42141ae3f5ee",
+      "slug": "tasks/type-check-the-islands",
+      "tip_commit_id": "01a12c02-66fb-78d0-bc19-6894b9bc245b"
+    },
+    {
+      "document_id": "01a12b55-d379-7202-be99-170112c8918d",
+      "slug": "tasks/problem-minimaps-all-instances",
+      "tip_commit_id": "01a12bc6-3605-7c51-ae7f-df7d535b4aaa"
+    },
+    {
+      "document_id": "01a12b6c-7972-75a3-8d90-7b09d57a8172",
+      "slug": "tasks/index-benchmark-markers",
+      "tip_commit_id": "01a12c02-ee9a-7a81-96da-d3a2e56c6349"
+    },
+    {
+      "document_id": "01a12b6e-0a8d-7b61-ae66-8ffb2bf450fd",
+      "slug": "tasks/tsplib-all-edge-weight-formats",
+      "tip_commit_id": "01a12bc6-3605-7c51-ae7f-df7d535b4aaa"
+    },
+    {
+      "document_id": "01a12b79-88a3-7420-832a-f48fedf90677",
+      "slug": "tasks/problem-minimaps-as-r2-assets",
+      "tip_commit_id": "01a12bc6-3605-7c51-ae7f-df7d535b4aaa"
+    },
+    {
+      "document_id": "01a12bc5-28ba-75d1-9113-8a7b81cf2534",
+      "slug": "tasks/problem-social-cards",
+      "tip_commit_id": "01a12be6-f95d-76a3-b88c-a7e394122573"
+    },
+    {
+      "document_id": "01a12be6-bd6e-7ac0-8772-9b26bd6d3250",
+      "slug": "tasks/minimap-pipeline-guards",
+      "tip_commit_id": "01a12bfa-64f8-7671-9776-d739ecc12487"
+    }
+  ]
+}

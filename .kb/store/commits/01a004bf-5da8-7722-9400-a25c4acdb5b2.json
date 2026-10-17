@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"04f952adb1aac775c74662b084fc67bbb83c58074fa1e416af9f2acbaca75b08","doc_type":"task","document_id":"01a004bf-5da8-7722-9400-a265afff5984","new_version":1,"previous_version":null,"slug":"tasks/webauthn-auth-replace-clerk","title":"Replace Clerk with WebAuthn + self-serve API keys"}],"created_at":"2026-08-15T09:27:25.307533806Z","id":"01a004bf-5da8-7722-9400-a25c4acdb5b2","message":"Task: replace Clerk with WebAuthn (phased plan)"},
+  "content_hash": "c28d424b96e15cfecefaf61ec370095827eeb8e46734babed9def702ee34d29e",
+  "hash_version": 3
+}

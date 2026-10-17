@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"3a5802339fa9d9377ab6ac0cb0ca375adec6552816b27439e266379c288e2691","doc_type":"brief","document_id":"019e2745-c75c-7343-ba85-11a67407fb08","new_version":1,"previous_version":null,"slug":"decisions/adr-003-coverage","title":"ADR-003: Test coverage via cargo-llvm-cov"}],"created_at":"2026-05-14T16:15:48.886703030Z","id":"019e2745-d6d8-7a20-ad47-56b35dac7479","message":"Add ADR-003: test coverage via cargo-llvm-cov"},
+  "content_hash": "ac31cb6ce0060ba9f9d9e768a4fe738b0c6a924837fa296fbd42e24635c761cd",
+  "hash_version": 3
+}

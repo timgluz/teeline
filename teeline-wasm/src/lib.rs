@@ -17,6 +17,9 @@ struct Component;
 fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
     let heuristic = HeuristicOptions {
         epochs: o.epochs as usize,
+        // Not exposed through the WASM interface yet; 0 keeps the plateau stop off, matching the
+        // option's default.
+        stagnation_epochs: 0,
         platoo_epochs: o.platoo_epochs as usize,
         n_nearest: o.n_nearest as usize,
         verbose: false,
@@ -321,11 +324,7 @@ impl Guest for Component {
             })
         } else {
             let data = teeline::tsp::tsplib::read_from_str(&input)?;
-            let dt = match data.distance_type {
-                teeline::tsp::DistanceType::Euc2D => "EUC_2D",
-                teeline::tsp::DistanceType::Explicit => "EXPLICIT",
-                teeline::tsp::DistanceType::Geo => "GEO",
-            };
+            let dt = data.distance_type.as_str();
             Ok(ParsedProblem {
                 name: data.name.clone(),
                 comment: data.comment.clone(),

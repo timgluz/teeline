@@ -36,6 +36,10 @@
 @layer base {
   html {
     color-scheme: dark;
+    /* The topbar is sticky (3.5rem tall), so an in-page jump — the hero's "algorithms"
+       link, and the "published results" row on each algorithm doc — would otherwise put
+       its target underneath the nav. Scroll padding affects anchor scrolling only. */
+    scroll-padding-top: 4.5rem;
   }
   body {
     @apply bg-canvas text-text font-sans antialiased;

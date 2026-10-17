@@ -19,6 +19,17 @@ pub fn tour_cost(route: &[usize], cities: &[KDPoint]) -> f32 {
     tour_cost_with_type(route, cities, DistanceType::Euc2D)
 }
 
+/// Sum of plain Euclidean distances — **not** TSPLIB's `EUC_2D`, which rounds to the nearest
+/// integer. See `DistanceMatrix::from_cities_unrounded` for why a caller would want the raw form.
+#[doc(hidden)]
+pub fn tour_cost_unrounded(route: &[usize], cities: &[KDPoint]) -> f32 {
+    let idx: HashMap<usize, &KDPoint> = cities.iter().map(|c| (c.id, c)).collect();
+    let n = route.len();
+    (0..n)
+        .map(|i| idx[&route[i]].distance(idx[&route[(i + 1) % n]]))
+        .sum()
+}
+
 /// Sum of distances along the tour using the given distance type.
 pub fn tour_cost_with_type(route: &[usize], cities: &[KDPoint], dt: DistanceType) -> f32 {
     let idx: HashMap<usize, &KDPoint> = cities.iter().map(|c| (c.id, c)).collect();
@@ -28,12 +39,10 @@ pub fn tour_cost_with_type(route: &[usize], cities: &[KDPoint], dt: DistanceType
             let a = idx[&route[i]];
             let b = idx[&route[(i + 1) % n]];
             match dt {
-                DistanceType::Euc2D => {
-                    let dx = a.x() - b.x();
-                    let dy = a.y() - b.y();
-                    (dx * dx + dy * dy).sqrt()
-                }
+                DistanceType::Euc2D => distance_matrix::euc_2d_distance(a, b),
                 DistanceType::Geo => distance_matrix::geo_distance(a, b),
+                DistanceType::Att => distance_matrix::att_distance(a, b),
+                DistanceType::Ceil2D => distance_matrix::ceil_2d_distance(a, b),
                 DistanceType::Explicit => {
                     panic!("tour_cost_with_type requires DistanceMatrix for EXPLICIT; use tour_cost_from_matrix instead")
                 }
@@ -49,6 +58,18 @@ pub fn tour_cost_from_matrix(route: &[usize], dm: &DistanceMatrix) -> f32 {
 
 pub fn compare_tours(solver: &[usize], optimal: &[usize], cities: &[KDPoint]) -> ComparisonStats {
     compare_tours_with_type(solver, optimal, cities, DistanceType::Euc2D)
+}
+
+/// `compare_tours` on plain Euclidean distances rather than TSPLIB's rounded `EUC_2D`.
+#[doc(hidden)]
+pub fn compare_tours_unrounded(
+    solver: &[usize],
+    optimal: &[usize],
+    cities: &[KDPoint],
+) -> ComparisonStats {
+    let optimal_cost = tour_cost_unrounded(optimal, cities);
+    let solver_cost = tour_cost_unrounded(solver, cities);
+    build_stats(solver_cost, optimal_cost, solver, optimal)
 }
 
 pub fn compare_tours_with_type(
@@ -160,7 +181,7 @@ mod tests {
         let cities = square_cities();
         let optimal = vec![1, 2, 3, 4];
         let solver = vec![1, 2, 4, 3];
-        let stats = compare_tours(&solver, &optimal, &cities);
+        let stats = compare_tours_unrounded(&solver, &optimal, &cities);
 
         assert!(
             stats.gap_pct > 0.0,
@@ -226,6 +247,49 @@ mod tests {
         assert_eq!(stats.gap_pct, 0.0);
         assert_eq!(stats.shared_edges, 6);
         assert_eq!(stats.solver_only_edges, 0);
+    }
+
+    #[test]
+    fn tour_cost_with_type_att_and_ceil_2d() {
+        // Covers the ATT / CEIL_2D arms of `tour_cost_with_type` — their own code paths in
+        // this function, which the api and CLI route tour-cost reporting through.
+        let cities: Vec<KDPoint> = [[0.0, 0.0], [3.0, 4.0], [10.0, 30.0], [-5.0, 2.0]]
+            .iter()
+            .enumerate()
+            .map(|(i, c)| KDPoint { id: i, coords: *c })
+            .collect();
+        let route = vec![0, 1, 2, 3];
+
+        let att = tour_cost_with_type(&route, &cities, DistanceType::Att);
+        let ceil = tour_cost_with_type(&route, &cities, DistanceType::Ceil2D);
+        let euc = tour_cost_with_type(&route, &cities, DistanceType::Euc2D);
+
+        // Each metric must produce its own value, not silently fall through to Euclidean.
+        assert!(att > 0.0 && ceil > 0.0);
+        assert_ne!(att, euc, "ATT arm fell through to Euclidean");
+        assert_ne!(ceil, euc, "CEIL_2D arm fell through to Euclidean");
+
+        // Agree with the primitives they delegate to, summed over the closed tour.
+        let n = route.len();
+        for (dt, f) in [
+            (
+                DistanceType::Att,
+                distance_matrix::att_distance as fn(&KDPoint, &KDPoint) -> f32,
+            ),
+            (
+                DistanceType::Ceil2D,
+                distance_matrix::ceil_2d_distance as fn(&KDPoint, &KDPoint) -> f32,
+            ),
+        ] {
+            let expected: f32 = (0..n)
+                .map(|i| f(&cities[route[i]], &cities[route[(i + 1) % n]]))
+                .sum();
+            let got = tour_cost_with_type(&route, &cities, dt);
+            assert!(
+                (got - expected).abs() < 0.01,
+                "tour_cost_with_type disagrees with its primitive: {got} vs {expected}"
+            );
+        }
     }
 
     #[test]

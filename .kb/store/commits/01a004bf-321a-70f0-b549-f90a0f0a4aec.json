@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"bbb90305ed0090c47a600c4ef41d3b71e5141cc8881e022f04da97b49e2a5df6","doc_type":"spec","document_id":"01a004bf-067a-7af0-ae9c-668dc0b8f347","new_version":1,"previous_version":null,"slug":"decisions/webauthn-auth-design","title":"WebAuthn Auth: Design & Implementation Plan"}],"created_at":"2026-08-15T09:27:14.051715878Z","id":"01a004bf-321a-70f0-b549-f90a0f0a4aec","message":"WebAuthn auth design + implementation plan (spec)"},
+  "content_hash": "b781e133e474cf5bf3980ac26196c90532b5e30a1e2bb99ff9743166eeffbffc",
+  "hash_version": 3
+}

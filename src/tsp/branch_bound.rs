@@ -328,7 +328,7 @@ mod tests {
             vec![1.0, 1.0],
             vec![1.0, 0.0],
         ]);
-        let dm = distance_matrix::from_cities(&cities);
+        let dm = distance_matrix::from_cities_unrounded(&cities);
         TspProblem::new(cities, dm)
     }
 

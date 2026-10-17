@@ -3,6 +3,7 @@ use std::sync::mpsc;
 use rand::RngExt;
 use rand::seq::SliceRandom;
 
+use super::budget::Budget;
 use super::probability::roulette_select;
 use super::progress::ProgressMessage;
 use super::route::Route;
@@ -175,7 +176,12 @@ pub fn solve(
         deposit_tour(&mut pheromone, n, &best_pos_seed, best_cost);
     }
 
-    for epoch in 0..opts.heuristic.epochs {
+    let mut budget = Budget::new(opts.heuristic.epochs, opts.heuristic.stagnation_epochs);
+    let mut improved = true;
+
+    while budget.record(improved) {
+        let epoch = budget.index();
+        let best_at_epoch_start = best_cost;
         // Precomputed once per epoch, not once per ant-step: with num_ants ants each
         // scanning up to n unvisited cities per step, per-step powf would cost roughly
         // num_ants * n^2 / 2 evaluations vs n^2 here.
@@ -241,6 +247,16 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::EpochUpdate(epoch));
         }
+
+        improved = best_cost < best_at_epoch_start;
+    }
+
+    if budget.converged() {
+        tracing::info!(
+            epoch = budget.epoch(),
+            stagnation_epochs = budget.stale_epochs(),
+            "ACO: converged, no improvement for the stagnation limit"
+        );
     }
 
     if let Some(tx) = progress_tx {
@@ -254,6 +270,9 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc;
+
+    use crate::tsp::progress::ProgressMessage;
     use crate::tsp::{AcoOptions, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     #[test]
@@ -368,13 +387,30 @@ mod tests {
         let optimal_cost = dm.tour_length(&optimal);
         let opts = AcoOptions {
             heuristic: HeuristicOptions {
-                epochs: 0,
+                epochs: 5,
                 ..HeuristicOptions::default()
             },
             ..AcoOptions::default()
         };
         let problem = TspProblem::new(cities.clone(), dm);
-        let result = solve(&problem, &opts, None, Some(&optimal));
+
+        // The seed must be the solver's *initial* best, and that is what the first update carries:
+        // it is sent before any epoch runs. Comparing final costs cannot show this — on an
+        // instance this small the solver may reach the optimum on its own, seed or no seed.
+        let (tx, rx) = mpsc::channel();
+        let result = solve(&problem, &opts, Some(&tx), Some(&optimal));
+        match rx.try_recv() {
+            Ok(ProgressMessage::PathUpdate(route, cost)) => {
+                assert_eq!(
+                    route.route(),
+                    optimal.as_slice(),
+                    "the seeded tour must be the initial best"
+                );
+                assert!((cost - optimal_cost).abs() < 1e-4, "at the seed's cost");
+            }
+            other => panic!("expected the seeded tour as the first update, got {other:?}"),
+        }
+
         assert!((result.total - optimal_cost).abs() < 1e-4);
         let mut visited = result.route().to_vec();
         visited.sort();

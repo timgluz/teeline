@@ -1,0 +1,5 @@
+{
+  "commit": {"author":"Timo Sulg <timgluz@gmail.com>","changes":[{"change_type":"created","content_hash":"138ab8688fae348d4bdfc2507981a7eaa54b0bd5842a0e236a5f3a26c3463509","doc_type":"task","document_id":"019ebfd9-6c05-7ac0-9d3b-ee9ca71279f8","new_version":1,"previous_version":null,"slug":"tasks/gh-73-gsa-solver","title":"feat: implement Gravitational Search Algorithm (GSA) solver (GH #73)"}],"created_at":"2026-06-13T07:19:21.270753181Z","id":"019ebfd9-7a1a-7a03-849a-3351604c098d","message":"task: create GSA solver task (GH #73)"},
+  "content_hash": "b79e9b0932bdc4fcef054b9bd259b665d3a067eeb2193b86e6a6e0522224b8c2",
+  "hash_version": 3
+}
