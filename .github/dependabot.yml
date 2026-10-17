@@ -13,6 +13,14 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    ignore:
+      # Preact majors are gated on @astrojs/preact, whose peer range is still
+      # `preact: ^10.6.5` (also true of 6.0.6, the newest release on any
+      # channel). npm enforces peer ranges, so `npm ci` fails with ERESOLVE in
+      # the ci/e2e/deploy-web workflows until that range includes preact 11.
+      # Drop this rule once @astrojs/preact accepts v11.
+      - dependency-name: "preact"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
