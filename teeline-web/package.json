@@ -27,7 +27,7 @@
     "@sentry/vite-plugin": "^5.4.1",
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "14.0.3",
-    "astro": "^7.4.0",
+    "astro": "^7.4.2",
     "preact": "^10.29.8",
     "tailwindcss": "^4.3.3",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
