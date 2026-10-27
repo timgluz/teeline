@@ -42,7 +42,7 @@
     "prettier": "^3.9.10",
     "typescript": "6.0.3",
     "vitest": "5.0.5",
-    "wrangler": "4.151.1"
+    "wrangler": "4.152.0"
   },
   "overrides": {
     "esbuild": "0.28.1"
