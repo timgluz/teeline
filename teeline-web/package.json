@@ -24,17 +24,17 @@
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@sentry/browser": "^11.10.0",
-    "@sentry/vite-plugin": "^11.9.0",
+    "@sentry/vite-plugin": "^11.10.0",
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "14.0.3",
-    "astro": "^7.4.2",
+    "astro": "^7.4.4",
     "preact": "^10.29.8",
     "tailwindcss": "^4.3.3",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@cloudflare/workers-types": "5.20261023.1",
+    "@cloudflare/workers-types": "5.20261030.1",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
@@ -42,7 +42,7 @@
     "prettier": "^3.9.10",
     "typescript": "6.0.3",
     "vitest": "5.0.5",
-    "wrangler": "4.152.0"
+    "wrangler": "4.156.2"
   },
   "overrides": {
     "esbuild": "0.28.1"
