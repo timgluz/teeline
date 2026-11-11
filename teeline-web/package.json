@@ -24,7 +24,7 @@
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@sentry/browser": "^11.10.0",
-    "@sentry/vite-plugin": "^11.10.0",
+    "@sentry/vite-plugin": "^11.11.0",
     "@simplewebauthn/browser": "13.3.0",
     "@simplewebauthn/server": "14.0.3",
     "astro": "^7.4.7",
@@ -42,7 +42,7 @@
     "prettier": "^3.9.10",
     "typescript": "6.0.3",
     "vitest": "5.1.0",
-    "wrangler": "4.156.2"
+    "wrangler": "4.158.0"
   },
   "overrides": {
     "esbuild": "0.28.1"
