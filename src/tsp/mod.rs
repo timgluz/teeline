@@ -62,6 +62,7 @@ pub enum Solvers {
     GeneticAlgorithm,
     GravitationalSearch,
     GreedyEdge,
+    SpaceFillingCurve,
     OrOpt,
     ParticleSwarmOptimization,
     RandomShuffle,
@@ -101,6 +102,9 @@ impl Solvers {
             "gsa",
             "greedy_edge",
             "gec",
+            "space_filling_curve",
+            "sfc",
+            "hilbert",
             "particle_swarm",
             "pso",
             "random_shuffle",
@@ -338,6 +342,11 @@ impl Solvers {
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
+                name: "space_filling_curve",
+                alias: Some("sfc"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
                 name: "tabu_search",
                 alias: Some("tabu"),
                 kind: SolverKind::Heuristic,
@@ -405,7 +414,7 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 22] = [
+static SOLVER_LIST: [SolverInfo; 23] = [
     SolverInfo {
         name: "Ant Colony",
         alias: "aco",
@@ -468,6 +477,16 @@ static SOLVER_LIST: [SolverInfo; 22] = [
                accepts each unless it creates degree 3+ or a premature sub-cycle.",
         complexity: "O(n\u{00b2} log n) time, O(n\u{00b2}) memory",
         has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Space-Filling Curve",
+        alias: "sfc",
+        category: "Constructive",
+        desc: "Orders cities along a Hilbert or Morton space-filling curve over a normalized \
+               grid; O(n log n) geometric warm start for local search.",
+        complexity: "O(n log n)",
+        has_options: true,
         exact: false,
     },
     SolverInfo {
@@ -631,6 +650,7 @@ impl FromStr for Solvers {
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "gsa" | "gravitational_search" => Ok(Solvers::GravitationalSearch),
             "gec" | "greedy_edge" => Ok(Solvers::GreedyEdge),
+            "sfc" | "hilbert" | "space_filling_curve" => Ok(Solvers::SpaceFillingCurve),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
             "shuffle" | "random_shuffle" => Ok(Solvers::RandomShuffle),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
@@ -1734,6 +1754,7 @@ pub struct AppOptions {
     pub fpa: Option<FPAOptions>,
     pub lk: Option<LKOptions>,
     pub fourier: Option<FourierOptions>,
+    pub sfc: Option<SfcOptions>,
     pub som: Option<SOMOptions>,
     pub aco: Option<AcoOptions>,
     pub heuristic: Option<HeuristicOptions>,
@@ -1844,6 +1865,11 @@ pub fn solve_with_context(
         }
         Solvers::GravitationalSearch => gravitational_search::solve(problem, &h, tx, init_tour),
         Solvers::GreedyEdge => greedy_edge::solve(problem, &h, tx, init_tour),
+        Solvers::SpaceFillingCurve => {
+            let sfc = opts.sfc.as_ref().cloned().unwrap_or_default();
+            sfc.validate()?;
+            space_filling_curve::solve(problem, &sfc, tx, init_tour)
+        }
         Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
         Solvers::RandomShuffle => random_shuffle::solve(problem, &h, tx, init_tour),
         Solvers::KohonenSom => {
@@ -2091,6 +2117,7 @@ mod tests {
             fpa: None,
             lk: None,
             fourier: None,
+            sfc: None,
             som: None,
             aco: None,
             heuristic: None,
@@ -2489,6 +2516,8 @@ mod tests {
         assert!(Solvers::CuckooSearch.auto_expand_with_shuffle());
         assert!(Solvers::FlowerPollination.auto_expand_with_shuffle());
         assert!(Solvers::Fourier.auto_expand_with_shuffle());
+        assert!(!Solvers::SpaceFillingCurve.auto_expand_with_nn());
+        assert!(!Solvers::SpaceFillingCurve.auto_expand_with_shuffle());
         assert!(Solvers::GravitationalSearch.auto_expand_with_shuffle());
         assert!(Solvers::AntColony.auto_expand_with_shuffle());
     }
@@ -2558,6 +2587,18 @@ mod tests {
                     alias
                 );
             }
+        }
+    }
+
+    #[test]
+    fn sfc_aliases_resolve_to_the_same_solver() {
+        use std::str::FromStr;
+        for alias in ["sfc", "hilbert", "space_filling_curve"] {
+            assert_eq!(
+                Solvers::from_str(alias).unwrap(),
+                Solvers::SpaceFillingCurve,
+                "alias {alias:?} must resolve to SpaceFillingCurve"
+            );
         }
     }
 

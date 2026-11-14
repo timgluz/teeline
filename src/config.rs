@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use crate::tsp::{
     AcoOptions, AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    LKOptions, SAOptions, SOMOptions, Solvers,
+    LKOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -13,7 +13,7 @@ pub trait AppOptionsProvider {
 }
 
 /// Applies recognised sub-tables from a `toml::Table` to the base `AppOptions`.
-/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `lk`, `som`, `aco`, and `heuristic`
+/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `sfc`, `lk`, `som`, `aco`, and `heuristic`
 /// are valid top-level keys.
 /// Returns `Err` on unknown keys or mis-typed sub-tables.
 pub struct TomlTableProvider<'a>(pub &'a toml::Table);
@@ -45,6 +45,10 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                         .ok_or("config: `fourier` must be a table")?;
                     base.fourier = Some(FourierOptions::from_toml(t)?);
                 }
+                "sfc" => {
+                    let t = value.as_table().ok_or("config: `sfc` must be a table")?;
+                    base.sfc = Some(SfcOptions::from_toml(t)?);
+                }
                 "lk" => {
                     let t = value.as_table().ok_or("config: `lk` must be a table")?;
                     base.lk = Some(LKOptions::from_toml(t)?);
@@ -65,7 +69,7 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, lk, som, aco, heuristic"
+                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, sfc, lk, som, aco, heuristic"
                     ));
                 }
             }
@@ -121,6 +125,7 @@ pub fn load_pipeline_config(
             ("cs", matches!(solver, Solvers::CuckooSearch)),
             ("fpa", matches!(solver, Solvers::FlowerPollination)),
             ("fourier", matches!(solver, Solvers::Fourier)),
+            ("sfc", matches!(solver, Solvers::SpaceFillingCurve)),
             ("lk", matches!(solver, Solvers::LinKernighan)),
             ("som", matches!(solver, Solvers::KohonenSom)),
             ("aco", matches!(solver, Solvers::AntColony)),
@@ -133,6 +138,7 @@ pub fn load_pipeline_config(
                         | Solvers::CuckooSearch
                         | Solvers::FlowerPollination
                         | Solvers::Fourier
+                        | Solvers::SpaceFillingCurve
                         | Solvers::LinKernighan
                         | Solvers::KohonenSom
                         | Solvers::AntColony
@@ -255,6 +261,23 @@ mod tests {
         let fourier = opts.fourier.unwrap();
         assert_eq!(fourier.k_max, 32);
         assert_eq!(fourier.m, 1120);
+    }
+
+    #[test]
+    fn test_toml_provider_sfc_sub_table_works() {
+        use crate::tsp::SfcCurveType;
+
+        let table: toml::Table = toml::from_str(
+            "solver = \"sfc\"\n[sfc]\ncurve_type = \"morton\"\norder = 8\nrotation = 90",
+        )
+        .unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.curve_type, SfcCurveType::Morton);
+        assert_eq!(sfc.order, 8);
+        assert_eq!(sfc.rotation, 90);
     }
 
     #[test]
@@ -393,6 +416,20 @@ mod tests {
         let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.fourier]\nk_max = 32\n";
         let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
         assert!(err.contains("fourier"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_sfc_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.sfc]\norder = 8\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("sfc"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_sfc_errors() {
+        let toml = "[[stage]]\nsolver = \"sfc\"\n\n[stage.sfc]\norder = 8\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
     }
 
     #[test]

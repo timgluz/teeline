@@ -223,6 +223,7 @@ fn make_app_options(
         fpa,
         lk,
         fourier,
+        sfc: None,
         som,
         aco,
         heuristic,
