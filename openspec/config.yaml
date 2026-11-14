@@ -8,6 +8,15 @@ schema: spec-driven
 #   context: |
 #     Designs and tasks must cover Windows, macOS, and Linux
 #     Write all artifacts in Spanish
+context: |
+  Teeline's governing principles live in `constitution.md` at the repository root.
+  Every proposal, spec delta, design and task MUST comply with it. If a change would
+  violate a principle, amend the constitution first (see its Governance section).
+
+  In particular: correctness before performance; TSPLIB known optima are the ground
+  truth; one solver dispatch path (`Solvers` -> `tsp::solve`); solver logic lives only in
+  the root `teeline` crate; teeline-api follows lean routes, business logic in services
+  behind traits, and data access only through repositories/ports.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

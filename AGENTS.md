@@ -6,6 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Teeline is a Traveling Salesman Problem (TSP) solver written in Rust. It reads city data in TSPLIB format (from stdin or file) and outputs the tour cost and ordered city IDs. A Piston-based progress window renders the route visually in a separate thread while solving.
 
+## Constitution
+
+`constitution.md` at the repository root holds the project's non-negotiable principles and
+constraints (vision, hard contracts, architecture/API guardrails, governance). Read it
+before proposing or implementing a change. Where this file and the constitution disagree
+on a matter of principle, the constitution wins; this file remains the operational how-to.
+
 ## Commands
 
 ```bash
