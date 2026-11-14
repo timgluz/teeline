@@ -933,6 +933,7 @@ EOF
         assert_eq!(sfc.curve_type, SfcCurveType::Hilbert);
         assert_eq!(sfc.aspect_scaling, AspectScaling::Uniform);
         assert_eq!(sfc.tie_breaker, TieBreaker::InputOrder);
+        assert_eq!(sfc.multi_orientation, 8);
     }
 
     #[test]

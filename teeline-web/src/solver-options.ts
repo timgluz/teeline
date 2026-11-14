@@ -36,6 +36,6 @@ export function defaultSolveOptions(): SolveOptions {
     sfcOrder: 16,
     sfcRotation: 0,
     sfcMirror: 0,
-    sfcMultiOrientation: 0,
+    sfcMultiOrientation: 8,
   }
 }

@@ -130,7 +130,7 @@ fn default_options() -> crate::teeline::solver::types::SolveOptions {
         sfc_order: 16,
         sfc_rotation: 0,
         sfc_mirror: 0,
-        sfc_multi_orientation: 0,
+        sfc_multi_orientation: 8,
     }
 }
 

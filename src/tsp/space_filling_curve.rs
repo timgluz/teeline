@@ -57,7 +57,7 @@ impl Default for SfcOptions {
             aspect_scaling: AspectScaling::Uniform,
             rotation: 0,
             mirror: false,
-            multi_orientation: 0,
+            multi_orientation: 8,
             tie_breaker: TieBreaker::InputOrder,
         }
     }
@@ -830,6 +830,7 @@ mod tests {
                     &SfcOptions {
                         rotation,
                         mirror,
+                        multi_orientation: 0,
                         ..Default::default()
                     },
                     None,
@@ -915,7 +916,7 @@ mod tests {
         assert_eq!(opts.aspect_scaling, AspectScaling::Uniform);
         assert_eq!(opts.rotation, 0);
         assert!(!opts.mirror);
-        assert_eq!(opts.multi_orientation, 0);
+        assert_eq!(opts.multi_orientation, 8);
         assert_eq!(opts.tie_breaker, TieBreaker::InputOrder);
     }
 
