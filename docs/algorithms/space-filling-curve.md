@@ -3,6 +3,7 @@ id: "space_filling_curve"
 name: "Space-Filling Curve"
 typeBadge: "Heuristic — constructive"
 description: "Projects city coordinates onto a 2^p × 2^p grid, maps each cell to a Hilbert or Morton curve index, and sorts cities by that index. O(n log n), deterministic, and a fast geometric warm start for local search."
+hasExplainer: true
 ---
 
 # Space-Filling Curve

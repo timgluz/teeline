@@ -5,6 +5,7 @@ import {
   PAGED_SOLVERS,
   EXPLAINER_SOLVERS,
 } from './nav-data'
+import { EXPLAINER_IDS } from './explainers/registry'
 
 describe('SOLVER_META', () => {
   it('contains exactly 22 solvers', () => {
@@ -87,24 +88,8 @@ describe('PAGED_SOLVERS', () => {
 })
 
 describe('EXPLAINER_SOLVERS', () => {
-  it('contains exactly the 13 ids with an interactive explainer', () => {
-    expect(EXPLAINER_SOLVERS).toEqual(
-      new Set([
-        'pso',
-        'gsa',
-        'tabu',
-        'ga',
-        'cs',
-        'fpa',
-        'lk',
-        'sa',
-        'som',
-        'fourier',
-        'greedy_edge',
-        'savings',
-        'aco',
-      ]),
-    )
+  it('matches the explainer registry', () => {
+    expect(EXPLAINER_SOLVERS).toEqual(new Set(EXPLAINER_IDS))
   })
 
   it('every explainer ID exists in SOLVER_META', () => {
