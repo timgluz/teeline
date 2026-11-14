@@ -247,6 +247,7 @@ done
 | Nearest Neighbor | `nn` | heuristic — constructive | [→](docs/algorithms/nearest-neighbor.md) |
 | Christofides | `christofides`, `chr` | heuristic — constructive | [→](docs/algorithms/christofides.md) |
 | Greedy Edge | `greedy_edge`, `gec` | heuristic — constructive | [→](docs/algorithms/greedy-edge.md) |
+| Space-Filling Curve | `space_filling_curve`, `sfc`, `hilbert` | heuristic — constructive | [→](docs/algorithms/space-filling-curve.md) |
 | Fourier | `fourier` | heuristic — constructive | [→](docs/algorithms/fourier.md) |
 | Kohonen SOM | `som` | heuristic — constructive | [→](docs/algorithms/som.md) |
 | 2-opt | `2opt` | heuristic — local search | [→](docs/algorithms/two-opt.md) |
@@ -279,7 +280,7 @@ Auto-expansion strategy depends on the solver type:
 | --- | --- | --- |
 | **Deterministic local search** (2opt, 3opt, tabu, or_opt, lk, branch_bound) | `pipeline(nn, solver)` | Monotone hill-climbers (and B&B's upper bound) benefit from a good start |
 | **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa, gsa, fourier, aco) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
-| **Constructive** (nn, christofides, greedy_edge, bhk) | no expansion | They build a tour from scratch |
+| **Constructive** (nn, christofides, greedy_edge, sfc, bhk) | no expansion | They build a tour from scratch |
 
 ```bash
 # sa auto-expands to pipeline(shuffle, sa)

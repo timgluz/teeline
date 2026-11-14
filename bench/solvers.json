@@ -94,6 +94,24 @@
       ]
     },
     {
+      "id": "space_filling_curve",
+      "cli": "space_filling_curve",
+      "name": "Space-Filling Curve",
+      "family": "constructive",
+      "deterministic": true,
+      "doc": "space-filling-curve",
+      "notes": "Hilbert/Morton ordering over a normalized 2^p grid. No RNG; measured identical tours across 5 runs on a280 (n=280).",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 5,
+        "outcome": "identical"
+      },
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
       "id": "savings",
       "cli": "savings",
       "name": "Savings",
