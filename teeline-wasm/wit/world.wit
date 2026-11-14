@@ -21,6 +21,11 @@ interface types {
         beta: f32,
         evaporation-rate: f32,
         num-ants: u32,
+        // SFC tunables (ignored by non-SFC solvers).
+        sfc-order: u32,
+        sfc-rotation: u32,
+        sfc-mirror: u32,
+        sfc-multi-orientation: u32,
     }
 
     record solution {
