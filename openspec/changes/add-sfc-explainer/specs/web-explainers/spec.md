@@ -70,7 +70,7 @@ The explainer SHALL let the visitor switch between Hilbert and Morton curve type
 #### Scenario: Long curve jumps are distinguishable
 
 - **WHEN** the selected curve contains consecutive cells that are not grid neighbours
-- **THEN** those jumps are visually distinguishable from locally adjacent curve segments
+- **THEN** those jumps are counted in the long-curve-jump statistic and drawn in a distinct style from locally adjacent curve segments
 
 ### Requirement: Seam and longest edge are explained
 
@@ -93,7 +93,7 @@ The explainer SHALL identify the tour's closing seam edge, SHALL identify the lo
 
 ### Requirement: Teaching statistics expose the mechanism
 
-The explainer SHALL display statistics that make the grid projection and curve locality legible: cities and cells used, the largest same-cell bucket, tour length, seam length, and the number of long curve jumps.
+The explainer SHALL display statistics that make the grid projection and curve locality legible: cities and cells used, the largest same-cell bucket, tour length, seam length, longest edge length, and the number of long curve jumps. A long curve jump is a step between consecutive curve cells that are not grid neighbours.
 
 #### Scenario: Grid resolution effect is visible
 
@@ -117,7 +117,7 @@ The explainer SHALL be operable by keyboard, expose a text alternative for the v
 #### Scenario: Screen-reader summary
 
 - **WHEN** a screen reader encounters the visualization
-- **THEN** it receives a summary of the selected curve, grid order, city order, tour length, and seam
+- **THEN** it receives a summary of the selected curve, grid order, city order, tour length, seam, and longest edge
 
 #### Scenario: Narrow viewport
 

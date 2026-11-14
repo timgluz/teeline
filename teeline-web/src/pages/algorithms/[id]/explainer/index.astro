@@ -28,6 +28,7 @@ import SomExplainer from '../../../../explainers/som'
 import FourierExplainer from '../../../../explainers/fourier'
 import GreedyEdgeExplainer from '../../../../explainers/greedy-edge'
 import SavingsExplainer from '../../../../explainers/savings'
+import SfcExplainer from '../../../../explainers/sfc'
 import AcoExplainer from '../../../../explainers/aco'
 import StochasticHillExplainer from '../../../../explainers/stochastic-hill'
 import OrOptExplainer from '../../../../explainers/or-opt'
@@ -81,6 +82,7 @@ const jsonLd = {
       {id === 'fourier' && <FourierExplainer client:visible />}
       {id === 'greedy_edge' && <GreedyEdgeExplainer client:visible />}
       {id === 'savings' && <SavingsExplainer client:visible />}
+      {id === 'space_filling_curve' && <SfcExplainer client:visible />}
       {id === 'aco' && <AcoExplainer client:visible />}
       {id === 'stochastic_hill' && <StochasticHillExplainer client:visible />}
       {id === 'or_opt' && <OrOptExplainer client:visible />}

@@ -20,10 +20,10 @@ test.describe('algorithms index & topbar nav', () => {
     page,
   }) => {
     await page.goto('/algorithms/')
-    // one "▶ interactive" link per explainer (21 at the time of writing)
+    // one "▶ interactive" link per explainer (22 at the time of writing)
     await expect(
       page.getByRole('link', { name: /Open interactive explainer for/ }),
-    ).toHaveCount(21)
+    ).toHaveCount(22)
     // a known solver doc link is present
     await expect(
       page.getByRole('link', { name: 'Christofides', exact: true }),
@@ -44,5 +44,19 @@ test.describe('algorithms index & topbar nav', () => {
       .click()
     await expect(page).toHaveURL(/\/algorithms\/christofides\/explainer\/$/)
     await expect(page.locator('.chr-root')).toBeVisible({ timeout: 10_000 })
+  })
+
+  test('the Space-Filling Curve row opens its explainer', async ({ page }) => {
+    await page.goto('/algorithms/')
+    const row = page.getByRole('row').filter({ hasText: 'Space-Filling Curve' })
+    await row
+      .getByRole('link', {
+        name: /Open interactive explainer for Space-Filling Curve/,
+      })
+      .click()
+    await expect(page).toHaveURL(
+      /\/algorithms\/space_filling_curve\/explainer\/$/,
+    )
+    await expect(page.locator('.sfc-root')).toBeVisible({ timeout: 10_000 })
   })
 })

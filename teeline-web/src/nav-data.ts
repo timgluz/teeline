@@ -133,20 +133,29 @@ export const SOLVER_GROUPS: SolverGroup[] = [
 // Every id in SOLVER_META has a generated doc page under /algorithms/<id>/.
 export const PAGED_SOLVERS = new Set(Object.keys(SOLVER_META))
 
-// The subset of ids with an interactive explainer under /algorithms/<id>/explainer/.
+// The ids with an interactive explainer under /algorithms/<id>/explainer/.
 export const EXPLAINER_SOLVERS = new Set([
-  'pso',
-  'gsa',
-  'tabu',
-  'ga',
-  'cs',
-  'fpa',
+  'bhk',
+  'branch_bound',
+  'nn',
+  'fourier',
+  'christofides',
+  'greedy_edge',
+  'space_filling_curve',
+  'savings',
+  'som',
+  '2opt',
+  '3opt',
+  'or_opt',
+  'stochastic_hill',
   'lk',
   'sa',
-  'som',
-  'fourier',
-  'greedy_edge',
-  'savings',
+  'tabu',
+  'ga',
+  'pso',
+  'cs',
+  'fpa',
+  'gsa',
   'aco',
 ])
 

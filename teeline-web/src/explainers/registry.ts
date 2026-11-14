@@ -1,4 +1,4 @@
-// Metadata registry for the 15 interactive explainer pages. Only metadata
+// Metadata registry for the 22 interactive explainer pages. Only metadata
 // lives here — the components themselves must be statically imported
 // directly in [id]/explainer/index.astro, because Astro's client:* hydration
 // directives require the compiler to see a literal top-level `import`
@@ -84,6 +84,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
     description:
       'Interactive walkthrough of Savings Construction: watch every pairwise edge scan highest-savings-first, ranked by the Clarke-Wright savings formula s(i,j) = d(hub,i) + d(hub,j) − d(i,j), with a centroid-nearest hub city bias and the same Kruskal-style accept/reject guards as Greedy Edge.',
     backLabel: 'Savings',
+  },
+  space_filling_curve: {
+    title: 'Space-Filling Curve — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the Space-Filling Curve construction: watch Hilbert and Morton curves order cities on a 2^p × 2^p grid, and see the seam edge that a 2-opt pass removes.',
+    backLabel: 'SFC',
   },
   aco: {
     title: 'Ant Colony Optimization — Interactive Explainer — Teeline',
