@@ -23,5 +23,5 @@ wit-bindgen-rt = { version = "0.44.0", features = ["bitflags"] }
 teeline = { path = "..", default-features = false, features = ["json"] }
 
 [dev-dependencies]
-wasmtime = { version = "45", features = ["component-model"] }
-wasmtime-wasi = "45"
+wasmtime = { version = "50", features = ["component-model"] }
+wasmtime-wasi = "50"
