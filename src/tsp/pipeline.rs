@@ -106,6 +106,10 @@ pub fn stage_warnings(solvers: &[Solvers]) -> Vec<String> {
                     "savings at stage {i} discards the warm-start seed from the previous \
                      stage (it always rebuilds from scratch)"
                 )),
+                Solvers::SpaceFillingCurve => warnings.push(format!(
+                    "sfc at stage {i} discards the warm-start seed from the previous \
+                     stage (it always rebuilds from scratch)"
+                )),
                 _ => {}
             }
         }
@@ -244,6 +248,18 @@ mod tests {
             stage_warnings(&[Solvers::TwoOpt, Solvers::NearestNeighbor, Solvers::TwoOpt]);
         assert_eq!(warnings.len(), 1);
         assert!(warnings[0].contains("nn at stage 1"));
+    }
+
+    #[test]
+    fn test_stage_warnings_flags_sfc_mid_pipeline() {
+        let warnings = stage_warnings(&[Solvers::TwoOpt, Solvers::SpaceFillingCurve]);
+        assert_eq!(warnings.len(), 1);
+        assert!(warnings[0].contains("sfc at stage 1"));
+    }
+
+    #[test]
+    fn test_stage_warnings_sfc_first_stage_is_fine() {
+        assert!(stage_warnings(&[Solvers::SpaceFillingCurve, Solvers::TwoOpt]).is_empty());
     }
 
     #[test]
