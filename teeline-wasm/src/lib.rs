@@ -1,15 +1,16 @@
 #[allow(warnings)]
 mod bindings;
 
-use bindings::Guest;
 use bindings::teeline::solver::types::{
     AlgorithmInfo, City, CompareResult, ComparisonStats, ParamSpec, ParsedProblem, Solution,
     SolveOptions,
 };
+use bindings::Guest;
 use teeline::tsp::comparison;
 use teeline::tsp::{
-    AppOptions, AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    SAOptions, Solvers, TspProblem, distance_matrix::DistanceMatrix, kdtree::KDPoint,
+    distance_matrix::DistanceMatrix, kdtree::KDPoint, AcoOptions, AppOptions, CSOptions,
+    FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions, SfcOptions, Solvers,
+    TspProblem,
 };
 
 struct Component;
@@ -63,6 +64,18 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::SpaceFillingCurve => AppOptions {
+            sfc: Some(SfcOptions {
+                // Saturate rather than truncate: a host value like 272 must fail
+                // `SfcOptions::validate()`, not wrap into a different valid config.
+                order: u8::try_from(o.sfc_order).unwrap_or(u8::MAX),
+                rotation: u16::try_from(o.sfc_rotation).unwrap_or(u16::MAX),
+                mirror: o.sfc_mirror != 0,
+                multi_orientation: u8::try_from(o.sfc_multi_orientation).unwrap_or(u8::MAX),
+                ..SfcOptions::default()
+            }),
+            ..AppOptions::default()
+        },
         Solvers::KohonenSom => AppOptions {
             som: Some(teeline::tsp::SOMOptions {
                 epochs: o.epochs as usize,
@@ -98,8 +111,8 @@ fn kd_to_city(c: &KDPoint) -> City {
 fn parse_to_tsp_problem(input: &str) -> Result<TspProblem, String> {
     if input.trim_start().starts_with('[') {
         let kd_cities = teeline::tsp::tsplib::parse_json_cities(input)?;
-        let distances = DistanceMatrix::from_cities(&kd_cities)
-            .map_err(|e| format!("distance matrix: {e}"))?;
+        let distances =
+            DistanceMatrix::from_cities(&kd_cities).map_err(|e| format!("distance matrix: {e}"))?;
         Ok(TspProblem::new(kd_cities, distances))
     } else {
         let data = teeline::tsp::tsplib::read_from_str(input)?;
@@ -130,6 +143,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "shuffle"         => "Baseline only; never produces good tours on its own",
         "christofides"    => "Only solver with a proven \u{2264}1.5\u{00d7} bound; ideal warm-start for pipeline(christofides,lk)",
         "fourier"         => "Constructive Fourier-basis solver; best as warm-start: pipeline(fourier,2opt)",
+        "sfc"             => "Space-filling curve construction; fast O(n log n) warm-start: pipeline(sfc,2opt) or pipeline(sfc,lk)",
         "som"             => "Topology-preserving constructive solver; best piped: pipeline(som,2opt) or pipeline(som,sa)",
         "gec"             => "Deterministic edge-by-edge construction; usually beats nn as a warm-start: pipeline(greedy_edge,2opt) or pipeline(greedy_edge,lk)",
         "sav"             => "Savings-based construction; strong warm-start: pipeline(savings,2opt) or pipeline(savings,lk)",
@@ -147,7 +161,8 @@ fn kind_for(solver: Solvers) -> String {
         | Solvers::Savings
         | Solvers::Fourier
         | Solvers::KohonenSom
-        | Solvers::GreedyEdge => "constructive",
+        | Solvers::GreedyEdge
+        | Solvers::SpaceFillingCurve => "constructive",
         Solvers::TwoOpt | Solvers::ThreeOpt => "local-search",
         Solvers::RandomShuffle => "utility",
         _ => "metaheuristic",
@@ -187,6 +202,22 @@ fn pi(key: &str, label: &str, min: f32) -> ParamSpec {
         min: Some(min),
         max: None,
         step: None,
+        description: String::new(),
+    }
+}
+
+fn pi_max(key: &str, label: &str, min: f32, max: f32) -> ParamSpec {
+    pi_step(key, label, min, max, 1.0)
+}
+
+fn pi_step(key: &str, label: &str, min: f32, max: f32, step: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "int".to_string(),
+        min: Some(min),
+        max: Some(max),
+        step: Some(step),
         description: String::new(),
     }
 }
@@ -251,6 +282,23 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         | Solvers::StochasticHill => shared_heuristic_params(),
         Solvers::Fourier => vec![pi("epochs", "Gradient steps per stage", 1.0)],
         Solvers::KohonenSom => vec![pi("epochs", "Training iterations", 1.0)],
+        Solvers::SpaceFillingCurve => vec![
+            pi_max("sfcOrder", "Grid order p (1..=16)", 1.0, 16.0),
+            pi_step(
+                "sfcRotation",
+                "Rotation (0, 90, 180 or 270)",
+                0.0,
+                270.0,
+                90.0,
+            ),
+            pi_max("sfcMirror", "Mirror the grid (0 = no, 1 = yes)", 0.0, 1.0),
+            pi_max(
+                "sfcMultiOrientation",
+                "Best-of orientations (0..=8)",
+                0.0,
+                8.0,
+            ),
+        ],
         _ => vec![],
     }
 }

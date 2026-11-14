@@ -170,6 +170,34 @@ pub struct FourierConfig {
     pub stagnation_epochs: Option<usize>,
 }
 
+/// Space-filling curve constructive solver. Mirrors `SfcOptions`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SfcConfig {
+    /// `hilbert` (default) or `morton`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "hilbert")]
+    pub curve_type: Option<String>,
+    /// Grid order `p` in `1..=16` (default 16).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<u8>,
+    /// `uniform` (default) or `stretch_to_square`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "uniform")]
+    pub aspect_scaling: Option<String>,
+    /// 0, 90, 180 or 270 (default 0).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirror: Option<bool>,
+    /// 0 disables the ensemble; 1..=8 evaluates that many orientations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multi_orientation: Option<u8>,
+    /// `input_order` (default), `lexicographic` or `nearest_prev`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "input_order")]
+    pub tie_breaker: Option<String>,
+}
+
 /// Per-solver optional configuration. Pass only the field matching your chosen solver.
 /// BHK, branch_bound, and Christofides have no tunable parameters and are absent.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -206,6 +234,8 @@ pub struct SolverConfigs {
     pub som: Option<SomConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fourier: Option<FourierConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sfc: Option<SfcConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -341,6 +371,25 @@ mod tests {
         let back: SolverConfigs = serde_json::from_str(&json).unwrap();
         assert_eq!(back.sa.as_ref().unwrap().cooling_rate, Some(0.0005));
         assert_eq!(back.sa.as_ref().unwrap().min_temperature, None);
+    }
+
+    #[test]
+    fn solver_configs_sfc_round_trip() {
+        let configs = SolverConfigs {
+            sfc: Some(SfcConfig {
+                curve_type: Some("morton".into()),
+                order: Some(8),
+                aspect_scaling: Some("stretch_to_square".into()),
+                rotation: Some(90),
+                mirror: Some(true),
+                multi_orientation: Some(4),
+                tie_breaker: Some("nearest_prev".into()),
+            }),
+            ..SolverConfigs::default()
+        };
+        let json = serde_json::to_string(&configs).unwrap();
+        let back: SolverConfigs = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.sfc, configs.sfc);
     }
 
     #[test]

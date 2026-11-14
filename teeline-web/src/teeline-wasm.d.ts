@@ -17,6 +17,10 @@ declare module 'teeline-wasm' {
     beta: number
     evaporationRate: number
     numAnts: number
+    sfcOrder: number
+    sfcRotation: number
+    sfcMirror: number
+    sfcMultiOrientation: number
   }
   export interface Solution {
     total: number

@@ -37,7 +37,7 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         use teeline::tsp::{
             AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-            LKOptions, SAOptions,
+            LKOptions, SAOptions, SfcOptions,
         };
         match self.solver {
             Solvers::AntColony => {
@@ -63,6 +63,9 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
             }
             Solvers::Fourier => {
                 base.fourier = Some(FourierOptions::from_cli(self.args)?);
+            }
+            Solvers::SpaceFillingCurve => {
+                base.sfc = Some(SfcOptions::from_cli(self.args)?);
             }
             _ => {
                 base.heuristic = Some(HeuristicOptions::from_cli(self.args)?);
@@ -353,6 +356,55 @@ fn tuning_args() -> Vec<Arg> {
             .long("num-ants")
             .value_name("N")
             .help("ACO: colony size — number of ants constructing tours per epoch (default 25)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("curve_type")
+            .long("curve-type")
+            .value_name("TYPE")
+            .value_parser(["hilbert", "morton"])
+            .help("SFC: curve type, `hilbert` (default) or `morton`")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("sfc_order")
+            .long("sfc-order")
+            .value_name("P")
+            .value_parser(clap::value_parser!(u8).range(1..=16))
+            .help("SFC: grid order p in 1..=16 (default 16); the grid is 2^p × 2^p")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("aspect_scaling")
+            .long("aspect-scaling")
+            .value_name("MODE")
+            .value_parser(["uniform", "stretch_to_square"])
+            .help("SFC: `uniform` (default) or `stretch_to_square`")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("sfc_rotation")
+            .long("sfc-rotation")
+            .value_name("DEG")
+            .value_parser(["0", "90", "180", "270"])
+            .help("SFC: rotation 0, 90, 180 or 270 (default 0)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("sfc_mirror")
+            .long("sfc-mirror")
+            .help("SFC: mirror the grid before indexing")
+            .action(ArgAction::SetTrue)
+            .required(false),
+        Arg::new("multi_orientation")
+            .long("multi-orientation")
+            .value_name("N")
+            .num_args(0..=1)
+            .require_equals(true)
+            .default_missing_value("8")
+            .help("SFC: best-of-N orientations (0..=8, default 8; 0 disables); omit N for 8")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("tie_breaker")
+            .long("tie-breaker")
+            .value_name("MODE")
+            .value_parser(["input_order", "lexicographic", "nearest_prev"])
+            .help("SFC: `input_order` (default), `lexicographic` or `nearest_prev`")
             .action(ArgAction::Set)
             .required(false),
     ]
@@ -868,6 +920,79 @@ mod tests {
         let args = options_cmd().get_matches_from(["test", "fourier", "--k-max", "32"]);
         let opts = solver_options_from_args(&args, Solvers::Fourier);
         assert_eq!(opts.fourier.unwrap().k_max, 32);
+    }
+
+    #[test]
+    fn test_solver_options_sfc_flags_parsed() {
+        // Exercises the CliArgsProvider::provide arm for Solvers::SpaceFillingCurve
+        // and every SFC flag.
+        let args = options_cmd().get_matches_from([
+            "test",
+            "sfc",
+            "--curve-type",
+            "morton",
+            "--sfc-order",
+            "8",
+            "--aspect-scaling",
+            "stretch_to_square",
+            "--sfc-rotation",
+            "90",
+            "--sfc-mirror",
+            "--multi-orientation=4",
+            "--tie-breaker",
+            "nearest_prev",
+        ]);
+        let opts = solver_options_from_args(&args, Solvers::SpaceFillingCurve);
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.curve_type, teeline::tsp::SfcCurveType::Morton);
+        assert_eq!(sfc.order, 8);
+        assert_eq!(
+            sfc.aspect_scaling,
+            teeline::tsp::AspectScaling::StretchToSquare
+        );
+        assert_eq!(sfc.rotation, 90);
+        assert!(sfc.mirror);
+        assert_eq!(sfc.multi_orientation, 4);
+        assert_eq!(sfc.tie_breaker, teeline::tsp::TieBreaker::NearestPrev);
+    }
+
+    #[test]
+    fn test_solver_options_sfc_multi_orientation_without_value_defaults_to_eight() {
+        let args = options_cmd().get_matches_from(["test", "sfc", "--multi-orientation"]);
+        let opts = solver_options_from_args(&args, Solvers::SpaceFillingCurve);
+        assert_eq!(opts.sfc.unwrap().multi_orientation, 8);
+    }
+
+    #[test]
+    fn test_solver_options_sfc_multi_orientation_before_positional_is_accepted() {
+        // `require_equals(true)` keeps the optional value from consuming the solver name.
+        let args = options_cmd().get_matches_from(["test", "--multi-orientation", "sfc"]);
+        let opts = solver_options_from_args(&args, Solvers::SpaceFillingCurve);
+        assert_eq!(opts.sfc.unwrap().multi_orientation, 8);
+    }
+
+    #[test]
+    fn test_sfc_flags_reject_invalid_values_at_the_cli_boundary() {
+        for argv in [
+            vec!["test", "sfc", "--curve-type", "bogus"],
+            vec!["test", "sfc", "--sfc-order", "0"],
+            vec!["test", "sfc", "--sfc-order", "20"],
+            vec!["test", "sfc", "--sfc-rotation", "45"],
+            vec!["test", "sfc", "--tie-breaker", "bogus"],
+        ] {
+            assert!(
+                options_cmd().try_get_matches_from(argv.clone()).is_err(),
+                "expected clap to reject {argv:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sfc_multi_orientation_out_of_range_errors() {
+        let args = options_cmd().get_matches_from(["test", "sfc", "--multi-orientation=9"]);
+        let result =
+            CliArgsProvider::new(&args, Solvers::SpaceFillingCurve).provide(AppOptions::default());
+        assert!(result.is_err(), "expected Err for --multi-orientation=9");
     }
 
     #[test]
