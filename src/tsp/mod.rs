@@ -28,6 +28,8 @@ pub mod route;
 pub mod savings;
 pub mod simulated_annealing;
 pub mod som;
+pub mod space_filling_curve;
+pub use space_filling_curve::{AspectScaling, SfcCurveType, SfcOptions, TieBreaker};
 pub mod stochastic_hill;
 pub mod tabu_search;
 pub mod three_opt;
