@@ -12,11 +12,12 @@ context: |
   Teeline's governing principles live in `constitution.md` at the repository root.
   Every proposal, spec delta, design and task MUST comply with it. If a change would
   violate a principle, amend the constitution first (see its Governance section).
+  Dated decisions live in `docs/adr/`; pending work is listed in `docs/backlog.md`.
 
   In particular: correctness before performance; TSPLIB known optima are the ground
-  truth; one solver dispatch path (`Solvers` -> `tsp::solve`); solver logic lives only in
-  the root `teeline` crate; teeline-api follows lean routes, business logic in services
-  behind traits, and data access only through repositories/ports.
+  truth; one solver dispatch path (`Solvers` -> `solve_with_context`); solver logic lives
+  only in the root `teeline` crate; teeline-api follows lean routes, business logic in
+  services behind traits, and data access only through repositories/ports.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

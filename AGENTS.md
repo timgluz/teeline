@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Teeline is a Traveling Salesman Problem (TSP) solver written in Rust. It reads city data in TSPLIB format (from stdin or file) and outputs the tour cost and ordered city IDs. A Piston-based progress window renders the route visually in a separate thread while solving.
+Teeline is a Traveling Salesman Problem (TSP) solver written in Rust. It reads city data in TSPLIB format (from stdin or file) and outputs the tour cost and ordered city IDs. The Qt 6 desktop GUI (`teeline-qt`) renders solver progress in real time; the library exposes progress as a `ProgressMessage` channel.
 
 ## Constitution
 
@@ -44,15 +44,16 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 ## Architecture
 
-**Entry point:** `src/main.rs` — parses CLI args with `clap`, reads TSPLIB data, then spawns two threads: one for the Piston progress/visualization window (`src/tsp/progress.rs`) and one for the solver. Output is written to stdout as `<total_distance> <optimized_flag>\n<city_id> <city_id> ...`.
+**Entry point:** the `teeline` binary is produced by the `teeline-cli` workspace member (`teeline-cli/src/main.rs`). It parses CLI args with `clap`, reads TSPLIB data, and writes `<total_distance> <optimized_flag>\n<city_id> <city_id> ...` to stdout. Solver progress is a library-side `ProgressMessage` channel; the Qt GUI (`teeline-qt`) consumes it.
 
-**Library root:** `src/lib.rs` exposes `pub mod tsp` and a private `mod test`.
+**Library root:** `src/lib.rs` exposes `pub mod config` and `pub mod tsp`.
 
 **Core types (all in `src/tsp/mod.rs`):**
 
 - `Solvers` enum — lists every algorithm with string aliases (e.g. `"nn"` → `NearestNeighbor`, `"2opt"` → `TwoOpt`)
-- `SolverOptions` — shared config struct passed to every solver (epochs, temperatures, mutation rate, etc.)
-- `Solution` — holds the tour route (`Vec<usize>` of city IDs) and total distance
+- `AppOptions` — pure config container; one optional option struct per solver plus shared `HeuristicOptions`
+- `TspProblem` — cities plus a precomputed `DistanceMatrix`
+- `Solution` — tour route, cities, and total distance computed from the distance matrix
 - `NearestResult` / `NearestResultItem` — returned by both KD-tree and distance matrix nearest-neighbor lookups
 
 **Spatial data structures:**
@@ -62,7 +63,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 **Input:** `src/tsp/tsplib.rs` — state-machine parser for TSPLIB format; accepts `NODE_COORD_SECTION` and `DISPLAY_DATA_SECTION`; reads from file or stdin.
 
-**Solvers** (each in its own file under `src/tsp/`):
+**Solvers** (each in its own file under `src/tsp/`; authoritative catalogue: `teeline solvers`, full table in [`README.md#algorithms`](README.md#algorithms)):
 
 | File                      | Algorithm                                                                                                                                                                        | Alias          |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
@@ -85,6 +86,9 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | `greedy_edge.rs`          | Greedy edge construction: Kruskal-style, sorts all edges shortest-first and greedily accepts unless it creates degree 3+ or a premature sub-cycle (uses `graph.rs`'s union-find) | `gec`          |
 | `space_filling_curve.rs`  | Space-filling curve construction: Hilbert/Morton indexing over a normalized 2^p grid; O(n log n) geometric warm start                                                             | `sfc`          |
 | `ant_colony.rs`           | Ant Colony Optimization (Ant System): pheromone- and heuristic-biased probabilistic tour construction; global evaporate + all-ants-deposit update per epoch                      | `aco`          |
+| `three_opt.rs`            | 3-opt local search: exhaustive 2-opt-style reversal cases                                                                                                                         | `3opt`         |
+| `savings.rs`              | Clarke-Wright savings: parallel savings construction from shortest edges                                                                                                          | `sav`          |
+| `som.rs`                  | Kohonen self-organising map: competitive-learning constructive solver                                                                                                             | `som`          |
 
 **Tests:**
 
@@ -136,11 +140,13 @@ After adding a new WIT export:
 - SSH pushes can fail with `Bad owner or permissions on /usr/etc/ssh/ssh_config.d/50-suse.conf` (that system file is owned by `nobody`). Work around it per-command without changing repo or remote config:
   `git -c core.sshCommand="ssh -F /dev/null" push -u origin <branch>`
 
-## GitKB
+## Knowledge & planning
 
-This project uses GitKB for knowledge management.
-
-@.kb/AGENTS.md
+- `constitution.md` — non-negotiable project principles.
+- `openspec/` — capability specs and proposed changes (`openspec list`, `openspec new change`).
+- `docs/adr/` — dated architecture decisions.
+- `docs/backlog.md` — pending work not tracked as a GitHub issue.
+- GitHub issues — use `gh issue` / `gh issue create` for new tracked work.
 
 ## Cloudflare
 
