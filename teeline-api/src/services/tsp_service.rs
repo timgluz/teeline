@@ -6,8 +6,9 @@ use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings};
 use teeline::tsp::tsplib;
 use teeline::tsp::{
-    AcoOptions, AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    LKOptions, SAOptions, SOMOptions, Solvers, TspProblem, find_solver, solve_problem,
+    AcoOptions, AppOptions, AspectScaling, CSOptions, FPAOptions, FourierOptions, GAOptions,
+    HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcCurveType, SfcOptions, Solvers,
+    TieBreaker, TspProblem, find_solver, solve_problem,
 };
 
 use super::TspSolverService;
@@ -216,6 +217,33 @@ fn make_app_options(
         sm.validate()?;
     }
 
+    let sfc = match cfg.sfc.as_ref() {
+        Some(c) => {
+            let d = SfcOptions::default();
+            let options = SfcOptions {
+                curve_type: match c.curve_type.as_deref() {
+                    Some(v) => SfcCurveType::parse(v)?,
+                    None => d.curve_type,
+                },
+                order: c.order.unwrap_or(d.order),
+                aspect_scaling: match c.aspect_scaling.as_deref() {
+                    Some(v) => AspectScaling::parse(v)?,
+                    None => d.aspect_scaling,
+                },
+                rotation: c.rotation.unwrap_or(d.rotation),
+                mirror: c.mirror.unwrap_or(d.mirror),
+                multi_orientation: c.multi_orientation.unwrap_or(d.multi_orientation),
+                tie_breaker: match c.tie_breaker.as_deref() {
+                    Some(v) => TieBreaker::parse(v)?,
+                    None => d.tie_breaker,
+                },
+            };
+            options.validate()?;
+            Some(options)
+        }
+        None => None,
+    };
+
     Ok(AppOptions {
         sa,
         ga,
@@ -223,7 +251,7 @@ fn make_app_options(
         fpa,
         lk,
         fourier,
-        sfc: None,
+        sfc,
         som,
         aco,
         heuristic,
@@ -819,6 +847,92 @@ EOF
             err.contains("mutation_probability"),
             "expected mutation error, got: {err}"
         );
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_maps_config() {
+        let configs = SolverConfigs {
+            sfc: Some(crate::models::request::SfcConfig {
+                curve_type: Some("morton".into()),
+                order: Some(8),
+                aspect_scaling: Some("stretch_to_square".into()),
+                rotation: Some(90),
+                mirror: Some(true),
+                multi_orientation: Some(4),
+                tie_breaker: Some("nearest_prev".into()),
+            }),
+            ..SolverConfigs::default()
+        };
+        let opts = make_app_options("sfc", Some(&configs)).unwrap();
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.curve_type, SfcCurveType::Morton);
+        assert_eq!(sfc.order, 8);
+        assert_eq!(sfc.aspect_scaling, AspectScaling::StretchToSquare);
+        assert_eq!(sfc.rotation, 90);
+        assert!(sfc.mirror);
+        assert_eq!(sfc.multi_orientation, 4);
+        assert_eq!(sfc.tie_breaker, TieBreaker::NearestPrev);
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_rejects_invalid_curve_type() {
+        let configs = SolverConfigs {
+            sfc: Some(crate::models::request::SfcConfig {
+                curve_type: Some("bogus".into()),
+                ..Default::default()
+            }),
+            ..SolverConfigs::default()
+        };
+        let err = make_app_options("sfc", Some(&configs)).unwrap_err();
+        assert!(err.contains("curve_type"), "got: {err}");
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_rejects_out_of_range_numbers() {
+        for config in [
+            crate::models::request::SfcConfig {
+                order: Some(0),
+                ..Default::default()
+            },
+            crate::models::request::SfcConfig {
+                order: Some(17),
+                ..Default::default()
+            },
+            crate::models::request::SfcConfig {
+                rotation: Some(45),
+                ..Default::default()
+            },
+            crate::models::request::SfcConfig {
+                multi_orientation: Some(9),
+                ..Default::default()
+            },
+        ] {
+            let configs = SolverConfigs {
+                sfc: Some(config),
+                ..SolverConfigs::default()
+            };
+            assert!(
+                make_app_options("sfc", Some(&configs)).is_err(),
+                "out-of-range SFC value must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_partial_config_falls_back_to_defaults() {
+        let configs = SolverConfigs {
+            sfc: Some(crate::models::request::SfcConfig {
+                order: Some(8),
+                ..Default::default()
+            }),
+            ..SolverConfigs::default()
+        };
+        let opts = make_app_options("sfc", Some(&configs)).unwrap();
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.order, 8);
+        assert_eq!(sfc.curve_type, SfcCurveType::Hilbert);
+        assert_eq!(sfc.aspect_scaling, AspectScaling::Uniform);
+        assert_eq!(sfc.tie_breaker, TieBreaker::InputOrder);
     }
 
     #[test]
