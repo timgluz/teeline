@@ -397,7 +397,7 @@ fn tuning_args() -> Vec<Arg> {
             .num_args(0..=1)
             .require_equals(true)
             .default_missing_value("8")
-            .help("SFC: try up to N orientations (0..=8) and keep the shortest; omit N for 8")
+            .help("SFC: best-of-N orientations (0..=8, default 8; 0 disables); omit N for 8")
             .action(ArgAction::Set)
             .required(false),
         Arg::new("tie_breaker")

@@ -20,6 +20,7 @@ describe('defaultSolveOptions', () => {
     expect(typeof opts.sfcRotation).toBe('number')
     expect(typeof opts.sfcMirror).toBe('number')
     expect(typeof opts.sfcMultiOrientation).toBe('number')
+    expect(opts.sfcMultiOrientation).toBe(8)
   })
 
   it('minTemperature is less than maxTemperature', () => {

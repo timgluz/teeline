@@ -47,6 +47,11 @@ export const SOLVER_META: Record<string, SolverMeta> = {
     name: 'Greedy Edge',
     complexity: 'O(n² log n) edge sort + O(n² α(n)) scan',
   },
+  space_filling_curve: {
+    id: 'space_filling_curve',
+    name: 'Space-Filling Curve',
+    complexity: 'O(n log n)',
+  },
   '2opt': { id: '2opt', name: '2-opt', complexity: 'O(n²) / pass' },
   '3opt': { id: '3opt', name: '3-opt', complexity: 'O(n³) / pass' },
   or_opt: { id: 'or_opt', name: 'Or-opt', complexity: 'O(n²) / pass' },
@@ -105,7 +110,15 @@ export const SOLVER_GROUPS: SolverGroup[] = [
   { label: 'Exact', ids: ['bhk', 'branch_bound'] },
   {
     label: 'Constructive',
-    ids: ['nn', 'fourier', 'christofides', 'greedy_edge', 'savings', 'som'],
+    ids: [
+      'nn',
+      'fourier',
+      'christofides',
+      'greedy_edge',
+      'space_filling_curve',
+      'savings',
+      'som',
+    ],
   },
   {
     label: 'Local search',

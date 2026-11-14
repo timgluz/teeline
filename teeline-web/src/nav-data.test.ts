@@ -7,8 +7,8 @@ import {
 } from './nav-data'
 
 describe('SOLVER_META', () => {
-  it('contains exactly 21 solvers', () => {
-    expect(Object.keys(SOLVER_META)).toHaveLength(21)
+  it('contains exactly 22 solvers', () => {
+    expect(Object.keys(SOLVER_META)).toHaveLength(22)
   })
 
   it('every entry has id and name', () => {
