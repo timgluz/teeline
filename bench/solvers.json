@@ -100,7 +100,7 @@
       "family": "constructive",
       "deterministic": true,
       "doc": "space-filling-curve",
-      "notes": "Hilbert/Morton ordering over a normalized 2^p grid. No RNG; measured identical tours across 5 runs on a280 (n=280).",
+      "notes": "Hilbert/Morton ordering over a normalized 2^p grid; the default runs the best-of-8 orientation ensemble (`--multi-orientation=0` disables). No RNG; measured identical tours across 5 runs on a280 (n=280).",
       "deterministic_method": "measured",
       "determinism_evidence": {
         "instance": "a280",

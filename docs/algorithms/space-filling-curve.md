@@ -24,9 +24,10 @@ spatially nearby cities tend to be close in the tour.
 This is the Platzman–Bartholdi construction: no pairwise distances are computed,
 so the whole solver is dominated by the sort and runs in **O(n log n)**. The
 standalone tour is typically 20–50% above optimal — the price of a purely
-geometric order — but it is an excellent and very cheap seed for
-[`2opt`](/algorithms/two-opt/), [`or_opt`](/algorithms/or-opt/), and
-[`lk`](/algorithms/lin-kernighan/).
+geometric order. It is a very cheap seed for [`2opt`](/algorithms/two-opt/),
+[`or_opt`](/algorithms/or-opt/), and [`lk`](/algorithms/lin-kernighan/); whether
+it beats nearest-neighbor as a seed is instance-dependent (see
+[Benchmarks](#benchmarks)).
 
 ```text
 1. Bounding box        min/max of x and y, computed in f64
@@ -60,7 +61,7 @@ jumps while keeping the good local structure.
 
 ### Ties and repeated cells
 
-Several cities can land in the same grid cell, especially at low `--order`. The
+Several cities can land in the same grid cell, especially at low `--sfc-order`. The
 `--tie-breaker` decides their order:
 
 - `input_order` (default) — keep the order the cities appeared in the input.
@@ -79,7 +80,7 @@ Several cities can land in the same grid cell, especially at low `--order`. The
 | `--aspect-scaling` | `uniform`, `stretch_to_square` | `uniform` | `uniform` preserves aspect; `stretch_to_square` fills elongated maps. |
 | `--sfc-rotation` | `0`, `90`, `180`, `270` | `0` | Moves the curve's entry/exit corners and the seam. |
 | `--sfc-mirror` | flag | off | Mirrors the grid before rotating. |
-| `--multi-orientation[=N]` | `0..=8` (optional value) | `0` | Best-of-N orientations; `--multi-orientation` alone means 8. Still O(n log n) per orientation. |
+| `--multi-orientation[=N]` | `0..=8` (optional value) | `8` | Best-of-N orientations; `--multi-orientation` alone means 8, `--multi-orientation=0` disables. Still O(n log n) per orientation. |
 | `--tie-breaker` | `input_order`, `lexicographic`, `nearest_prev` | `input_order` | Ordering within a grid cell; see [Ties](#ties-and-repeated-cells). |
 
 The same options are available in a TOML pipeline stage:
@@ -110,8 +111,8 @@ teeline solve space_filling_curve -i ./data/tsplib/berlin52.tsp
 # Morton curve with a coarser grid
 teeline solve sfc --curve-type morton --sfc-order 12 -i ./data/tsplib/berlin52.tsp
 
-# try all eight rotations/mirrors and keep the shortest
-teeline solve sfc --multi-orientation -i ./data/tsplib/berlin52.tsp
+# disable the ensemble for the single-orientation tour
+teeline solve sfc --multi-orientation=0 -i ./data/tsplib/berlin52.tsp
 
 # as a warm start for local search (recommended usage)
 teeline pipeline --steps=sfc,2opt -i ./data/tsplib/berlin52.tsp
@@ -120,20 +121,46 @@ teeline pipeline --steps=sfc,lk -i ./data/tsplib/berlin52.tsp
 
 ## Benchmarks
 
-Measured with this repository's CLI. Published optima: **berlin52 = 7542**,
-**att532 = 27686**.
+Measured with this repository's release binary on TSPLIB instances with
+published optima. Each figure is the median of five runs; gaps are against the
+published optimum. The default now runs the 8-orientation ensemble; use
+`--multi-orientation=0` for the single-orientation behaviour.
 
-| Configuration | berlin52 | Gap | att532 | Gap |
-| --- | ---: | ---: | ---: | ---: |
-| `sfc` (default) | 10459 | +38.7% | 41528 | +50.0% |
-| `sfc --multi-orientation=8` | 9095 | +20.6% | 39498 | +42.7% |
-| `sfc → 2opt` | 9819 | +30.2% | — | — |
-| `sfc → lk` | **7542** | **0.0%** | — | — |
+### Standalone
 
-The pattern is the same as other constructive heuristics: judge the standalone
-gap with suspicion and the warm-start result by what local search reaches. Here
-`sfc → lk` reaches the published berlin52 optimum, while `sfc` alone is ~39%
-above it.
+| Instance (optimum) | `sfc` (default) | `sfc --multi-orientation=0` | `nn` | `savings` | `greedy_edge` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| a280 (2,579) | 3,555 (+37.8%) | 3,819 (+48.1%) | 3,157 (+22.4%) | **2,857 (+10.8%)** | 3,111 (+20.6%) |
+| att532 (27,686) | 39,498 (+42.7%) | 41,528 (+50.0%) | 35,516 (+28.3%) | **30,374 (+9.7%)** | 33,093 (+19.5%) |
+| dsj1000 (18,660,188) | 26,509,724 (+42.1%) | 28,219,382 (+51.2%) | 24,631,478 (+32.0%) | **20,475,028 (+9.7%)** | 21,706,244 (+16.3%) |
+
+### Warm start
+
+| Instance | `nn → 2opt` | `sfc → 2opt` | `nn → lk` | `sfc → lk` | `savings → lk` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| a280 | 10.0% | 26.1% | 3.6% | 5.0% | **3.2%** |
+| att532 | 14.2% | 20.1% | 3.7% | 6.9% | **2.8%** |
+| dsj1000 | 13.4% | 19.6% | 8.2% | 10.4% | **4.3%** |
+
+On the small preliminary instances (burma14, ulysses16/22, att48, berlin52,
+eil76), the median standalone gap across the solvers is: savings 1.7%, fourier
+6.8%, som 13.3%, christofides 16.2%, greedy_edge 17.6%, `sfc` (default) 17.6%,
+`sfc --multi-orientation=0` 32.1%, nn 21.0%. As a warm start, `sfc → lk` ties
+`nn → lk` at a 1.5% median gap, while `sfc → 2opt` trails `nn → 2opt` (14.5%
+vs 11.2%). Fourier's default `k_max=4` is an outlier on a280 (+103%); see the
+[Fourier page](/algorithms/fourier/) for its tuned settings.
+
+The honest conclusion: SFC is extremely fast and deterministic, and its value is
+a cheap geometric seed, not a quality winner. It reaches the berlin52 optimum
+with LK and is competitive with NN on some instances, but savings is the
+stronger seed on a280/att532/dsj1000. `--multi-orientation=0` is 10–14 points
+worse; the ensemble is the main quality lever.
+
+**Coordinate requirement:** SFC needs coordinates. EXPLICIT instances without
+`NODE_COORD_SECTION`/`DISPLAY_DATA_SECTION` (for example `gr17`) cannot be
+meaningfully solved; the same limitation affects fourier, som, and LK's
+candidate lists. NN, savings, greedy-edge, christofides, and 2-opt use the
+distance matrix and are unaffected. Tracked in #655.
 
 ## Relationship to other solvers
 
