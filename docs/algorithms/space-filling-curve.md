@@ -183,8 +183,9 @@ distance matrix and are unaffected. Tracked in #655.
   (The construction this solver implements.)
 - Butz, A. R. (1971) — "Alternative Algorithm for Hilbert's Space-Filling
   Curve", *IEEE Transactions on Computers*, C-20(4), 424–426.
-- Lam, W. M. & Shapiro, J. M. (1994) — "An efficient method for generating
-  Hilbert curves", *Proceedings of the 1994 ACM Symposium on Applied Computing*.
+- Lam, W. M. & Shapiro, J. H. (1994) — "A class of fast algorithms for the
+  Peano-Hilbert space-filling curve", *Proceedings of the 1994 IEEE International
+  Conference on Image Processing*, 1, 638–641.
 - [Hilbert curve (Wikipedia)](https://en.wikipedia.org/wiki/Hilbert_curve) —
   the `xy2d`/`rot` reference used to validate the indexing.
 - [Z-order curve (Wikipedia)](https://en.wikipedia.org/wiki/Z-order_curve) —
