@@ -30,7 +30,19 @@
 - [x] 4.2 Run the targeted Playwright specs (including the reduced-motion check) and the existing explainer smoke specs; verify they pass with no new flakes.
 - [x] 4.3 Run the repository pre-commit checks on the changed files and `graphify update .`; verify the hook is green and the graph is current.
 
+## 5. Pedagogy revision: construction, 1D order, and order changes
+
+- [x] 5.1 Extend `sfc-algo.ts` with `rows` (city/cell/index/visit in visit order), `buckets` (cities grouped by cell in index order, input order inside), `orderDiff(previous, next)`, and `twoOptSeamPreview(cities, order)`; verify Vitest covers bucket groups at `p = 1` and `p = 3`, input-order ties, a known changed-city set, the preview's removed/added edges and exact delta, and determinism.
+- [x] 5.2 Replace the complete-tour initial state in `sfc.tsx` with the four-stage construction state machine (Project, Index, Sort, Connect); default to `p = 3`; add stage-jump, Back, Step, Run/Pause, and Reset controls; p/curve/stage changes stop playback; verify the initial stage has no tour and Step/Back walk the stages and edges in both directions.
+- [x] 5.3 Add the 1D index strip below the canvas and the compact sort table (visit, city, cell, index) with shared-cell group headers; synchronize hover between canvas, strip, and table; drive the strip playhead from the current Connect edge; verify tick/row counts, group labels, and playhead movement with Playwright or a component test.
+- [x] 5.4 Add the occupied-cell overlay with bucket counts, shared-cell outlines, and the city-to-cell mapping; keep the full curve crisp for `p <= 4`, fade it and draw the occupied-cell spine for `p > 4`; add the Morton quadrant-crossing dashed callout; verify visually at `p = 2, 3, 4, 8` for both curve types.
+- [x] 5.5 Add the stage-specific lesson copy and the persistent “curve is a sort key, not the tour path” explanation; add the changed-city diff/highlight and the “N cities changed order since p = X” callout; verify the copy changes per stage and the diff highlights the expected rows after a `p` or curve-type change.
+- [x] 5.6 Add the interactive 2-opt preview (best seam-removing move, ghosted removed edges, dashed replacement edges, real tour-length delta), the seam/longest overlap styling, indigo tour edges, and visit-order-primary labels with the city index on hover/table; verify the preview toggle, edge count, and computed delta.
+- [x] 5.7 Add Pause and discrete `p−`/`p+` stepping for the subdivision, reduced-motion behavior for both construction and subdivision, and update the registry description to mention the staged construction and 1D order; verify keyboard operation, pause/resume, and reduced-motion jumps.
+- [x] 5.8 Rewrite `teeline-web/tests/sfc.spec.ts` for the new narrative: initial Project at `p = 3` with no tour, stage stepping/back, Run/Pause/Reset, strip/table counts and headers, shared-cell groups, changed-city diff, 2-opt preview, Morton quadrant crossings, keyboard operation, and the narrow viewport; verify the targeted Playwright specs pass.
+- [x] 5.9 Run the full gate (`task web:test`, `task web:lint`, `task web:build`, targeted Playwright plus existing explainer smoke specs, pre-commit, `graphify update .`) and push the revision as a follow-up commit to the existing `feat/sfc-explainer` / PR #660.
+
 ## Workflow follow-up
 
-- Branch off `master` as `feat/sfc-explainer`, commit with a Conventional Commit scoped to `web`, and open the PR with `gh pr create`.
+- The first version is already on `feat/sfc-explainer` (PR #660). Push this pedagogy revision as a follow-up commit while the PR is open.
 - Archive the change after review and a green integration gate.

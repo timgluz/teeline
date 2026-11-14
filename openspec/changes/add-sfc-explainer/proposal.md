@@ -2,19 +2,22 @@
 
 ## Why
 
-Issue #644 asks for an interactive explainer for the Space-Filling Curve solver added in #643. The solver's output depends on a geometric idea that is hard to see from prose: cities are projected onto a `2^p × 2^p` grid, ordered by a Hilbert or Morton index, and the resulting tour inherits the curve's locality plus one long closing seam. Now that the solver is merged, the web explainers are the right place to make that mechanism visible.
+Issue #644 asked for an interactive Space-Filling Curve explainer. The first version shipped a final-state viewer: it loads with the complete tour, the curve is a background wash, and the order panel is a bare list of `visit · city` pairs. At `p = 8` the curve is a 256×256 texture, every city is in its own cell, and nothing on screen explains why the order is what it is or how the curve produced the tour.
+
+The missing explanation is the construction: **project → index → sort → connect**. The curve is a 1D sort key, not the tour path. This change turns the explainer into a staged construction with a 1D index strip, a sort-key table, and an explicit "why the order changed" diff.
 
 ## What Changes
 
-- Add a browser-only, interactive Space-Filling Curve explainer at `/algorithms/space_filling_curve/explainer/`.
-- Provide a live grid-order slider for `p = 1..8` and a Hilbert/Morton toggle. Changing either redraws the curve and the city ordering.
-- Draw a faint curve on a `2^p × 2^p` grid, the city order along it, and the resulting tour. Use a background canvas for the curve (65,536 segments at `p = 8`) with an SVG overlay for cities, tour edges, labels, and the seam.
-- Highlight the closing seam edge, surface the longest tour edge separately when it differs, and explain concisely why SFC tours are usually paired with a 2-opt pass.
-- Add teaching stats that make the curve's behavior legible: cells used, largest bucket, tour length, seam length, and long curve jumps (zero for Hilbert, many for Morton).
-- Add a "Play subdivision" control that steps `p` from 1 through 8, while the slider remains directly scrubbable. Respect `prefers-reduced-motion`.
-- Implement only the subset of solver behavior the demonstration needs: uniform normalization, Hilbert and Morton indexing for `p <= 8`, and input-order tie-breaking. This is a pedagogical simulation, not a one-to-one port of `src/tsp/space_filling_curve.rs`.
-- Register the explainer in the web explainer registry, the Astro explainer route, and the Space-Filling Curve docs frontmatter so the existing CTA and sidebars pick it up.
-- Add unit tests for the simulation logic and a Playwright smoke test for the page.
+- Present the construction in four stages: **Project** (cities → cells), **Index** (cells → curve index), **Sort** (index → visit order), and **Connect** (visit order → tour edges + seam). Start at Project with no completed tour; default to `p = 3`.
+- Add a **1D number-line strip** below the canvas: each city is a tick at its curve index; same-cell cities stack; hover is synchronized with the canvas and table; a scrubbable playhead traces the curve and tour.
+- Replace the flat order list with a **compact sort table**: visit, city, cell, curve index; shared cells are grouped and the input-order tie is labelled.
+- Add an **occupied-cell overlay** with bucket counts; outline shared cells and highlight changed cells/cities when `p` or curve type changes. Show a "why the order changed" callout.
+- Add construction playback with **Back, Step, Run/Pause, Reset**, and stage-jump buttons. Add **Pause and discrete `p−`/`p+` stepping** for the subdivision. Keep the `p` slider and Hilbert/Morton toggle live.
+- Reduce visual noise: keep the full curve crisp for `p <= 4`; fade it and draw the occupied-cell **spine** for `p > 4`; default to `p = 3`.
+- Improve the Morton lesson: highlight **quadrant-crossing jumps** with a dashed callout.
+- Clarify labels and colours: visit order is the primary node label, city index on hover/table; **indigo tour edges**; encode seam/longest overlap with a dashed/striped stroke.
+- Add an interactive **2-opt preview**: ghost the seam and its best partner edge, draw the two replacement edges, and show the actual tour-length delta for the fixture.
+- Keep the existing seam, statistics, registration, and accessibility work; update the registry description and tests.
 
 No solver, CLI, API, or WASM behavior changes. No breaking changes.
 
@@ -22,7 +25,7 @@ No solver, CLI, API, or WASM behavior changes. No breaking changes.
 
 ### New Capabilities
 
-- `web-explainers`: Interactive, browser-only visual explanations of Teeline's solvers, including their geometry, state transitions, and the trade-offs behind their results.
+- `web-explainers`: Interactive, browser-only visual explanations of Teeline's solvers, including their construction steps, geometry, and state transitions.
 
 ### Modified Capabilities
 
@@ -30,8 +33,8 @@ No solver, CLI, API, or WASM behavior changes. No breaking changes.
 
 ## Impact
 
-- Web explainers: `teeline-web/src/explainers/sfc-algo.ts`, `sfc-algo.test.ts`, `sfc.tsx` (new)
-- Web registration: `teeline-web/src/explainers/registry.ts`, `teeline-web/src/pages/algorithms/[id]/explainer/index.astro`, `teeline-web/src/nav-data.ts` and its test if the explainer set is corrected
-- Docs: `docs/algorithms/space-filling-curve.md` (`hasExplainer: true`)
-- Web tests: new `teeline-web/tests/sfc.spec.ts`; update `teeline-web/tests/algorithms-index.spec.ts` from 21 to 22 interactive links
+- Web explainers: `teeline-web/src/explainers/sfc-algo.ts`, `sfc-algo.test.ts`, `sfc.tsx`
+- Web registration: `teeline-web/src/explainers/registry.ts` (description), Astro route; the `EXPLAINER_SOLVERS` set is already correct
+- Docs: `docs/algorithms/space-filling-curve.md` (`hasExplainer` already set)
+- Web tests: `teeline-web/tests/sfc.spec.ts` rewritten; the algorithms-index count stays 22
 - No changes to `src/`, `teeline-cli`, `teeline-api`, `teeline-wasm`, or solver behavior

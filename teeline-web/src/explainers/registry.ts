@@ -88,7 +88,7 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
   space_filling_curve: {
     title: 'Space-Filling Curve — Interactive Explainer — Teeline',
     description:
-      'Interactive walkthrough of the Space-Filling Curve construction: watch Hilbert and Morton curves order cities on a 2^p × 2^p grid, and see the seam edge that a 2-opt pass removes.',
+      'Interactive walkthrough of the Space-Filling Curve construction: project cities onto a 2^p × 2^p grid, watch the curve assign 1D indices, sort the cities, and connect them into a tour. See the seam and preview the 2-opt fix.',
     backLabel: 'SFC',
   },
   aco: {

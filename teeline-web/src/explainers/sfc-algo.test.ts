@@ -12,8 +12,10 @@ import {
   mortonIndex,
   normalizeToGrid,
   orderCities,
+  orderDiff,
   seamEdge,
   tourEdges,
+  twoOptSeamPreview,
 } from './sfc-algo'
 import type { CurveType, Point } from './sfc-algo'
 
@@ -238,6 +240,38 @@ describe('buildLayout', () => {
     expect(orderCities(reversed, 1, 'hilbert').slice(0, 2)).toEqual([0, 1])
   })
 
+  it('builds buckets and rows in curve order', () => {
+    const layout = buildLayout(CITIES_SFC, 1, 'hilbert')
+    expect(layout.buckets).toHaveLength(4)
+    expect(layout.stats.cellsUsed).toBe(4)
+    expect(layout.stats.sharedCells).toBe(4)
+    expect(layout.stats.largestBucket).toBe(6)
+    expect(layout.buckets.every((bucket) => bucket.cities.length === 6)).toBe(
+      true,
+    )
+    expect(layout.buckets.flatMap((bucket) => bucket.cities)).toEqual(
+      layout.order,
+    )
+    for (const bucket of layout.buckets) {
+      expect(bucket.cities).toEqual([...bucket.cities].sort((a, b) => a - b))
+    }
+
+    const p3 = buildLayout(CITIES_SFC, 3, 'hilbert')
+    expect(p3.stats.cellsUsed).toBe(20)
+    expect(p3.stats.sharedCells).toBe(4)
+    expect(p3.stats.largestBucket).toBe(2)
+    expect(p3.buckets).toHaveLength(20)
+    expect(p3.rows).toHaveLength(N_CITIES_SFC)
+    expect(p3.rows.map((row) => row.visit)).toEqual(
+      Array.from({ length: N_CITIES_SFC }, (_, i) => i),
+    )
+    expect(p3.rows.map((row) => row.city)).toEqual(p3.order)
+    for (const row of p3.rows) {
+      expect(row.index).toBe(p3.indices[row.city])
+      expect(row.cell).toEqual(p3.grid[row.city])
+    }
+  })
+
   it('selects the closing edge as the seam', () => {
     const layout = buildLayout(CITIES_SFC, 4, 'hilbert')
     expect(layout.seam.closing).toBe(true)
@@ -255,19 +289,6 @@ describe('buildLayout', () => {
     const edges = tourEdges(cities, [0, 1, 2, 3])
     expect(longestEdge(edges)).toBe(edges[0])
     expect(seamEdge(edges)).toBe(edges[3])
-  })
-
-  it('finds a longest edge that is not the seam', () => {
-    const cities: Point[] = [
-      [0, 0],
-      [10, 0],
-      [10, 1],
-      [0, 1],
-    ]
-    const edges = tourEdges(cities, [0, 1, 2, 3])
-    expect(longestEdge(edges)).toBe(edges[0])
-    expect(seamEdge(edges)).toBe(edges[3])
-    expect(longestEdge(edges)).not.toBe(seamEdge(edges))
   })
 
   it('reports the p=1 bucket and jump statistics', () => {
@@ -296,6 +317,76 @@ describe('buildLayout', () => {
   it('is deterministic', () => {
     expect(buildLayout(CITIES_SFC, 4, 'hilbert')).toEqual(
       buildLayout(CITIES_SFC, 4, 'hilbert'),
+    )
+  })
+})
+
+describe('orderDiff', () => {
+  it('returns no changes without a previous layout', () => {
+    expect(orderDiff(null, buildLayout(CITIES_SFC, 3, 'hilbert'))).toEqual([])
+  })
+
+  it('returns no changes for the same layout', () => {
+    const layout = buildLayout(CITIES_SFC, 3, 'hilbert')
+    expect(orderDiff(layout, layout)).toEqual([])
+  })
+
+  it('finds the cities that moved between p = 3 and p = 4', () => {
+    const hilbert3 = buildLayout(CITIES_SFC, 3, 'hilbert')
+    const hilbert4 = buildLayout(CITIES_SFC, 4, 'hilbert')
+    expect(orderDiff(hilbert3, hilbert4)).toEqual([1, 4, 8, 9])
+
+    const morton3 = buildLayout(CITIES_SFC, 3, 'morton')
+    const morton4 = buildLayout(CITIES_SFC, 4, 'morton')
+    expect(orderDiff(morton3, morton4)).toEqual([19, 23])
+  })
+})
+
+describe('twoOptSeamPreview', () => {
+  it('returns null for tours that are too small', () => {
+    expect(
+      twoOptSeamPreview(
+        [
+          [0, 0],
+          [1, 0],
+          [1, 1],
+        ],
+        [0, 1, 2],
+      ),
+    ).toBeNull()
+  })
+
+  it('finds the best seam-removing move on the fixture', () => {
+    const layout = buildLayout(CITIES_SFC, 3, 'hilbert')
+    const preview = twoOptSeamPreview(CITIES_SFC, layout.order)
+    expect(preview).not.toBeNull()
+    if (!preview) return
+
+    expect(preview.removed).toHaveLength(2)
+    expect(preview.added).toHaveLength(2)
+    expect(preview.removed[0].closing).toBe(true)
+    expect(preview.removed[1].from).toBe(layout.order[4])
+    expect(preview.removed[1].to).toBe(layout.order[5])
+    expect(preview.added[0].from).toBe(layout.order[N_CITIES_SFC - 1])
+    expect(preview.added[0].to).toBe(layout.order[4])
+    expect(preview.added[1].from).toBe(layout.order[0])
+    expect(preview.added[1].to).toBe(layout.order[5])
+
+    const recomputed =
+      preview.oldLength -
+      preview.removed[0].length -
+      preview.removed[1].length +
+      preview.added[0].length +
+      preview.added[1].length
+    expect(preview.newLength).toBeCloseTo(recomputed, 6)
+    expect(preview.delta).toBeCloseTo(recomputed - preview.oldLength, 6)
+    expect(preview.delta).toBeLessThan(0)
+  })
+
+  it('returns the same move on repeated calls', () => {
+    const layout = buildLayout(CITIES_SFC, 3, 'hilbert')
+    expect(twoOptSeamPreview(CITIES_SFC, layout.order)).toEqual(
+      twoOptSeamPreview(CITIES_SFC, layout.order),
     )
   })
 })

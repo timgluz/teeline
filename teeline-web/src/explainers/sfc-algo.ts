@@ -3,7 +3,8 @@
 // uniform normalization, Hilbert/Morton indexing, and input-order sorting.
 // The solver also supports rotation, mirroring, aspect scaling, a
 // multi-orientation ensemble, and alternate tie-breakers; those are
-// intentionally omitted here so the curve stays legible while p is scrubbed.
+// intentionally omitted here so the construction stays legible while p is
+// scrubbed.
 
 export type Point = [number, number]
 export type Cell = [number, number]
@@ -24,9 +25,24 @@ export type TourEdge = {
   closing: boolean
 }
 
+export type TwoOptEdge = {
+  from: number
+  to: number
+  length: number
+}
+
+export type TwoOptPreview = {
+  removed: TourEdge[]
+  added: TwoOptEdge[]
+  oldLength: number
+  newLength: number
+  delta: number
+}
+
 export type SfcStats = {
   cities: number
   cellsUsed: number
+  sharedCells: number
   largestBucket: number
   tourLength: number
   seamLength: number
@@ -34,14 +50,30 @@ export type SfcStats = {
   longJumps: number
 }
 
+export type SfcRow = {
+  city: number
+  cell: Cell
+  index: number
+  visit: number
+}
+
+export type SfcBucket = {
+  cell: Cell
+  index: number
+  cities: number[] // input order
+}
+
 export type SfcLayout = {
   p: number
   curveType: CurveType
   cities: Point[]
   bounds: Bounds
-  grid: Cell[]
-  cells: Cell[]
-  order: number[]
+  grid: Cell[] // projected cell per city
+  indices: number[] // curve index per city
+  cells: Cell[] // curve cells in index order
+  order: number[] // city indices in visit order
+  rows: SfcRow[] // visit order, with cell and index
+  buckets: SfcBucket[] // cells in curve-index order, cities in input order
   edges: TourEdge[]
   seam: TourEdge
   longest: TourEdge
@@ -152,7 +184,7 @@ export function mortonIndex(x: number, y: number): number {
   return ((spreadBits(y) << 1) | spreadBits(x)) >>> 0
 }
 
-function curveIndex(
+export function curveIndex(
   p: number,
   curveType: CurveType,
   x: number,
@@ -182,24 +214,12 @@ export function countLongJumps(cells: Cell[]): number {
   return jumps
 }
 
-function orderFromGrid(
-  cities: Point[],
-  grid: Cell[],
-  p: number,
-  curveType: CurveType,
-): number[] {
-  const keys = grid.map(([x, y]) => curveIndex(p, curveType, x, y))
-  const order = cities.map((_, index) => index)
-  order.sort((a, b) => keys[a] - keys[b] || a - b)
-  return order
-}
-
 export function orderCities(
   cities: Point[],
   p: number,
   curveType: CurveType,
 ): number[] {
-  return orderFromGrid(cities, normalizeToGrid(cities, p), p, curveType)
+  return buildLayout(cities, p, curveType).order
 }
 
 export function distance(a: Point, b: Point): number {
@@ -236,6 +256,10 @@ function sum(values: number[]): number {
   return total
 }
 
+export function tourLength(cities: Point[], order: number[]): number {
+  return sum(tourEdges(cities, order).map((edge) => edge.length))
+}
+
 export function buildLayout(
   cities: Point[],
   p: number,
@@ -243,21 +267,36 @@ export function buildLayout(
 ): SfcLayout {
   const b = bounds(cities)
   const grid = projectToGrid(cities, p, b)
-  const order = orderFromGrid(cities, grid, p, curveType)
+  const indices = grid.map(([x, y]) => curveIndex(p, curveType, x, y))
+
+  const byCell = new Map<string, SfcBucket>()
+  for (let city = 0; city < cities.length; city++) {
+    const [x, y] = grid[city]
+    const key = `${x},${y}`
+    const existing = byCell.get(key)
+    if (existing) existing.cities.push(city)
+    else byCell.set(key, { cell: [x, y], index: indices[city], cities: [city] })
+  }
+
+  const buckets = [...byCell.values()].sort((a, b) => a.index - b.index)
+  const order = buckets.flatMap((bucket) => bucket.cities)
+  const rows = order.map((city, visit) => ({
+    city,
+    cell: grid[city],
+    index: indices[city],
+    visit,
+  }))
   const edges = tourEdges(cities, order)
   const seam = seamEdge(edges)
   const longest = longestEdge(edges)
   const cells = curveCells(p, curveType)
 
-  const n = 1 << p
-  const buckets = new Map<number, number>()
-  for (const [x, y] of grid) {
-    const key = y * n + x
-    buckets.set(key, (buckets.get(key) ?? 0) + 1)
-  }
   let largestBucket = 0
-  for (const count of buckets.values()) {
-    if (count > largestBucket) largestBucket = count
+  let sharedCells = 0
+  for (const bucket of buckets) {
+    if (bucket.cities.length > largestBucket)
+      largestBucket = bucket.cities.length
+    if (bucket.cities.length > 1) sharedCells++
   }
 
   return {
@@ -266,19 +305,100 @@ export function buildLayout(
     cities,
     bounds: b,
     grid,
+    indices,
     cells,
     order,
+    rows,
+    buckets,
     edges,
     seam,
     longest,
     stats: {
       cities: cities.length,
-      cellsUsed: buckets.size,
+      cellsUsed: buckets.length,
+      sharedCells,
       largestBucket,
       tourLength: sum(edges.map((edge) => edge.length)),
       seamLength: seam.length,
       longestEdgeLength: longest.length,
       longJumps: countLongJumps(cells),
     },
+  }
+}
+
+// Cities whose visit position changed between two layouts. The component uses
+// this to explain the effect of a grid-order or curve-type change.
+export function orderDiff(
+  previous: SfcLayout | null,
+  next: SfcLayout,
+): number[] {
+  if (!previous) return []
+  const previousVisit = new Map<number, number>()
+  previous.order.forEach((city, visit) => previousVisit.set(city, visit))
+  const changed: number[] = []
+  next.order.forEach((city, visit) => {
+    if (previousVisit.get(city) !== visit) changed.push(city)
+  })
+  return changed.sort((a, b) => a - b)
+}
+
+// The best 2-opt move that removes the closing seam. For each valid partner
+// edge, remove (seam, partner) and reconnect (last -> partner.from) and
+// (first -> partner.to); this reverses the prefix between the two edges.
+export function twoOptSeamPreview(
+  cities: Point[],
+  order: number[],
+): TwoOptPreview | null {
+  const n = order.length
+  if (n < 4) return null
+
+  const seam: TourEdge = {
+    from: order[n - 1],
+    to: order[0],
+    length: distance(cities[order[n - 1]], cities[order[0]]),
+    closing: true,
+  }
+  const oldLength = tourLength(cities, order)
+
+  let best: { j: number; newLength: number } | null = null
+  for (let j = 1; j <= n - 3; j++) {
+    const a = order[j]
+    const b = order[j + 1]
+    const partnerLength = distance(cities[a], cities[b])
+    const newLength =
+      oldLength -
+      seam.length -
+      partnerLength +
+      distance(cities[order[n - 1]], cities[a]) +
+      distance(cities[order[0]], cities[b])
+    if (!best || newLength < best.newLength) best = { j, newLength }
+  }
+
+  if (!best) return null
+  const { j, newLength } = best
+  const partner: TourEdge = {
+    from: order[j],
+    to: order[j + 1],
+    length: distance(cities[order[j]], cities[order[j + 1]]),
+    closing: false,
+  }
+
+  return {
+    removed: [seam, partner],
+    added: [
+      {
+        from: order[n - 1],
+        to: order[j],
+        length: distance(cities[order[n - 1]], cities[order[j]]),
+      },
+      {
+        from: order[0],
+        to: order[j + 1],
+        length: distance(cities[order[0]], cities[order[j + 1]]),
+      },
+    ],
+    oldLength,
+    newLength,
+    delta: newLength - oldLength,
   }
 }

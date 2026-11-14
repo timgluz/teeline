@@ -2,166 +2,140 @@
 
 ## Context
 
-See `proposal.md` — Why. Relevant current state:
+See `proposal.md` — Why. The first implementation exposed the final state: the tour was complete on load, the order panel was a flat `visit · city` list, and the curve was a dense wash at high `p`. User review found three failures: the construction was invisible, the order changes looked arbitrary, and `p = 8` reduced the explainer to a permutation viewer.
 
-- The solver already exists in `src/tsp/space_filling_curve.rs` and is wired through the core, CLI, API, WASM, and web options. This change does not touch it.
-- All existing explainers are self-contained Preact components with a pure-TypeScript `*-algo.ts` simulation module. None import `teeline-wasm`.
-- The Astro route requires a static import and a literal `id === ...` branch; a dynamic component lookup fails at render time (`NoMatchingImport`).
-- The docs page CTA is driven by `hasExplainer: true` in the Markdown frontmatter; the algorithms index and explainer sidebar are driven by `EXPLAINER_META`.
-- `EXPLAINER_SOLVERS` in `nav-data.ts` is stale: it names 13 explainers while the registry has 21. It is not used by the pages, only by its own test.
-- The explainer pages use the existing light docs-page explainer palette. The dark `web-design.md` tokens apply to page shells, not these embedded islands.
+Relevant current state:
+
+- The solver already exists in `src/tsp/space_filling_curve.rs`; this change does not touch it.
+- All explainers are self-contained Preact components with a pure-TypeScript `*-algo.ts` simulation module. None import `teeline-wasm`.
+- The Astro route needs a static import and a literal `id === ...` branch.
+- The docs CTA is driven by `hasExplainer: true`; the index/sidebar are driven by `EXPLAINER_META`.
+- The first implementation is on `feat/sfc-explainer` / PR #660. This revision is a follow-up delta, not a new capability.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- A self-contained, deterministic explainer that makes the SFC projection, ordering, curve-type contrast, and seam visible for `p = 1..8`.
-- A small simulation module that is easy to audit against the Rust source and cheap enough to run on every slider input.
-- Registration that reuses the existing explainer shells, sidebars, CTA, and test patterns.
-- Accessibility and responsive behavior consistent with the existing explainers.
+- Make the construction — not the final tour — the primary narrative.
+- Show explicitly that the curve is a 1D sort key and the tour connects the sorted cities.
+- Make order changes explainable through cell buckets, the 1D index strip, and a changed-city diff.
+- Keep the visualization legible at every `p`, especially `p = 8`.
+- Provide reversible, inspectable playback (Back / Step / Run-Pause / Reset) for construction and subdivision.
+- Make the seam/2-opt lesson tangible with a real, computed preview.
 
 **Non-Goals:**
 
-- A one-to-one port of `SfcOptions`. The explainer does not implement rotation, mirroring, multi-orientation, aspect scaling, or the `lexicographic`/`nearest_prev` tie-breakers.
+- A one-to-one port of `SfcOptions` (rotation, mirroring, multi-orientation, aspect scaling, alternate tie-breakers).
 - Calling the WASM solver or adding a WASM debug export.
-- Replacing or improving the solver, changing CLI/API behavior, or benchmarking the explainer.
 - A general-purpose SFC playground for arbitrary uploaded instances.
+- A full 2-opt pass or optimizer; the preview shows one best seam-removing move.
 
 ## Decisions
 
-### 1. Pure-TypeScript pedagogical simulation, not a full solver port
+### 1. Pure-TypeScript pedagogical simulation
 
-`sfc-algo.ts` implements only what the demonstration needs:
+`sfc-algo.ts` keeps the small solver subset: uniform projection, Hilbert/Morton indices for `p <= 8`, input-order sorting. It adds only the data the new lesson needs:
 
-- uniform bounding-box normalization with the solver's `EPSILON` zero-span guard and round-and-clamp to `0..2^p - 1`,
-- Hilbert and Morton indices for `p = 1..8`,
-- sorting by `(curve index, input index)`.
+- `rows`: city, cell, index, visit for each city in visit order,
+- `buckets`: cities grouped by cell, in curve-index order, with input order inside a bucket,
+- `orderDiff(previous, next)`: cities whose visit position changed,
+- `twoOptSeamPreview(cities, order)`: the best 2-opt move that removes the closing seam.
 
-The module intentionally omits the solver's rotation, mirror, aspect mode, multi-orientation, and alternate tie-breakers. The UI explains that the real solver can try eight orientations; the visualization fixes orientation at 0 degrees and no mirror so the curve does not flip while the visitor scrubs `p`.
+This is a visualization, not a second solver path: it never produces solver output, and the production web solve path remains `Solvers -> tsp::solve` through the WASM bridge.
 
-This is a visualization, not a second solver path: it never produces solver output, and the production web solve path remains `Solvers -> tsp::solve` through the WASM bridge. The constitution's "solver logic lives in the root crate" constraint is preserved because this module only draws a teaching model of the construction.
+### 2. Canvas for the dense curve, SVG for everything else
 
-Alternatives considered:
+The full curve is canvas-rendered (65,536 segments at `p = 8`). Cities, occupied cells, tour edges, the 1D strip, and labels are SVG. The canvas is decorative (`aria-hidden`); the table and strip provide the accessible data.
 
-- **Call the WASM solver for the tour order.** Rejected: it would add async/worker plumbing, still leave the curve geometry to TypeScript, and only cover the order, not the 65k-cell curve.
-- **Port every `SfcOptions` field.** Rejected: the extra controls would bury the core lesson, and the extra code would be harder to keep aligned with Rust than the small subset.
-- **Add a WASM debug export returning grid coordinates and keys.** Rejected: it expands the public WASM surface and the ambient `.d.ts` for one page.
+Rendering policy:
 
-The module cites the Rust functions it mirrors and uses the same reference vectors in tests (Hilbert `p=1`, Hilbert `p=2`, bijection and Manhattan adjacency for `p <= 6`, max-edge clamping, identical/collinear points).
-
-### 2. Canvas for the curve, SVG for everything interactive
-
-At `p = 8` the curve has `4^8 = 65,536` segments. Per-segment SVG elements are not viable, and a single SVG path is roughly half a megabyte of `d` data and can jank while the slider moves.
-
-The visualization uses:
-
-- a background `<canvas>` that draws the full curve once per `p`/curve-type change,
-- an SVG overlay with the same `0 0 300 300` coordinate system for city markers, order badges, tour edges, seam/longest-edge highlights, and labels.
-
-`sfc-algo.ts` exposes `curveCells(p, curveType)` returning the ordered cell coordinates. Unit tests pin its length (`4^p`), bijection, adjacency, and jump count, and the canvas consumes the same function. This keeps the drawing path testable instead of reducing it to "a canvas exists".
-
-The canvas is `aria-hidden="true"`; the SVG carries a concise `role="img"` label, and a visible order list plus statistics provide the text equivalent. The canvas backing store is sized for the device pixel ratio, and redraws are coalesced with `requestAnimationFrame`. Faint grid lines are drawn for `p <= 5`; above that the curve itself shows the subdivision.
-
-Non-adjacent curve steps are drawn in a second hue so Morton's quadrant jumps are visible against Hilbert's continuous path. The tour is drawn above the curve with a light contrast halo so it stays legible at `p = 8`.
-
-Alternatives considered:
-
-- **Single SVG path.** Simpler DOM, but the `p=8` path is large and rebuilt on every input event.
-- **Canvas for everything.** Good for the curve, but labels, focus styling, and accessible structure are easier to keep in SVG.
-- **Cap the drawn curve at `p = 6`.** Rejected: it would not show the selected curve at `p = 7..8`.
+- `p <= 4`: full curve crisp (teal), grid lines faint, occupied cells tinted.
+- `p > 4`: fade the full curve exponentially and draw the **occupied-cell spine** — the polyline through the 24 occupied cells in visit order. The spine is the legible curve signal at high `p`.
+- The longest Morton quadrant-crossing jumps are drawn dashed red even when the rest of the curve is faded.
+- The tour is drawn above the curve with a contrast halo.
 
 ### 3. Fixed 24-city illustrative layout
 
-The explainer uses a fixed 24-city layout with integer coordinates, arranged as four multi-scale corner clusters. This is a deliberate teaching fixture, not a benchmark instance.
+Keep the pinned `256 × 254` four-cluster fixture. `p = 3` (8×8) gives 20 occupied cells and four shared buckets of two, so the curve is traceable and the tie rule is visible on load. `p = 1..8` remains available.
 
-The pinned layout is:
+### 4. Staged construction is the primary narrative
 
-```text
-[22,208] [46,232] [70,256] [94,280] [30,270] [88,214]
-[206,208] [230,232] [254,256] [278,280] [214,270] [272,214]
-[22,26]  [46,50]  [70,74]  [94,98]  [30,88]  [88,32]
-[206,26] [230,50] [254,74] [278,98] [214,88] [272,32]
-```
+The explainer is a four-stage state machine:
 
-The spans are `256 × 254`. This near-square shape is intentional: an exact `256 × 256` grid-aligned layout stabilizes the city order at `p = 4`, while the 2-unit shorter y span keeps both Hilbert and Morton changing order at `p = 2, 3, 4, 5, 6`. The shorter axis leaves a margin below 1% under uniform scaling, which is visually imperceptible.
+| Stage | Canvas | Table / strip | Copy |
+| --- | --- | --- | --- |
+| Project | cities + occupied cells + bucket counts; no curve/tour | city + cell; grouped by cell | “Each city falls into one cell…” |
+| Index | curve + occupied-cell indices | add index column; strip appears | “The curve gives every cell a 1D index…” |
+| Sort | city visit-order badges; no tour | sorted by index; strip ticks labelled by visit | “Sort by index; same-cell ties use input order.” |
+| Connect | tour edges in visit order; seam last | current row/edge; strip playhead | “The tour connects the sorted cities; the curve is the sort key.” |
 
-Why 24 cities:
+The initial state is Project at `p = 3`. The visitor can jump to a stage, Step/Back, or Run through the sequence. Clicking Connect jumps to the completed tour; Step/Run builds it edge by edge.
 
-- the existing 12-city layouts put most cities in distinct cells by `p = 2`, so the Hilbert order barely changes for the rest of the slider range;
-- 24 cities change order at several orders (`p = 2..6`) while still fitting readable markers and two-digit order badges;
-- four clusters create meaningful same-cell buckets at low `p` and separate cleanly at higher `p`.
+### 5. 1D strip, sort table, and projection overlay
 
-At `p = 1` the layout uses 4 cells with a largest bucket of 6; at `p = 2` it uses 16 cells with a largest bucket of 2; by `p = 4` all 24 cities have their own cell.
+- **1D strip** below the canvas: x-axis is the curve index `[0, 4^p − 1]`; each city is a tick at its index; same-index ticks stack; visit labels appear at Sort/Connect. A playhead follows the current Connect edge. The seam is the wrap from the rightmost tick to the leftmost.
+- **Sort table** replaces the flat order list: columns visit, city, cell, index. Shared cells get a group header labelled “same cell · input order”. The table is a real `<table>` with a caption and scoped headers.
+- **Bidirectional hover**: a shared `hoveredCity` state links the canvas city, strip tick, and table row.
+- **Occupied-cell overlay**: distinct cells are tinted; shared cells are outlined with a count badge; cell index labels appear from Index onward. For `p > 5` the cells are sub-pixel, so the table/strip carry the mapping and only the hovered cell is outlined.
 
-City positions use the same uniform normalization as the solver (scale both axes by the larger span, anchor at the minimum, `y` up). They are not snapped to cell centers, so the tour stays visually readable when several cities share a cell; the bucket statistics expose the projection instead.
+### 6. Order changes are explained
 
-Alternatives considered:
+On `p` or curve-type change, keep the previous layout, compute `orderDiff`, and:
 
-- **Reuse `CITIES_12`.** Rejected: the order stabilizes too early.
-- **Use a real TSPLIB subset.** Rejected: it introduces an asymmetric bounding box and invites benchmark comparisons the explainer does not make. The docs page remains the place for real-instance results.
+- highlight changed cities on the canvas and in the table,
+- add a “N cities changed order since p = X” callout,
+- keep the shared-cell groups visible so the visitor sees that finer grids split cells and same-cell cities retain input order.
 
-### 4. Highlight the seam and the longest edge separately
+No fake explanation: the diff is derived from the actual visit positions.
 
-The tour is the closed sequence produced by the curve order. The edge from the last city back to the first is always the seam and is drawn in amber. The longest edge is computed separately; when it is not the seam, it is drawn in a contrasting colour and labelled. If two edges share the maximum length, the first edge in tour order wins, keeping the display deterministic.
+### 7. Reversible playback
 
-Tour length, seam length, and longest-edge length are computed on the fixture coordinates, not canvas pixels, and the UI labels them as layout units. This keeps the statistics stable when the viewport changes.
+Construction and subdivision are separate playback modes; starting one pauses the other.
 
-A long curve jump is a step between consecutive curve cells that are not grid neighbours (Manhattan distance greater than 1). The statistic counts all of them, and the canvas draws all non-adjacent steps in a distinct hue; longer jumps get more opacity so the quadrant structure remains readable at high `p`. At `p = 8` that is 32,767 for Morton and 0 for Hilbert.
+- **Construction**: Back, Step, Run/Pause, Reset, plus stage buttons. Step advances one stage or one tour edge; Back reverses. Run uses ~700 ms per stage and ~180 ms per edge. Reset returns to Project, `p = 3`, Hilbert.
+- **Subdivision**: Play/Pause plus `p−`/`p+` discrete stepping; the slider remains live.
+- Changing `p`, curve type, or stage stops playback.
+- `prefers-reduced-motion`: construction Run jumps to the completed Connect stage; subdivision Play jumps to `p = 8`.
 
-A short callout explains that a 2-opt pass removes the seam plus another edge and reconnects the four endpoints, which is why SFC tours are usually fed to `2opt` or `lk`.
+### 8. Labels, colours, and the seam/longest overlap
 
-Alternatives considered:
+- Primary node badge = visit order at Sort/Connect; city index (`#13`) at Project/Index and in the table/hover.
+- Tour edges: indigo (`#4f46e5`); curve: teal; seam: amber; longest: magenta; long jumps: orange; Morton quadrant crossings: dashed red.
+- When the seam is also the longest edge, draw a dashed magenta overlay on the amber seam and say “seam (also longest edge)”.
+- The seam callout uses visit positions (“visit 24 → visit 1”) and highlights both endpoints.
 
-- **Highlight only the seam.** Simple, but hides the Morton quadrant jumps that can be worse than the closing edge.
-- **Highlight every above-average edge.** Too noisy to read.
-- **Count only quadrant-scale jumps.** Rejected: the spec defines a long jump as any non-adjacent step, and a separate threshold would make the statistic and the drawing disagree.
+### 9. Interactive 2-opt preview
 
-### 5. Subdivision is a stateful step, not decorative motion
+`twoOptSeamPreview` iterates the valid partner edges (excluding the two degenerate neighbours), computes the new length for removing the seam + partner edge and adding the two reconnections, and returns the best move:
 
-The explainer starts at `p = 1`. A "Play subdivision" control advances `p` to 8 on a timer; Reset returns to 1. Moving the slider, switching the curve type, or pressing Reset stops playback. There is no Pause button: the run is short, the slider is direct, and reduced-motion users skip it. A Pause toggle can be added later if parity with the other explainers matters.
+- removed edges: the seam and the partner,
+- added edges: `(last, order[j])` and `(first, order[j+1])`,
+- old/new lengths and delta.
 
-With `prefers-reduced-motion: reduce`, Play jumps straight to `p = 8` instead of animating through intermediate orders.
+The Connect callout gets a `[Preview 2-opt fix]` toggle. When on, the removed edges are ghosted, the two replacement edges are drawn dashed green, and the callout shows `old → new (delta%)`, computed from fixture coordinates. If no move improves, show the least-worse delta and say so; never invent numbers.
 
-Alternatives considered:
+### 10. Registration and docs
 
-- **CSS draw-on animation of the curve.** Decorative, hard to time sensibly for 65k segments, and at odds with the project's "motion is functional only" rule.
-- **No animation.** The slider alone covers the acceptance criteria, but the issue explicitly asks for an animated subdivision.
+Keep the existing registry route and docs wiring. Update the registry description to mention the staged construction and 1D order. The algorithms-index count stays 22.
 
-### 6. Registration follows the existing explainer pattern
+### 11. Tests
 
-Add the metadata to `EXPLAINER_META`, a static import and `id === 'space_filling_curve'` branch to the Astro route, and `hasExplainer: true` to the docs frontmatter. Update the algorithms-index E2E count from 21 to 22.
-
-The registry entry pins:
-
-- `title`: `Space-Filling Curve — Interactive Explainer — Teeline`
-- `description`: `Interactive walkthrough of the Space-Filling Curve construction: watch Hilbert and Morton curves order cities on a 2^p × 2^p grid, and see the seam edge that a 2-opt pass removes.`
-- `backLabel`: `SFC`
-
-The explainer uses the existing docs-page explainer light palette (the same approach as Greedy Edge and Savings); the dark `web-design.md` tokens apply to page shells, not these embedded explainers.
-
-Also correct `EXPLAINER_SOLVERS` in `nav-data.ts` to list every explainer ID and change `nav-data.test.ts` to assert the set equals `EXPLAINER_IDS`, so adding this explainer does not leave another stale registry behind and future additions cannot silently drift.
-
-### 7. Tests pin the math and the interaction, not the pixels
-
-- Vitest (node) tests cover the simulation: Hilbert reference grids, bijection and adjacency, Morton keys, normalization edge cases, `curveCells` length/bijection/jumps, order changes at the pinned `p` values, same-cell input order, seam/longest-edge selection and tie-breaking, and statistics in layout units.
-- Playwright smoke tests cover hydration, the slider, the Hilbert/Morton toggle, Play/Reset, reduced-motion behavior, seam/longest-edge presence, keyboard operation, and the docs/index links.
-- No screenshot tests: the drawing is intentionally display-resolution dependent.
+- Vitest: existing curve/normalization tests, plus `rows`/`buckets` grouping at `p = 1, 3`, input-order ties, `orderDiff` on a known change, `twoOptSeamPreview` (removed/added edges, exact delta, best move), and determinism.
+- Playwright: initial Project/no tour at `p = 3`; stage stepping and Back; Run/Pause/Reset; `p−`/`p+`; strip/table counts and headers; shared-cell group; changed-city diff after `p` change; 2-opt preview edges and real delta; Morton quadrant crossing; keyboard; narrow viewport; docs/index links.
 
 ## Risks / Trade-offs
 
-- **JavaScript bitwise operations are 32-bit; the Rust Morton spread is 64-bit.** → Implement the `p <= 8` spread with a simple bit loop (or 32-bit masks) and test Morton keys against known values. The explainer deliberately does not support `p > 8`.
-- **The simulation drifts from the Rust solver.** → Keep the ported subset small, cite the source functions, pin the same reference vectors, and state in the UI that the explainer uses a fixed orientation and input-order tie-breaking.
-- **`p = 8` redraw cost.** → Draw the curve on a canvas with a single path, coalesce redraws with `requestAnimationFrame`, and avoid re-rendering 65k SVG nodes.
-- **The 24-city fixture could still produce long stable stretches.** → The pinned near-square layout changes both curves at `p = 2..6`; add a unit test asserting those transitions so a future fixture edit cannot silently remove them.
-- **Morton's 32,767 non-adjacent steps at `p = 8` could swamp the canvas.** → Draw all non-adjacent steps in a low-alpha second hue, give the longer jumps more opacity, and keep the tour above them with a contrast halo. If the result is still unreadable, reduce the jump opacity, not the statistic.
-- **A dense visual is hard to read for screen-reader and low-vision users.** → Provide the order list, statistics, `aria-valuetext` on the slider, and a concise SVG summary; keep the canvas decorative.
-- **Stale registry/test counts.** → Update the algorithms-index count and assert `EXPLAINER_SOLVERS` equals `EXPLAINER_IDS`; the Vitest test becomes the guard.
-- **The docs page CTA silently stays hidden.** → Add `hasExplainer: true` and cover the link in the E2E test.
+- **More UI state → more interactions.** → Keep one `stage` enum, one `connectStep`, one playback mode; unit-test the pure data transitions; stop playback on every manual control change.
+- **The table and strip can duplicate information.** → The strip carries position/intuition; the table carries exact cell/index/visit. Shared hover binds them.
+- **`p = 8` cells are sub-pixel.** → Fade the curve, draw the occupied-cell spine, and rely on the table/strip for exact cells; outline only the hovered cell.
+- **Live-region noise during playback.** → Announce stage changes and changed-city counts, not every edge tick; the table is the stable detailed view.
+- **The 2-opt preview could imply a full pass.** → Label it “one best seam-removing move” and show the exact delta.
+- **PR #660 is open.** → Push the revision as a follow-up commit to `feat/sfc-explainer` while the PR is open; re-run the full gate.
 
 ## Migration Plan
 
-Additive only. No data, API, or solver migration. Rollback is deleting the new explainer files and reverting the registry, route, docs-frontmatter, and test edits.
+Additive only. No data/API/solver migration. Rollback is reverting the explainer component and tests to the first version.
 
 ## Open Questions
 
-None. The scope is deliberately limited to a fixed-orientation, input-order, `p <= 8` teaching simulation.
+None. Decisions locked: default `p = 3`; strip + compact table; indigo tour edges; best seam-removing 2-opt preview; Back/Step/Run-Pause/Reset.
