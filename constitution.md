@@ -48,20 +48,22 @@ Hard constraints every change must preserve:
 ## 4. Architecture Guardrails
 
 - **Solver registration** happens in `src/tsp/mod.rs` in four coordinated places: the
-  `Solvers` enum, the `FromStr` impl, the `tsp::solve` dispatch arm, and
+  `Solvers` enum, the `FromStr` impl, the `solve_with_context` dispatch arm, and
   `Solvers::all_meta()`. Updating fewer than all four is a defect.
-- **`Solution` is the single tour representation** (`route: Vec<usize>`, `cities`, `total`).
-  Any route mutation must call `update_total()` so the distance stays consistent.
+- **`Solution` is the single tour representation** (`route`, `cities`, `total`). `total` is
+  computed from the distance matrix when the solution is constructed; build a new
+  `Solution` when the route changes rather than mutating one in place.
 - **Spatial queries** go through the shared `nearest(&pt, n)` interface — `KDTree`
   (preferred) or `DistanceMatrix` (brute-force fallback) — returning `NearestResult`.
 - **Composition via pipeline.** Local-search and stochastic solvers warm-start from a
   constructive seed rather than a random/sequential tour: deterministic hill-climbers seed
   from `nn`, stochastic solvers from `shuffle` (per the auto-expansion rules).
-- **Threading model:** the Piston visualisation runs on the main thread (required by its
-  event loop); the solver runs on a background thread and reports via a non-blocking `mpsc`
-  channel.
+- **Progress and threading:** the library is GUI-free and reports progress as
+  `ProgressMessage` values over an `mpsc` channel. The Qt GUI (`teeline-qt`) owns its event
+  loop, drains the channel on a worker thread, and renders on the Qt main thread. Never add
+  a GUI toolkit dependency to the solver library.
 - **The root `teeline` crate is the pure solver library**, shared by all subprojects
-  (teeline-cli, teeline-api, teeline-qt, teeline-wasm, teeline-web). Solver logic lives
+  (teeline-cli, teeline-api, teeline-qt, teeline-wasm, teeline-web, teeline-excel). Solver logic lives
   there, never duplicated into a subproject.
 
 ## 5. API Design Principles (teeline-api)
@@ -93,17 +95,16 @@ only; gradients, glassmorphism, decorative shadows, and count-up/parallax effect
 banned.
 
 The full, exact rules (palette hex values, type scale, anti-pattern checklist) live in
-[`web-design.md`](.kb/store/documents/context/immutable/web-design.md), to be migrated into
-`openspec/` during the GitKB→OpenSpec migration. This constitution fixes the *principle* —
-dark, restrained, route-motif, no decorative chrome — and defers the *exact values* to that
+[`docs/web-design.md`](docs/web-design.md). This constitution fixes the *principle* — dark,
+restrained, route-motif, no decorative chrome — and defers the *exact values* to that
 reference.
 
 ## 7. Relationship to ADRs
 
-This constitution states what must always hold. Architecture Decision Records (ADRs) record
-specific, dated decisions and their rationale. An ADR may not contradict the constitution;
-a decision that would require violating a principle must amend the constitution first and
-record the ADR against the amended text.
+This constitution states what must always hold. Architecture Decision Records (ADRs) in
+[`docs/adr/`](docs/adr/) record specific, dated decisions and their rationale. An ADR may
+not contradict the constitution; a decision that would require violating a principle must
+amend the constitution first and record the ADR against the amended text.
 
 ## 8. Governance
 
