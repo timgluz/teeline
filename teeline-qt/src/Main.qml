@@ -10,7 +10,11 @@ ApplicationWindow {
     id: root
     visible: true
     width: 900
-    height: 640
+    height: 780
+    // The loaded page (metadata, mini-map, opt tour, five recent rows, action
+    // bar) needs ~760px. Below that the ColumnLayout squeezes and later items
+    // cover the buttons, so they stop receiving clicks.
+    minimumHeight: 780
     title: "teeline-qt — TSP Solver"
 
     // ── Colour theme (single source of truth for all palette values) ────────
@@ -100,7 +104,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                         text: "Browse…"
                         onClicked: {
-                            fileDialog.selectedNameFilter = "TSPLIB files (*.tsp)"
+                            fileDialog.selectedNameFilter.index = 0
                             fileDialog.open()
                         }
                     }
@@ -144,7 +148,7 @@ ApplicationWindow {
                     Button {
                         text: "Open another .tsp…"
                         onClicked: {
-                            fileDialog.selectedNameFilter = "TSPLIB files (*.tsp)"
+                            fileDialog.selectedNameFilter.index = 0
                             fileDialog.open()
                         }
                     }
@@ -202,7 +206,7 @@ ApplicationWindow {
                 Button {
                     text: FileLoader.hasOptTour ? "Replace…" : "Browse…"
                     onClicked: {
-                        optTourDialog.selectedNameFilter = "Tour files (*.tour *.opt.tour)"
+                        optTourDialog.selectedNameFilter.index = 0
                         optTourDialog.open()
                     }
                 }
@@ -228,7 +232,10 @@ ApplicationWindow {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: FileLoader.loadFile(modelData)
+                            // Capture the path at click time: loadFile rebuilds the
+                            // recent list, so the delegate's modelData must not be
+                            // read from the deferred callback.
+                            onClicked: Qt.callLater(FileLoader.loadFile, modelData)
                         }
                     }
                 }

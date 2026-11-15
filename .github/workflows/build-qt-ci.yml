@@ -33,6 +33,11 @@ jobs:
         with:
           version: '6.11.*'
           cache: true
+      - name: Lint QML
+        # Main.qml is include_bytes!-embedded and only parsed at runtime, so a
+        # plain cargo build cannot catch a read-only property assignment. This
+        # caught the v1.0.16 `selectedNameFilter = "..."` regression class.
+        run: qmllint --import disable --unqualified disable --missing-property disable --read-only-property error teeline-qt/src/Main.qml
       - name: Build teeline-qt
         run: cargo build --manifest-path teeline-qt/Cargo.toml 2>&1
         env:
