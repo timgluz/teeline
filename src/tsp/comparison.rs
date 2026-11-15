@@ -1,3 +1,4 @@
+use crate::tsp::DistanceSource;
 use crate::tsp::DistanceType;
 use crate::tsp::distance_matrix;
 use crate::tsp::distance_matrix::DistanceMatrix;

@@ -1,9 +1,10 @@
+use std::path::Path;
 /// Integration tests for the Lin-Kernighan TSP solver.
 ///
 /// Fast tests use berlin52 with epochs=5 for quick structural validation.
 /// The quality test is marked #[ignore] and can be run with:
 ///   cargo test --test lin_kernighan_test -- --include-ignored
-use std::path::Path;
+use teeline::tsp::DistanceSource;
 use teeline::tsp::{
     HeuristicOptions, LKOptions, TspProblem, distance_matrix, kdtree, lin_kernighan,
     nearest_neighbor, tsplib,

@@ -258,7 +258,6 @@ fn cuckoo_search_valid_tour_berlin52() {
             ..HeuristicOptions::default()
         },
         mutation_probability: 0.25,
-        ..CSOptions::default()
     };
     let tour = cuckoo_search::solve(&make_problem(&cities), &opts, None, None);
     assert!(
@@ -445,7 +444,6 @@ fn flower_pollination_valid_tour_berlin52() {
             ..HeuristicOptions::default()
         },
         mutation_probability: 0.8,
-        ..FPAOptions::default()
     };
     let tour = flower_pollination::solve(&make_problem(&cities), &opts, None, None);
     assert!(
@@ -463,7 +461,6 @@ fn flower_pollination_tour_is_finite_and_positive() {
             ..HeuristicOptions::default()
         },
         mutation_probability: 0.8,
-        ..FPAOptions::default()
     };
     let tour = flower_pollination::solve(&make_problem(&cities), &opts, None, None);
     assert!(tour.total > 0.0);

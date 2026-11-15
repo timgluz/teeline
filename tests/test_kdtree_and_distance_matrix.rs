@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use teeline::tsp::DistanceSource;
 use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::{distance_matrix, kdtree};

@@ -55,7 +55,7 @@ use std::collections::HashMap;
 
 use super::distance_source::DistanceSource;
 use super::kdtree::KDPoint;
-use super::{CityTable, DistanceType, NearestResult, NearestResultItem};
+use super::{CityTable, DistanceType};
 
 pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     // Full-precision PI, deliberately, not TSPLIB's truncated `PI = 3.141592` from the
@@ -256,10 +256,6 @@ impl DistanceMatrix {
         self.items.is_empty()
     }
 
-    pub fn num_cities(&self) -> usize {
-        self.n
-    }
-
     pub fn num_distances(&self) -> usize {
         self.size
     }
@@ -268,9 +264,17 @@ impl DistanceMatrix {
         &self.items
     }
 
-    // It returns distance by raw vector ids for backward support for some solutions
-    // preferred solution: distance_between as it checks if city exists on table
-    pub fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
+    pub fn city_index(&self) -> &HashMap<usize, usize> {
+        &self.city_idx
+    }
+}
+
+impl DistanceSource for DistanceMatrix {
+    fn num_cities(&self) -> usize {
+        self.n
+    }
+
+    fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
         if pos1 == pos2 {
             return Ok(0.0);
         }
@@ -286,11 +290,11 @@ impl DistanceMatrix {
             .ok_or("distance index out of range")
     }
 
-    /// returns distance between city n and m
-    /// array is packed version of bottom triangle with given structure
-    /// ||d2,1|d3,1|d3,2|d4,1|d4,2|d4,3||
-    /// here bigger cityId works like padding, then smaller id acts as index from padding
-    pub fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
+    /// Hot-path override: the default would dispatch `city_id2pos` twice and
+    /// `distance_by_pos` once through the vtable for every lookup. This one resolves the
+    /// map directly and calls the primitive statically. The conformance suite proves it
+    /// returns the same values as the default.
+    fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
         if city_id1 == city_id2 {
             return Ok(0.0);
         }
@@ -307,159 +311,12 @@ impl DistanceMatrix {
         self.distance_by_pos(pos1, pos2)
     }
 
-    /// returns list of distances from city N, where 0 distance from the city;
-    pub fn distances_from(&self, city_id: usize) -> Vec<f32> {
-        let pos: usize = *self.city_idx.get(&city_id).expect("Unknown city id");
-
-        self.distances_from_index(pos)
-    }
-
-    pub fn tour_length(&self, path: &[usize]) -> f32 {
-        if path.len() < 2 {
-            return 0.0;
-        }
-        // Translate city IDs to positions upfront; unknown city ID → return 0.0.
-        let positions: Option<Vec<usize>> = path.iter().map(|&id| self.city_id2pos(id)).collect();
-        match positions {
-            None => 0.0,
-            Some(pos_path) => self.tour_length_by_pos(&pos_path),
-        }
-    }
-
-    /// Position-based tour length — no HashMap lookups per edge.
-    /// All positions must be in 0..num_cities().
-    pub fn tour_length_by_pos(&self, path: &[usize]) -> f32 {
-        if path.len() < 2 {
-            return 0.0;
-        }
-        let last = *path.last().unwrap();
-        let mut total = self.distance_by_pos(last, path[0]).unwrap_or(0.0);
-        for w in path.windows(2) {
-            total += self.distance_by_pos(w[0], w[1]).unwrap_or(0.0);
-        }
-        total
-    }
-
-    pub fn city_index(&self) -> &HashMap<usize, usize> {
-        &self.city_idx
-    }
-
-    pub fn pos2city_id(&self, pos: usize) -> Option<usize> {
+    fn pos2city_id(&self, pos: usize) -> Option<usize> {
         self.cities.get(&pos).map(|c| c.id)
     }
 
-    pub fn city_id2pos(&self, city_id: usize) -> Option<usize> {
-        self.city_idx.get(&city_id).copied()
-    }
-
-    pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let mut search_result = NearestResult::new(*target, n);
-
-        let city_pos = match self.city_id2pos(target.id) {
-            Some(pos) => pos,
-            None => return search_result, // unknown target → empty result, no panic
-        };
-
-        let distances_from_target = self.distances_from_index(city_pos);
-        for (pos, distance) in distances_from_target.iter().enumerate() {
-            if pos == city_pos {
-                continue; // skip self (belt-and-suspenders; add() already gates on pt.id)
-            }
-            // Look up by matrix position, not city_id.  city_id != pos when city IDs
-            // are not 0-based (e.g. 1-indexed TSPLIB files like berlin52.tsp).
-            if let Some(pt) = self.cities.get(&pos) {
-                search_result.add(*pt, *distance);
-            }
-        }
-
-        search_result
-    }
-
-    /// Nearest city satisfying `is_candidate`, ties broken by lowest city id.
-    ///
-    /// A predicate rather than a visited/unvisited set: taking `&HashSet<usize> visited`
-    /// let a caller pass its `unvisited` set without the compiler noticing, inverting the
-    /// test and returning `None` for every query.
-    ///
-    /// `target` is excluded internally, so `|id| unvisited.contains(&id)` is already
-    /// correct and a caller's extra `id != current_id` is harmless.
-    ///
-    /// O(n): the whole row is scanned. Deterministic by the total order
-    /// `(distance, city_id)` rather than iteration order, which is what makes `nn`
-    /// reproducible.
-    pub fn nearest_unvisited(
-        &self,
-        target: &KDPoint,
-        is_candidate: impl Fn(usize) -> bool,
-    ) -> Option<NearestResultItem> {
-        let city_pos = self.city_id2pos(target.id)?;
-        let row = self.distances_from_index(city_pos);
-
-        let mut best: Option<NearestResultItem> = None;
-        for (pos, distance) in row.iter().enumerate() {
-            if pos == city_pos {
-                continue;
-            }
-            // Unreachable: `build()`/`new()` populate `cities` for every position 0..n.
-            // Skipped to match `nearest()` above rather than asserting.
-            let Some(pt) = self.cities.get(&pos) else {
-                continue;
-            };
-            if !is_candidate(pt.id) {
-                continue;
-            }
-            let better = match &best {
-                None => true,
-                // `total_cmp`, not `<`: the latter is false against NaN, so a non-finite
-                // distance reaching `best` would block every later candidate and win by
-                // default. `total_cmp` is a genuine total order, so the result stays
-                // deterministic even on malformed input.
-                Some(current) => distance
-                    .total_cmp(&current.distance)
-                    .then_with(|| pt.id.cmp(&current.point.id))
-                    .is_lt(),
-            };
-            if better {
-                best = Some(NearestResultItem::new(*pt, *distance));
-            }
-        }
-
-        best
-    }
-
-    fn distances_from_index(&self, pos: usize) -> Vec<f32> {
-        let mut distances = Vec::with_capacity(self.n);
-        for i in 0..pos {
-            distances.push(
-                self.distance_by_pos(pos, i)
-                    .expect("valid position in distances_from_index"),
-            );
-        }
-        for i in pos..self.n {
-            distances.push(
-                self.distance_by_pos(i, pos)
-                    .expect("valid position in distances_from_index"),
-            );
-        }
-        distances
-    }
-}
-
-impl DistanceSource for DistanceMatrix {
-    fn num_cities(&self) -> usize {
-        self.n
-    }
-
-    fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
-        DistanceMatrix::distance_by_pos(self, pos1, pos2)
-    }
-
-    fn pos2city_id(&self, pos: usize) -> Option<usize> {
-        DistanceMatrix::pos2city_id(self, pos)
-    }
-
     fn city_id2pos(&self, city_id: usize) -> Option<usize> {
-        DistanceMatrix::city_id2pos(self, city_id)
+        self.city_idx.get(&city_id).copied()
     }
 
     fn point_at(&self, pos: usize) -> Option<KDPoint> {
@@ -489,7 +346,7 @@ mod tests {
         // City 1 must be skipped despite being "closest" only in the sense that NaN loses
         // every ordinary comparison — a NaN in `best` would otherwise stick forever.
         let pick = dm
-            .nearest_unvisited(&cities[0], |id| id != cities[0].id)
+            .nearest_unvisited(&cities[0], &|id| id != cities[0].id)
             .expect("city 2 is reachable");
         assert_eq!(pick.point.id, cities[2].id);
         assert_approx(5.0, pick.distance);
@@ -537,14 +394,14 @@ mod tests {
         let dm = DistanceMatrix::from_cities(&cities).unwrap();
         let start = cities[0].id;
 
-        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        let pick = dm.nearest_unvisited(&cities[0], &|id| id != start).unwrap();
         assert_eq!(pick.point.id, cities[1].id);
         assert_approx(1.0, pick.distance);
 
         // Excluding the three nearest leaves id 4.
         let excluded: Vec<usize> = vec![start, cities[1].id, cities[2].id, cities[3].id];
         let pick = dm
-            .nearest_unvisited(&cities[0], |id| !excluded.contains(&id))
+            .nearest_unvisited(&cities[0], &|id| !excluded.contains(&id))
             .unwrap();
         assert_eq!(pick.point.id, cities[4].id);
         assert_approx(4.0, pick.distance);
@@ -557,7 +414,7 @@ mod tests {
         let dm = DistanceMatrix::from_cities(&cities).unwrap();
         let start = cities[0].id;
 
-        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        let pick = dm.nearest_unvisited(&cities[0], &|id| id != start).unwrap();
         assert_approx(1.0, pick.distance);
         assert_eq!(
             pick.point.id, cities[1].id,
@@ -571,7 +428,7 @@ mod tests {
         let dm = DistanceMatrix::from_cities(&cities).unwrap();
 
         assert!(
-            dm.nearest_unvisited(&cities[0], |_| false).is_none(),
+            dm.nearest_unvisited(&cities[0], &|_| false).is_none(),
             "an empty candidate set must yield None rather than a bogus city"
         );
     }
@@ -607,7 +464,7 @@ mod tests {
         assert_eq!(unvisited.len(), cities.len() - 1);
 
         let pick = dm
-            .nearest_unvisited(&cities[0], |id| id != start && unvisited.contains(&id))
+            .nearest_unvisited(&cities[0], &|id| id != start && unvisited.contains(&id))
             .expect("279 cities are unvisited, so a nearest must exist");
         assert!(
             unvisited.contains(&pick.point.id),

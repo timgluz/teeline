@@ -38,10 +38,10 @@ pub mod three_opt;
 pub mod tsplib;
 pub mod two_opt;
 
-use crate::tsp::distance_matrix::DistanceMatrix;
 use crate::tsp::kdtree::KDPoint;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::mpsc;
 
 pub const VERSION: &str = "1.0.1";
@@ -1903,11 +1903,36 @@ pub fn solve_with_context(
 #[derive(Clone)]
 pub struct TspProblem {
     pub cities: Vec<KDPoint>,
-    pub distances: DistanceMatrix,
+    pub distances: Arc<dyn DistanceSource>,
 }
 
 impl TspProblem {
-    pub fn new(cities: Vec<KDPoint>, distances: DistanceMatrix) -> Self {
+    /// Wraps a concrete source, so existing `TspProblem::new(cities, dm)` call sites keep
+    /// compiling when the field became a trait object.
+    pub fn new(cities: Vec<KDPoint>, distances: impl DistanceSource + 'static) -> Self {
+        TspProblem {
+            cities,
+            distances: Arc::new(distances),
+        }
+    }
+
+    /// Shares an already-constructed source, as the selection policy returns.
+    pub fn from_source(cities: Vec<KDPoint>, distances: Arc<dyn DistanceSource>) -> Self {
+        debug_assert_eq!(
+            distances.num_cities(),
+            cities.len(),
+            "distance source has {} cities, problem has {}",
+            distances.num_cities(),
+            cities.len()
+        );
+        for (pos, city) in cities.iter().enumerate() {
+            debug_assert_eq!(
+                distances.pos2city_id(pos),
+                Some(city.id),
+                "distance source position {pos} does not match city id {}",
+                city.id
+            );
+        }
         TspProblem { cities, distances }
     }
 }
@@ -1948,7 +1973,7 @@ impl Solution {
     pub(crate) fn from_parts(
         route: &[usize],
         cities: &[kdtree::KDPoint],
-        distances: &DistanceMatrix,
+        distances: &dyn DistanceSource,
     ) -> Self {
         let cities_idx = cities.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
 

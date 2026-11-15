@@ -1,11 +1,12 @@
+use super::DistanceSource;
 use rand::RngExt;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::mpsc;
 
 use super::budget::Budget;
-use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
 use super::probability::probability;
 use super::progress::ProgressMessage;
@@ -29,7 +30,13 @@ pub fn solve(
         Some(t) => TspPopulation::from_cities_seeded(cities, population_size, &evaluator, t),
         None => TspPopulation::from_cities(cities, population_size, &evaluator),
     };
-    let best_candidate = solve_ga(&population, evaluator, distances, opts, progress_tx);
+    let best_candidate = solve_ga(
+        &population,
+        evaluator,
+        distances.as_ref(),
+        opts,
+        progress_tx,
+    );
 
     let best_route = Route::new(best_candidate.genotype());
     if let Some(tx) = progress_tx {
@@ -39,13 +46,13 @@ pub fn solve(
         ));
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(best_candidate.genotype(), cities, distances)
+    Solution::from_parts(best_candidate.genotype(), cities, distances.as_ref())
 }
 
 fn solve_ga(
     population: &TspPopulation,
     fitness_fn: FitnessFn,
-    distances: &DistanceMatrix,
+    distances: &dyn DistanceSource,
     ga: &GAOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
 ) -> TspGenotype {
@@ -128,8 +135,8 @@ fn solve_ga(
     current_population.best().clone()
 }
 
-fn build_evaluator(distances: &DistanceMatrix) -> FitnessFn {
-    let dm = Rc::new(distances.clone());
+fn build_evaluator(distances: &Arc<dyn DistanceSource>) -> FitnessFn {
+    let dm = Arc::clone(distances);
 
     Rc::new(move |path: &[usize]| {
         let tour_length = dm.tour_length(path);

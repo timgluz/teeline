@@ -35,11 +35,11 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, distances);
+        return Solution::from_parts(&path, cities, distances.as_ref());
     }
 
     // Step 1: all pairwise edges, sorted shortest-first.
-    let edges = sorted_edges(n, distances);
+    let edges = sorted_edges(n, distances.as_ref());
 
     // Emit a placeholder progress update so the viz window doesn't appear frozen —
     // this solver has no meaningful intermediate state to stream (mirrors christofides).
@@ -61,7 +61,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, cities, distances.as_ref())
 }
 
 #[cfg(test)]

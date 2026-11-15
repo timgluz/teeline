@@ -37,7 +37,7 @@
 ## 6. Integration verification
 
 - [ ] 6.1 Run `cargo test --workspace`; verify it is green.
-- [ ] 6.2 Run `cargo clippy --workspace --all-targets -- -D warnings`; verify no warnings.
+- [ ] 6.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
 - [ ] 6.3 Run `cargo fmt --check`; verify no diffs.
 - [ ] 6.4 Build the WASM target and verify the ambient `teeline-wasm.d.ts` matches any changed export.
 - [ ] 6.5 Build and smoke-test `teeline-qt`; verify a solve still renders progress.

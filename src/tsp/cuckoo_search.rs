@@ -152,12 +152,13 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&best, cities, distances)
+    Solution::from_parts(&best, cities, distances.as_ref())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::distance_source::DistanceSource;
     use std::sync::mpsc;
 
     use crate::tsp::progress::ProgressMessage;

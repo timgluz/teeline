@@ -9,10 +9,12 @@
 
 use std::path::Path;
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
-use teeline::tsp::{DistanceType, tsplib};
+use teeline::tsp::{DistanceSource, DistanceType, tsplib};
 
 const DATASETS: &[&str] = &["berlin52", "a280", "att532"];
 

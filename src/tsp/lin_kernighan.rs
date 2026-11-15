@@ -1,3 +1,4 @@
+use super::DistanceSource;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
     HeuristicOptions, LKOptions, Solution, TspProblem,

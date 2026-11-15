@@ -1,9 +1,10 @@
+use std::path::Path;
 /// Integration tests for the Or-opt TSP solver.
 ///
 /// Fast tests run berlin52 with the default HeuristicOptions for structural
 /// validation. The quality test is marked #[ignore] and can be run with:
 ///   cargo test --test or_opt_test -- --include-ignored
-use std::path::Path;
+use teeline::tsp::DistanceSource;
 use teeline::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree, or_opt, tsplib};
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
