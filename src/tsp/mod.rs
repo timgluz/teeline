@@ -12,6 +12,7 @@ pub mod cuckoo_search;
 pub mod distance_matrix;
 pub mod distance_source;
 pub use distance_source::DistanceSource;
+pub(crate) mod embedding;
 pub mod flower_pollination;
 pub mod fourier;
 pub mod genetic_algorithm;

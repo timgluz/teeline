@@ -22,6 +22,7 @@ principles every decision must respect; an ADR must not contradict it.
 | [009](009-wasm-component-model.md) | WebAssembly Component Model for solver exposure | Accepted |
 | [010](010-distance-source.md) | Distance-source boundary with swappable backends | Proposed |
 | [011](011-remove-codecov.md) | Remove Codecov from CI | Accepted |
+| [012](012-explicit-embedding.md) | Derived 2D layouts for coordinate-less EXPLICIT instances | Proposed |
 
 ## Adding an ADR
 
