@@ -105,12 +105,12 @@
 
 ## 11. Stacked PR delivery
 
-- [ ] 11.1 Open PR 1 (`docs/constitution-distance-source`) against `master` containing only task 1.1; verify the diff is limited to `constitution.md`.
-- [ ] 11.2 Open PR 2 (`bench/distance-backend`) against PR 1 for group 2; verify `--dry-run`, the scaling script, and the committed baseline run as documented.
-- [ ] 11.3 Open PR 3 (`refactor/add-distance-source-trait`) against PR 2 for tasks 3.1–3.2; verify the trait and matrix impl compile with no `TspProblem` field change.
-- [ ] 11.4 Open PR 4 (`refactor/use-distance-source`) against PR 3 for tasks 3.3–3.12; verify the no-regression sweep and that the diff is mechanical.
-- [ ] 11.5 Open PR 5 (`fix/lk-declared-metric`) against PR 4 for group 4; verify the seeded LK tests and the re-baseline note.
-- [ ] 11.6 Open PR 6 (`feat/on-the-fly-backend`) against PR 5 for group 5; verify the conformance and equivalence suites.
+- [x] 11.1 Open PR 1 (`docs/constitution-distance-source`) against `master` containing only task 1.1; verify the diff is limited to `constitution.md`.
+- [x] 11.2 Open PR 2 (`bench/distance-backend`) against PR 1 for group 2; verify `--dry-run`, the scaling script, and the committed baseline run as documented.
+- [x] 11.3 Open PR 3 (`refactor/add-distance-source-trait`) against PR 2 for tasks 3.1–3.2; verify the trait and matrix impl compile with no `TspProblem` field change.
+- [x] 11.4 Open PR 4 (`refactor/use-distance-source`) against PR 3 for tasks 3.3–3.12; verify the no-regression sweep and that the diff is mechanical.
+- [x] 11.5 Open PR 5 (`fix/lk-declared-metric`) against PR 4 for group 4; verify the seeded LK tests and the re-baseline note.
+- [x] 11.6 Open PR 6 (`feat/on-the-fly-backend`) against PR 5 for group 5; verify the conformance and equivalence suites.
 - [ ] 11.7 Open PR 7 (`feat/distance-backend-selection`) against PR 6 for group 6; verify the comparison sweep, thresholds, and 100k ceiling.
 - [ ] 11.8 Open PR 8 (`perf/candidate-lists`) against PR 7 for group 7; verify the quality and memory report.
 - [ ] 11.9 Open PR 9 (`perf/compact-explicit`) against PR 8 for group 8; verify exactness and the EXPLICIT memory report.
