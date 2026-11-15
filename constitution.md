@@ -37,8 +37,12 @@ It is a reference codebase: correctness and code clarity matter more than raw pe
 
 Hard constraints every change must preserve:
 
-- **Input contract:** TSPLIB format, 2D Euclidean coordinates (`NODE_COORD_SECTION` or
-  `DISPLAY_DATA_SECTION`), read from a file or stdin.
+- **Input contract:** TSPLIB format read from a file or stdin, carrying either 2D city
+  coordinates (`NODE_COORD_SECTION` or `DISPLAY_DATA_SECTION`) with an `EDGE_WEIGHT_TYPE` of
+  EUC_2D, GEO, ATT, or CEIL_2D, or explicit edge weights (`EDGE_WEIGHT_SECTION`). An EXPLICIT
+  instance without coordinates is a complete problem: the distance matrix remains the
+  objective, and a deterministic 2D layout derived from it is used only for geometry-based
+  solvers and display.
 - **Output contract:** tour cost followed by ordered city IDs (`<tour_cost> <optimised_flag>`
   on the first line, then space-separated city IDs). This is the CLI's stable interface.
 - **One dispatch mechanism:** every algorithm is a variant of the `Solvers` enum and is
