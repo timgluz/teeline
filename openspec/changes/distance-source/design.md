@@ -101,7 +101,7 @@ impl TspProblem {
 
 `new` wraps its argument, so all 80 `TspProblem::new(cities, dm)` call sites keep compiling. PR 4 adds only `new` and `from_source`; `from_points` cannot exist before `DistanceBackend` and `OnTheFly`, so it lands with the selection policy in Phase 2. It is deliberately **not** named `from_cities`, to avoid colliding with the existing "EUC_2D matrix from points" meaning.
 
-`from_source` verifies the position invariant that solvers already assume (`greedy_edge.rs:56` indexes `cities[pos]`): `num_cities() == cities.len()` and `pos2city_id(i) == cities[i].id` for every `i`, at least under `debug_assert`. `OnTheFly` also asserts unique city ids, mirroring `DistanceMatrix::new`.
+`from_source` verifies the position invariant that solvers already assume (`greedy_edge.rs:56` indexes `cities[pos]`): `num_cities() == cities.len()` and `pos2city_id(i) == cities[i].id` for every `i`, at least under `debug_assert`. `OnTheFly` also rejects duplicate city ids, mirroring `DistanceMatrix::new`'s uniqueness check.
 
 ### D4: Land the trait in two steps to keep every PR green
 
