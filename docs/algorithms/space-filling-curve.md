@@ -163,6 +163,35 @@ meaningfully solved; the same limitation affects fourier, som, and LK's
 candidate lists. NN, savings, greedy-edge, christofides, and 2-opt use the
 distance matrix and are unaffected. Tracked in #655.
 
+## Large instances
+
+SFC is the 100k-city path because it never builds a distance matrix. Coordinate input above
+20,000 cities selects the on-the-fly backend under the default `--distance-backend auto`
+policy, so construction is dominated by the grid indexing and sort.
+
+Measured with `scripts/gen-synthetic-tsp.py --n 100000 --seed 42`, five-run medians, release
+build:
+
+| Cities | Backend | Wall | Peak RSS | Tour cost |
+| ---: | --- | ---: | ---: | ---: |
+| 100,000 | on-the-fly (`Auto`) | 0.230s | 21.2 MB | 1,054,663 |
+
+The ignored integration test
+`sfc_100k_via_dispatch_is_valid_and_self_consistent` exercises the same path through
+`Solvers::SpaceFillingCurve` and checks that the reported cost equals an independent sum of the
+tour edges:
+
+```bash
+python3 scripts/gen-synthetic-tsp.py --n 100000 --seed 42 > /tmp/synthetic100k.tsp
+./target/release/teeline solve sfc -i /tmp/synthetic100k.tsp
+
+cargo test --release -p teeline --test sfc_100k_test -- --ignored
+```
+
+`--distance-backend matrix` at 100k does not fit in memory; see the
+[distance-source benchmarks](https://github.com/timgluz/teeline/blob/master/docs/benchmarks/distance-source.md) for the matrix ceiling. SFC still
+needs coordinates, so EXPLICIT instances without a coordinate section remain unsupported.
+
 ## Relationship to other solvers
 
 - [`nn`](/algorithms/nearest-neighbor/) also constructs from geometry, but walks

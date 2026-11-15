@@ -101,20 +101,20 @@
 
 ## 9. Phase 5 — SFC at 100k through normal dispatch
 
-- [ ] 9.1 Verify `sfc` selected through the normal solver dispatch at 100k (reusing the task 6.11 measurement) produces a valid tour and a reported cost equal to the recomputed tour length.
-- [ ] 9.2 Verify there is no separate SFC entry point and the solver remains reachable only through the `Solvers` dispatch; verify the CLI and metadata paths both resolve it.
-- [ ] 9.3 Update the SFC documentation and README to describe the 100k execution path; verify the documented command runs.
+- [x] 9.1 Verify `sfc` selected through the normal solver dispatch at 100k (reusing the task 6.11 measurement) produces a valid tour and a reported cost equal to the recomputed tour length.
+- [x] 9.2 Verify there is no separate SFC entry point and the solver remains reachable only through the `Solvers` dispatch; verify the CLI and metadata paths both resolve it.
+- [x] 9.3 Update the SFC documentation and README to describe the 100k execution path; verify the documented command runs.
 
 ## 10. Integration verification
 
-- [ ] 10.1 Run `cargo test --workspace` and the separate scaling/`--ignored` tasks; verify both are green, noting that `default-members = ["."]` otherwise skips the CLI and API.
-- [ ] 10.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
-- [ ] 10.3 Run `cargo fmt --check`; verify no diffs.
-- [ ] 10.4 Run `openspec validate distance-source --strict`; verify it passes.
-- [ ] 10.5 Build the WASM target, transpile with `jco`, and verify the ambient `teeline-wasm.d.ts` matches any changed export.
+- [x] 10.1 Run `cargo test --workspace` and the separate scaling/`--ignored` tasks; verify both are green, noting that `default-members = ["."]` otherwise skips the CLI and API.
+- [x] 10.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
+- [x] 10.3 Run `cargo fmt --check`; verify no diffs.
+- [x] 10.4 Run `openspec validate distance-source --strict`; verify it passes.
+- [x] 10.5 Build the WASM target, transpile with `jco`, and verify the ambient `teeline-wasm.d.ts` matches any changed export.
 - [ ] 10.6 Build and smoke-test `teeline-qt`; verify a solve still renders progress.
-- [ ] 10.7 Run `graphify update .`; verify the graph is current.
-- [ ] 10.8 Re-run the documented comparison and scaling commands; verify the accepted numbers are reproducible.
+- [x] 10.7 Run `graphify update .`; verify the graph is current.
+- [x] 10.8 Re-run the documented comparison and scaling commands; verify the accepted numbers are reproducible.
 
 ## 11. Stacked PR delivery
 
@@ -135,3 +135,4 @@
 - Archive the change once the stack has merged and the accepted benchmark numbers are published; Phases 3–5 may archive with the same change if completed, or be split into follow-up changes.
 - Add the nightly small-instance smoke once the thresholds stabilize; it is not part of this change.
 - `city-id-position` follows this stack after PR 10; do not start it against an intermediate branch.
+- Qt remains environment-blocked in this checkout: `qmake`/Qt 6 are not installed, so `teeline-qt` cannot build locally. No Qt source changed in the stack, and the solver engine still calls the unchanged `TspLibData::to_problem`; run the Qt smoke in release CI once Qt is available.
