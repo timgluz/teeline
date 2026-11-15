@@ -4,7 +4,7 @@ use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{HeuristicOptions, Solution, TspProblem};
+use super::{HeuristicOptions, Solution, TspProblem, kdtree::KDPoint};
 
 /// Or-opt local search: relocates segments of 1, 2, or 3 consecutive cities.
 ///
@@ -43,14 +43,10 @@ pub fn solve(
     }
 
     // A candidate list is a pruning heuristic: every relocation is still scored with the exact
-    // distance source. EXPLICIT inputs carry placeholder coordinates, so they keep the full
-    // scan. When k covers every city there is nothing to prune, so the full scan is cheaper.
+    // distance source. EXPLICIT inputs keep the full scan instead of building a list from a
+    // layout, and when k covers every city there is nothing to prune.
     let k = opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K);
-    let candidates = if distances.is_coordinate_metric() && k < n.saturating_sub(1) {
-        Some(CandidateList::build(cities, k))
-    } else {
-        None
-    };
+    let candidates = candidates_for(distances.as_ref(), cities, k);
 
     while let Some(best) = find_best_move(&path, distances.as_ref(), candidates.as_ref()) {
         let (_, i, j, seg_len, reversed) = best;
@@ -88,6 +84,18 @@ pub fn solve(
 ///
 /// Returns `(delta, seg_start, insert_after_j, seg_len, reversed)`.
 /// `delta` is the change in total tour length (negative = improvement).
+fn candidates_for(
+    distances: &dyn DistanceSource,
+    cities: &[KDPoint],
+    k: usize,
+) -> Option<CandidateList> {
+    if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
+        Some(CandidateList::build(cities, k))
+    } else {
+        None
+    }
+}
+
 fn find_best_move(
     path: &[usize],
     distances: &dyn DistanceSource,
@@ -419,5 +427,23 @@ mod tests {
         visited.sort_unstable();
         let expected: Vec<usize> = (0..problem.cities.len()).collect();
         assert_eq!(visited, expected, "each city must appear exactly once");
+    }
+
+    #[test]
+    fn explicit_input_skips_the_candidate_list() {
+        use crate::tsp::CityTable;
+
+        let n = 6;
+        let cities: Vec<kdtree::KDPoint> = (0..n)
+            .map(|i| kdtree::KDPoint::new_with_id(i + 1, &[i as f32, 0.0]))
+            .collect();
+        let table: CityTable = cities
+            .iter()
+            .enumerate()
+            .map(|(position, city)| (position, *city))
+            .collect();
+        let matrix = distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table);
+
+        assert!(candidates_for(&matrix, &cities, 2).is_none());
     }
 }

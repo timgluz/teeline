@@ -12,6 +12,7 @@
 //! sparse IDs (10, 20, 30, …) would otherwise size the table by the largest ID instead of by
 //! the city count.
 
+use super::distance_source::DistanceSource;
 use super::id_index::IdIndex;
 use super::kdtree::{self, KDPoint};
 
@@ -47,6 +48,52 @@ impl CandidateList {
                 .map(|item| item.point.id)
                 .collect();
         }
+        Self { rows, id_index }
+    }
+
+    /// Build candidate rows from the exact distance matrix rather than the coordinates.
+    ///
+    /// EXPLICIT instances may have no coordinates, or coordinates that are display data rather
+    /// than the objective. Ranking by `distance_by_pos` keeps the neighbourhood tied to the
+    /// distances the solver is scored on; non-finite pairs are skipped.
+    pub(crate) fn build_from_distances(
+        distances: &dyn DistanceSource,
+        cities: &[KDPoint],
+        k: usize,
+    ) -> Self {
+        let n = cities.len();
+        debug_assert_eq!(
+            distances.num_cities(),
+            n,
+            "distance source and city list disagree on the city count"
+        );
+        let k = k.min(n.saturating_sub(1));
+        let mut rows = vec![Vec::new(); n];
+        let id_index = IdIndex::build(cities);
+        if n < 2 || k == 0 {
+            return Self { rows, id_index };
+        }
+
+        for (pos, row) in rows.iter_mut().enumerate() {
+            let mut neighbours: Vec<(f32, usize)> = (0..n)
+                .filter(|&other| other != pos)
+                .filter_map(|other| {
+                    let distance = distances.distance_by_pos(pos, other).ok()?;
+                    if !distance.is_finite() {
+                        return None;
+                    }
+                    Some((distance, cities[other].id))
+                })
+                .collect();
+            neighbours.sort_by(|left, right| {
+                left.0
+                    .total_cmp(&right.0)
+                    .then_with(|| left.1.cmp(&right.1))
+            });
+            neighbours.truncate(k);
+            *row = neighbours.into_iter().map(|(_, city_id)| city_id).collect();
+        }
+
         Self { rows, id_index }
     }
 
@@ -132,12 +179,45 @@ pub(crate) fn candidate_positions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::CityTable;
+    use crate::tsp::distance_matrix::DistanceMatrix;
 
     fn cities_at(ids: &[usize]) -> Vec<KDPoint> {
         ids.iter()
             .enumerate()
             .map(|(i, &id)| KDPoint::new_with_id(id, &[i as f32, 0.0]))
             .collect()
+    }
+
+    fn explicit_matrix(distances: Vec<f32>, cities: &[KDPoint]) -> DistanceMatrix {
+        let table: CityTable = cities
+            .iter()
+            .enumerate()
+            .map(|(position, city)| (position, *city))
+            .collect();
+        DistanceMatrix::new(cities.len(), distances, table)
+    }
+
+    #[test]
+    fn matrix_candidates_rank_by_distance_not_geometry() {
+        let cities = cities_at(&[1, 2, 3, 4]);
+        // Geometry puts city 2 next to city 1; the matrix makes city 4 closest.
+        let matrix = explicit_matrix(vec![10.0, 20.0, 1.0, 1.0, 30.0, 30.0], &cities);
+
+        let geometric = CandidateList::build(&cities, 1);
+        assert_eq!(geometric.neighbours(1), &[2]);
+
+        let exact = CandidateList::build_from_distances(&matrix, &cities, 1);
+        assert_eq!(exact.neighbours(1), &[4]);
+    }
+
+    #[test]
+    fn matrix_candidates_skip_non_finite_distances() {
+        let cities = cities_at(&[1, 2, 3, 4]);
+        let matrix = explicit_matrix(vec![f32::NAN, 20.0, 1.0, 1.0, 30.0, 30.0], &cities);
+
+        let exact = CandidateList::build_from_distances(&matrix, &cities, 2);
+        assert_eq!(exact.neighbours(1), &[4, 3]);
     }
 
     #[test]

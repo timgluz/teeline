@@ -4,7 +4,7 @@ use super::DistanceSource;
 use super::candidate_list::{self, CandidateList};
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{HeuristicOptions, Solution, TspProblem};
+use super::{HeuristicOptions, Solution, TspProblem, kdtree::KDPoint};
 
 pub fn solve(
     problem: &TspProblem,
@@ -36,11 +36,7 @@ pub fn solve(
     // scan instead of ranking meaningless neighbours. When k covers every city there is
     // nothing to prune, so the full scan is also cheaper than building the table.
     let k = opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K);
-    let candidates = if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
-        Some(CandidateList::build(cities, k))
-    } else {
-        None
-    };
+    let candidates = candidates_for(distances.as_ref(), cities, k);
 
     let n_indices = cities.len() - 1;
     match candidates {
@@ -58,6 +54,21 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
     Solution::from_parts(&path, cities, distances.as_ref())
+}
+
+/// A candidate list is a pruning heuristic: every move is still scored with the exact distance
+/// source. EXPLICIT inputs keep the full scan instead of building a list from a layout, and when
+/// `k` covers every city there is nothing to prune.
+fn candidates_for(
+    distances: &dyn DistanceSource,
+    cities: &[KDPoint],
+    k: usize,
+) -> Option<CandidateList> {
+    if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
+        Some(CandidateList::build(cities, k))
+    } else {
+        None
+    }
 }
 
 /// Best-improvement pass over candidate endpoints.
@@ -290,5 +301,23 @@ mod tests {
             let tour = solve(&problem, &HeuristicOptions::default(), None, None);
             assert_eq!(tour.route().len(), n);
         }
+    }
+
+    #[test]
+    fn explicit_input_skips_the_candidate_list() {
+        use crate::tsp::CityTable;
+
+        let n = 6;
+        let cities: Vec<kdtree::KDPoint> = (0..n)
+            .map(|i| kdtree::KDPoint::new_with_id(i + 1, &[i as f32, 0.0]))
+            .collect();
+        let table: CityTable = cities
+            .iter()
+            .enumerate()
+            .map(|(position, city)| (position, *city))
+            .collect();
+        let matrix = distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table);
+
+        assert!(candidates_for(&matrix, &cities, 2).is_none());
     }
 }
