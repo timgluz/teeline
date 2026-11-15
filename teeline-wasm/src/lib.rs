@@ -113,7 +113,7 @@ fn parse_to_tsp_problem(input: &str) -> Result<TspProblem, String> {
         TspProblem::from_points(kd_cities, DistanceType::Euc2D, DistanceBackend::Auto)
     } else {
         let data = teeline::tsp::tsplib::read_from_str(input)?;
-        data.to_problem(DistanceBackend::Auto)
+        data.into_problem(DistanceBackend::Auto)
     }
 }
 
@@ -543,7 +543,7 @@ impl Guest for Component {
         } else {
             DistanceBackend::OnTheFly
         };
-        let problem = data.to_problem(backend)?;
+        let problem = data.into_problem(backend)?;
 
         let solver: Vec<usize> = solver_route.iter().map(|&x| x as usize).collect();
         let opt: Vec<usize> = opt_route.iter().map(|&x| x as usize).collect();
@@ -570,7 +570,7 @@ impl Guest for Component {
         } else {
             DistanceBackend::OnTheFly
         };
-        let problem = data.to_problem(backend)?;
+        let problem = data.into_problem(backend)?;
         let route: Vec<usize> = route.iter().map(|&x| x as usize).collect();
         Ok(problem.distances.tour_length(&route))
     }

@@ -560,7 +560,7 @@ fn run_as_pipeline_stages(
         }
     };
 
-    let problem = match tsp_data.to_problem(backend) {
+    let problem = match tsp_data.into_problem(backend) {
         Ok(problem) => problem,
         Err(e) => {
             eprintln!("Error building the distance source: {e}");

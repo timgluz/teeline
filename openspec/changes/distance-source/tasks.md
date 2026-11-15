@@ -88,12 +88,16 @@
 
 ## 8. Phase 4 — Compact EXPLICIT storage
 
-- [ ] 8.1 Add width detection and `u16`/`u32` storage for EXPLICIT distances when all weights are non-negative integers; verify exact round-trips for 16-bit and 32-bit ranges.
-- [ ] 8.2 Fall back to `f32` for non-integer or negative weights; verify every distance is preserved exactly.
-- [ ] 8.3 Implement the trait primitives over the compact representation; verify the existing EXPLICIT tests pass.
-- [ ] 8.4 Compare compact-path tour costs against the `f32` path; verify every cost is identical.
-- [ ] 8.5 Measure EXPLICIT parse-time and stored peak RSS separately, evaluate a consuming `into_problem` to drop the `raw_distances.clone()`, and record sizes beyond the feasible parse limit as not-measured; verify the report states both figures.
-- [ ] 8.6 Document the compaction rule and measured EXPLICIT memory reduction; verify the numbers match the benchmark.
+- [x] 8.1 Add width detection and `u16` storage for EXPLICIT distances when all weights are non-negative integers that fit in 16 bits, leaving wider weights in `f32` because a `u32` representation is not narrower; verify exact round-trips across the 16-bit and wider ranges.
+- [x] 8.2 Fall back to `f32` for non-integer or negative weights; verify every distance is preserved exactly.
+- [x] 8.3 Implement the trait primitives over the compact representation; verify the existing EXPLICIT tests pass.
+- [x] 8.4 Compare compact-path tour costs against the `f32` path; verify every cost is identical.
+- [x] 8.5 Measure EXPLICIT parse-time and stored peak RSS separately, evaluate a consuming `into_problem` to drop the `raw_distances.clone()`, and record sizes beyond the feasible parse limit as not-measured; verify the report states both figures.
+- [x] 8.6 Document the compaction rule and measured EXPLICIT memory reduction; verify the numbers match the benchmark.
+- [x] 8.7 Replace the entry-coordinate `Vec` and `n²` parser scratch with a lazy entry iterator; verify every layout still packs identically and peak RSS falls.
+- [x] 8.8 Add a deterministic synthetic EXPLICIT generator and record the before/after fixtures; verify the documented commands reproduce the table.
+- [x] 8.9 Validate EXPLICIT dimension arithmetic and city/weight counts before constructing the matrix, return `Err` for malformed input instead of panicking, and return `Cow` from `distances()` so `f32` storage stays zero-copy; verify the malformed-input tests.
+- [x] 8.10 Drop the width-identical `u32` representation, reject `-0.0` so its sign survives, and extend fallback tests for infinities, signed zero, and values wider than `u16`; verify the chosen storage kinds.
 
 ## 9. Phase 5 — SFC at 100k through normal dispatch
 
