@@ -127,8 +127,8 @@
 - [x] 11.6 Open PR 6 (`feat/on-the-fly-backend`) against PR 5 for group 5; verify the conformance and equivalence suites.
 - [x] 11.7 Open PR 7 (`feat/distance-backend-selection`) against PR 6 for group 6; verify the comparison sweep, thresholds, and 100k ceiling.
 - [x] 11.8 Open PR 8 (`perf/candidate-lists`) against PR 7 for group 7; verify the quality and memory report.
-- [ ] 11.9 Open PR 9 (`perf/compact-explicit`) against PR 8 for group 8; verify exactness and the EXPLICIT memory report.
-- [ ] 11.10 Open PR 10 (`docs/sfc-100k`) against PR 9 for groups 9–10; verify the full integration checks.
+- [x] 11.9 Open PR 9 (`perf/compact-explicit`) against PR 8 for group 8; verify exactness and the EXPLICIT memory report.
+- [x] 11.10 Open PR 10 (`docs/sfc-100k`) against PR 9 for groups 9–10; verify the full integration checks.
 - [ ] 11.11 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope.
 
 ## Workflow follow-up
