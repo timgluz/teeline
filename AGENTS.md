@@ -145,6 +145,20 @@ After adding a new WIT export:
 - SSH pushes can fail with `Bad owner or permissions on /usr/etc/ssh/ssh_config.d/50-suse.conf` (that system file is owned by `nobody`). Work around it per-command without changing repo or remote config:
   `git -c core.sshCommand="ssh -F /dev/null" push -u origin <branch>`
 
+## Releases & web deployment
+
+- **Version bump:** update `Cargo.toml` and `teeline-cli/Cargo.toml` together. Bump
+  `teeline-wasm/Cargo.toml` when the WASM changes; `/solve/` displays it as
+  `teeline-solver <version>` (`env!("CARGO_PKG_VERSION")`).
+- **Tag:** push `vX.Y.Z` matching the manifests. `.github/workflows/release.yml` builds the CLI
+  artifacts, WASM, Qt bundles, and the GitHub Release.
+- **Web:** a successful tag release triggers `.github/workflows/deploy-web.yml` via
+  `workflow_run`. It downloads the latest release's `teeline-solver.wasm`, transpiles with jco,
+  and deploys. Manual redeploy: `gh workflow run deploy-web.yml --ref master`.
+- The web solver list comes from the WASM's `list_algorithms`, so a new solver reaches `/solve/`
+  only after that deploy. `deploy-web` also runs on `teeline-web/**` pushes; the `workflow_run`
+  guard ignores PR runs of the Release workflow.
+
 ## Knowledge & planning
 
 - `constitution.md` — non-negotiable project principles.

@@ -95,6 +95,19 @@ Inspect the component's exported interface:
 wasm-tools component wit target/wasm32-wasip1/debug/teeline_wasm.wasm
 ```
 
+## Release and web deployment
+
+- The `/solve/` page downloads `teeline-solver.wasm` from the **latest GitHub Release**, not
+  from `master`. The displayed `teeline-solver <version>` is `teeline-wasm/Cargo.toml`'s
+  `CARGO_PKG_VERSION`, so bump that file whenever the WASM changes.
+- `.github/workflows/release.yml` builds and publishes the asset on a `vX.Y.Z` tag.
+- `.github/workflows/deploy-web.yml` runs after a successful tag release via `workflow_run`,
+  downloads the latest asset, transpiles it with jco, and deploys the site. It can also be run
+  manually with `gh workflow run deploy-web.yml --ref master`, and it still runs on
+  `teeline-web/**` pushes.
+- The solver dropdown is populated by the WASM's `list_algorithms`; a newly added solver appears
+  only after the web deploy that consumes the release containing it.
+
 ---
 
 ## JavaScript / Node.js
