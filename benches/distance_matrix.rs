@@ -70,7 +70,13 @@ fn bench_lookup(c: &mut Criterion) {
     let dm = DistanceMatrix::build(&cities, DistanceType::Euc2D).unwrap();
     let last = dm.num_cities();
     c.bench_function("distance_between_last_pair", |b| {
-        b.iter(|| black_box(dm.distance_between(1, last).unwrap()));
+        b.iter(|| {
+            black_box(
+                black_box(&dm)
+                    .distance_between(black_box(1), black_box(last))
+                    .unwrap(),
+            )
+        });
     });
 }
 
