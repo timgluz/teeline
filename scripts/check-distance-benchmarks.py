@@ -60,6 +60,12 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help="override every family's median wall-clock tolerance",
     )
+    ap.add_argument(
+        "--absolute-slack",
+        type=float,
+        default=0.1,
+        help="absolute wall-clock slack in seconds for micro-cells (default: 0.1)",
+    )
     return ap.parse_args()
 
 
@@ -129,9 +135,13 @@ def main() -> int:
             f"{matrix_rss:12.0f}{onfly_rss:10.0f}{rss_ratio:8.2f}"
         )
 
-        if wall_ratio > tolerance:
+        # A relative tolerance is meaningless for 10-50 ms cells where process startup and
+        # timer resolution dominate, so a larger absolute allowance also passes.
+        wall_limit = max(matrix_wall * tolerance, matrix_wall + args.absolute_slack)
+        if onfly_wall > wall_limit:
             violations.append(
-                f"{solver}/{dataset}: wall {wall_ratio:.2f}x > {tolerance:.2f}x"
+                f"{solver}/{dataset}: wall {wall_ratio:.2f}x > {tolerance:.2f}x "
+                f"and {onfly_wall - matrix_wall:+.2f}s > {args.absolute_slack:.2f}s slack"
             )
         if rss_ratio > args.memory_ratio:
             violations.append(

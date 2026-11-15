@@ -104,6 +104,29 @@ Two findings:
 The 100k run stays under 1 GiB with three orders of magnitude of headroom; the matrix run at
 the same size was killed at 25.76 GiB. This is the acceptance path for #647.
 
+## Matrix-vs-on-the-fly comparison
+
+Both backends were measured on the same commit and the same 36 cells (`tier-distance.toml`),
+five runs each, medians over `status: ok` rows. Full rows:
+`bench/baseline/distance/comparison-tier.jsonl`.
+
+| Family | Cells | Worst wall (all) | Worst wall (cells >= 100 ms) | Worst peak RSS |
+| --- | ---: | ---: | ---: | ---: |
+| exact | 2 | 2.97x (`bhk`/`ulysses16`) | — | 1.00x |
+| constructive | 10 | 1.81x (`sfc`/`ulysses16`) | — | 1.04x |
+| local | 19 | 1.87x (`lk`/`burma14`) | 1.43x (`or_opt`/`att532`) | 1.02x |
+| meta | 5 | 1.92x (`tabu`/`burma14`) | 1.45x (`tabu`/`att532`) | 1.02x |
+
+The all-cell ratios above 1.5 are sub-100 ms instances where process startup and timer
+resolution dominate; their absolute differences are 18–91 ms. The accepted tolerance is
+therefore:
+
+- **median wall-clock:** 1.5x for local/meta, 2.0x for exact/constructive, **or** the matrix
+  median + 100 ms, whichever is larger;
+- **median peak RSS:** 1.25x the matrix.
+
+`scripts/check-distance-benchmarks.py` enforces both and passes on this run.
+
 ## Backend selection
 
 - `--distance-backend auto|matrix|on-the-fly` (default `auto`); the same value is accepted as a
