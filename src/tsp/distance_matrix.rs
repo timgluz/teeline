@@ -51,6 +51,7 @@
     because it adds more complexity than any actual benefits;
 */
 
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use super::distance_source::DistanceSource;
@@ -142,11 +143,96 @@ pub fn build(cities: &[KDPoint], dt: DistanceType) -> DistanceMatrix {
     DistanceMatrix::build(cities, dt).unwrap()
 }
 
+/// Packed lower-triangle storage.
+///
+/// Coordinate matrices are computed as `f32` and stay there. EXPLICIT files usually carry
+/// integer weights that fit in `u16`, which halves the stored footprint without changing any
+/// query result. Wider weights stay `f32`: `u32` is the same four bytes and would only add a
+/// conversion on every lookup.
+#[derive(Debug, Clone)]
+enum PackedDistances {
+    F32(Vec<f32>),
+    U16(Vec<u16>),
+}
+
+impl PackedDistances {
+    fn from_explicit(distances: Vec<f32>) -> Self {
+        if Self::fits_u16(&distances) {
+            Self::U16(distances.iter().map(|&d| d as u16).collect())
+        } else {
+            Self::F32(distances)
+        }
+    }
+
+    fn from_explicit_slice(distances: &[f32]) -> Self {
+        if Self::fits_u16(distances) {
+            Self::U16(distances.iter().map(|&d| d as u16).collect())
+        } else {
+            Self::F32(distances.to_vec())
+        }
+    }
+
+    /// True when every value is a non-negative integer ≤ `u16::MAX`.
+    ///
+    /// `-0.0` is rejected so the sign bit survives; the compact representation has no way to
+    /// carry it, and "preserve every distance exactly" is the contract.
+    fn fits_u16(distances: &[f32]) -> bool {
+        distances.iter().all(|&distance| {
+            distance.is_finite()
+                && !distance.is_sign_negative()
+                && distance.fract() == 0.0
+                && distance <= f32::from(u16::MAX)
+        })
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::F32(items) => items.len(),
+            Self::U16(items) => items.len(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn get(&self, index: usize) -> Option<f32> {
+        match self {
+            Self::F32(items) => items.get(index).copied(),
+            Self::U16(items) => items.get(index).map(|&value| f32::from(value)),
+        }
+    }
+
+    fn widen(&self) -> Cow<'_, [f32]> {
+        match self {
+            Self::F32(items) => Cow::Borrowed(items),
+            Self::U16(items) => Cow::Owned(items.iter().map(|&value| f32::from(value)).collect()),
+        }
+    }
+
+    fn bytes(&self) -> usize {
+        self.len() * self.element_bytes()
+    }
+
+    fn element_bytes(&self) -> usize {
+        match self {
+            Self::F32(_) => 4,
+            Self::U16(_) => 2,
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::F32(_) => "f32",
+            Self::U16(_) => "u16",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DistanceMatrix {
-    n: usize,    // how many cities
-    size: usize, // how many distances under diagonal
-    items: Vec<f32>,
+    n: usize, // how many cities
+    items: PackedDistances,
     cities: CityTable,
     city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
     /// False for an EXPLICIT-weight matrix, whose cities are TSPLIB grid placeholders.
@@ -154,8 +240,54 @@ pub struct DistanceMatrix {
 }
 
 impl DistanceMatrix {
+    /// Build an EXPLICIT matrix from packed lower-triangle weights.
+    ///
+    /// Values that fit in `u16` are stored at two bytes each; everything else stays `f32`.
+    /// Both representations preserve every value exactly.
     pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
-        Self::new_with_coordinates(n, distances, cities, false)
+        Self::from_parts(n, PackedDistances::from_explicit(distances), cities, false)
+    }
+
+    /// Like [`Self::new`], but packs straight from a borrowed slice, so a caller holding the
+    /// parsed weights does not have to clone them first.
+    pub fn from_explicit_slice(n: usize, distances: &[f32], cities: CityTable) -> Self {
+        Self::from_parts(
+            n,
+            PackedDistances::from_explicit_slice(distances),
+            cities,
+            false,
+        )
+    }
+
+    fn from_parts(
+        n: usize,
+        items: PackedDistances,
+        cities: CityTable,
+        has_coordinates: bool,
+    ) -> Self {
+        let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
+
+        assert!(n == city_idx.len(), "city_idx size differs from n cities");
+        let expected = n
+            .checked_sub(1)
+            .and_then(|previous| n.checked_mul(previous))
+            .map(|pairs| pairs / 2)
+            .unwrap_or(0);
+        assert_eq!(
+            items.len(),
+            expected,
+            "distances length {} != n*(n-1)/2={} for n={}",
+            items.len(),
+            expected,
+            n
+        );
+        DistanceMatrix {
+            n,
+            items,
+            cities,
+            city_idx,
+            has_coordinates,
+        }
     }
 
     fn new_with_coordinates(
@@ -164,25 +296,7 @@ impl DistanceMatrix {
         cities: CityTable,
         has_coordinates: bool,
     ) -> Self {
-        let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
-
-        assert!(n == city_idx.len(), "city_idx size differs from n cities");
-        assert_eq!(
-            distances.len(),
-            n * (n - 1) / 2,
-            "distances length {} != n*(n-1)/2={} for n={}",
-            distances.len(),
-            n * (n - 1) / 2,
-            n
-        );
-        DistanceMatrix {
-            n,
-            size: distances.len(),
-            items: distances,
-            cities,
-            city_idx,
-            has_coordinates,
-        }
+        Self::from_parts(n, PackedDistances::F32(distances), cities, has_coordinates)
     }
 
     // assumes that cities are already sorted by id and ids are incrementally crowing
@@ -257,11 +371,31 @@ impl DistanceMatrix {
     }
 
     pub fn num_distances(&self) -> usize {
-        self.size
+        self.items.len()
     }
 
-    pub fn distances(&self) -> &[f32] {
-        &self.items
+    /// Expand the packed lower triangle to `f32` values.
+    ///
+    /// A coordinate or wide EXPLICIT matrix borrows its storage; a `u16` EXPLICIT matrix
+    /// allocates the widened copy. Use [`Self::stored_bytes`] or [`Self::storage_kind`] for the
+    /// actual footprint.
+    pub fn distances(&self) -> Cow<'_, [f32]> {
+        self.items.widen()
+    }
+
+    /// Bytes actually held by the packed lower triangle.
+    pub fn stored_bytes(&self) -> usize {
+        self.items.bytes()
+    }
+
+    /// Bytes per stored distance: `2` for `u16`, `4` for `f32`.
+    pub fn storage_width(&self) -> usize {
+        self.items.element_bytes()
+    }
+
+    /// `"u16"` or `"f32"` — the storage chosen for this matrix.
+    pub fn storage_kind(&self) -> &'static str {
+        self.items.kind()
     }
 
     pub fn city_index(&self) -> &HashMap<usize, usize> {
@@ -284,10 +418,7 @@ impl DistanceSource for DistanceMatrix {
         let from = pos1.max(pos2);
         let to = pos1.min(pos2);
         let idx = from * (from - 1) / 2 + to;
-        self.items
-            .get(idx)
-            .copied()
-            .ok_or("distance index out of range")
+        self.items.get(idx).ok_or("distance index out of range")
     }
 
     /// Hot-path override: the default would dispatch `city_id2pos` twice and
@@ -584,7 +715,7 @@ mod tests {
         assert!(res.is_ok());
         let res = res.unwrap();
 
-        assert_eq!(&[1.0], res.distances());
+        assert_eq!(res.distances().as_ref(), &[1.0]);
     }
 
     /// The memory model the benchmark and the 100k claim rest on: a coordinate matrix stores
@@ -600,10 +731,95 @@ mod tests {
         let dm = DistanceMatrix::build(&cities, DistanceType::Euc2D).unwrap();
 
         let pairs = n * (n - 1) / 2;
-        let bytes = std::mem::size_of_val(dm.distances());
+        let bytes = dm.stored_bytes();
         assert!(
             bytes <= 4 * pairs,
             "coordinate matrix stores {bytes} bytes for {pairs} pairs, exceeding 4 bytes/pair"
+        );
+        assert_eq!(dm.storage_kind(), "f32");
+    }
+
+    fn explicit_cities(n: usize) -> CityTable {
+        (0..n)
+            .map(|i| (i, KDPoint::new_with_id(i + 1, &[i as f32, 0.0])))
+            .collect()
+    }
+
+    #[test]
+    fn explicit_integers_use_u16_and_wider_values_stay_f32() {
+        let cities = explicit_cities(3);
+        let packed = vec![0.0, 65_535.0, 1.0];
+
+        let narrow = DistanceMatrix::new(3, packed.clone(), cities.clone());
+        assert_eq!(narrow.storage_kind(), "u16");
+        assert_eq!(narrow.stored_bytes(), packed.len() * 2);
+        assert_eq!(narrow.distance_by_pos(2, 0).unwrap(), 65_535.0);
+        assert_eq!(narrow.distance_by_pos(2, 1).unwrap(), 1.0);
+
+        for (packed, expected_kind) in [
+            (vec![1.0, 65_536.0, 2.0], "f32"), // does not fit u16
+            (vec![1.0, 1.5, 2.0], "f32"),
+            (vec![1.0, -1.0, 2.0], "f32"),
+            (vec![1.0, -0.0, 2.0], "f32"), // keeps the sign bit
+            (vec![1.0, f32::NAN, 2.0], "f32"),
+            (vec![1.0, f32::INFINITY, 2.0], "f32"),
+            (vec![1.0, f32::NEG_INFINITY, 2.0], "f32"),
+        ] {
+            let matrix = DistanceMatrix::new(3, packed.clone(), cities.clone());
+            assert_eq!(
+                matrix.storage_kind(),
+                expected_kind,
+                "packed values {packed:?}"
+            );
+            for (got, want) in matrix.distances().iter().zip(&packed) {
+                assert_eq!(got.to_bits(), want.to_bits(), "packed values {packed:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn from_explicit_slice_packs_without_an_owned_vec() {
+        let cities = explicit_cities(3);
+
+        let narrow = [0.0, 65_535.0, 1.0];
+        let matrix = DistanceMatrix::from_explicit_slice(3, &narrow, cities.clone());
+        assert_eq!(matrix.storage_kind(), "u16");
+        assert_eq!(matrix.distances().as_ref(), narrow.as_slice());
+
+        let wide = [0.0, 65_536.0, 1.0];
+        let matrix = DistanceMatrix::from_explicit_slice(3, &wide, cities);
+        assert_eq!(matrix.storage_kind(), "f32");
+        assert_eq!(matrix.distances().as_ref(), wide.as_slice());
+    }
+
+    /// Compact and `f32` storage must produce bit-identical tours: compaction is a storage
+    /// change, never a numeric one.
+    #[test]
+    fn compact_storage_matches_f32_storage_for_every_pair() {
+        let n = 16;
+        let values: Vec<f32> = (0..n * (n - 1) / 2).map(|i| (i % 60_000) as f32).collect();
+        let cities = explicit_cities(n);
+
+        let compact = DistanceMatrix::new(n, values.clone(), cities.clone());
+        assert_eq!(compact.storage_kind(), "u16");
+        let reference =
+            DistanceMatrix::from_parts(n, PackedDistances::F32(values.clone()), cities, false);
+
+        for a in 0..n {
+            for b in 0..n {
+                assert_eq!(
+                    compact.distance_by_pos(a, b).unwrap(),
+                    reference.distance_by_pos(a, b).unwrap(),
+                    "pair ({a}, {b})"
+                );
+            }
+        }
+
+        let route: Vec<usize> = (1..=n).collect();
+        assert_eq!(
+            compact.tour_length(&route),
+            reference.tour_length(&route),
+            "compaction changed the tour cost"
         );
     }
 

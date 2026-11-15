@@ -169,6 +169,59 @@ The restored full-scan baseline matches the pre-candidate-list numbers: `2opt` 2
 `or_opt` 2821/31159. Candidate lists improve both 2-opt tours (2798/30432) and leave or-opt
 0.8%/1.3% worse, so the Tier A `2opt` cells should be re-run at the next release.
 
+## EXPLICIT compact storage
+
+TSPLIB `EDGE_WEIGHT_SECTION` weights are integers in practice. `DistanceMatrix::new` stores each
+value at its narrowest exact width:
+
+- `u16` when every weight is a non-negative integer `<= 65_535`;
+- `f32` for everything wider — `u32` is the same four bytes and would only add a conversion on
+  every lookup, so it is not a separate representation.
+
+Fractional, negative, non-finite, and `-0.0` weights also fall back to `f32`, preserving the
+sign bit.
+
+The parser fills the packed lower triangle directly through a lazy entry iterator, so it no
+longer allocates an `n×n` scratch matrix or a `Vec<(usize, usize)>` of entry coordinates.
+`TspLibData::into_problem` consumes the parsed weights instead of cloning them, and the borrowed
+`distance_matrix()` packs straight from a slice.
+
+Five-run medians, release build, `teeline solve nn --distance-backend matrix`; costs were
+identical before and after in every comparable row:
+
+| Instance | n | Width | Stored before | Stored after | Peak RSS before | Peak RSS after | Wall before | Wall after |
+| --- | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `si1032` | 1,032 | `u16` | 2.03 MiB | 1.01 MiB | 21.1 MB | 11.0 MB | 0.080s | 0.080s |
+| synthetic `UPPER_ROW` | 5,000 | `u16` | 47.7 MiB | 23.8 MiB | 342.7 MB | 103.0 MB | 1.430s | 1.430s |
+| synthetic `UPPER_ROW` | 10,000 | `f32` | 190.7 MiB | 190.7 MiB | 1,344.6 MB | 389.9 MB | 5.900s | 6.010s |
+| synthetic `UPPER_ROW` | 25,000 | `u16` | not measured | 596.0 MiB | not measured | 2,391.7 MB | — | 59.270s |
+
+The n=10,000 row is wider than 16 bits, so it stays `f32`; its stored width does not shrink,
+and the 71% peak reduction comes from removing the entry-coordinate vector and the raw-weight
+clone. The n=5,000 row shows both effects: stored bytes halve and peak RSS falls 70%.
+
+The remaining peak is parse scratch: the token vector and the packed `f32` buffer are both live
+while `parse_explicit` runs. At 25,000 that is roughly 1.19 GiB each, which is why the stored
+596 MiB matrix still peaks at 2.34 GiB. Sizes beyond 25,000 are recorded as not measured: a
+50,000-city `UPPER_ROW` input is about 7 GB of text, and its parse scratch is estimated above
+the 16 GiB test environment.
+
+`into_problem` consumes the parsed weights, while `to_problem` keeps the borrowed path and packs
+a copy for wide values. At 10,000 cities the process peak is already set during parsing (the
+token vector and the packed `f32` buffer), so the construction saving does not move peak RSS at
+that size; it removes an O(n²) copy whose cost would otherwise reappear once the parser's scratch
+is released. The consuming path is exercised by the `into_problem` integration tests.
+
+Reproduce with:
+
+```bash
+python3 scripts/gen-synthetic-explicit.py --n 5000 --max-weight 60000 > /tmp/explicit5000.tsp
+python3 scripts/gen-synthetic-explicit.py --n 10000 --max-weight 1000000 > /tmp/explicit10000.tsp
+/usr/bin/time -v ./target/release/teeline solve nn -i /tmp/explicit5000.tsp --distance-backend matrix
+/usr/bin/time -v ./target/release/teeline solve nn -i /tmp/explicit10000.tsp --distance-backend matrix
+/usr/bin/time -v ./target/release/teeline solve nn -i data/tsplib/si1032.tsp --distance-backend matrix
+```
+
 ## Gate and publication
 
 - The comparison is a manual per-release sweep on a documented machine; a nightly

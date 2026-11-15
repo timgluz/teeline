@@ -40,7 +40,7 @@ fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicO
 fn input_to_problem(input: &TspInput) -> Result<TspProblem, String> {
     if let Some(tsplib_str) = &input.tsplib {
         let data = tsplib::read_from_str(tsplib_str)?;
-        data.to_problem(DistanceBackend::Auto)
+        data.into_problem(DistanceBackend::Auto)
     } else if let Some(cities) = &input.cities {
         let pts: Vec<KDPoint> = cities
             .iter()

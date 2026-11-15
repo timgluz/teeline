@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -83,14 +83,10 @@ impl TspLibData {
     pub fn distance_matrix(&self) -> Result<DistanceMatrix, String> {
         match &self.raw_distances {
             Some(dists) => {
-                let n = self.cities.len();
-                let city_table: CityTable = self
-                    .cities
-                    .iter()
-                    .enumerate()
-                    .map(|(i, c)| (i, *c))
-                    .collect();
-                Ok(DistanceMatrix::new(n, dists.clone(), city_table))
+                let (n, city_table) = explicit_city_table(&self.cities, dists.len())?;
+                // Packs straight from the parsed weights; `DistanceMatrix::new` would require
+                // an O(n^2) clone first.
+                Ok(DistanceMatrix::from_explicit_slice(n, dists, city_table))
             }
             None => {
                 DistanceMatrix::build(&self.cities, self.distance_type).map_err(|e| e.to_string())
@@ -103,6 +99,9 @@ impl TspLibData {
     /// Selection is keyed off whether the file carries explicit weights, never the
     /// `distance_type` field: `--distance-type` can override that field after parsing, while an
     /// EXPLICIT file supplies only placeholder coordinates.
+    ///
+    /// This borrows the parsed weights; use [`Self::into_problem`] to hand them over without a
+    /// clone.
     pub fn to_problem(&self, backend: DistanceBackend) -> Result<TspProblem, String> {
         if self.has_explicit_weights() {
             if backend == DistanceBackend::OnTheFly {
@@ -126,6 +125,80 @@ impl TspLibData {
         let source = super::build_distance_source(&self.cities, self.distance_type, backend)?;
         Ok(TspProblem::from_source(self.cities.clone(), source))
     }
+
+    /// Consuming variant of [`Self::to_problem`].
+    ///
+    /// It hands the parsed EXPLICIT weights to the matrix instead of cloning them. That clone
+    /// is O(n²), so the CLI, API, and WASM entry points use this path.
+    pub fn into_problem(self, backend: DistanceBackend) -> Result<TspProblem, String> {
+        let TspLibData {
+            cities,
+            raw_distances,
+            distance_type,
+            ..
+        } = self;
+
+        if let Some(distances) = raw_distances {
+            if backend == DistanceBackend::OnTheFly {
+                return Err(
+                    "EXPLICIT edge weights cannot use the on-the-fly backend; use matrix or auto"
+                        .to_string(),
+                );
+            }
+            let (n, city_table) = explicit_city_table(&cities, distances.len())?;
+            let dm = DistanceMatrix::new(n, distances, city_table);
+            return Ok(TspProblem::new(cities, dm));
+        }
+
+        if distance_type == DistanceType::Explicit {
+            return Err(
+                "coordinate input cannot use EXPLICIT distances; provide an EDGE_WEIGHT_SECTION \
+                 or choose a coordinate distance type"
+                    .to_string(),
+            );
+        }
+
+        let source = super::build_distance_source(&cities, distance_type, backend)?;
+        Ok(TspProblem::from_source(cities, source))
+    }
+}
+
+/// Validate an EXPLICIT city list and build its position-indexed city table.
+///
+/// `DistanceMatrix::new` asserts on a mismatched weight count or duplicate IDs; a malformed
+/// TSPLIB file (or a hand-built `TspLibData`) should return an error instead of panicking.
+fn explicit_city_table(
+    cities: &[KDPoint],
+    weight_count: usize,
+) -> Result<(usize, CityTable), String> {
+    let n = cities.len();
+    if n < 2 {
+        return Err(format!(
+            "EXPLICIT matrix requires at least 2 cities, got {n}"
+        ));
+    }
+    let expected = n
+        .checked_sub(1)
+        .and_then(|previous| n.checked_mul(previous))
+        .map(|pairs| pairs / 2)
+        .ok_or_else(|| format!("DIMENSION {n} is too large for this target"))?;
+    if weight_count != expected {
+        return Err(format!(
+            "EXPLICIT distance count ({weight_count}) does not match {n} cities (expected {expected})"
+        ));
+    }
+
+    let unique: HashSet<usize> = cities.iter().map(|city| city.id).collect();
+    if unique.len() != n {
+        return Err("EXPLICIT input contains duplicate city IDs".to_string());
+    }
+
+    let table = cities
+        .iter()
+        .enumerate()
+        .map(|(position, city)| (position, *city))
+        .collect();
+    Ok((n, table))
 }
 
 pub fn read_from_file(path: &Path) -> Result<TspLibData, String> {
@@ -295,21 +368,68 @@ fn grid_coords(n: usize) -> Vec<KDPoint> {
 /// layouts: each picks a triangle, includes the diagonal or not, and walks it row-wise or
 /// column-wise. They are all the same matrix, so a reader that transposes one of them produces a
 /// plausible wrong answer rather than an error — which is why they share one reader.
-fn explicit_entries(format: &str, n: usize) -> Result<Vec<(usize, usize)>, String> {
+///
+/// The iterator is lazy: an EXPLICIT file can carry tens of millions of weights, and a
+/// `Vec<(usize, usize)>` of entry coordinates used to dominate the parse footprint.
+/// A lazy sequence of matrix entries, in the order the file stores them.
+type ExplicitEntries = Box<dyn Iterator<Item = (usize, usize)>>;
+
+fn explicit_entries(format: &str, n: usize) -> Result<(ExplicitEntries, usize), String> {
+    if n == 0 {
+        return Err("EDGE_WEIGHT_SECTION requires DIMENSION >= 1".to_string());
+    }
+    let pairs = n
+        .checked_mul(n - 1)
+        .map(|entries| entries / 2)
+        .ok_or_else(|| format!("DIMENSION {n} is too large for this target"))?;
+    let diagonal = n
+        .checked_mul(
+            n.checked_add(1)
+                .ok_or_else(|| format!("DIMENSION {n} is too large for this target"))?,
+        )
+        .map(|entries| entries / 2)
+        .ok_or_else(|| format!("DIMENSION {n} is too large for this target"))?;
+    let full = n
+        .checked_mul(n)
+        .ok_or_else(|| format!("DIMENSION {n} is too large for this target"))?;
+
     Ok(match format {
-        "FULL_MATRIX" => (0..n).flat_map(|i| (0..n).map(move |j| (i, j))).collect(),
-        "UPPER_ROW" => (0..n)
-            .flat_map(|i| (i + 1..n).map(move |j| (i, j)))
-            .collect(),
-        "LOWER_ROW" => (0..n).flat_map(|i| (0..i).map(move |j| (i, j))).collect(),
-        "UPPER_DIAG_ROW" => (0..n).flat_map(|i| (i..n).map(move |j| (i, j))).collect(),
-        "LOWER_DIAG_ROW" => (0..n).flat_map(|i| (0..=i).map(move |j| (i, j))).collect(),
-        "UPPER_COL" => (0..n).flat_map(|j| (0..j).map(move |i| (i, j))).collect(),
-        "LOWER_COL" => (0..n)
-            .flat_map(|j| (j + 1..n).map(move |i| (i, j)))
-            .collect(),
-        "UPPER_DIAG_COL" => (0..n).flat_map(|j| (0..=j).map(move |i| (i, j))).collect(),
-        "LOWER_DIAG_COL" => (0..n).flat_map(|j| (j..n).map(move |i| (i, j))).collect(),
+        "FULL_MATRIX" => (
+            Box::new((0..n).flat_map(move |i| (0..n).map(move |j| (i, j)))),
+            full,
+        ),
+        "UPPER_ROW" => (
+            Box::new((0..n).flat_map(move |i| (i + 1..n).map(move |j| (i, j)))),
+            pairs,
+        ),
+        "LOWER_ROW" => (
+            Box::new((0..n).flat_map(move |i| (0..i).map(move |j| (i, j)))),
+            pairs,
+        ),
+        "UPPER_DIAG_ROW" => (
+            Box::new((0..n).flat_map(move |i| (i..n).map(move |j| (i, j)))),
+            diagonal,
+        ),
+        "LOWER_DIAG_ROW" => (
+            Box::new((0..n).flat_map(move |i| (0..=i).map(move |j| (i, j)))),
+            diagonal,
+        ),
+        "UPPER_COL" => (
+            Box::new((0..n).flat_map(move |j| (0..j).map(move |i| (i, j)))),
+            pairs,
+        ),
+        "LOWER_COL" => (
+            Box::new((0..n).flat_map(move |j| (j + 1..n).map(move |i| (i, j)))),
+            pairs,
+        ),
+        "UPPER_DIAG_COL" => (
+            Box::new((0..n).flat_map(move |j| (0..=j).map(move |i| (i, j)))),
+            diagonal,
+        ),
+        "LOWER_DIAG_COL" => (
+            Box::new((0..n).flat_map(move |j| (j..n).map(move |i| (i, j)))),
+            diagonal,
+        ),
         "" => return Err("EDGE_WEIGHT_SECTION without an EDGE_WEIGHT_FORMAT".to_string()),
         other => return Err(format!("Unsupported EDGE_WEIGHT_FORMAT: {other}")),
     })
@@ -322,26 +442,33 @@ fn explicit_entries(format: &str, n: usize) -> Result<Vec<(usize, usize)>, Strin
 /// `TYPE: TSP` means the matrix is symmetric; `TYPE: ATSP` never reaches here (it is rejected),
 /// so mirroring the stored triangle is the whole of the asymmetry question.
 fn parse_explicit(tokens: &[f32], n: usize, format: &str) -> Result<Vec<f32>, String> {
-    let entries = explicit_entries(format, n)?;
-    if tokens.len() != entries.len() {
+    let (entries, expected) = explicit_entries(format, n)?;
+    if tokens.len() != expected {
         return Err(format!(
-            "{format}: expected {} tokens, got {}",
-            entries.len(),
+            "{format}: expected {expected} tokens, got {}",
             tokens.len()
         ));
     }
 
-    let mut matrix = vec![0.0f32; n * n];
+    // Fill the packed lower triangle directly instead of materialising an n×n matrix first:
+    // the temporary was the largest allocation in EXPLICIT parsing.
+    let packed_len = n
+        .checked_mul(n - 1)
+        .map(|pairs| pairs / 2)
+        .ok_or_else(|| format!("DIMENSION {n} is too large for this target"))?;
+    let mut packed = vec![0.0f32; packed_len];
     for (token, (i, j)) in tokens.iter().zip(entries) {
-        matrix[i * n + j] = *token;
-        matrix[j * n + i] = *token;
-    }
-
-    let mut packed = Vec::with_capacity(n * (n - 1) / 2);
-    for i in 1..n {
-        for j in 0..i {
-            packed.push(matrix[i * n + j]);
+        if i == j {
+            continue; // the diagonal is not stored
         }
+        // FULL_MATRIX is the only layout with both triangles. Row-major order puts the
+        // lower-triangle token (i > j) last, so the upper one is redundant. Skipping it keeps
+        // the old last-write-wins result without the n² scratch matrix.
+        if format == "FULL_MATRIX" && i < j {
+            continue;
+        }
+        let (row, col) = if i > j { (i, j) } else { (j, i) };
+        packed[row * (row - 1) / 2 + col] = *token;
     }
     Ok(packed)
 }
@@ -565,6 +692,37 @@ mod tests {
         }
     }
 
+    /// The old parser materialised the full n×n matrix and then read the lower triangle. The
+    /// direct packer must keep that exact last-write result, including an asymmetric
+    /// FULL_MATRIX where the lower-triangle token wins.
+    #[test]
+    fn test_direct_packing_matches_the_full_matrix_reference() {
+        fn naive_parse(tokens: &[f32], n: usize, format: &str) -> Vec<f32> {
+            let (entries, _) = explicit_entries(format, n).unwrap();
+            let mut matrix = vec![0.0f32; n * n];
+            for (token, (i, j)) in tokens.iter().zip(entries) {
+                matrix[i * n + j] = *token;
+                matrix[j * n + i] = *token;
+            }
+            let matrix = &matrix;
+            (1..n)
+                .flat_map(|i| (0..i).map(move |j| matrix[i * n + j]))
+                .collect()
+        }
+
+        let n = 4;
+        let full: Vec<f32> = (1..=n * n).map(|i| i as f32).collect();
+        for (format, _) in THREE_CITY_LAYOUTS {
+            let (entries, _) = explicit_entries(format, n).unwrap();
+            let tokens: Vec<f32> = entries.map(|(i, j)| full[i * n + j]).collect();
+            assert_eq!(
+                parse_explicit(&tokens, n, format).unwrap(),
+                naive_parse(&tokens, n, format),
+                "{format} changed the packed matrix"
+            );
+        }
+    }
+
     #[test]
     fn test_unpack_keeps_the_row_and_column_orders_distinct() {
         // The 3-city cases above cannot tell a row-wise read from a column-wise one: at n=3 both
@@ -606,6 +764,16 @@ mod tests {
             err.contains("UPPER_TRIANGLE"),
             "error should name it: {err}"
         );
+    }
+
+    #[test]
+    fn test_unpack_rejects_a_zero_or_overflowing_dimension() {
+        for n in [0, usize::MAX] {
+            assert!(
+                parse_explicit(&[], n, "UPPER_ROW").is_err(),
+                "dimension {n} must be rejected before any allocation"
+            );
+        }
     }
 
     #[test]
@@ -930,5 +1098,99 @@ mod tests {
         let expected = matrix.distances.tour_length(&route);
         assert_eq!(auto.distances.tour_length(&route), expected);
         assert_eq!(onfly.distances.tour_length(&route), expected);
+    }
+
+    #[test]
+    fn into_problem_matches_to_problem_for_explicit_weights() {
+        let data = fixture("ring6_explicit.tsp");
+        let route: Vec<usize> = data.cities().iter().map(|c| c.id).collect();
+        let expected = data.to_problem(DistanceBackend::Auto).unwrap();
+        let actual = data.clone().into_problem(DistanceBackend::Auto).unwrap();
+
+        assert_eq!(
+            actual.distances.tour_length(&route),
+            expected.distances.tour_length(&route)
+        );
+        assert_eq!(actual.distances.tour_length(&route), 60.0);
+    }
+
+    #[test]
+    fn into_problem_rejects_mismatched_explicit_weights() {
+        let data = TspLibData::new(
+            "t".to_string(),
+            String::new(),
+            grid_coords(3),
+            3,
+            Some(vec![1.0, 2.0]),
+            DistanceType::Explicit,
+        );
+
+        assert!(data.distance_matrix().is_err());
+        let err = data
+            .into_problem(DistanceBackend::Auto)
+            .err()
+            .expect("mismatched input must fail");
+        assert!(err.contains("does not match"), "{err}");
+    }
+
+    #[test]
+    fn into_problem_rejects_duplicate_explicit_city_ids() {
+        let cities = vec![
+            KDPoint::new_with_id(1, &[0.0, 0.0]),
+            KDPoint::new_with_id(1, &[1.0, 0.0]),
+            KDPoint::new_with_id(2, &[2.0, 0.0]),
+        ];
+        let data = TspLibData::new(
+            "t".to_string(),
+            String::new(),
+            cities,
+            3,
+            Some(vec![1.0, 2.0, 3.0]),
+            DistanceType::Explicit,
+        );
+
+        let err = data
+            .into_problem(DistanceBackend::Auto)
+            .err()
+            .expect("mismatched input must fail");
+        assert!(err.contains("duplicate"), "{err}");
+    }
+
+    #[test]
+    fn explicit_matrix_uses_compact_storage() {
+        let data = fixture("bays29.tsp");
+        let raw = data.raw_distances().expect("bays29 is EXPLICIT");
+        let dm = data.distance_matrix().unwrap();
+
+        assert_eq!(dm.storage_kind(), "u16");
+        assert_eq!(dm.stored_bytes(), raw.len() * 2);
+        assert_eq!(
+            dm.distances().as_ref(),
+            raw,
+            "every weight must survive compaction"
+        );
+
+        // Recompute the tour from the raw packed weights using the same position→id mapping
+        // the matrix uses; this pins the index order, not just the values.
+        let route: Vec<usize> = data.cities().iter().map(|c| c.id).collect();
+        let positions: HashMap<usize, usize> = data
+            .cities()
+            .iter()
+            .enumerate()
+            .map(|(i, c)| (c.id, i))
+            .collect();
+        let cycle: Vec<usize> = route
+            .iter()
+            .copied()
+            .chain(route.first().copied())
+            .collect();
+        let mut reference = 0.0;
+        for pair in cycle.windows(2) {
+            let a = positions[&pair[0]];
+            let b = positions[&pair[1]];
+            let (from, to) = (a.max(b), a.min(b));
+            reference += raw[from * (from - 1) / 2 + to];
+        }
+        assert_eq!(dm.tour_length(&route), reference);
     }
 }
