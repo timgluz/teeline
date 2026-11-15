@@ -43,3 +43,7 @@ lto = "thin"
 [[bench]]
 name = "kdtree"
 harness = false
+
+[[bench]]
+name = "distance_matrix"
+harness = false

@@ -38,18 +38,19 @@ a280 = "mid"         # EUC_2D, 280
 att532 = "large"     # ATT, 532
 
 # The pre-selection default: no --distance-backend argument, so the binary uses its matrix
-# default. Phase 2 adds the on-the-fly config and makes this config explicit.
+# default. Phase 2 adds the on-the-fly family and makes these configs explicit.
 #
-# `bhk` is exact and therefore only reaches the `upto24` group. `3opt` is included for now;
-# task 2.2 bounds the local solvers' instance size if it cannot finish `att532` within budget.
+# `bhk` is exact and therefore only reaches the `upto24` group. `3opt` is split out because it
+# cannot finish `att532` within the local budget (measured: >60s, versus 2opt 0.2s and or_opt
+# 14.5s). `tabu` gets a fixed-work config because it honours `--epochs`; `sa` does not (a budget
+# below its cooling schedule is raised to the schedule), so it is not used here.
 [configs.matrix]
-solvers = [
-  "2opt",
-  "3opt",
-  "or_opt",
-  "lk",
-  "nn",
-  "space_filling_curve",
-  "sa",
-  "bhk",
-]
+solvers = ["2opt", "or_opt", "lk", "nn", "space_filling_curve", "bhk"]
+
+[configs.matrix-3opt]
+solvers = ["3opt"]
+instances = ["burma14", "ulysses16", "berlin52", "a280"]
+
+[configs.matrix-fixed]
+solvers = ["tabu"]
+args = ["--epochs", "1000"]
