@@ -38,9 +38,9 @@
 
 ## 4. Lin-Kernighan metric fix (explicit behaviour change)
 
-- [ ] 4.1 Add an optional seed to `LKOptions` and thread it through the double-bridge RNG, updating `teeline-api/src/services/tsp_service.rs:177–184` and any TOML/CLI plumbing in the same PR; verify two runs with the same seed return the same tour.
-- [ ] 4.2 Replace `lin_kernighan`'s private `distance_matrix::from_cities` and its local `tour_distance` summation with `problem.distances`; verify seeded LK returns metric-correct tours on GEO and ATT fixtures and agrees across backends.
-- [ ] 4.3 Re-baseline LK's published numbers for GEO/ATT/CEIL_2D/EXPLICIT and record the change as a bug fix; verify the benchmark notes explain the difference.
+- [x] 4.1 Add an optional seed to `LKOptions` and thread it through the double-bridge RNG, updating `teeline-api/src/services/tsp_service.rs:177–184` and any TOML/CLI plumbing in the same PR; verify two runs with the same seed return the same tour.
+- [x] 4.2 Replace `lin_kernighan`'s private `distance_matrix::from_cities` and its local `tour_distance` summation with `problem.distances`; verify seeded LK returns metric-correct tours on GEO and ATT fixtures and agrees across backends.
+- [x] 4.3 Re-baseline LK's published numbers for GEO/ATT/CEIL_2D/EXPLICIT and record the change as a bug fix; verify the benchmark notes explain the difference.
 
 ## 5. On-the-fly backend and conformance
 

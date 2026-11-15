@@ -181,6 +181,7 @@ fn make_app_options(
                 .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
                 .unwrap_or(d.heuristic),
             max_depth: c.max_depth.unwrap_or(d.max_depth),
+            seed: None,
         }
     });
     if let Some(ref l) = lk {

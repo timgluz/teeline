@@ -91,6 +91,24 @@ Two findings:
    is as important as changing the O(n²) layout; the Phase 4 work should measure them
    separately.
 
+## LK metric-fix re-baseline
+
+LK used to build a private EUC_2D matrix, so it optimized the wrong objective on GEO, ATT,
+CEIL_2D, and EXPLICIT instances while reporting the correct metric. After the fix, seeded LK
+(`--seed 7`) is deterministic: five runs per instance return the same tour.
+
+| Instance | Type | Tour cost | Published optimum | Gap |
+| --- | --- | ---: | ---: | ---: |
+| ulysses16 | GEO | 6909 | 6859 | 0.73% |
+| att48 | ATT | 10684 | 10628 | 0.53% |
+| gr120 | EXPLICIT | 6971 | 6942 | 0.42% |
+| dsj1000 | CEIL_2D | 20,085,164 | 18,660,188 | 7.64% |
+| a280 | EUC_2D | 2727 | 2579 | 5.74% |
+
+Raw rows: `bench/baseline/distance/lk-rebaseline.jsonl`. The published LK numbers for these
+instances should be re-run from this tier before the next release; the solver's behavior on
+the affected metrics changed by design.
+
 ## Phase 1 refactor result
 
 The matrix backend was re-run after the `Arc<dyn DistanceSource>` switch. All 180 cells
