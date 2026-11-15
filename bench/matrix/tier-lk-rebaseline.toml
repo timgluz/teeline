@@ -1,0 +1,34 @@
+# LK re-baseline after the metric fix (PR 5).
+#
+# LK used to build a private EUC_2D matrix, so its tours on GEO/ATT/CEIL_2D/EXPLICIT were
+# optimized for the wrong objective. This tier measures one instance per distance type with a
+# fixed seed, so the published numbers can be re-stated for the corrected solver.
+
+tier = "lk-rebaseline"
+
+runs = 5
+
+[budgets]
+exact = 60
+local = 300
+meta = 300
+constructive = 30
+utility = 60
+
+[coverage]
+exact = []
+constructive = []
+local = ["all"]
+meta = []
+utility = []
+
+[instances]
+ulysses16 = "all" # GEO
+att48 = "all"     # ATT
+gr120 = "all"     # EXPLICIT
+dsj1000 = "all"   # CEIL_2D
+a280 = "all"      # EUC_2D
+
+[configs.seeded]
+solvers = ["lk"]
+args = ["--seed", "7"]

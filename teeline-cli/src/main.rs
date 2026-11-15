@@ -299,6 +299,12 @@ fn tuning_args() -> Vec<Arg> {
             .value_name("N")
             .action(ArgAction::Set)
             .required(false),
+        Arg::new("seed")
+            .long("seed")
+            .help("LK: fixed RNG seed for reproducible runs (default: system entropy)")
+            .value_name("N")
+            .action(ArgAction::Set)
+            .required(false),
         Arg::new("learning_rate")
             .long("learning_rate")
             .help("SOM: initial learning rate η₀ (default 0.8)")

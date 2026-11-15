@@ -1383,6 +1383,8 @@ impl AcoOptions {
 pub struct LKOptions {
     pub heuristic: HeuristicOptions,
     pub max_depth: usize,
+    /// Fixed RNG seed for reproducible runs; `None` uses system entropy.
+    pub seed: Option<u64>,
 }
 
 impl Default for LKOptions {
@@ -1396,6 +1398,7 @@ impl Default for LKOptions {
                 verbose: false,
             },
             max_depth: 5,
+            seed: None,
         }
     }
 }
@@ -1444,9 +1447,17 @@ impl LKOptions {
                         .ok_or_else(|| format!("config: `max_depth` must be an integer, got {v}"))?
                         as usize;
                 }
+                "seed" => {
+                    let value = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `seed` must be an integer, got {v}"))?;
+                    lk.seed = Some(u64::try_from(value).map_err(|_| {
+                        format!("config: `seed` must be non-negative, got {value}")
+                    })?);
+                }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [lk] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, max_depth"
+                        "config: unknown field `{other}` in [lk] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, max_depth, seed"
                     ));
                 }
             }
@@ -1464,6 +1475,12 @@ impl LKOptions {
             lk.max_depth = v
                 .parse::<usize>()
                 .map_err(|_| format!("--max-depth: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("seed") {
+            lk.seed = Some(
+                v.parse::<u64>()
+                    .map_err(|_| format!("--seed: invalid integer `{v}`"))?,
+            );
         }
         lk.validate()?;
         Ok(lk)
@@ -2666,6 +2683,7 @@ mod tests {
                 ..HeuristicOptions::default()
             },
             max_depth: 5,
+            seed: None,
         };
         assert!(opts.validate().is_err(), "n_nearest=0 must be rejected");
     }
@@ -2717,7 +2735,8 @@ mod tests {
                 Arg::new("max_depth")
                     .long("max-depth")
                     .action(ArgAction::Set),
-            ); // hyphen matches production CLI
+            ) // hyphen matches production CLI
+            .arg(Arg::new("seed").long("seed").action(ArgAction::Set));
         let args = cmd.get_matches_from(["t", "--max-depth", "3"]); // hyphen matches production CLI
         let opts = LKOptions::from_cli(&args).unwrap();
         assert_eq!(opts.max_depth, 3);

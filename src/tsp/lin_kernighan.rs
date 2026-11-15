@@ -2,12 +2,11 @@ use super::DistanceSource;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
     HeuristicOptions, LKOptions, Solution, TspProblem,
-    distance_matrix::{self, DistanceMatrix},
     kdtree::{self, KDPoint},
     nearest_neighbor,
     route::Route,
 };
-use rand::RngExt;
+use rand::{RngExt, SeedableRng};
 use std::sync::mpsc;
 
 pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> Vec<Vec<usize>> {
@@ -39,7 +38,7 @@ pub fn solve(
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
 ) -> Solution {
-    let dm = distance_matrix::from_cities(&problem.cities);
+    let dm = problem.distances.as_ref();
     let k = opts.heuristic.n_nearest;
     let candidates = build_candidates(&problem.cities, k);
 
@@ -64,14 +63,14 @@ pub fn solve(
         &mut best_tour,
         &mut init_pos,
         &candidates,
-        &dm,
+        dm,
         opts.max_depth,
     );
     drop(init_pos);
-    let mut best_dist = tour_distance(&best_tour, &dm);
+    let mut best_dist = tour_distance(&best_tour, dm);
     send_progress(progress_tx, &best_tour, best_dist);
 
-    let mut rng = rand::rng();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(opts.seed.unwrap_or_else(rand::random::<u64>));
     let mut platoo = 0usize;
     for _ in 0..opts.heuristic.epochs {
         let mut candidate = double_bridge(&best_tour, &mut rng);
@@ -80,10 +79,10 @@ pub fn solve(
             &mut candidate,
             &mut cand_pos,
             &candidates,
-            &dm,
+            dm,
             opts.max_depth,
         );
-        let dist = tour_distance(&candidate, &dm);
+        let dist = tour_distance(&candidate, dm);
         if dist < best_dist {
             best_tour = candidate;
             best_dist = dist;
@@ -102,7 +101,7 @@ pub fn solve(
 
 // ── Distance shorthand ────────────────────────────────────────────────────────
 
-fn d(dm: &DistanceMatrix, a: usize, b: usize) -> f32 {
+fn d(dm: &dyn DistanceSource, a: usize, b: usize) -> f32 {
     dm.distance_between(a, b).unwrap_or(f32::MAX)
 }
 
@@ -117,7 +116,7 @@ fn make_pos(tour: &[usize]) -> Vec<usize> {
     pos
 }
 
-fn tour_distance(tour: &[usize], dm: &DistanceMatrix) -> f32 {
+fn tour_distance(tour: &[usize], dm: &dyn DistanceSource) -> f32 {
     let n = tour.len();
     (0..n).map(|i| d(dm, tour[i], tour[(i + 1) % n])).sum()
 }
@@ -273,7 +272,7 @@ fn find_lk_chain(
     used: &mut Vec<bool>,
     next: &[usize],
     prev: &[usize],
-    dm: &DistanceMatrix,
+    dm: &dyn DistanceSource,
     candidates: &[Vec<usize>],
 ) -> bool {
     // After at least one add-remove pair, try closing with edge (t_open, t1).
@@ -346,7 +345,7 @@ fn find_lk_chain(
 fn find_lk_move(
     next: &[usize],
     prev: &[usize],
-    dm: &DistanceMatrix,
+    dm: &dyn DistanceSource,
     candidates: &[Vec<usize>],
     max_depth: usize,
     city_ids: &[usize],
@@ -456,7 +455,7 @@ fn lk_pass(
     tour: &mut [usize],
     pos: &mut [usize],
     candidates: &[Vec<usize>],
-    dm: &DistanceMatrix,
+    dm: &dyn DistanceSource,
     max_depth: usize,
 ) -> bool {
     let n = tour.len();
