@@ -44,13 +44,13 @@
 
 ## 5. On-the-fly backend and conformance
 
-- [ ] 5.1 Implement `OnTheFly` primitives with position-indexed coordinates, an id→position index, and the four distance function pointers; verify it accepts all four coordinate types, rejects `Explicit`, and mirrors `DistanceMatrix::build`'s `n < 2` rejection.
-- [ ] 5.2 Assert unique city ids in `OnTheFly::new`, mirroring `DistanceMatrix::new`; verify a duplicate-id input is rejected.
-- [ ] 5.3 Add the shared conformance suite covering every backend, every distance type, and the edge/error paths (`distance_between(a,a)`, `distance_by_pos(p,p)`, unknown id in `tour_length`, unknown id in `distances_from`); verify `Matrix` and `OnTheFly` both pass.
-- [ ] 5.4 Add pairwise equivalence tests for every city pair across all four distance types, including a synthetic CEIL_2D fixture; verify exact equality.
-- [ ] 5.5 Add deterministic solver equivalence tests (`nn`, `sfc`, `2opt`, `or_opt`, `bhk`) against both backends; verify identical tours and costs.
-- [ ] 5.6 Add a seeded LK equivalence test on a GEO fixture against both backends; verify identical tours and costs, and that the cost equals the GEO recomputation.
-- [ ] 5.7 Verify `from_cities_unrounded` remains test-only and is not represented by either backend; verify the conformance suite excludes it explicitly.
+- [x] 5.1 Implement `OnTheFly` primitives with position-indexed coordinates, an id→position index, and the four distance function pointers; verify it accepts all four coordinate types, rejects `Explicit`, and mirrors `DistanceMatrix::build`'s `n < 2` rejection.
+- [x] 5.2 Assert unique city ids in `OnTheFly::new`, mirroring `DistanceMatrix::new`; verify a duplicate-id input is rejected.
+- [x] 5.3 Add the shared conformance suite covering every backend, every distance type, and the edge/error paths (`distance_between(a,a)`, `distance_by_pos(p,p)`, unknown id in `tour_length`, unknown id in `distances_from`); verify `Matrix` and `OnTheFly` both pass.
+- [x] 5.4 Add pairwise equivalence tests for every city pair across all four distance types, including a synthetic CEIL_2D fixture; verify exact equality.
+- [x] 5.5 Add deterministic solver equivalence tests (`nn`, `sfc`, `2opt`, `or_opt`, `bhk`) against both backends; verify identical tours and costs.
+- [x] 5.6 Add a seeded LK equivalence test on a GEO fixture against both backends; verify identical tours and costs, and that the cost equals the GEO recomputation.
+- [x] 5.7 Verify `from_cities_unrounded` remains test-only and is not represented by either backend; verify the conformance suite excludes it explicitly.
 - [ ] 5.8 Add a conformance case with 1-based and non-contiguous city IDs (for example 10, 20, 30); verify `pos2city_id`/`city_id2pos` round-trip, both backends agree, and the reported tour preserves the original IDs.
 
 ## 6. Phase 2 — Selection policy and backend comparison

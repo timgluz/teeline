@@ -19,6 +19,8 @@ pub mod greedy_edge;
 pub mod kdtree;
 pub mod lin_kernighan;
 pub mod nearest_neighbor;
+pub mod on_the_fly;
+pub use on_the_fly::OnTheFly;
 pub mod opt_tour;
 pub mod or_opt;
 pub mod particle_swarm;
