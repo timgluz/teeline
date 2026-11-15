@@ -7,7 +7,7 @@
 
 ## 2. Phase 0 — Benchmark development (reuse the existing harness)
 
-- [ ] 2.1 Add `bench/matrix/tier-distance.toml` with a `matrix` config (the pre-selection default), the tracked fixtures `burma14`, `ulysses16`, `berlin52`, `a280`, `att532`, an explicit `solvers` list per config, and `utility = []` plus its budget entry; verify `scripts/bench-matrix.sh ... --dry-run` lists every cell.
+- [x] 2.1 Add `bench/matrix/tier-distance.toml` with a `matrix` config (the pre-selection default), the tracked fixtures `burma14`, `ulysses16`, `berlin52`, `a280`, `att532`, an explicit `solvers` list per config, and `utility = []` plus its budget entry; verify `scripts/bench-matrix.sh ... --dry-run` lists every cell.
 - [ ] 2.2 Add fixed-work configs (`--epochs N`) for the solvers that honour them, and bound the instance size for `2opt`/`or_opt`/`3opt`, which ignore `--epochs`; verify every compared cell completes with `status: ok`.
 - [ ] 2.3 Add a separate `bench/matrix/tier-distance-large.toml` for downloaded instances (`dsj1000`, `pla7397`, `pla33810`) with `download_data.sh` documented as a prerequisite; verify a fresh checkout's default comparison tier does not reference an untracked instance and therefore does not abort.
 - [ ] 2.4 Add the synthetic coordinate generator for n = 1k, 5k, 10k, 25k, 50k, 100k; verify it emits exactly the requested city count and a stable seed output.

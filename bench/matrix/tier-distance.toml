@@ -1,0 +1,55 @@
+# Distance-backend comparison tier.
+#
+# Read by scripts/bench-matrix.sh. This file starts with the pre-selection default so Phase 0
+# can record a matrix baseline before the backend flag exists; Phase 2 adds the on-the-fly
+# config and makes the matrix config explicit.
+#
+# The fixtures deliberately live in tests/fixtures so a fresh checkout can run the tier
+# without download_data.sh. Larger downloaded instances belong in tier-distance-large.toml.
+
+tier = "distance"
+
+# Five runs per cell, per constitution §2.5: an improvement claim is a median, never a single
+# run. The existing harness and publisher already assume this.
+runs = 5
+
+# Must agree with bench/budgets.json.
+[budgets]
+exact = 60
+local = 300
+meta = 300
+constructive = 30
+utility = 60
+
+# A family that is not measured here still needs an entry; `utility = []` is how this tier says
+# "not measured", rather than relying on silence.
+[coverage]
+exact = ["upto24"]
+constructive = ["upto24", "small", "mid", "large"]
+local = ["upto24", "small", "mid", "large"]
+meta = ["upto24", "small", "mid", "large"]
+utility = []
+
+[instances]
+burma14 = "upto24"   # GEO, 14
+ulysses16 = "upto24" # GEO, 16
+berlin52 = "small"   # EUC_2D, 52
+a280 = "mid"         # EUC_2D, 280
+att532 = "large"     # ATT, 532
+
+# The pre-selection default: no --distance-backend argument, so the binary uses its matrix
+# default. Phase 2 adds the on-the-fly config and makes this config explicit.
+#
+# `bhk` is exact and therefore only reaches the `upto24` group. `3opt` is included for now;
+# task 2.2 bounds the local solvers' instance size if it cannot finish `att532` within budget.
+[configs.matrix]
+solvers = [
+  "2opt",
+  "3opt",
+  "or_opt",
+  "lk",
+  "nn",
+  "space_filling_curve",
+  "sa",
+  "bhk",
+]
