@@ -20,6 +20,7 @@ principles every decision must respect; an ADR must not contradict it.
 | [007](007-webauthn-auth.md) | Replace Clerk with WebAuthn + self-serve API keys | Accepted |
 | [008](008-qt-gui.md) | Qt 6/QML desktop GUI in `teeline-qt` | Accepted |
 | [009](009-wasm-component-model.md) | WebAssembly Component Model for solver exposure | Accepted |
+| [010](010-distance-source.md) | Distance-source boundary with swappable backends | Proposed |
 
 ## Adding an ADR
 
