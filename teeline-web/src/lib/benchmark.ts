@@ -13,6 +13,12 @@ import type { SolverFamily } from './solver-index'
 /** The only contract version this module understands. See parseAlgorithmShard. */
 export const SCHEMA_VERSION = 2
 
+/**
+ * Where the city layout came from. `derived` means the instance published no coordinates and
+ * teeline derived a 2D layout from the distance matrix; the tour cost is still exact.
+ */
+export type LayoutProvenance = 'real' | 'derived'
+
 export type { SolverFamily }
 
 /** Median/best/worst are always present; `mean` is omitted when a cell has a single run. */
@@ -38,6 +44,7 @@ export interface ShardCell {
 export interface ShardInstance {
   cities: number | null
   optimalCost: number | null
+  layout: LayoutProvenance
   byConfig: Record<string, ShardCell>
 }
 
@@ -285,6 +292,18 @@ function parseCell(raw: unknown, what: string): ShardCell {
   }
 }
 
+/**
+ * Absent means `real`: the field is additive, so shards published before it existed are still
+ * valid and their layouts were file coordinates.
+ */
+function parseLayout(raw: unknown, what: string): LayoutProvenance {
+  if (raw === undefined || raw === null) return 'real'
+  if (raw === 'real' || raw === 'derived') return raw
+  throw new Error(
+    `${what} must be "real" or "derived", got ${JSON.stringify(raw)}`,
+  )
+}
+
 function parseResults(raw: unknown): Record<string, ShardInstance> {
   const results = asRecord(raw, 'results')
   const out: Record<string, ShardInstance> = {}
@@ -309,6 +328,7 @@ function parseResults(raw: unknown): Record<string, ShardInstance> {
         instance.optimal_cost,
         `results.${dataset}.optimal_cost`,
       ),
+      layout: parseLayout(instance.layout, `results.${dataset}.layout`),
       byConfig,
     }
   }
@@ -405,6 +425,7 @@ export interface ProblemShard {
   dataset: string
   cities: number | null
   optimalCost: number | null
+  layout: LayoutProvenance
   leaderboard: LeaderboardEntry[]
 }
 
@@ -447,6 +468,7 @@ export function parseProblemShard(raw: unknown): ProblemShard {
     // Null when the dataset has no problem doc, not a malformed shard.
     cities: optionalNumber(obj.cities, 'cities'),
     optimalCost: optionalNumber(obj.optimal_cost, 'optimal_cost'),
+    layout: parseLayout(obj.layout, 'layout'),
     leaderboard: parseLeaderboard(obj.leaderboard),
   }
 }
@@ -557,6 +579,8 @@ export interface BenchmarkRow {
   config: string
   /** Known optimum, or null when TSPLIB has none published for this instance. */
   optimal: number | null
+  /** File coordinates or a layout derived from the distance matrix. */
+  layout: LayoutProvenance
   gap: Stat | null
   tour: Stat | null
   wall: Stat | null
@@ -604,6 +628,7 @@ export function buildRows(
         // The instance-level optimum is the authoritative one; the cell's copy agrees with it
         // when the publisher knew it at all.
         optimal: instance.optimalCost ?? cell.optimalCost,
+        layout: instance.layout,
         gap: cell.gapPct,
         tour: cell.tourCost,
         wall: cell.wallS,

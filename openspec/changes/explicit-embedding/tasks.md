@@ -31,10 +31,10 @@
 
 ## 5. Benchmark and web provenance
 
-- [ ] 5.1 Stamp `layout: "real" | "derived"` on each raw row in `scripts/bench-matrix.sh`; verify a `gr17` row is `derived` and a `berlin52` row is `real`.
-- [ ] 5.2 Extend `scripts/publish-benchmarks.sh` to treat `layout` as optional (old JSONL and `tests/e2e/publish-benchmarks.bats` must keep working), fall back to `minimapDerived` parsed from `docs/problems/*.md`, and emit `layout` on both `problems/{dataset}.json` and `algorithms/{solver_id}.json` under `results.{dataset}`; verify both shards carry the field.
-- [ ] 5.3 Update `teeline-web/src/lib/benchmark.ts` and its tests, plus `ProblemResults` and `AlgorithmBenchmarks`, to read and render the derived-layout indicator; verify the `gr17` algorithm page labels the row.
-- [ ] 5.4 Document the additive field in `docs/benchmarks/schema.md` (no `/bench/v3/` bump) and verify the doc matches the emitted JSON.
+- [x] 5.1 Stamp `layout: "real" | "derived"` on each raw row in `scripts/bench-matrix.sh`; verify a `gr17` row is `derived` and a `berlin52` row is `real`.
+- [x] 5.2 Extend `scripts/publish-benchmarks.sh` to treat `layout` as optional (old JSONL and `tests/e2e/publish-benchmarks.bats` must keep working), fall back to `minimapDerived` parsed from `docs/problems/*.md`, and emit `layout` on both `problems/{dataset}.json` and `algorithms/{solver_id}.json` under `results.{dataset}`; verify both shards carry the field.
+- [x] 5.3 Update `teeline-web/src/lib/benchmark.ts` and its tests, plus `ProblemResults` and `AlgorithmBenchmarks`, to read and render the derived-layout indicator; verify the `gr17` algorithm page labels the row.
+- [x] 5.4 Document the additive field in `docs/benchmarks/schema.md` (no `/bench/v3/` bump) and verify the doc matches the emitted JSON.
 
 ## 6. Integration checks
 

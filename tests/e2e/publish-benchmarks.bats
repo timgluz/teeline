@@ -599,3 +599,36 @@ PY
     [ -f "$TMPDIR/stage/v2/problems/eil51.json" ]
     [ "$(jq -r '.leaderboard[0].solver + " runs=" + (.leaderboard[0].runs|tostring) + " timeouts=" + (.leaderboard[0].timeouts|tostring)' "$TMPDIR/stage/v2/problems/eil51.json")" = "sa runs=0 timeouts=1" ]
 }
+
+@test "layout provenance reaches the algorithm and problem shards" {
+    jq -cn --argjson m "$DEFAULT_MEASUREMENT" \
+        '{solver:"nn",dataset:"eil51",config:"default",run:1,status:"ok",layout:"derived",
+          wall_s:0.01,peak_rss_kb:6000,tour_cost:450.0,measurement:$m}' \
+        > "$TMPDIR/derived.jsonl"
+
+    run publish --runs "$TMPDIR/derived.jsonl"
+    [ "$status" -eq 0 ]
+
+    [ "$(jq -r '.results.eil51.layout' "$TMPDIR/stage/v2/algorithms/nn.json")" = "derived" ]
+    [ "$(jq -r '.layout' "$TMPDIR/stage/v2/problems/eil51.json")" = "derived" ]
+}
+
+@test "layout defaults to real when the row predates the field" {
+    run publish --runs "$TMPDIR/prev.jsonl"
+    [ "$status" -eq 0 ]
+
+    [ "$(jq -r '.results.eil51.layout' "$TMPDIR/stage/v2/algorithms/nn.json")" = "real" ]
+    [ "$(jq -r '.layout' "$TMPDIR/stage/v2/problems/eil51.json")" = "real" ]
+}
+
+@test "layout falls back to the problem doc's minimapDerived" {
+    # gr17 publishes no coordinates, so its problem doc is marked minimapDerived: true. A row
+    # from an older log that predates `layout` still gets the derived provenance.
+    row nn gr17 default 1 0.01 6000 2100.0 ok > "$TMPDIR/gr17.jsonl"
+
+    run publish --runs "$TMPDIR/gr17.jsonl"
+    [ "$status" -eq 0 ]
+
+    [ "$(jq -r '.results.gr17.layout' "$TMPDIR/stage/v2/algorithms/nn.json")" = "derived" ]
+    [ "$(jq -r '.layout' "$TMPDIR/stage/v2/problems/gr17.json")" = "derived" ]
+}
