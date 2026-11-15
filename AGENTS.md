@@ -52,7 +52,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 - `Solvers` enum — lists every algorithm with string aliases (e.g. `"nn"` → `NearestNeighbor`, `"2opt"` → `TwoOpt`)
 - `AppOptions` — pure config container; one optional option struct per solver plus shared `HeuristicOptions`
-- `TspProblem` — cities plus `Arc<dyn DistanceSource>`; `new` wraps a concrete source, `from_source` shares one. `cities` is the 2D layout geometry-based solvers read; `DistanceSource::has_coordinates()` reports whether the distance source is the coordinates rather than an EXPLICIT matrix
+- `TspProblem` — cities plus `Arc<dyn DistanceSource>`; `new` wraps a concrete source, `from_source` shares one. `cities` is the 2D layout geometry-based solvers read; `DistanceSource::is_coordinate_metric()` reports whether the distance source is the coordinates rather than an EXPLICIT matrix
 - `Solution` — tour route, cities, and total distance computed from the problem's distance source
 - `DistanceSource` — the distance-query trait (`src/tsp/distance_source.rs`); positions are dense indices into the city list, city IDs are external, and the shared defaults keep backends byte-identical
 - `NearestResult` / `NearestResultItem` — returned by both KD-tree and distance-source nearest-neighbor lookups
@@ -105,7 +105,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - The CLI binary is produced by the `teeline-cli` workspace member (`cargo build -p teeline-cli`). The binary is named `teeline` (at `target/debug/teeline` and `target/release/teeline`). Any older `target/release/bin` is a stale artifact from before the workspace split — ignore it.
 - `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity — don't use them on datasets larger than ~30 cities.
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
-- `DistanceSource::has_coordinates()` means "distances are computed from these coordinates" — it is `false` for every EXPLICIT matrix, even when the file supplies `DISPLAY_DATA_SECTION`. `two_opt`/`or_opt` use it to stay on the exact full scan. The planned `TspLibData.has_real_coordinates` is the separate "the file supplied coordinates" flag.
+- `DistanceSource::is_coordinate_metric()` means "distances are computed from these coordinates" — it is `false` for every EXPLICIT matrix, even when the file supplies `DISPLAY_DATA_SECTION`. `two_opt`/`or_opt` use it to stay on the exact full scan. `TspLibData.has_real_coordinates` is the separate "the file supplied coordinates" flag.
 - `teeline convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
 - `download_data.sh` fetches benchmark datasets.
 

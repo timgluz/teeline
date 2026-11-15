@@ -101,7 +101,7 @@ fn every_backend_obeys_the_conformance_contract() {
     for &(fixture, dt) in FIXTURES {
         for (name, source) in backends(fixture, dt) {
             let n = source.num_cities();
-            assert!(source.has_coordinates(), "{fixture}/{name}");
+            assert!(source.is_coordinate_metric(), "{fixture}/{name}");
             assert_eq!(source.tour_length(&[]), 0.0);
 
             let first_id = source.pos2city_id(0).expect("position 0 exists");

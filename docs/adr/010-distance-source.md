@@ -29,7 +29,7 @@ Introduce a `DistanceSource` trait as the single distance-query boundary:
   summation order, id handling, and tie-breaking cannot drift between them.
 - **`Send + Sync`** because the API moves problems into `spawn_blocking` and the Qt GUI moves
   them into worker threads.
-- **`has_coordinates()`** distinguishes a coordinate-computed source from an EXPLICIT matrix;
+- **`is_coordinate_metric()`** distinguishes a coordinate-computed source from an EXPLICIT matrix;
   candidate pruning must use the matrix rather than a layout when it is false.
 - **Storage:** `TspProblem` holds `Arc<dyn DistanceSource>`. The source is immutable, `clone()`
   becomes O(1) instead of deep-copying the matrix, and the same source can be shared.

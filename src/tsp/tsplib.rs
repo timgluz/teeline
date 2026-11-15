@@ -55,8 +55,7 @@ impl TspLibData {
 
     /// True when the file supplied coordinates (a node-coordinate or display-data section).
     ///
-    /// Distinct from `DistanceSource::has_coordinates()`, which asks whether the distances are
-    /// computed from coordinates rather than read from an EXPLICIT matrix.
+    /// Distinct from `DistanceSource::is_coordinate_metric()`, which is about the distance source.
     pub fn has_real_coordinates(&self) -> bool {
         self.has_real_coordinates
     }

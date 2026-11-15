@@ -46,7 +46,7 @@ pub fn solve(
     // distance source. EXPLICIT inputs carry placeholder coordinates, so they keep the full
     // scan. When k covers every city there is nothing to prune, so the full scan is cheaper.
     let k = opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K);
-    let candidates = if distances.has_coordinates() && k < n.saturating_sub(1) {
+    let candidates = if distances.is_coordinate_metric() && k < n.saturating_sub(1) {
         Some(CandidateList::build(cities, k))
     } else {
         None
@@ -338,7 +338,7 @@ mod tests {
         }
         let dm = distance_matrix::DistanceMatrix::new(n, packed, city_table);
         assert!(
-            !dm.has_coordinates(),
+            !dm.is_coordinate_metric(),
             "EXPLICIT matrices must not advertise coordinates"
         );
 
