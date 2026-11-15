@@ -689,6 +689,26 @@ mod tests {
         assert_eq!(&[1.0], res.distances());
     }
 
+    /// The memory model the benchmark and the 100k claim rest on: a coordinate matrix stores
+    /// four bytes per city pair. A wider element (or a padded layout) must fail here rather
+    /// than silently doubling the footprint.
+    #[test]
+    fn coordinate_matrix_stores_at_most_four_bytes_per_pair() {
+        let n = 64;
+        let coords: Vec<Vec<f32>> = (0..n)
+            .map(|i| vec![(i % 8) as f32, (i / 8) as f32])
+            .collect();
+        let cities = kdtree::build_points(&coords);
+        let dm = DistanceMatrix::build(&cities, DistanceType::Euc2D).unwrap();
+
+        let pairs = n * (n - 1) / 2;
+        let bytes = std::mem::size_of_val(dm.distances());
+        assert!(
+            bytes <= 4 * pairs,
+            "coordinate matrix stores {bytes} bytes for {pairs} pairs, exceeding 4 bytes/pair"
+        );
+    }
+
     /// TSPLIB's EUC_2D is `nint(sqrt(dx^2 + dy^2))`. The rounding *is* the metric: unrounded,
     /// teeline optimises a different objective than `EDGE_WEIGHT_TYPE` names and cannot reproduce
     /// any published optimum. A regression to the raw square root has to fail here.

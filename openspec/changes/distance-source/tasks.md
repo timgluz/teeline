@@ -7,17 +7,17 @@
 
 ## 2. Phase 0 — Benchmark development (reuse the existing harness)
 
-- [ ] 2.1 Add `bench/matrix/tier-distance.toml` with a `matrix` config (the pre-selection default), the tracked fixtures `burma14`, `ulysses16`, `berlin52`, `a280`, `att532`, an explicit `solvers` list per config, and `utility = []` plus its budget entry; verify `scripts/bench-matrix.sh ... --dry-run` lists every cell.
-- [ ] 2.2 Add fixed-work configs (`--epochs N`) for the solvers that honour them, and bound the instance size for `2opt`/`or_opt`/`3opt`, which ignore `--epochs`; verify every compared cell completes with `status: ok`.
-- [ ] 2.3 Add a separate `bench/matrix/tier-distance-large.toml` for downloaded instances (`dsj1000`, `pla7397`, `pla33810`) with `download_data.sh` documented as a prerequisite; verify a fresh checkout's default comparison tier does not reference an untracked instance and therefore does not abort.
-- [ ] 2.4 Add the synthetic coordinate generator for n = 1k, 5k, 10k, 25k, 50k, 100k; verify it emits exactly the requested city count and a stable seed output.
-- [ ] 2.5 Add `scripts/bench-distance-scaling.sh` that writes one TSPLIB file per size, runs the CLI once per size in a fresh process under GNU time, and records peak RSS; verify it emits one row per size and records `OOM`/not-measured when the matrix exceeds RAM.
-- [ ] 2.6 Add the criterion construction-time benchmark in `benches/distance_matrix.rs` with a `[[bench]]` entry; verify `cargo bench --bench distance_matrix` runs the small sizes by default.
-- [ ] 2.7 Add a guard test asserting the coordinate matrix stores at most four bytes per pair (`<= 4 · n(n-1)/2`); verify it fails if a wider representation is introduced and does not trip on PR 9's `u16` EXPLICIT compaction.
-- [ ] 2.8 Run the matrix-only scaling baseline and record the pre-refactor numbers plus the Phase 1 refactor runtime bound in the baseline section of `docs/benchmarks/distance-source.md`; verify the matrix rows are reproducible from the documented command.
-- [ ] 2.9 Add a `task bench:distance` entry; verify it runs the comparison tier and the scaling script.
-- [ ] 2.10 Gate the 25k+ sizes behind the scaling script or `--ignored`; verify `cargo test` does not run them.
-- [ ] 2.11 Run the `matrix` config on the base commit and commit the JSONL to a tracked path outside `bench/runs/` (which is git-ignored); verify the file is in git and is the Phase 1 no-regression reference.
+- [x] 2.1 Add `bench/matrix/tier-distance.toml` with a `matrix` config (the pre-selection default), the tracked fixtures `burma14`, `ulysses16`, `berlin52`, `a280`, `att532`, an explicit `solvers` list per config, and `utility = []` plus its budget entry; verify `scripts/bench-matrix.sh ... --dry-run` lists every cell.
+- [x] 2.2 Add fixed-work configs (`--epochs N`) for the solvers that honour them, and bound the instance size for `2opt`/`or_opt`/`3opt`, which ignore `--epochs`; verify every compared cell completes with `status: ok`.
+- [x] 2.3 Add a separate `bench/matrix/tier-distance-large.toml` for downloaded instances (`dsj1000`, `pla7397`, `pla33810`) with `download_data.sh` documented as a prerequisite; verify a fresh checkout's default comparison tier does not reference an untracked instance and therefore does not abort.
+- [x] 2.4 Add the synthetic coordinate generator for n = 1k, 5k, 10k, 25k, 50k, 100k; verify it emits exactly the requested city count and a stable seed output.
+- [x] 2.5 Add `scripts/bench-distance-scaling.sh` that writes one TSPLIB file per size, runs the CLI once per size in a fresh process under GNU time, and records peak RSS; verify it emits one row per size and records `OOM`/not-measured when the matrix exceeds RAM.
+- [x] 2.6 Add the criterion construction-time benchmark in `benches/distance_matrix.rs` with a `[[bench]]` entry; verify `cargo bench --bench distance_matrix` runs the small sizes by default.
+- [x] 2.7 Add a guard test asserting the coordinate matrix stores at most four bytes per pair (`<= 4 · n(n-1)/2`); verify it fails if a wider representation is introduced and does not trip on PR 9's `u16` EXPLICIT compaction.
+- [x] 2.8 Run the matrix-only scaling baseline and record the pre-refactor numbers plus the Phase 1 refactor runtime bound in the baseline section of `docs/benchmarks/distance-source.md`; verify the matrix rows are reproducible from the documented command.
+- [x] 2.9 Add a `task bench:distance` entry; verify it runs the comparison tier and the scaling script.
+- [x] 2.10 Gate the 25k+ sizes behind the scaling script or `--ignored`; verify `cargo test` does not run them.
+- [x] 2.11 Run the `matrix` config on the base commit and commit the JSONL to a tracked path outside `bench/runs/` (which is git-ignored); verify the file is in git and is the Phase 1 no-regression reference.
 
 ## 3. Phase 1 — Trait boundary (behaviour-preserving)
 
@@ -60,7 +60,7 @@
 - [ ] 6.4 Extend `src/config.rs` to parse a top-level `distance_backend`, add the CLI flag, and add `tests/pipeline_config_test.rs` coverage; verify valid values parse, unknown values are rejected, and the CLI wins over TOML without a clap `default_value` shadowing it.
 - [ ] 6.5 Wire the API, WASM, and Qt constructors to the shared policy constructor; verify each crate builds and one end-to-end solve per surface succeeds.
 - [ ] 6.6 Fix the WASM scoring-only paths (`compare_tours_from_input`, `tour_distance_from_input`) to pick `Matrix` for explicit weights and `OnTheFly` for coordinates; verify an EXPLICIT TSPLIB input still scores in WASM.
-- [ ] 6.7 Add the `on-the-fly` config to `tier-distance.toml`, make every config in `tier-distance*.toml` pass `--distance-backend` explicitly, then run the comparison sweep with at least five runs per cell; verify the same cells appear under both backends, only `status: ok` rows are compared, and the report states the memory ratio and runtime ratio per family.
+- [ ] 6.7 Add the `on-the-fly` config family (`on-the-fly`, `on-the-fly-3opt`, `on-the-fly-fixed`) to `tier-distance.toml`, make every config in `tier-distance*.toml` pass `--distance-backend` explicitly, then run the comparison sweep with at least five runs per cell; verify the same cells appear under both backends, only `status: ok` rows are compared, and the report states the memory ratio and runtime ratio per family.
 - [ ] 6.8 Set the per-family runtime tolerance and the memory expectation from the sweep using medians/distributions across the repeated runs, and record them in `docs/benchmarks/distance-source.md`; verify the numbers match the raw rows and no claim rests on a single run.
 - [ ] 6.9 Add `scripts/check-distance-benchmarks.py` that reads the local JSONL and fails when a runtime or memory bound is violated; verify a deliberately slower run fails the check.
 - [ ] 6.10 Flip the default to `Auto` only after tasks 6.8 and 6.9; verify the documented threshold equals the measured one.
