@@ -138,6 +138,31 @@ therefore:
 - Trade-off: the matrix is O(n²) memory and a lookup is a `Vec` index; on-the-fly is O(n)
   memory and computes the declared TSPLIB primitive per lookup.
 
+## Candidate-list local search
+
+`two_opt` and `or_opt` evaluate moves against the 16 nearest neighbors from the KD-tree when
+the input has real coordinates; EXPLICIT inputs keep the full scan. The list is a pruning
+heuristic — every move is still scored with the exact distance source — and memory is O(n·k)
+instead of O(n²).
+
+Seeded with nearest-neighbor (matching the CLI's auto-expansion), five-run medians, release
+build:
+
+| Solver | Instance | Full cost | k=16 cost | Full wall | k=16 wall | Speedup |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| two_opt | a280 | 2798 | 2798 | 0.238s | 0.039s | 6.1x |
+| two_opt | att532 | 30685 | 30432 | 3.206s | 0.164s | 19.5x |
+| or_opt | a280 | 2821 | 2849 | 1.788s | 0.186s | 9.6x |
+| or_opt | att532 | 31159 | 31569 | 18.939s | 0.773s | 24.5x |
+
+Gaps against the published optima: two-opt a280 8.5%, att532 9.9%; or-opt a280 10.5%,
+att532 14.0%. The candidate-list tours stay within 2% of the full-neighbourhood result.
+
+The `n_nearest` default of 3 is raised to 16 for these solvers; a larger `--n_nearest` trades
+time for quality. The earlier full-scan baseline was `2opt` 2838/31606 and `or_opt`
+2821/31159; the 2-opt tours change (mostly improve) and or-opt on att532 is 1.3% worse, so the
+Tier A `2opt`/`or_opt` cells should be re-run at the next release.
+
 ## Gate and publication
 
 - The comparison is a manual per-release sweep on a documented machine; a nightly

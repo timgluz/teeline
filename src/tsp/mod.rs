@@ -2,6 +2,7 @@ pub mod ant_colony;
 pub mod bellman_karp;
 pub mod branch_bound;
 pub(crate) mod budget;
+pub(crate) mod candidate_list;
 pub mod christofides;
 pub mod comparison;
 pub use comparison::{ComparisonStats, compare_tours, tour_cost};

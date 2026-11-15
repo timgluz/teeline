@@ -1,4 +1,5 @@
 use super::DistanceSource;
+use super::candidate_list;
 use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
@@ -18,7 +19,7 @@ use super::{HeuristicOptions, Solution, TspProblem};
 /// Complexity: O(n²) per pass (three segment sizes × n × n insertion positions).
 pub fn solve(
     problem: &TspProblem,
-    _opts: &HeuristicOptions,
+    opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
 ) -> Solution {
@@ -41,7 +42,18 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
     }
 
-    while let Some(best) = find_best_move(&path, distances.as_ref()) {
+    // A candidate list is a pruning heuristic: every relocation is still scored with the exact
+    // distance source. EXPLICIT inputs carry placeholder coordinates, so they keep the full scan.
+    let candidates = if distances.has_coordinates() {
+        Some(candidate_list::build(
+            cities,
+            opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K),
+        ))
+    } else {
+        None
+    };
+
+    while let Some(best) = find_best_move(&path, distances.as_ref(), candidates.as_deref()) {
         let (_, i, j, seg_len, reversed) = best;
 
         #[cfg(debug_assertions)]
@@ -80,8 +92,10 @@ pub fn solve(
 fn find_best_move(
     path: &[usize],
     distances: &dyn DistanceSource,
+    candidates: Option<&[Vec<usize>]>,
 ) -> Option<(f32, usize, usize, usize, bool)> {
     let n = path.len();
+    let pos = candidates.map(|_| candidate_list::positions(path));
     // -1e-3 threshold avoids infinite loops from f32 rounding at large coordinate scales.
     let mut best_delta = -1e-3_f32;
     let mut best: Option<(f32, usize, usize, usize, bool)> = None;
@@ -116,10 +130,16 @@ fn find_best_move(
                 + distances.distance_between(last_seg, d).unwrap_or(f32::MAX)
                 - distances.distance_between(a, d).unwrap_or(f32::MAX);
 
-            // Try inserting the segment after every valid position j.
-            // Forbidden: j == prev (no-op reinsertion) and j in [i, i+seg_len-1]
-            // (overlaps with segment). This gives seg_len+1 forbidden positions.
-            for j in 0..n {
+            // Try inserting the segment after every valid position j. With a candidate list,
+            // only positions adjacent to the segment endpoints are considered; exact
+            // distances still score every move.
+            let js: Vec<usize> = match (candidates, pos.as_deref()) {
+                (Some(cands), Some(pos)) => {
+                    candidate_list::candidate_positions(cands, pos, first_seg, last_seg)
+                }
+                _ => (0..n).collect(),
+            };
+            for j in js {
                 // Forbidden window: {prev, i, i+1, ..., i+seg_len-1}
                 if j == prev || (j >= i && j < i + seg_len) {
                     continue;
@@ -250,7 +270,7 @@ mod tests {
         // Moving city 2 elsewhere should be profitable.
         let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [5.0, 5.0], [2.0, 0.0], [3.0, 0.0]]);
         let path: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
-        let result = find_best_move(&path, problem.distances.as_ref());
+        let result = find_best_move(&path, problem.distances.as_ref(), None);
         assert!(result.is_some(), "expected an improving move");
         let (delta, _, _, _, _) = result.unwrap();
         assert!(
@@ -264,7 +284,7 @@ mod tests {
         // Square: [0,1,2,3] is already optimal (perimeter tour).
         let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
         let path = vec![0, 1, 2, 3];
-        let result = find_best_move(&path, problem.distances.as_ref());
+        let result = find_best_move(&path, problem.distances.as_ref(), None);
         assert!(
             result.is_none(),
             "expected no improvement on optimal square tour, got {result:?}"

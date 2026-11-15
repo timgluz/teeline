@@ -1,29 +1,14 @@
 use super::DistanceSource;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
-    HeuristicOptions, LKOptions, Solution, TspProblem,
-    kdtree::{self, KDPoint},
-    nearest_neighbor,
+    HeuristicOptions, LKOptions, Solution, TspProblem, kdtree::KDPoint, nearest_neighbor,
     route::Route,
 };
 use rand::{RngExt, SeedableRng};
 use std::sync::mpsc;
 
 pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> Vec<Vec<usize>> {
-    let n = cities.len();
-    let k = k.min(n.saturating_sub(1));
-    let max_id = cities.iter().map(|c| c.id).max().unwrap_or(0);
-    let mut candidates = vec![Vec::new(); max_id + 1];
-    let tree = kdtree::from_cities(cities);
-    for city in cities {
-        candidates[city.id] = tree
-            .nearest(city, k)
-            .nearest()
-            .iter()
-            .map(|item| item.point.id)
-            .collect();
-    }
-    candidates
+    super::candidate_list::build(cities, k)
 }
 
 fn send_progress(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize], dist: f32) {

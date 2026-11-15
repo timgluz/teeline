@@ -71,11 +71,11 @@
 
 ## 7. Phase 3 — Candidate-list move evaluation for local search
 
-- [ ] 7.1 Extend the KD-tree k-nearest candidate lists to `two_opt` and `or_opt` (LK already has them), bounding move evaluation rather than adding a `DistanceSource`; verify each city's candidate set on a fixture, address the narrow `n_nearest` default of 3, and use `has_coordinates()` to skip candidate pruning on EXPLICIT placeholder coordinates.
-- [ ] 7.2 Verify `two_opt`, `or_opt`, and `lin_kernighan` still score moves with exact distances from the problem's source; verify each returns a valid tour.
-- [ ] 7.3 Measure memory and runtime against the full-neighbourhood evaluation on `a280` and `att532`; verify the report gains before/after rows.
-- [ ] 7.4 Add a quality test comparing candidate-list tours to the published optima (`a280` 2579, `att532` 27686) using seeded or median runs; verify the gap is within the documented tolerance.
-- [ ] 7.5 Document candidate-list usage, its raw-Euclidean geo-ranking caveat, and its tolerance, and note the expected baseline updates for `2opt`/`or_opt`; verify the document matches the benchmark report.
+- [x] 7.1 Extend the KD-tree k-nearest candidate lists to `two_opt` and `or_opt` (LK already has them), bounding move evaluation rather than adding a `DistanceSource`; verify each city's candidate set on a fixture, address the narrow `n_nearest` default of 3, and use `has_coordinates()` to skip candidate pruning on EXPLICIT placeholder coordinates.
+- [x] 7.2 Verify `two_opt`, `or_opt`, and `lin_kernighan` still score moves with exact distances from the problem's source; verify each returns a valid tour.
+- [x] 7.3 Measure memory and runtime against the full-neighbourhood evaluation on `a280` and `att532`; verify the report gains before/after rows.
+- [x] 7.4 Add a quality test comparing candidate-list tours to the published optima (`a280` 2579, `att532` 27686) using seeded or median runs; verify the gap is within the documented tolerance.
+- [x] 7.5 Document candidate-list usage, its raw-Euclidean geo-ranking caveat, and its tolerance, and note the expected baseline updates for `2opt`/`or_opt`; verify the document matches the benchmark report.
 
 ## 8. Phase 4 — Compact EXPLICIT storage
 
