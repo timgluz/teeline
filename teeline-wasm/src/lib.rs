@@ -8,9 +8,8 @@ use bindings::teeline::solver::types::{
 use bindings::Guest;
 use teeline::tsp::comparison;
 use teeline::tsp::{
-    distance_matrix::DistanceMatrix, kdtree::KDPoint, AcoOptions, AppOptions, CSOptions,
-    DistanceSource, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions,
-    SfcOptions, Solvers, TspProblem,
+    kdtree::KDPoint, AcoOptions, AppOptions, CSOptions, DistanceBackend, DistanceType, FPAOptions,
+    FourierOptions, GAOptions, HeuristicOptions, SAOptions, SfcOptions, Solvers, TspProblem,
 };
 
 struct Component;
@@ -111,16 +110,10 @@ fn kd_to_city(c: &KDPoint) -> City {
 fn parse_to_tsp_problem(input: &str) -> Result<TspProblem, String> {
     if input.trim_start().starts_with('[') {
         let kd_cities = teeline::tsp::tsplib::parse_json_cities(input)?;
-        let distances =
-            DistanceMatrix::from_cities(&kd_cities).map_err(|e| format!("distance matrix: {e}"))?;
-        Ok(TspProblem::new(kd_cities, distances))
+        TspProblem::from_points(kd_cities, DistanceType::Euc2D, DistanceBackend::Auto)
     } else {
         let data = teeline::tsp::tsplib::read_from_str(input)?;
-        let kd_cities = data.cities().to_vec();
-        let distances = data
-            .distance_matrix()
-            .map_err(|e| format!("distance matrix: {e}"))?;
-        Ok(TspProblem::new(kd_cities, distances))
+        data.to_problem(DistanceBackend::Auto)
     }
 }
 
@@ -312,9 +305,7 @@ fn solve_with_cities(
     if kd_cities.len() < 2 {
         return Err("need at least 2 cities".into());
     }
-    let distances =
-        DistanceMatrix::from_cities(&kd_cities).map_err(|e| format!("distance matrix: {e}"))?;
-    let problem = TspProblem::new(kd_cities, distances);
+    let problem = TspProblem::from_points(kd_cities, DistanceType::Euc2D, DistanceBackend::Auto)?;
     let opts = build_opts(solver_id, options);
     let start = std::time::Instant::now();
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -547,12 +538,18 @@ impl Guest for Component {
             ));
         }
         let data = teeline::tsp::tsplib::read_from_str(&input)?;
-        let dm = data.distance_matrix()?;
+        let backend = if data.has_explicit_weights() {
+            DistanceBackend::Matrix
+        } else {
+            DistanceBackend::OnTheFly
+        };
+        let problem = data.to_problem(backend)?;
 
         let solver: Vec<usize> = solver_route.iter().map(|&x| x as usize).collect();
         let opt: Vec<usize> = opt_route.iter().map(|&x| x as usize).collect();
 
-        let stats = comparison::compare_tours_from_matrix(&solver, &opt, &dm);
+        let stats =
+            comparison::compare_tours_from_source(&solver, &opt, problem.distances.as_ref());
         Ok(ComparisonStats {
             optimal_cost: stats.optimal_cost,
             solver_cost: stats.solver_cost,
@@ -568,9 +565,14 @@ impl Guest for Component {
             return Err("route must contain at least 2 city ids".to_string());
         }
         let data = teeline::tsp::tsplib::read_from_str(&input)?;
-        let dm = data.distance_matrix()?;
+        let backend = if data.has_explicit_weights() {
+            DistanceBackend::Matrix
+        } else {
+            DistanceBackend::OnTheFly
+        };
+        let problem = data.to_problem(backend)?;
         let route: Vec<usize> = route.iter().map(|&x| x as usize).collect();
-        Ok(dm.tour_length(&route))
+        Ok(problem.distances.tour_length(&route))
     }
 }
 

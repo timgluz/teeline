@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::tsp::{
-    AcoOptions, AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    LKOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
+    AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, FourierOptions, GAOptions,
+    HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -78,17 +78,43 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
     }
 }
 
+/// A parsed pipeline: its stages plus the top-level distance-backend policy.
+pub struct PipelineConfig {
+    pub stages: Vec<(Solvers, AppOptions)>,
+    pub distance_backend: DistanceBackend,
+}
+
 /// Parse a TOML string into a list of `(Solvers, AppOptions)` pairs.
 ///
-/// `base` is the starting `AppOptions` (usually `AppOptions::default()`).
-/// Per-stage `[stage.sa]`, `[stage.ga]`, etc. are merged on top of `base`.
-/// Returns `Err` on parse errors, unknown keys, or wrong sub-table for a solver.
+/// Kept for callers that only need the stages; use
+/// [`load_pipeline_config_with_backend`] for the top-level backend key.
 pub fn load_pipeline_config(
     source: &str,
     base: AppOptions,
 ) -> Result<Vec<(Solvers, AppOptions)>, String> {
+    load_pipeline_config_with_backend(source, base).map(|config| config.stages)
+}
+
+/// Parse a TOML string into stages plus the top-level `distance_backend` policy.
+///
+/// `base` is the starting `AppOptions` (usually `AppOptions::default()`).
+/// Per-stage `[stage.sa]`, `[stage.ga]`, etc. are merged on top of `base`.
+/// Returns `Err` on parse errors, unknown keys, an invalid backend value, or a wrong
+/// sub-table for a solver.
+pub fn load_pipeline_config_with_backend(
+    source: &str,
+    base: AppOptions,
+) -> Result<PipelineConfig, String> {
     let root: toml::Table =
         toml::from_str(source).map_err(|e| format!("config: TOML parse error: {e}"))?;
+
+    let distance_backend = match root.get("distance_backend") {
+        Some(value) => value
+            .as_str()
+            .ok_or("config: `distance_backend` must be a string")?
+            .parse::<DistanceBackend>()?,
+        None => DistanceBackend::Auto,
+    };
 
     let stage_array = root
         .get("stage")
@@ -155,7 +181,10 @@ pub fn load_pipeline_config(
         stages.push((solver, stage_options));
     }
 
-    Ok(stages)
+    Ok(PipelineConfig {
+        stages,
+        distance_backend,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -205,16 +234,37 @@ impl AppOptionsProvider for IdentityProvider {
 }
 
 /// Reads a pipeline config file and returns fully-resolved `(Solvers, AppOptions)` pairs.
-/// The `overrides` provider applies to the base before per-stage TOML keys are merged.
+///
+/// Kept for callers that only need the stages; use [`resolve_pipeline_config`] for the
+/// top-level backend policy.
 pub fn resolve_config_file<P: AppOptionsProvider>(
     path: &Path,
     overrides: &P,
 ) -> Result<Vec<(Solvers, AppOptions)>, String> {
+    resolve_pipeline_config(path, overrides).map(|config| config.stages)
+}
+
+/// Reads a pipeline config file and returns its stages plus the backend policy.
+pub fn resolve_pipeline_config<P: AppOptionsProvider>(
+    path: &Path,
+    overrides: &P,
+) -> Result<PipelineConfig, String> {
     let source = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read config file '{}': {e}", path.display()))?;
 
     let base = overrides.provide(AppOptions::default())?;
-    load_pipeline_config(&source, base)
+    load_pipeline_config_with_backend(&source, base)
+}
+
+/// CLI value wins over the config value; `None` keeps the config.
+pub fn resolve_distance_backend(
+    cli_value: Option<&str>,
+    config_backend: DistanceBackend,
+) -> Result<DistanceBackend, String> {
+    match cli_value {
+        Some(value) => value.parse::<DistanceBackend>(),
+        None => Ok(config_backend),
+    }
 }
 
 // ---------------------------------------------------------------------------

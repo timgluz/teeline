@@ -1,8 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use teeline::config::{IdentityProvider, resolve_config_file, select_pipeline_source};
+use teeline::config::{
+    IdentityProvider, load_pipeline_config_with_backend, resolve_config_file,
+    resolve_distance_backend, resolve_pipeline_config, select_pipeline_source,
+};
 use teeline::tsp::{
-    Solvers, TspProblem,
+    AppOptions, DistanceBackend, Solvers, TspProblem,
     pipeline::{PipelineStage, run_pipeline},
     tsplib,
 };
@@ -174,4 +177,51 @@ fn test_pipeline_cooling_rate_zero_errors() {
     let p = fixture("pipeline_bad_cooling_rate.toml");
     let err = resolve_config_file(&p, &IdentityProvider).unwrap_err();
     assert!(err.contains("cooling_rate"), "got: {err}");
+}
+
+// ---------------------------------------------------------------------------
+// Distance backend
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pipeline_config_parses_the_distance_backend() {
+    let config = resolve_pipeline_config(
+        &fixture("pipeline_distance_backend.toml"),
+        &IdentityProvider,
+    )
+    .unwrap();
+    assert_eq!(config.distance_backend, DistanceBackend::OnTheFly);
+    assert_eq!(config.stages.len(), 1);
+}
+
+#[test]
+fn pipeline_config_defaults_to_auto_backend() {
+    let config =
+        load_pipeline_config_with_backend("[[stage]]\nsolver = \"nn\"\n", AppOptions::default())
+            .unwrap();
+    assert_eq!(config.distance_backend, DistanceBackend::Auto);
+}
+
+#[test]
+fn pipeline_config_rejects_an_invalid_backend() {
+    let err = load_pipeline_config_with_backend(
+        "distance_backend = \"gpu\"\n[[stage]]\nsolver = \"nn\"\n",
+        AppOptions::default(),
+    )
+    .err()
+    .expect("an invalid backend must be rejected");
+    assert!(err.contains("distance backend"), "got: {err}");
+}
+
+#[test]
+fn cli_backend_overrides_the_config_value() {
+    assert_eq!(
+        resolve_distance_backend(Some("matrix"), DistanceBackend::OnTheFly).unwrap(),
+        DistanceBackend::Matrix
+    );
+    assert_eq!(
+        resolve_distance_backend(None, DistanceBackend::OnTheFly).unwrap(),
+        DistanceBackend::OnTheFly
+    );
+    assert!(resolve_distance_backend(Some("gpu"), DistanceBackend::Auto).is_err());
 }

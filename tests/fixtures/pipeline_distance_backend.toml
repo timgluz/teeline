@@ -1,0 +1,4 @@
+distance_backend = "on-the-fly"
+
+[[stage]]
+solver = "nn"

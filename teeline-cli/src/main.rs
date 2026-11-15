@@ -6,12 +6,12 @@ use std::thread;
 use serde_json::json;
 use teeline::DistanceType;
 use teeline::config::{
-    AppOptionsProvider, IdentityProvider, PipelineSource, resolve_config_file,
-    select_pipeline_source,
+    AppOptionsProvider, IdentityProvider, PipelineSource, resolve_distance_backend,
+    resolve_pipeline_config, select_pipeline_source,
 };
 use teeline::tsp::{
-    self, AppOptions, DistanceSource, SOMOptions, Solution, SolverKind, Solvers, TspProblem,
-    distance_matrix, list_solvers,
+    self, AppOptions, DistanceBackend, DistanceSource, SOMOptions, Solution, SolverKind, Solvers,
+    list_solvers,
     pipeline::{PipelineStage, run_pipeline, stage_warnings},
     tsplib,
 };
@@ -293,6 +293,11 @@ fn tuning_args() -> Vec<Arg> {
             .long("distance-type")
             .help("override distance formula: euc_2d, geo (default: from file header)")
             .required(false),
+        Arg::new("distance_backend")
+            .long("distance-backend")
+            .help("distance backend: auto (default), matrix, or on-the-fly")
+            .value_parser(["auto", "matrix", "on-the-fly"])
+            .required(false),
         Arg::new("max_depth")
             .long("max-depth")
             .help("LK: max sequential-search chain depth (default 5; depth-1 = 2-opt, depth-5 = full LK quality)")
@@ -478,14 +483,14 @@ fn run_pipeline_cmd(args: &ArgMatches) {
             std::process::exit(1);
         }
         Ok(PipelineSource::Config(path)) => {
-            let stage_configs = match resolve_config_file(&path, &IdentityProvider) {
-                Ok(r) => r,
+            let config = match resolve_pipeline_config(&path, &IdentityProvider) {
+                Ok(config) => config,
                 Err(e) => {
                     eprintln!("error: {e}");
                     std::process::exit(1);
                 }
             };
-            run_as_pipeline_stages(stage_configs, args, false);
+            run_as_pipeline_stages(config.stages, args, false, config.distance_backend);
         }
         Ok(PipelineSource::Steps(solvers)) => {
             run_as_pipeline(&solvers, args, false);
@@ -498,13 +503,14 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches, json_mode: bool) {
         .iter()
         .map(|&s| (s, solver_options_from_args(args, s)))
         .collect();
-    run_as_pipeline_stages(stage_configs, args, json_mode);
+    run_as_pipeline_stages(stage_configs, args, json_mode, DistanceBackend::Auto);
 }
 
 fn run_as_pipeline_stages(
     stage_configs: Vec<(Solvers, AppOptions)>,
     args: &ArgMatches,
     json_mode: bool,
+    config_backend: DistanceBackend,
 ) {
     let verbose = args.get_flag("verbose");
     let default_level = if verbose { "debug" } else { "info" };
@@ -542,11 +548,22 @@ fn run_as_pipeline_stages(
     tracing::info!(name = %tsp_data.name, comment = %tsp_data.comment,
                    cities = tsp_data.len(), "problem loaded");
 
-    let cities = tsp_data.cities().to_vec();
-    let distances = match tsp_data.distance_matrix() {
-        Ok(dm) => dm,
+    let backend = match resolve_distance_backend(
+        args.get_one::<String>("distance_backend")
+            .map(String::as_str),
+        config_backend,
+    ) {
+        Ok(backend) => backend,
         Err(e) => {
-            eprintln!("Error building distance matrix: {e}");
+            eprintln!("error: --distance-backend: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let problem = match tsp_data.to_problem(backend) {
+        Ok(problem) => problem,
+        Err(e) => {
+            eprintln!("Error building the distance source: {e}");
             std::process::exit(1);
         }
     };
@@ -563,14 +580,7 @@ fn run_as_pipeline_stages(
 
     let stages: Vec<PipelineStage> = stage_configs
         .into_iter()
-        .map(|(solver, options)| {
-            PipelineStage::new(
-                solver,
-                options,
-                TspProblem::new(cities.clone(), distances.clone()),
-                None,
-            )
-        })
+        .map(|(solver, options)| PipelineStage::new(solver, options, problem.clone(), None))
         .collect();
 
     let n_stages = stages.len();
@@ -587,9 +597,14 @@ fn run_as_pipeline_stages(
     .join()
     .expect("Solver thread failed");
 
-    let opt_cmp = opt_tour
-        .as_ref()
-        .and_then(|ot| compute_optimal_comparison(tour.total, &distances, tsp_data.len(), ot));
+    let opt_cmp = opt_tour.as_ref().and_then(|ot| {
+        compute_optimal_comparison(
+            tour.total,
+            problem.distances.as_ref(),
+            problem.cities.len(),
+            ot,
+        )
+    });
 
     if json_mode {
         print_solution_json(&tour, false, opt_cmp.as_ref());
@@ -728,7 +743,7 @@ struct OptimalComparison {
 
 fn compute_optimal_comparison(
     solver_cost: f32,
-    distances: &distance_matrix::DistanceMatrix,
+    distances: &dyn DistanceSource,
     n_cities: usize,
     opt_tour: &teeline::tsp::opt_tour::OptTour,
 ) -> Option<OptimalComparison> {

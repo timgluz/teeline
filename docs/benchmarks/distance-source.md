@@ -91,6 +91,63 @@ Two findings:
    is as important as changing the O(n²) layout; the Phase 4 work should measure them
    separately.
 
+## On-the-fly scaling result
+
+`sfc` with `--distance-backend on-the-fly`, same synthetic generator:
+
+| Cities | Status | Wall | Peak RSS |
+|---:|---|---:|---:|
+| 1,000 | ok | 0.0153s | 7.1 MB |
+| 10,000 | ok | 0.0383s | 8.5 MB |
+| 100,000 | ok | 0.2220s | 23.3 MB |
+
+The 100k run stays under 1 GiB with three orders of magnitude of headroom; the matrix run at
+the same size was killed at 25.76 GiB. This is the acceptance path for #647.
+
+## Matrix-vs-on-the-fly comparison
+
+Both backends were measured on the same commit and the same 36 cells (`tier-distance.toml`),
+five runs each, medians over `status: ok` rows. Full rows:
+`bench/baseline/distance/comparison-tier.jsonl`.
+
+| Family | Cells | Worst wall (all) | Worst wall (cells >= 100 ms) | Worst peak RSS |
+| --- | ---: | ---: | ---: | ---: |
+| exact | 2 | 2.97x (`bhk`/`ulysses16`) | — | 1.00x |
+| constructive | 10 | 1.81x (`sfc`/`ulysses16`) | — | 1.04x |
+| local | 19 | 1.87x (`lk`/`burma14`) | 1.43x (`or_opt`/`att532`) | 1.02x |
+| meta | 5 | 1.92x (`tabu`/`burma14`) | 1.45x (`tabu`/`att532`) | 1.02x |
+
+The all-cell ratios above 1.5 are sub-100 ms instances where process startup and timer
+resolution dominate; their absolute differences are 18–91 ms. The accepted tolerance is
+therefore:
+
+- **median wall-clock:** 1.5x for local/meta, 2.0x for exact/constructive, **or** the matrix
+  median + 100 ms, whichever is larger;
+- **median peak RSS:** 1.25x the matrix.
+
+`scripts/check-distance-benchmarks.py` enforces both and passes on this run.
+
+## Backend selection
+
+- `--distance-backend auto|matrix|on-the-fly` (default `auto`); the same value is accepted as a
+  top-level `distance_backend` in a pipeline TOML. The CLI flag wins over the file.
+- `Auto` uses the matrix at or below 20,000 cities and on-the-fly above it.
+- EXPLICIT input always uses the matrix, regardless of `--distance-type`, because the parser
+  supplies only placeholder coordinates for those files. Coordinate input with
+  `--distance-type explicit` is a descriptive error, not a panic.
+- Trade-off: the matrix is O(n²) memory and a lookup is a `Vec` index; on-the-fly is O(n)
+  memory and computes the declared TSPLIB primitive per lookup.
+
+## Gate and publication
+
+- The comparison is a manual per-release sweep on a documented machine; a nightly
+  small-instance smoke is a follow-up once the thresholds stabilize. There is no per-PR CI job.
+- The report is internal: `publish-benchmarks.sh` does not consume
+  `bench/runs/tier-distance-compare.jsonl`, and the public leaderboard continues to measure the
+  default backend.
+- `scripts/check-distance-benchmarks.py` fails when a paired cell exceeds the documented
+  runtime or memory tolerance.
+
 ## LK metric-fix re-baseline
 
 LK used to build a private EUC_2D matrix, so it optimized the wrong objective on GEO, ATT,
