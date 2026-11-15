@@ -1454,7 +1454,7 @@ checksum = "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca"
 
 [[package]]
 name = "teeline"
-version = "1.0.12"
+version = "1.0.14"
 dependencies = [
  "clap",
  "num-complex",
@@ -1469,7 +1469,7 @@ dependencies = [
 
 [[package]]
 name = "teeline-wasm"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "teeline",
  "wasmtime",
