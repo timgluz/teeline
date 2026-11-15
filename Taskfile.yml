@@ -202,6 +202,11 @@ tasks:
     cmds:
       - ./scripts/bench-distance-scaling.sh {{.CLI_ARGS}}
 
+  bench:distance-check:
+    desc: Check the matrix-vs-on-the-fly comparison against its thresholds
+    cmds:
+      - python3 scripts/check-distance-benchmarks.py {{.CLI_ARGS}}
+
   completions:bash:
     desc: Print bash completion script (eval in .bashrc or pipe to a file)
     deps: [build]

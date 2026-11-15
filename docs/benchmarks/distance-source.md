@@ -104,6 +104,27 @@ Two findings:
 The 100k run stays under 1 GiB with three orders of magnitude of headroom; the matrix run at
 the same size was killed at 25.76 GiB. This is the acceptance path for #647.
 
+## Backend selection
+
+- `--distance-backend auto|matrix|on-the-fly` (default `auto`); the same value is accepted as a
+  top-level `distance_backend` in a pipeline TOML. The CLI flag wins over the file.
+- `Auto` uses the matrix at or below 20,000 cities and on-the-fly above it.
+- EXPLICIT input always uses the matrix, regardless of `--distance-type`, because the parser
+  supplies only placeholder coordinates for those files. Coordinate input with
+  `--distance-type explicit` is a descriptive error, not a panic.
+- Trade-off: the matrix is O(n²) memory and a lookup is a `Vec` index; on-the-fly is O(n)
+  memory and computes the declared TSPLIB primitive per lookup.
+
+## Gate and publication
+
+- The comparison is a manual per-release sweep on a documented machine; a nightly
+  small-instance smoke is a follow-up once the thresholds stabilize. There is no per-PR CI job.
+- The report is internal: `publish-benchmarks.sh` does not consume
+  `bench/runs/tier-distance-compare.jsonl`, and the public leaderboard continues to measure the
+  default backend.
+- `scripts/check-distance-benchmarks.py` fails when a paired cell exceeds the documented
+  runtime or memory tolerance.
+
 ## LK metric-fix re-baseline
 
 LK used to build a private EUC_2D matrix, so it optimized the wrong objective on GEO, ATT,

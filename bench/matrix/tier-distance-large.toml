@@ -33,20 +33,23 @@ pla33810 = "xlarge" # EUC_2D, 33810
 [configs.matrix]
 solvers = ["2opt", "or_opt", "nn", "space_filling_curve"]
 instances = ["dsj1000", "pla7397"]
+args = ["--distance-backend", "matrix"]
 
 # LK's iterated passes are the most expensive local search, so keep it on the smaller large
 # instance until the sweep says it fits the budget on pla7397 too.
 [configs.matrix-lk]
 solvers = ["lk"]
 instances = ["dsj1000"]
+args = ["--distance-backend", "matrix"]
 
 [configs.matrix-fixed]
 solvers = ["tabu"]
 instances = ["dsj1000", "pla7397"]
-args = ["--epochs", "1000"]
+args = ["--epochs", "1000", "--distance-backend", "matrix"]
 
 # 2-opt/or-opt are O(n^2) per pass at 33k cities; only the constructive solvers are planned
 # for the xlarge instance.
 [configs.matrix-xlarge]
 solvers = ["nn", "space_filling_curve"]
 instances = ["pla33810"]
+args = ["--distance-backend", "matrix"]

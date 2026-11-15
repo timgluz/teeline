@@ -6,8 +6,8 @@ use std::thread;
 use serde_json::json;
 use teeline::DistanceType;
 use teeline::config::{
-    AppOptionsProvider, IdentityProvider, PipelineSource, resolve_config_file,
-    select_pipeline_source,
+    AppOptionsProvider, IdentityProvider, PipelineSource, resolve_distance_backend,
+    resolve_pipeline_config, select_pipeline_source,
 };
 use teeline::tsp::{
     self, AppOptions, DistanceBackend, DistanceSource, SOMOptions, Solution, SolverKind, Solvers,
@@ -483,14 +483,14 @@ fn run_pipeline_cmd(args: &ArgMatches) {
             std::process::exit(1);
         }
         Ok(PipelineSource::Config(path)) => {
-            let stage_configs = match resolve_config_file(&path, &IdentityProvider) {
-                Ok(r) => r,
+            let config = match resolve_pipeline_config(&path, &IdentityProvider) {
+                Ok(config) => config,
                 Err(e) => {
                     eprintln!("error: {e}");
                     std::process::exit(1);
                 }
             };
-            run_as_pipeline_stages(stage_configs, args, false);
+            run_as_pipeline_stages(config.stages, args, false, config.distance_backend);
         }
         Ok(PipelineSource::Steps(solvers)) => {
             run_as_pipeline(&solvers, args, false);
@@ -503,13 +503,14 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches, json_mode: bool) {
         .iter()
         .map(|&s| (s, solver_options_from_args(args, s)))
         .collect();
-    run_as_pipeline_stages(stage_configs, args, json_mode);
+    run_as_pipeline_stages(stage_configs, args, json_mode, DistanceBackend::Auto);
 }
 
 fn run_as_pipeline_stages(
     stage_configs: Vec<(Solvers, AppOptions)>,
     args: &ArgMatches,
     json_mode: bool,
+    config_backend: DistanceBackend,
 ) {
     let verbose = args.get_flag("verbose");
     let default_level = if verbose { "debug" } else { "info" };
@@ -547,15 +548,16 @@ fn run_as_pipeline_stages(
     tracing::info!(name = %tsp_data.name, comment = %tsp_data.comment,
                    cities = tsp_data.len(), "problem loaded");
 
-    let backend = match args.get_one::<String>("distance_backend") {
-        Some(value) => match value.parse::<DistanceBackend>() {
-            Ok(backend) => backend,
-            Err(e) => {
-                eprintln!("error: --distance-backend: {e}");
-                std::process::exit(1);
-            }
-        },
-        None => DistanceBackend::Auto,
+    let backend = match resolve_distance_backend(
+        args.get_one::<String>("distance_backend")
+            .map(String::as_str),
+        config_backend,
+    ) {
+        Ok(backend) => backend,
+        Err(e) => {
+            eprintln!("error: --distance-backend: {e}");
+            std::process::exit(1);
+        }
     };
 
     let problem = match tsp_data.to_problem(backend) {

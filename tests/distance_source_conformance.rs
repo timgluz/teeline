@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use teeline::tsp::{
     AppOptions, DistanceSource, DistanceType, LKOptions, Solvers, TspProblem, distance_matrix,
-    lin_kernighan, on_the_fly::OnTheFly, solve_problem, tsplib,
+    kdtree::KDPoint, lin_kernighan, on_the_fly::OnTheFly, solve_problem, tsplib,
 };
 
 /// One fixture per coordinate metric. CEIL_2D has no tracked file, so `berlin52` coordinates
@@ -201,4 +201,38 @@ fn seeded_lk_agrees_across_backends_on_geo() {
         runs[0].0, runs[1].0
     );
     assert_eq!(runs[0].2, runs[1].2);
+}
+
+#[test]
+fn non_contiguous_city_ids_map_correctly() {
+    let cities = vec![
+        KDPoint::new_with_id(10, &[0.0, 0.0]),
+        KDPoint::new_with_id(20, &[3.0, 4.0]),
+        KDPoint::new_with_id(30, &[0.0, 1.0]),
+    ];
+    let matrix = distance_matrix::build(&cities, DistanceType::Euc2D);
+    let onfly = OnTheFly::new(&cities, DistanceType::Euc2D).expect("coordinate source builds");
+    let route = vec![10, 20, 30];
+
+    for (name, source) in [
+        ("matrix", &matrix as &dyn DistanceSource),
+        ("on-the-fly", &onfly as &dyn DistanceSource),
+    ] {
+        assert_eq!(source.pos2city_id(0), Some(10), "{name}");
+        assert_eq!(source.pos2city_id(1), Some(20), "{name}");
+        assert_eq!(source.pos2city_id(2), Some(30), "{name}");
+        assert_eq!(source.city_id2pos(20), Some(1), "{name}");
+        assert_eq!(source.distance_between(10, 20).unwrap(), 5.0, "{name}");
+        assert_eq!(
+            source.distance_between(20, 30).unwrap(),
+            onfly.distance_between(20, 30).unwrap(),
+            "{name}"
+        );
+    }
+
+    assert_eq!(
+        matrix.tour_length(&route),
+        onfly.tour_length(&route),
+        "tour length must use the original city IDs, not positions"
+    );
 }

@@ -51,23 +51,23 @@
 - [x] 5.5 Add deterministic solver equivalence tests (`nn`, `sfc`, `2opt`, `or_opt`, `bhk`) against both backends; verify identical tours and costs.
 - [x] 5.6 Add a seeded LK equivalence test on a GEO fixture against both backends; verify identical tours and costs, and that the cost equals the GEO recomputation.
 - [x] 5.7 Verify `from_cities_unrounded` remains test-only and is not represented by either backend; verify the conformance suite excludes it explicitly.
-- [ ] 5.8 Add a conformance case with 1-based and non-contiguous city IDs (for example 10, 20, 30); verify `pos2city_id`/`city_id2pos` round-trip, both backends agree, and the reported tour preserves the original IDs.
+- [x] 5.8 Add a conformance case with 1-based and non-contiguous city IDs (for example 10, 20, 30); verify `pos2city_id`/`city_id2pos` round-trip, both backends agree, and the reported tour preserves the original IDs.
 
 ## 6. Phase 2 — Selection policy and backend comparison
 
 - [x] 6.1 Add `DistanceBackend`, `to_problem` keyed off `has_explicit_weights()`, and `from_points`; verify explicit weights + a coordinate `--distance-type` override still use the materialized backend.
 - [x] 6.2 Replace the `distance_matrix::build(..).unwrap()` panic with an error return; verify coordinate input + `--distance-type explicit` returns a descriptive error without panicking.
 - [x] 6.3 Add the threshold constant and boundary tests at threshold−1, threshold, and threshold+1; verify `Auto` picks the expected backend.
-- [ ] 6.4 Extend `src/config.rs` to parse a top-level `distance_backend`, add the CLI flag, and add `tests/pipeline_config_test.rs` coverage; verify valid values parse, unknown values are rejected, and the CLI wins over TOML without a clap `default_value` shadowing it.
+- [x] 6.4 Extend `src/config.rs` to parse a top-level `distance_backend`, add the CLI flag, and add `tests/pipeline_config_test.rs` coverage; verify valid values parse, unknown values are rejected, and the CLI wins over TOML without a clap `default_value` shadowing it.
 - [ ] 6.5 Wire the API, WASM, and Qt constructors to the shared policy constructor; verify each crate builds and one end-to-end solve per surface succeeds.
-- [ ] 6.6 Fix the WASM scoring-only paths (`compare_tours_from_input`, `tour_distance_from_input`) to pick `Matrix` for explicit weights and `OnTheFly` for coordinates; verify an EXPLICIT TSPLIB input still scores in WASM.
+- [x] 6.6 Fix the WASM scoring-only paths (`compare_tours_from_input`, `tour_distance_from_input`) to pick `Matrix` for explicit weights and `OnTheFly` for coordinates; verify an EXPLICIT TSPLIB input still scores in WASM.
 - [ ] 6.7 Add the `on-the-fly` config family (`on-the-fly`, `on-the-fly-3opt`, `on-the-fly-fixed`) to `tier-distance.toml`, make every config in `tier-distance*.toml` pass `--distance-backend` explicitly, then run the comparison sweep with at least five runs per cell; verify the same cells appear under both backends, only `status: ok` rows are compared, and the report states the memory ratio and runtime ratio per family.
 - [ ] 6.8 Set the per-family runtime tolerance and the memory expectation from the sweep using medians/distributions across the repeated runs, and record them in `docs/benchmarks/distance-source.md`; verify the numbers match the raw rows and no claim rests on a single run.
 - [ ] 6.9 Add `scripts/check-distance-benchmarks.py` that reads the local JSONL and fails when a runtime or memory bound is violated; verify a deliberately slower run fails the check.
 - [ ] 6.10 Flip the default to `Auto` only after tasks 6.8 and 6.9; verify the documented threshold equals the measured one.
 - [x] 6.11 Add the 100k-city SFC end-to-end measurement in a fresh process; verify it returns a valid tour with peak RSS below 1 GiB.
-- [ ] 6.12 Document the flag, threshold, and memory/CPU trade-off; verify the documented commands run as written.
-- [ ] 6.13 Document the manual per-release gate and keep the comparison run file out of `publish-benchmarks.sh`; verify the public leaderboard's configs are unchanged and the comparison report is linked from the benchmark docs.
+- [x] 6.12 Document the flag, threshold, and memory/CPU trade-off; verify the documented commands run as written.
+- [x] 6.13 Document the manual per-release gate and keep the comparison run file out of `publish-benchmarks.sh`; verify the public leaderboard's configs are unchanged and the comparison report is linked from the benchmark docs.
 
 ## 7. Phase 3 — Candidate-list move evaluation for local search
 

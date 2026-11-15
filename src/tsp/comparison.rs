@@ -94,6 +94,18 @@ pub fn compare_tours_from_matrix(
     build_stats(solver_cost, optimal_cost, solver, optimal)
 }
 
+/// Compare tours using any distance source, so the WASM scoring paths do not need a
+/// materialized matrix.
+pub fn compare_tours_from_source(
+    solver: &[usize],
+    optimal: &[usize],
+    source: &dyn DistanceSource,
+) -> ComparisonStats {
+    let optimal_cost = source.tour_length(optimal);
+    let solver_cost = source.tour_length(solver);
+    build_stats(solver_cost, optimal_cost, solver, optimal)
+}
+
 fn build_stats(
     solver_cost: f32,
     optimal_cost: f32,

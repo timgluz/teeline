@@ -6,8 +6,8 @@ use std::time::Instant;
 use qtbridge::{QObjectHolder, invoke_method, qobject_impl};
 use serde_json::json;
 use teeline::tsp::{
-    self, AcoOptions, AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions,
-    Solvers, TspProblem,
+    self, AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, GAOptions,
+    HeuristicOptions, SAOptions, Solvers,
     kdtree::KDPoint,
     pipeline::{PipelineStage, run_pipeline},
     progress::ProgressMessage,
@@ -256,9 +256,8 @@ impl SolverEngine {
                     return;
                 }
             };
-            let cities = data.cities().to_vec();
-            let distances = match data.distance_matrix() {
-                Ok(d) => d,
+            let problem = match data.to_problem(DistanceBackend::Auto) {
+                Ok(problem) => problem,
                 Err(e) => {
                     invoke_method!(
                         inv_done,
@@ -266,12 +265,11 @@ impl SolverEngine {
                         "[]".to_string(),
                         0.0_f32,
                         0i32,
-                        e.to_string()
+                        e
                     );
                     return;
                 }
             };
-            let problem = TspProblem::new(cities, distances);
             let start = Instant::now();
 
             // Build pipeline stages — each gets the same problem + its own progress channel.
@@ -392,9 +390,8 @@ impl SolverEngine {
                 }
             };
 
-            let cities = data.cities().to_vec();
-            let distances = match data.distance_matrix() {
-                Ok(d) => d,
+            let problem = match data.to_problem(DistanceBackend::Auto) {
+                Ok(problem) => problem,
                 Err(e) => {
                     invoke_method!(
                         inv_done,
@@ -402,12 +399,11 @@ impl SolverEngine {
                         "[]".to_string(),
                         0.0_f32,
                         0i32,
-                        e.to_string()
+                        e
                     );
                     return;
                 }
             };
-            let problem = TspProblem::new(cities, distances);
 
             let (tx, rx) = mpsc::channel::<ProgressMessage>();
             let start = Instant::now();

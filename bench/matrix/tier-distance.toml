@@ -37,8 +37,8 @@ berlin52 = "small"   # EUC_2D, 52
 a280 = "mid"         # EUC_2D, 280
 att532 = "large"     # ATT, 532
 
-# The pre-selection default: no --distance-backend argument, so the binary uses its matrix
-# default. Phase 2 adds the on-the-fly family and makes these configs explicit.
+# Both backends are named explicitly: a `matrix` cell must never silently become on-the-fly
+# above the threshold, and an `on-the-fly` cell must never fall back to the matrix.
 #
 # `bhk` is exact and therefore only reaches the `upto24` group. `3opt` is split out because it
 # cannot finish `att532` within the local budget (measured: >60s, versus 2opt 0.2s and or_opt
@@ -46,11 +46,26 @@ att532 = "large"     # ATT, 532
 # below its cooling schedule is raised to the schedule), so it is not used here.
 [configs.matrix]
 solvers = ["2opt", "or_opt", "lk", "nn", "space_filling_curve", "bhk"]
+args = ["--distance-backend", "matrix"]
 
 [configs.matrix-3opt]
 solvers = ["3opt"]
 instances = ["burma14", "ulysses16", "berlin52", "a280"]
+args = ["--distance-backend", "matrix"]
 
 [configs.matrix-fixed]
 solvers = ["tabu"]
-args = ["--epochs", "1000"]
+args = ["--epochs", "1000", "--distance-backend", "matrix"]
+
+[configs.on-the-fly]
+solvers = ["2opt", "or_opt", "lk", "nn", "space_filling_curve", "bhk"]
+args = ["--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-3opt]
+solvers = ["3opt"]
+instances = ["burma14", "ulysses16", "berlin52", "a280"]
+args = ["--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-fixed]
+solvers = ["tabu"]
+args = ["--epochs", "1000", "--distance-backend", "on-the-fly"]
