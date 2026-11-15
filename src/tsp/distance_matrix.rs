@@ -290,6 +290,27 @@ impl DistanceSource for DistanceMatrix {
             .ok_or("distance index out of range")
     }
 
+    /// Hot-path override: the default would dispatch `city_id2pos` twice and
+    /// `distance_by_pos` once through the vtable for every lookup. This one resolves the
+    /// map directly and calls the primitive statically. The conformance suite proves it
+    /// returns the same values as the default.
+    fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
+        if city_id1 == city_id2 {
+            return Ok(0.0);
+        }
+        let pos1 = self
+            .city_idx
+            .get(&city_id1)
+            .copied()
+            .ok_or("city_id1 not in index")?;
+        let pos2 = self
+            .city_idx
+            .get(&city_id2)
+            .copied()
+            .ok_or("city_id2 not in index")?;
+        self.distance_by_pos(pos1, pos2)
+    }
+
     fn pos2city_id(&self, pos: usize) -> Option<usize> {
         self.cities.get(&pos).map(|c| c.id)
     }

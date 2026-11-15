@@ -31,7 +31,7 @@
 - [x] 3.8 Change `nearest_unvisited` to take `&dyn Fn(usize) -> bool` and update `nearest_neighbor` plus the six test call sites; verify the NN determinism tests pass.
 - [x] 3.9 Add `use DistanceSource` imports to every concrete caller (`tests/*`, `main.rs:736`, WASM `lib.rs:573`); verify each crate builds.
 - [x] 3.10 Update the CLI, API, WASM, and Qt constructors to the new field type; verify each crate builds (WASM and Qt built separately).
-- [ ] 3.11 Run the `matrix` config against the tracked baseline from task 2.11; verify every tour cost is unchanged for deterministic solvers and the runtime is within the documented refactor bound.
+- [x] 3.11 Run the `matrix` config against the tracked baseline from task 2.11; verify every tour cost is unchanged for deterministic solvers and the runtime is within the documented refactor bound.
 - [x] 3.12 Verify every published-optimum test (att48, ulysses16, gr17, burma14, …) reports the same cost as before the refactor for deterministic solvers.
 - [x] 3.13 Write ADR 010 recording the distance-source boundary (trait, backends, selection signal) and add it to the `docs/adr/` index; verify the index links it.
 - [x] 3.14 Apply the PR-665 review fixes: make the default `tour_length` allocation-free, document the `distances_from` panic contract, and strengthen the trait skeleton test; verify the lib tests.

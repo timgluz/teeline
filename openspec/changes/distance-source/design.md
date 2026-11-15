@@ -64,6 +64,8 @@ Providing defaults is the key correctness decision: the matrix and on-the-fly ba
 
 The hot-path translation in `tour_length` is single-pass and allocation-free; solvers call it inside candidate loops, and the pre-trait version allocated a position vector per call.
 
+A backend may override a default only when a conformance test proves the override returns the same values. The matrix backend does this for `distance_between`: the default resolves two `city_id2pos` calls and one `distance_by_pos` through the vtable per lookup, which measured as a 20% regression in the 2-opt hot loop; the override resolves the map directly and restores the baseline.
+
 **Alternative considered:** a required method per backend (the current inherent API). It duplicates loops and invites drift, and the "byte-identical" claim would rest on every implementer redoing the arithmetic in the same order.
 
 `nearest_unvisited` takes `&dyn Fn(usize) -> bool` rather than `impl Fn` so the trait stays object-safe. Call sites pass `&|id| ..`.
