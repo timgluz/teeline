@@ -6,7 +6,7 @@ See `proposal.md` — Why. The current state that shapes the approach:
 
 - `tsplib.rs::process_lines` fabricates `grid_coords(dimension)` when an EXPLICIT file has neither `NODE_COORD_SECTION` nor `DISPLAY_DATA_SECTION`, and `TspLibData` has no record that those coordinates are placeholders.
 - `TspLibData::cities()` is the coordinate source for every parse surface: Qt (`teeline-qt/src/file_loader.rs`), WASM (`teeline-wasm/src/lib.rs` → `teeline-web`), and the API (`teeline-api/src/services/tsp_service.rs`). `Solution::cities()` is not used by those surfaces.
-- `DistanceSource::has_coordinates()` exists and is `false` for an EXPLICIT `DistanceMatrix`; `two_opt` and `or_opt` already use it to fall back to a full scan.
+- `DistanceSource::is_coordinate_metric()` exists and is `false` for an EXPLICIT `DistanceMatrix`; `two_opt` and `or_opt` already use it to fall back to a full scan.
 - `TspProblem` is `{ cities: Vec<KDPoint>, distances: Arc<dyn DistanceSource> }`; every geometry-based solver and `branch_bound`'s beam read `problem.cities`.
 - `CandidateList::build` ranks neighbours with a KD-tree over `cities`; `lin_kernighan` calls it unconditionally.
 - `scripts/lib/problem-minimap.mjs` already derives a 2D layout for problem minimaps with classical MDS, and the problem page already labels it (`minimapDerived` in `docs/problems/*.md`). The Rust implementation must be correct where that script is fragile.
@@ -41,11 +41,11 @@ This is the critical correction to the earlier draft. Computing lazily inside `d
 
 ### D2: Keep two distinct flags
 
-`TspLibData.has_real_coordinates` means "the file supplied coordinates". `DistanceSource::has_coordinates()` keeps meaning "distances are computed from these coordinates" and stays `false` for every EXPLICIT matrix. After D1 the city list is meaningful, but the matrix is still the distance source, so `two_opt`/`or_opt` keep their exact full scan.
+`TspLibData.has_real_coordinates` means "the file supplied coordinates". `DistanceSource::is_coordinate_metric()` keeps meaning "distances are computed from these coordinates" and stays `false` for every EXPLICIT matrix. After D1 the city list is meaningful, but the matrix is still the distance source, so `two_opt`/`or_opt` keep their exact full scan.
 
 Update the stale comments while here: `distance_matrix.rs` ("whose cities are TSPLIB grid placeholders"), `distance_source.rs`, and `docs/adr/010-distance-source.md` all describe the old placeholder model.
 
-**Alternative rejected:** reuse `has_coordinates()` as "a layout exists". That would silently switch `two_opt`/`or_opt` from an exact full scan to an approximate candidate list.
+**Alternative rejected:** reuse `is_coordinate_metric()` as "a layout exists". That would silently switch `two_opt`/`or_opt` from an exact full scan to an approximate candidate list.
 
 ### D3: Corrected classical MDS via power iteration
 
@@ -66,7 +66,7 @@ Complexity: O(n²·iters) time, O(n²) scratch — the same order as the EXPLICI
 
 ### D4: Lin-Kernighan builds exact matrix candidates for every EXPLICIT input
 
-Add `CandidateList::build_from_distances(distances: &dyn DistanceSource, k)` ranking by `distance_by_pos` (ties by city ID, non-finite distances skipped with `f32::total_cmp` + a finite check) and use it in `lin_kernighan` whenever `!distances.has_coordinates()`. Keep the KD-tree path for coordinate-metric sources.
+Add `CandidateList::build_from_distances(distances: &dyn DistanceSource, k)` ranking by `distance_by_pos` (ties by city ID, non-finite distances skipped with `f32::total_cmp` + a finite check) and use it in `lin_kernighan` whenever `!distances.is_coordinate_metric()`. Keep the KD-tree path for coordinate-metric sources.
 
 This applies to EXPLICIT instances **with** display data too (`bayg29`, `bays29`): their street distances are a better neighbourhood signal than display coordinates, so LK's tours there may improve. The byte-for-byte guarantee therefore covers coordinate-metric instances, not EXPLICIT-with-display; the benchmark re-measures those cells.
 

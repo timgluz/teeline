@@ -29,21 +29,22 @@ Introduce a `DistanceSource` trait as the single distance-query boundary:
   summation order, id handling, and tie-breaking cannot drift between them.
 - **`Send + Sync`** because the API moves problems into `spawn_blocking` and the Qt GUI moves
   them into worker threads.
-- **`has_coordinates()`** distinguishes real geometry from TSPLIB EXPLICIT placeholder grid
-  coordinates; candidate pruning must not run on the placeholders.
+- **`is_coordinate_metric()`** distinguishes a coordinate-computed source from an EXPLICIT matrix;
+  candidate pruning must use the matrix rather than a layout when it is false.
 - **Storage:** `TspProblem` holds `Arc<dyn DistanceSource>`. The source is immutable, `clone()`
   becomes O(1) instead of deep-copying the matrix, and the same source can be shared.
 - **Backends:** `Matrix` (the current packed table) and `OnTheFly` (compute the TSPLIB
   primitive per lookup). Both call the same four distance primitives, which is what makes
   their results byte-identical by construction.
 - **Selection:** keyed off `has_explicit_weights()`, never the overridable declared distance
-  type, because EXPLICIT inputs have only placeholder coordinates. Coordinate input defaults
-  to the matrix at or below a documented threshold and to on-the-fly above it.
+  type, because an EXPLICIT matrix is the distance source and any coordinates are a display or
+  derived layout. Coordinate input defaults to the matrix at or below a documented threshold and
+  to on-the-fly above it.
 - **Output:** the reported tour remains a sequence of city IDs. Positions are an internal
   distance-indexing detail and never leak into the CLI/API/WASM contract.
 
-The full `CityId`/`Position` newtype refactor is a follow-up decision (ADR-011); this ADR
-establishes the boundary and the contract it must obey.
+The full `CityId`/`Position` newtype refactor is a follow-up decision; this ADR establishes the
+boundary and the contract it must obey.
 
 ## Alternatives considered
 

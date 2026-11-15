@@ -25,9 +25,6 @@
 //! corrections: that script starts from all-ones (the nullspace of a double-centred matrix) and
 //! deflates the shifted matrix.
 
-// The parser wires this module in the next stacked PR; remove this allow then.
-#![allow(dead_code)]
-
 use std::f64::consts::PI;
 
 const MAX_ITERATIONS: usize = 512;

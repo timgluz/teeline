@@ -235,8 +235,7 @@ pub struct DistanceMatrix {
     items: PackedDistances,
     cities: CityTable,
     city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
-    /// False for an EXPLICIT-weight matrix, whose cities are TSPLIB grid placeholders.
-    has_coordinates: bool,
+    is_coordinate_metric: bool,
 }
 
 impl DistanceMatrix {
@@ -263,7 +262,7 @@ impl DistanceMatrix {
         n: usize,
         items: PackedDistances,
         cities: CityTable,
-        has_coordinates: bool,
+        is_coordinate_metric: bool,
     ) -> Self {
         let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
 
@@ -286,7 +285,7 @@ impl DistanceMatrix {
             items,
             cities,
             city_idx,
-            has_coordinates,
+            is_coordinate_metric,
         }
     }
 
@@ -294,9 +293,14 @@ impl DistanceMatrix {
         n: usize,
         distances: Vec<f32>,
         cities: CityTable,
-        has_coordinates: bool,
+        is_coordinate_metric: bool,
     ) -> Self {
-        Self::from_parts(n, PackedDistances::F32(distances), cities, has_coordinates)
+        Self::from_parts(
+            n,
+            PackedDistances::F32(distances),
+            cities,
+            is_coordinate_metric,
+        )
     }
 
     // assumes that cities are already sorted by id and ids are incrementally crowing
@@ -454,8 +458,8 @@ impl DistanceSource for DistanceMatrix {
         self.cities.get(&pos).copied()
     }
 
-    fn has_coordinates(&self) -> bool {
-        self.has_coordinates
+    fn is_coordinate_metric(&self) -> bool {
+        self.is_coordinate_metric
     }
 }
 

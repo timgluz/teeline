@@ -19,8 +19,7 @@ pub trait DistanceSource: Send + Sync {
     fn city_id2pos(&self, city_id: usize) -> Option<usize>;
     fn point_at(&self, pos: usize) -> Option<KDPoint>;
 
-    /// False when the cities are TSPLIB EXPLICIT placeholders rather than real coordinates.
-    fn has_coordinates(&self) -> bool {
+    fn is_coordinate_metric(&self) -> bool {
         true
     }
 
@@ -164,7 +163,7 @@ mod tests {
     /// `dyn` reference so object safety is part of the test, not an assumption.
     fn assert_skeleton(source: &dyn DistanceSource, n: usize) {
         assert_eq!(source.num_cities(), n);
-        assert!(source.has_coordinates());
+        assert!(source.is_coordinate_metric());
         assert_eq!(source.distance_between(0, 0).unwrap(), 0.0);
         assert_eq!(source.distances_from(0).len(), n);
         let tour: Vec<usize> = (0..n).collect();

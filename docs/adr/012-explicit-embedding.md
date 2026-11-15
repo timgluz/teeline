@@ -20,11 +20,11 @@ problem and that the distance matrix remains the objective.
 - `process_lines` derives a deterministic 2D layout from the distance matrix with classical MDS
   when an EXPLICIT instance supplies no coordinates, and stores it in `TspLibData.cities`.
 - `TspLibData.has_real_coordinates` records whether the file supplied coordinates.
-  `DistanceSource::has_coordinates()` keeps its distinct meaning — "distances are computed from
+  `DistanceSource::is_coordinate_metric()` keeps its distinct meaning — "distances are computed from
   these coordinates" — and stays false for every EXPLICIT matrix.
 - Geometry-based constructors consume `TspProblem.cities` unchanged.
 - Lin-Kernighan builds its candidate list from the exact distance matrix whenever
-  `!DistanceSource::has_coordinates()`, including EXPLICIT instances with display data.
+  `!DistanceSource::is_coordinate_metric()`, including EXPLICIT instances with display data.
 - `LayoutPolicy::RequireReal` is the opt-out; it fails at problem construction, not inside a
   solver.
 

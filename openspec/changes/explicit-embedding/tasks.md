@@ -5,14 +5,14 @@
 - [x] 1.1 Add `src/tsp/embedding.rs` with `mds_embed(n, distance)` using `f64` internals, double-centering, zero-mean trigonometric start vectors (`cos`/`sin`), per-iteration re-centering, unshifted deflation with a recomputed shift, Gram–Schmidt against the first axis, and sign canonicalization for both axes; verify a unit test reconstructs a planar point set up to translation, rotation, and reflection.
 - [x] 1.2 Add isotropic (square and a regular hexagon), collinear, high-aspect-ratio, non-Euclidean (`ring6_explicit`), repeated-derivation, and `n = 2` tests; verify every case is finite and deterministic, the isotropic case keeps two dimensions, and the collinear case does not fabricate a second axis.
 - [x] 1.3 Register the module in `src/tsp/mod.rs` and document why classical MDS, why hand-rolled power iteration, the `f64` choice, the O(n²) scratch, the EXPLICIT-only scope, and the relationship to `scripts/lib/problem-minimap.mjs`; verify `cargo test -p teeline embedding` passes and the docs explain the limits.
-- [x] 1.4 Write ADR 012 recording the derived-layout decision, the `has_real_coordinates` versus `DistanceSource::has_coordinates` split, and the corrected power-iteration recipe, then add it to `docs/adr/README.md`; verify the index links it and notes the `city-id-position` ADR-number collision.
+- [x] 1.4 Write ADR 012 recording the derived-layout decision, the `has_real_coordinates` versus `DistanceSource::is_coordinate_metric` split, and the corrected power-iteration recipe, then add it to `docs/adr/README.md`; verify the index links it and notes the `city-id-position` ADR-number collision.
 
 ## 2. Parse-time embedding
 
-- [ ] 2.1 Add `has_real_coordinates` to `TspLibData`, defaulting to `true` in `new`, plus a builder that clears it; verify every existing `TspLibData::new` call site still compiles and reports real coordinates.
-- [ ] 2.2 In `process_lines`, when `cities.is_empty() && raw_distances.is_some()`, build the city list from `mds_embed` instead of `grid_coords` and clear the flag; verify `gr17` and `ring6_explicit` parse with `has_real_coordinates == false` and non-placeholder coordinates, while `bays29` and `bayg29` (display data) stay `true`.
-- [ ] 2.3 Verify `TspLibData::cities()`, `distance_matrix().point_at(pos)`, and `TspProblem::new(data.cities().to_vec(), data.distance_matrix()?)` agree on `gr17`; verify `tests/space_filling_curve_test.rs`'s `load_problem("gr17.tsp")` now gets the derived layout.
-- [ ] 2.4 Update the stale comments in `src/tsp/distance_matrix.rs` ("whose cities are TSPLIB grid placeholders"), `src/tsp/distance_source.rs`, and `docs/adr/010-distance-source.md`; verify no comment still claims EXPLICIT cities are always placeholders.
+- [x] 2.1 Add `has_real_coordinates` to `TspLibData`, defaulting to `true` in `new`, plus a builder that clears it; verify every existing `TspLibData::new` call site still compiles and reports real coordinates.
+- [x] 2.2 In `process_lines`, when `cities.is_empty() && raw_distances.is_some()`, build the city list from `mds_embed` instead of `grid_coords` and clear the flag; verify `gr17` and `ring6_explicit` parse with `has_real_coordinates == false` and non-placeholder coordinates, while `bays29` and `bayg29` (display data) stay `true`.
+- [x] 2.3 Verify `TspLibData::cities()`, `distance_matrix().point_at(pos)`, and `TspProblem::new(data.cities().to_vec(), data.distance_matrix()?)` agree on `gr17`; verify `tests/space_filling_curve_test.rs`'s `load_problem("gr17.tsp")` now gets the derived layout.
+- [x] 2.4 Update the stale comments in `src/tsp/distance_matrix.rs` ("whose cities are TSPLIB grid placeholders"), `src/tsp/distance_source.rs`, and `docs/adr/010-distance-source.md`; verify no comment still claims EXPLICIT cities are always placeholders.
 
 ## 3. Problem construction and geometric solvers
 
@@ -25,7 +25,7 @@
 ## 4. Lin-Kernighan exact candidates
 
 - [ ] 4.1 Add `CandidateList::build_from_distances(distances, k)` that ranks neighbours by `distance_by_pos` with a city-ID tie-break and skips non-finite distances using `f32::total_cmp` plus a finite check; verify a unit test where geometric and matrix order differ and a `NaN` case.
-- [ ] 4.2 Use the matrix path in `lin_kernighan` whenever `!distances.has_coordinates()`, including EXPLICIT instances with display data; verify `lk` on `gr17` returns a valid tour, beats the placeholder-coordinate baseline, and is deterministic with a fixed seed, and that `bayg29`/`bays29` still return valid tours.
+- [ ] 4.2 Use the matrix path in `lin_kernighan` whenever `!distances.is_coordinate_metric()`, including EXPLICIT instances with display data; verify `lk` on `gr17` returns a valid tour, beats the placeholder-coordinate baseline, and is deterministic with a fixed seed, and that `bayg29`/`bays29` still return valid tours.
 - [ ] 4.3 Add a regression test that `two_opt` and `or_opt` still take the full-scan path on EXPLICIT input; verify the tests assert the no-candidate branch.
 - [ ] 4.4 Document LK's exact-matrix-candidate fallback on its algorithm page; verify the page states that it covers all EXPLICIT instances and does not depend on layout quality.
 

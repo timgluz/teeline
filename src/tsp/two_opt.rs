@@ -36,7 +36,7 @@ pub fn solve(
     // scan instead of ranking meaningless neighbours. When k covers every city there is
     // nothing to prune, so the full scan is also cheaper than building the table.
     let k = opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K);
-    let candidates = if distances.has_coordinates() && k < cities.len().saturating_sub(1) {
+    let candidates = if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
         Some(CandidateList::build(cities, k))
     } else {
         None
