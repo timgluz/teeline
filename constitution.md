@@ -28,6 +28,10 @@ It is a reference codebase: correctness and code clarity matter more than raw pe
 4. **Benchmark against reality.** TSPLIB known optima are the ground truth; tour quality is
    reported as a gap against those optima, never asserted from the solver's own output
    alone.
+5. **Verify improvements across runs.** Any claimed improvement — speed, memory, or tour
+   quality — must be supported by multiple benchmark runs and summarised (median or
+   distribution), never by a single run. A single run can be an outlier, and choosing a
+   change on one is how a regression gets merged as an improvement.
 
 ## 3. Non-negotiable Constraints
 
@@ -51,10 +55,10 @@ Hard constraints every change must preserve:
   `Solvers` enum, the `FromStr` impl, the `solve_with_context` dispatch arm, and
   `Solvers::all_meta()`. Updating fewer than all four is a defect.
 - **`Solution` is the single tour representation** (`route`, `cities`, `total`). `total` is
-  computed from the distance matrix when the solution is constructed; build a new
+  computed from the problem's distance source when the solution is constructed; build a new
   `Solution` when the route changes rather than mutating one in place.
 - **Spatial queries** go through the shared `nearest(&pt, n)` interface — `KDTree`
-  (preferred) or `DistanceMatrix` (brute-force fallback) — returning `NearestResult`.
+  (preferred) or the distance source's brute-force fallback — returning `NearestResult`.
 - **Composition via pipeline.** Local-search and stochastic solvers warm-start from a
   constructive seed rather than a random/sequential tour: deterministic hill-climbers seed
   from `nn`, stochastic solvers from `shuffle` (per the auto-expansion rules).
