@@ -35,14 +35,3 @@ jobs:
         run: ./tests/bats/bin/bats tests/e2e/
       - name: Clippy
         run: cargo clippy -p teeline -p teeline-cli -- -D warnings
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Coverage
-        run: cargo llvm-cov -p teeline -p teeline-cli --lcov --output-path lcov.info
-      - name: Upload coverage
-        uses: codecov/codecov-action@v7
-        with:
-          files: lcov.info
-          flags: core
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

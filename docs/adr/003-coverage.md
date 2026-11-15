@@ -1,5 +1,9 @@
 # ADR-003: Test coverage via cargo-llvm-cov
 
+## Status
+
+Superseded by ADR-011
+
 ## Context
 
 The Teeline project had uneven test coverage: 4 solvers (`nearest_neighbor`, `branch_bound`, `tabu_search`, `stochastic_hill`) had zero unit tests, and only a single integration test existed. CI had no coverage gate, making it impossible to track or enforce coverage over time.
