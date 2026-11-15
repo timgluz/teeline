@@ -11,6 +11,10 @@ ApplicationWindow {
     visible: true
     width: 900
     height: 640
+    // The loaded page (metadata, mini-map, opt tour, five recent rows, action
+    // bar) needs ~760px. Below that the ColumnLayout squeezes and later items
+    // cover the buttons, so they stop receiving clicks.
+    minimumHeight: 780
     title: "teeline-qt — TSP Solver"
 
     // ── Colour theme (single source of truth for all palette values) ────────
