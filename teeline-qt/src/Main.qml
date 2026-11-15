@@ -228,7 +228,10 @@ ApplicationWindow {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: Qt.callLater(function() { FileLoader.loadFile(modelData) })
+                            // Capture the path at click time: loadFile rebuilds the
+                            // recent list, so the delegate's modelData must not be
+                            // read from the deferred callback.
+                            onClicked: Qt.callLater(FileLoader.loadFile, modelData)
                         }
                     }
                 }
