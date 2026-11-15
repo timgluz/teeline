@@ -129,7 +129,7 @@
 - [x] 11.8 Open PR 8 (`perf/candidate-lists`) against PR 7 for group 7; verify the quality and memory report.
 - [x] 11.9 Open PR 9 (`perf/compact-explicit`) against PR 8 for group 8; verify exactness and the EXPLICIT memory report.
 - [x] 11.10 Open PR 10 (`docs/sfc-100k`) against PR 9 for groups 9–10; verify the full integration checks.
-- [ ] 11.11 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope.
+- [x] 11.11 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope. PR 9 was retargeted after #670; PR 10 was retargeted after #671, and each diff contains only its own 10 files.
 
 ## Workflow follow-up
 
