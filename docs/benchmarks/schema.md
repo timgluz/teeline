@@ -233,6 +233,7 @@ Rules the harness enforces, each because the alternative is a hole in the publis
     "berlin52": {
       "cities": 52,
       "optimal_cost": 7542,
+      "layout": "real",
       "by_config": {
         "default": {
           "runs": 5,
@@ -292,6 +293,14 @@ Rules:
   communicated this way rather than by a badge: being able to see which version
   produced a number is the requirement (design section 3.8).
 
+### `layout` provenance
+
+`layout` is an additive field on both shards: `"real"` when the instance supplied coordinates,
+`"derived"` when teeline derived a 2D layout from its distance matrix because the file published
+none. It defaults to `"real"` when absent, so shards published before the field existed remain
+valid and do not need a schema bump. Tour costs are exact in both cases; the label tells a reader
+that a geometric solver's ordering came from an approximate layout.
+
 ## `problems/{dataset_id}.json`
 
 The per-instance solver leaderboard, sorted by `gap_pct.median` ascending — or by
@@ -306,6 +315,7 @@ live tree with `scripts/read-benchmarks.sh problem berlin52`.
   "dataset": "berlin52",
   "cities": 52,
   "optimal_cost": 7542,
+  "layout": "real",
   "leaderboard": [
     {
       "solver": "lk",

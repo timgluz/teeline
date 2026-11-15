@@ -546,6 +546,17 @@ with open(runs_path, "r", encoding="utf-8") as fh:
                 f"{', '.join(STATUSES)}; got {status!r}"
             )
 
+        raw_layout = obj.get("layout")
+        if raw_layout is None:
+            layout = None
+        elif raw_layout in ("real", "derived"):
+            layout = raw_layout
+        else:
+            sys.exit(
+                f"ERROR: {runs_path}:{lineno}: 'layout' must be 'real' or 'derived', "
+                f"got {raw_layout!r}"
+            )
+
         run_no = obj.get("run")
         if isinstance(run_no, bool) or not isinstance(run_no, int):
             sys.exit(f"ERROR: {runs_path}:{lineno}: 'run' must be an integer, got {run_no!r}")
@@ -569,6 +580,7 @@ with open(runs_path, "r", encoding="utf-8") as fh:
             "config": config,
             "run": run_no,
             "status": status,
+            "layout": layout,
             # Only a completed run has numbers. A killed run has no tour to report, and
             # demanding one would force the harness to invent a 0 — the fabricated measurement
             # this parser exists to refuse. Non-ok rows are carried with nulls and are counted
@@ -620,18 +632,23 @@ except FileNotFoundError:
 
 OPTIMAL_RE = re.compile(r"^optimalCost:\s*(.+)$", re.M)
 CITIES_RE = re.compile(r"^cities:\s*(\d+)$", re.M)
+MINIMAP_DERIVED_RE = re.compile(r"^minimapDerived:\s*(true|false)\s*$", re.M | re.I)
 
 instances = {}
 for doc in sorted((ROOT / "docs" / "problems").glob("*.md")):
     text = doc.read_text(encoding="utf-8")
     m_opt = OPTIMAL_RE.search(text)
     m_cit = CITIES_RE.search(text)
+    m_der = MINIMAP_DERIVED_RE.search(text)
     raw = m_opt.group(1).strip() if m_opt else "null"
     optimal = None if raw in ("null", "~", "") else float(raw)
     instances[doc.stem] = {
         "id": doc.stem,
         "cities": int(m_cit.group(1)) if m_cit else None,
         "optimal_cost": optimal,
+        # The minimap caption already distinguishes a derived layout; the benchmark rows
+        # reuse the same fact when the raw log does not carry one.
+        "layout": "derived" if m_der and m_der.group(1).lower() == "true" else "real",
     }
 
 # --- aggregate -------------------------------------------------------------
@@ -669,8 +686,12 @@ per_problem = defaultdict(list)
 
 for (sid, dataset, config), bucket in sorted(cells.items()):
     ok = bucket["ok"]
-    meta = instances.get(dataset, {"id": dataset, "cities": None, "optimal_cost": None})
+    meta = instances.get(
+        dataset, {"id": dataset, "cities": None, "optimal_cost": None, "layout": "real"}
+    )
     optimal = meta["optimal_cost"]
+    row_layout = next((r["layout"] for r in ok if r.get("layout")), None)
+    layout = row_layout or meta.get("layout", "real")
 
     gaps = []
     if optimal:
@@ -691,12 +712,14 @@ for (sid, dataset, config), bucket in sorted(cells.items()):
         entry["peak_rss_kb"] = rss
     if optimal is not None:
         entry["optimal_cost"] = optimal
+    entry["layout"] = layout
 
     slot = per_solver[sid]
     slot["configs"].add(config)
     problem = slot["results"].setdefault(dataset, {
         "cities": meta["cities"],
         "optimal_cost": optimal,
+        "layout": layout,
         "by_config": {},
     })
     problem["by_config"][config] = entry
@@ -704,6 +727,7 @@ for (sid, dataset, config), bucket in sorted(cells.items()):
     per_problem[dataset].append({
         "solver": sid,
         "config": config,
+        "layout": entry["layout"],
         "runs": entry["runs"],
         "timeouts": entry["timeouts"],
         "errors": entry["errors"],
@@ -830,13 +854,16 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
             if b.get("solver") not in measured
         ]
         board = kept + fresh
+        fresh_layout = next((b["layout"] for b in fresh if b.get("layout")), None)
         # Fall back to the previous instance metadata: a dataset with no problem doc still has
         # a known city count and possibly an optimal, and nulling them loses real information.
         if dataset in instances:
             cities, optimal = instances[dataset]["cities"], instances[dataset]["optimal_cost"]
+            layout = fresh_layout or instances[dataset]["layout"]
         else:
             prev_doc = prev_problems.get(dataset, {})
             cities, optimal = prev_doc.get("cities"), prev_doc.get("optimal_cost")
+            layout = fresh_layout or prev_doc.get("layout", "real")
     else:
         doc = prev_problems[dataset]
         # Drop entries for solvers re-measured in this run: their shards were replaced and no
@@ -845,6 +872,7 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
             b for b in doc.get("leaderboard", []) if b.get("solver") not in measured
         ]
         cities, optimal = doc.get("cities"), doc.get("optimal_cost")
+        layout = doc.get("layout", "real")
 
     # A dataset absent from this run log whose every entry belonged to a re-measured solver has an
     # empty board. Publishing it would advertise a problem page with no results and list a
@@ -857,6 +885,7 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
         "dataset": dataset,
         "cities": cities,
         "optimal_cost": optimal,
+        "layout": layout,
         "leaderboard": board,
     }
 

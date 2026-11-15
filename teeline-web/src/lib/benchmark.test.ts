@@ -123,6 +123,24 @@ describe('parseAlgorithmShard', () => {
       /results is not an object/,
     )
   })
+
+  it('treats an absent layout as real', () => {
+    const raw = JSON.parse(twoOptRaw)
+    delete raw.results.berlin52.layout
+    expect(parseAlgorithmShard(raw).results.berlin52.layout).toBe('real')
+  })
+
+  it('reads a derived layout', () => {
+    const raw = JSON.parse(twoOptRaw)
+    raw.results.berlin52.layout = 'derived'
+    expect(parseAlgorithmShard(raw).results.berlin52.layout).toBe('derived')
+  })
+
+  it('refuses an unknown layout provenance', () => {
+    const raw = JSON.parse(twoOptRaw)
+    raw.results.berlin52.layout = 'guessed'
+    expect(() => parseAlgorithmShard(raw)).toThrow(/layout/)
+  })
 })
 
 describe('fetchAlgorithmShard', () => {
@@ -551,6 +569,18 @@ describe('problem shards and the landing chart', () => {
       .map((entry) => entry.config)
       .sort()
     expect(configs).toEqual(['budget', 'exact'])
+  })
+
+  it('reads a derived problem layout', () => {
+    const raw = JSON.parse(berlinRaw)
+    raw.layout = 'derived'
+    expect(parseProblemShard(raw).layout).toBe('derived')
+  })
+
+  it('treats an absent problem layout as real', () => {
+    const raw = JSON.parse(berlinRaw)
+    delete raw.layout
+    expect(parseProblemShard(raw).layout).toBe('real')
   })
 
   it('refuses a schema version it does not know', () => {

@@ -763,6 +763,14 @@ function Row({
         >
           {row.name}
         </a>
+        {row.layout === 'derived' && (
+          <span
+            class="ml-2 rounded border border-border px-1 font-mono text-[10px] uppercase tracking-wider text-text-dim"
+            title="This instance publishes no coordinates; the layout is derived from its distance matrix."
+          >
+            derived layout
+          </span>
+        )}
         {multiConfig && (
           <span class="ml-2 font-mono text-xs text-text-dim">{row.config}</span>
         )}
