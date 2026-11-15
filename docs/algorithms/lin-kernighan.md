@@ -82,7 +82,7 @@ max_depth = 3
 n_nearest = 8
 ```
 
-## Benchmark
+## Benchmarks
 
 | Instance | Optimal | This solver (default) | Gap |
 | --- | --- | --- | --- |
@@ -96,6 +96,12 @@ LK chain search (issue #184) is implemented and shipped, not a future improvemen
 
 ## Notes
 
+- **EXPLICIT instances use exact matrix candidates**: when `is_coordinate_metric()` is false (an
+  EXPLICIT distance matrix, with or without display data), the candidate list is built from
+  `distance_by_pos` and ranked by the real weights instead of the KD-tree over city
+  coordinates. Non-finite pairs are skipped and ties break by city ID. This covers `gr17`
+  (derived layout) and `bayg29`/`bays29` (display data is not the objective), so neighbourhood
+  quality does not depend on a derived layout.
 - **Candidate-list construction uses a KD-tree**: `build_candidates()` builds the
   per-city `k`-nearest-neighbour list with a `KDTree::nearest` query per city
   (`src/tsp/kdtree.rs`, same module used by `branch_bound.rs` and `fourier.rs`) instead

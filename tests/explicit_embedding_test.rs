@@ -6,8 +6,9 @@
 
 use std::path::Path;
 use teeline::tsp::{
-    DistanceBackend, FourierOptions, HeuristicOptions, SOMOptions, SfcOptions, TspProblem,
-    branch_bound, fourier, kdtree::KDPoint, som, space_filling_curve, tsplib,
+    DistanceBackend, FourierOptions, HeuristicOptions, LKOptions, SOMOptions, SfcOptions,
+    TspProblem, branch_bound, fourier, kdtree::KDPoint, lin_kernighan, nearest_neighbor, som,
+    space_filling_curve, tsplib,
 };
 
 fn load(name: &str) -> tsplib::TspLibData {
@@ -110,4 +111,54 @@ fn berlin52_keeps_its_file_coordinates() {
     let original = data.cities().to_vec();
     let problem = data.to_problem(DistanceBackend::Auto).unwrap();
     assert_eq!(problem.cities, original);
+}
+
+#[test]
+fn lin_kernighan_on_gr17_uses_exact_matrix_candidates() {
+    let problem = load("gr17.tsp").to_problem(DistanceBackend::Auto).unwrap();
+    let options = LKOptions {
+        seed: Some(42),
+        ..Default::default()
+    };
+    let first = lin_kernighan::solve(&problem, &options, None, None);
+    let second = lin_kernighan::solve(&problem, &options, None, None);
+    assert!(is_valid(first.route(), &problem), "lk tour is invalid");
+    assert_eq!(
+        first.route(),
+        second.route(),
+        "seeded lk must be deterministic"
+    );
+
+    let nearest = nearest_neighbor::solve(&problem, &HeuristicOptions::default(), None, None);
+    assert!(
+        first.total <= nearest.total,
+        "lk ({:.1}) must not worsen the NN seed ({:.1}) on gr17",
+        first.total,
+        nearest.total
+    );
+    assert!(
+        first.total < 4125.0,
+        "lk ({:.1}) must beat the placeholder-coordinate baseline (4125.0)",
+        first.total
+    );
+}
+
+#[test]
+fn lin_kernighan_returns_valid_tours_on_explicit_with_display_data() {
+    for name in ["bayg29.tsp", "bays29.tsp"] {
+        let problem = load(name).to_problem(DistanceBackend::Auto).unwrap();
+        let solution = lin_kernighan::solve(
+            &problem,
+            &LKOptions {
+                seed: Some(7),
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+        assert!(
+            is_valid(solution.route(), &problem),
+            "{name} lk tour is invalid"
+        );
+    }
 }

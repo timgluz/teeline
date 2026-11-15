@@ -26,7 +26,11 @@ pub fn solve(
 ) -> Solution {
     let dm = problem.distances.as_ref();
     let k = opts.heuristic.n_nearest;
-    let candidates = build_candidates(&problem.cities, k);
+    let candidates = if dm.is_coordinate_metric() {
+        build_candidates(&problem.cities, k)
+    } else {
+        CandidateList::build_from_distances(dm, &problem.cities, k)
+    };
 
     let mut best_tour: Vec<usize> = if let Some(t) = init_tour {
         t.to_vec()

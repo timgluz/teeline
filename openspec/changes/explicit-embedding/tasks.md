@@ -24,10 +24,10 @@
 
 ## 4. Lin-Kernighan exact candidates
 
-- [ ] 4.1 Add `CandidateList::build_from_distances(distances, k)` that ranks neighbours by `distance_by_pos` with a city-ID tie-break and skips non-finite distances using `f32::total_cmp` plus a finite check; verify a unit test where geometric and matrix order differ and a `NaN` case.
-- [ ] 4.2 Use the matrix path in `lin_kernighan` whenever `!distances.is_coordinate_metric()`, including EXPLICIT instances with display data; verify `lk` on `gr17` returns a valid tour, beats the placeholder-coordinate baseline, and is deterministic with a fixed seed, and that `bayg29`/`bays29` still return valid tours.
-- [ ] 4.3 Add a regression test that `two_opt` and `or_opt` still take the full-scan path on EXPLICIT input; verify the tests assert the no-candidate branch.
-- [ ] 4.4 Document LK's exact-matrix-candidate fallback on its algorithm page; verify the page states that it covers all EXPLICIT instances and does not depend on layout quality.
+- [x] 4.1 Add `CandidateList::build_from_distances(distances, k)` that ranks neighbours by `distance_by_pos` with a city-ID tie-break and skips non-finite distances using `f32::total_cmp` plus a finite check; verify a unit test where geometric and matrix order differ and a `NaN` case.
+- [x] 4.2 Use the matrix path in `lin_kernighan` whenever `!distances.is_coordinate_metric()`, including EXPLICIT instances with display data; verify `lk` on `gr17` returns a valid tour, beats the placeholder-coordinate baseline, and is deterministic with a fixed seed, and that `bayg29`/`bays29` still return valid tours.
+- [x] 4.3 Add a regression test that `two_opt` and `or_opt` still take the full-scan path on EXPLICIT input; verify the tests assert the no-candidate branch.
+- [x] 4.4 Document LK's exact-matrix-candidate fallback on its algorithm page; verify the page states that it covers all EXPLICIT instances and does not depend on layout quality.
 
 ## 5. Benchmark and web provenance
 
