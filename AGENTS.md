@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-Teeline is a Traveling Salesman Problem (TSP) solver written in Rust. It reads city data in TSPLIB format (from stdin or file) and outputs the tour cost and ordered city IDs. The Qt 6 desktop GUI (`teeline-qt`) renders solver progress in real time; the library exposes progress as a `ProgressMessage` channel.
+Teeline is a Traveling Salesman Problem (TSP) solver written in Rust. It reads TSPLIB instances — city coordinates or explicit edge weights — from stdin or a file, and outputs the tour cost and ordered city IDs. The Qt 6 desktop GUI (`teeline-qt`) renders solver progress in real time; the library exposes progress as a `ProgressMessage` channel.
 
 ## Constitution
 
@@ -52,7 +52,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 - `Solvers` enum — lists every algorithm with string aliases (e.g. `"nn"` → `NearestNeighbor`, `"2opt"` → `TwoOpt`)
 - `AppOptions` — pure config container; one optional option struct per solver plus shared `HeuristicOptions`
-- `TspProblem` — cities plus `Arc<dyn DistanceSource>`; `new` wraps a concrete source, `from_source` shares one
+- `TspProblem` — cities plus `Arc<dyn DistanceSource>`; `new` wraps a concrete source, `from_source` shares one. `cities` is the 2D layout geometry-based solvers read; `DistanceSource::has_coordinates()` reports whether the distance source is the coordinates rather than an EXPLICIT matrix
 - `Solution` — tour route, cities, and total distance computed from the problem's distance source
 - `DistanceSource` — the distance-query trait (`src/tsp/distance_source.rs`); positions are dense indices into the city list, city IDs are external, and the shared defaults keep backends byte-identical
 - `NearestResult` / `NearestResultItem` — returned by both KD-tree and distance-source nearest-neighbor lookups
@@ -62,8 +62,9 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - `src/tsp/kdtree.rs` — KD-tree for fast nearest-neighbor queries; `KDPoint` is the shared city/point type used everywhere
 - `src/tsp/distance_matrix.rs` — the `Matrix` backend: a packed O(n²) lower triangle implementing `DistanceSource`; a brute-force alternative to the KD-tree
 - `src/tsp/distance_source.rs` — the `DistanceSource` trait, its shared defaults, and the backend contract
+- `src/tsp/embedding.rs` — deterministic classical-MDS layout for EXPLICIT instances without coordinates, introduced by the `explicit-embedding` OpenSpec change
 
-**Input:** `src/tsp/tsplib.rs` — state-machine parser for TSPLIB format; accepts `NODE_COORD_SECTION` and `DISPLAY_DATA_SECTION`; reads from file or stdin.
+**Input:** `src/tsp/tsplib.rs` — state-machine parser for TSPLIB format; accepts `NODE_COORD_SECTION`, `DISPLAY_DATA_SECTION`, and `EDGE_WEIGHT_SECTION` (all nine `EDGE_WEIGHT_FORMAT` layouts); reads from file or stdin. EXPLICIT files without coordinates currently get placeholder grid coordinates; the `explicit-embedding` change replaces them with a deterministic MDS layout at parse time.
 
 **Solvers** (each in its own file under `src/tsp/`; authoritative catalogue: `teeline solvers`, full table in [`README.md#algorithms`](README.md#algorithms)):
 
@@ -97,12 +98,14 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - Unit tests live inline in each source file (`#[cfg(test)]`)
 - Integration tests in `tests/` use the public library crate
 - Test helpers (approximate float comparison, etc.) in `src/test/helpers.rs`
+- EXPLICIT fixtures: `gr17.tsp` and `ring6_explicit.tsp` have no coordinates; `bays29.tsp` has a `DISPLAY_DATA_SECTION`
 
 ## Important Notes
 
 - The CLI binary is produced by the `teeline-cli` workspace member (`cargo build -p teeline-cli`). The binary is named `teeline` (at `target/debug/teeline` and `target/release/teeline`). Any older `target/release/bin` is a stale artifact from before the workspace split — ignore it.
 - `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity — don't use them on datasets larger than ~30 cities.
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
+- `DistanceSource::has_coordinates()` means "distances are computed from these coordinates" — it is `false` for every EXPLICIT matrix, even when the file supplies `DISPLAY_DATA_SECTION`. `two_opt`/`or_opt` use it to stay on the exact full scan. The planned `TspLibData.has_real_coordinates` is the separate "the file supplied coordinates" flag.
 - `teeline convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
 - `download_data.sh` fetches benchmark datasets.
 
