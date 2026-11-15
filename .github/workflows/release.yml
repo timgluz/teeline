@@ -548,11 +548,19 @@ jobs:
           path: artifacts/
       - uses: actions/download-artifact@v8
         if: ${{ needs.build-qt-macos.result == 'success' }}
+        continue-on-error: true
         with:
           name: qt-macos
           path: artifacts/
       - name: Attach Qt artifacts to GitHub Release
-        run: gh release upload "${{ needs.plan.outputs.tag }}" artifacts/* --repo "${{ github.repository }}"
+        run: |
+          shopt -s nullglob
+          files=(artifacts/*)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No Qt artifacts were produced; skipping the release upload."
+            exit 0
+          fi
+          gh release upload "${{ needs.plan.outputs.tag }}" "${files[@]}" --repo "${{ github.repository }}" --clobber
 
   publish-wassette:
     needs: [plan]

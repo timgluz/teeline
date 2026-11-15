@@ -5,6 +5,13 @@ on:
     branches: [master]
     paths: ['teeline-web/**']
   workflow_dispatch:
+  workflow_run:
+    # A release publishes a new teeline-solver.wasm. Redeploy the web once the
+    # Release workflow succeeds so the solver dropdown and version label pick it
+    # up. The Release workflow also runs on pull_request; only a successful tag
+    # push should redeploy the site.
+    workflows: [Release]
+    types: [completed]
 
 permissions:
   contents: read
@@ -15,6 +22,7 @@ defaults:
 
 jobs:
   deploy:
+    if: ${{ github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
 
     steps:
