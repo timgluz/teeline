@@ -173,6 +173,13 @@ m     = 200
   point against the same id space it came from, as in `nearest_neighbor.rs`) would otherwise
   make curve sample 0 permanently unselectable whenever the query's id defaulted to `0`.
 - **WASM-compatible**: uses `num-complex = "0.4"` (no_std-compatible, no libm dependency).
+- **Explicit instances without coordinates**: the parser derives a 2D layout from the distance
+  matrix with classical MDS and Fourier fits its curve to that layout. Tours are still scored
+  with the exact matrix, but the fit is only as good as the derived geometry.
+
+## Benchmarks
+
+Published results for this solver are rendered below.
 
 ## Relationship to the Elastic Net
 

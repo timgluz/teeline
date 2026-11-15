@@ -16,11 +16,11 @@
 
 ## 3. Problem construction and geometric solvers
 
-- [ ] 3.1 Add `LayoutPolicy { Derived, RequireReal }` with additive `to_problem_with_layout` and `into_problem_with_layout`; keep the existing constructors meaning `Derived`; verify the existing problem-construction tests pass unchanged.
-- [ ] 3.2 Make `RequireReal` return a descriptive error before building a problem from an instance without real coordinates; verify no `TspProblem` is returned and the error names the policy.
-- [ ] 3.3 Add acceptance tests: `sfc`, `fourier`, and `som` return valid permutations on `gr17`, `sfc`'s cost is lower than a tour built from the pre-change grid coordinates, `branch_bound` returns a valid tour on `gr17`, and `berlin52` keeps its exact tours.
-- [ ] 3.4 Correct `tests/three_opt_test.rs` to build `gr17` from `to_problem(DistanceBackend::Auto)` so the explicit weights are used, and seed the solver with the NN tour or relax the comparison to `<=`; verify both gr17 tests pass.
-- [ ] 3.5 Document the derived-layout behaviour and its quality caveat on the `sfc`, `fourier`, and `som` algorithm pages; verify each page states what happens when coordinates are absent.
+- [x] 3.1 Add `LayoutPolicy { Derived, RequireReal }` with additive `to_problem_with_layout` and `into_problem_with_layout`; keep the existing constructors meaning `Derived`; verify the existing problem-construction tests pass unchanged.
+- [x] 3.2 Make `RequireReal` return a descriptive error before building a problem from an instance without real coordinates; verify no `TspProblem` is returned and the error names the policy.
+- [x] 3.3 Add acceptance tests: `sfc`, `fourier`, and `som` return valid permutations on `gr17`, `sfc`'s cost is lower than a tour built from the pre-change grid coordinates, `branch_bound` returns a valid tour on `gr17`, and `berlin52` keeps its exact tours.
+- [x] 3.4 Correct `tests/three_opt_test.rs` to build `gr17` from `to_problem(DistanceBackend::Auto)` so the explicit weights are used, and seed the solver with the NN tour or relax the comparison to `<=`; verify both gr17 tests pass.
+- [x] 3.5 Document the derived-layout behaviour and its quality caveat on the `sfc`, `fourier`, and `som` algorithm pages; verify each page states what happens when coordinates are absent.
 
 ## 4. Lin-Kernighan exact candidates
 

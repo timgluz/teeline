@@ -41,6 +41,7 @@ pub mod stochastic_hill;
 pub mod tabu_search;
 pub mod three_opt;
 pub mod tsplib;
+pub use tsplib::LayoutPolicy;
 pub mod two_opt;
 
 use crate::tsp::distance_matrix::DistanceMatrix;

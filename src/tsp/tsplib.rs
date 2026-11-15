@@ -22,6 +22,16 @@ static SECTION_START_MATCHER: LazyLock<Regex> =
 static KEY_VALUE_MATCHER: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^(?P<key>\w+)\s*:\s*(?P<val>.+)$").unwrap());
 
+/// Whether a problem may use a derived 2D layout when the instance supplies no coordinates.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LayoutPolicy {
+    /// Derive a layout from the distance matrix when no coordinates are present.
+    #[default]
+    Derived,
+    /// Reject an instance that supplied no coordinates.
+    RequireReal,
+}
+
 #[derive(Debug, Clone)]
 pub struct TspLibData {
     pub name: String,
@@ -175,6 +185,37 @@ impl TspLibData {
 
         let source = super::build_distance_source(&cities, distance_type, backend)?;
         Ok(TspProblem::from_source(cities, source))
+    }
+
+    /// Like [`Self::to_problem`], but lets the caller reject a derived layout.
+    pub fn to_problem_with_layout(
+        &self,
+        backend: DistanceBackend,
+        layout: LayoutPolicy,
+    ) -> Result<TspProblem, String> {
+        self.require_layout(layout)?;
+        self.to_problem(backend)
+    }
+
+    /// Consuming variant of [`Self::to_problem_with_layout`].
+    pub fn into_problem_with_layout(
+        self,
+        backend: DistanceBackend,
+        layout: LayoutPolicy,
+    ) -> Result<TspProblem, String> {
+        self.require_layout(layout)?;
+        self.into_problem(backend)
+    }
+
+    fn require_layout(&self, layout: LayoutPolicy) -> Result<(), String> {
+        if layout == LayoutPolicy::RequireReal && !self.has_real_coordinates {
+            return Err(
+                "EXPLICIT input has no real coordinates; a derived layout is required. \
+                 Use LayoutPolicy::Derived or supply NODE_COORD_SECTION/DISPLAY_DATA_SECTION"
+                    .to_string(),
+            );
+        }
+        Ok(())
     }
 }
 
@@ -1262,6 +1303,40 @@ mod tests {
             .err()
             .expect("mismatched input must fail");
         assert!(err.contains("duplicate"), "{err}");
+    }
+
+    #[test]
+    fn require_real_rejects_a_derived_layout() {
+        let data = fixture("gr17.tsp");
+        let error = data
+            .to_problem_with_layout(DistanceBackend::Auto, LayoutPolicy::RequireReal)
+            .err()
+            .expect("RequireReal must reject a derived layout");
+        assert!(error.contains("derived layout"), "{error}");
+
+        let coordinate = fixture("berlin52.tsp");
+        assert!(
+            coordinate
+                .to_problem_with_layout(DistanceBackend::Auto, LayoutPolicy::RequireReal)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn into_problem_with_layout_matches_the_borrowed_variant() {
+        let data = fixture("gr17.tsp");
+        let expected = data
+            .to_problem_with_layout(DistanceBackend::Auto, LayoutPolicy::Derived)
+            .unwrap();
+        let actual = data
+            .clone()
+            .into_problem_with_layout(DistanceBackend::Auto, LayoutPolicy::Derived)
+            .unwrap();
+        let route: Vec<usize> = expected.cities.iter().map(|city| city.id).collect();
+        assert_eq!(
+            actual.distances.tour_length(&route),
+            expected.distances.tour_length(&route)
+        );
     }
 
     #[test]

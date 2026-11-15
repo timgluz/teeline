@@ -5,7 +5,8 @@
 ///   cargo test --test three_opt_test -- --include-ignored
 use std::path::Path;
 use teeline::tsp::{
-    HeuristicOptions, TspProblem, distance_matrix, kdtree, nearest_neighbor, three_opt, tsplib,
+    DistanceBackend, HeuristicOptions, TspProblem, distance_matrix, kdtree, nearest_neighbor,
+    three_opt, tsplib,
 };
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -46,30 +47,33 @@ fn nn_tour_length(cities: &[kdtree::KDPoint]) -> f32 {
 
 #[test]
 fn three_opt_valid_tour_gr17() {
-    let cities = load_tsp("gr17.tsp").cities().to_vec();
-    let tour = three_opt::solve(
-        &make_problem(cities.clone()),
-        &HeuristicOptions::default(),
-        None,
-        None,
+    let problem = load_tsp("gr17.tsp")
+        .to_problem(DistanceBackend::Auto)
+        .unwrap();
+    let tour = three_opt::solve(&problem, &HeuristicOptions::default(), None, None);
+    assert!(
+        is_valid_tour(tour.route(), &problem.cities),
+        "gr17 tour is invalid"
     );
-    assert!(is_valid_tour(tour.route(), &cities), "gr17 tour is invalid");
 }
 
 #[test]
 fn three_opt_improves_on_gr17() {
-    let cities = load_tsp("gr17.tsp").cities().to_vec();
+    let problem = load_tsp("gr17.tsp")
+        .to_problem(DistanceBackend::Auto)
+        .unwrap();
+    let nearest = nearest_neighbor::solve(&problem, &HeuristicOptions::default(), None, None);
+    let nn_total = nearest.total;
     let three_opt_total = three_opt::solve(
-        &make_problem(cities.clone()),
+        &problem,
         &HeuristicOptions::default(),
         None,
-        None,
+        Some(nearest.route()),
     )
     .total;
-    let nn_total = nn_tour_length(&cities);
     assert!(
-        three_opt_total < nn_total,
-        "3-opt ({three_opt_total:.1}) must improve over NN ({nn_total:.1}) on gr17"
+        three_opt_total <= nn_total,
+        "3-opt ({three_opt_total:.1}) must not worsen the NN tour ({nn_total:.1}) on gr17"
     );
 }
 

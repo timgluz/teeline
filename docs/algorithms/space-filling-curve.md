@@ -72,6 +72,14 @@ Several cities can land in the same grid cell, especially at low `--sfc-order`. 
   Buckets larger than 64 cities (heavily clustered or degenerate inputs) fall back
   to input order so the solver stays O(n log n).
 
+### Explicit instances without coordinates
+
+TSPLIB EXPLICIT files may carry distances but no coordinates. The parser derives a
+deterministic 2D layout from the distance matrix with classical MDS and stores it as the city
+layout, so SFC still has a grid to project onto. The tour is scored with the exact distance
+matrix, but the ordering is only as good as that derived layout — treat it as an approximate
+geometric warm start, not a surveyed map.
+
 ## Options
 
 | Flag | Values | Default | Notes |
