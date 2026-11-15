@@ -86,7 +86,7 @@ A shell installer is also available:
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/timgluz/teeline/releases/latest/download/teeline-cli-installer.sh | sh
 ```
 
-Each release also includes `teeline-solver.wasm` — the WebAssembly component built with `cargo-component`.
+Each release also includes `teeline-solver.wasm` — the WebAssembly component built with `cargo-component`. The [web solver](https://www.tspsolver.com/solve/) downloads that asset from the latest release and redeploys automatically after a successful Release workflow; the `teeline-solver <version>` label is the `teeline-wasm` crate version.
 
 ### Shell completions
 
