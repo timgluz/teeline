@@ -21,8 +21,8 @@
 
 ## 3. Phase 1 — Trait boundary (behaviour-preserving)
 
-- [ ] 3.1 Define `DistanceSource` with five required primitives, a `has_coordinates` default, and six shared method defaults; verify a `&dyn DistanceSource` test compiles and the conformance-suite skeleton runs.
-- [ ] 3.2 Implement the five primitives for `DistanceMatrix`, override `has_coordinates` to false in `new` (explicit weights) and true in `build`, and keep both the matrix-only accessors and the existing inherent query methods until PR 4; verify the existing `distance_matrix` unit tests pass unchanged and the workspace compiles with `TspProblem.distances` still concrete.
+- [x] 3.1 Define `DistanceSource` with five required primitives, a `has_coordinates` default, and six shared method defaults; verify a `&dyn DistanceSource` test compiles and the conformance-suite skeleton runs.
+- [x] 3.2 Implement the five primitives for `DistanceMatrix`, override `has_coordinates` to false in `new` (explicit weights) and true in `build`, and keep both the matrix-only accessors and the existing inherent query methods until PR 4; verify the existing `distance_matrix` unit tests pass unchanged and the workspace compiles with `TspProblem.distances` still concrete.
 - [ ] 3.3 Change `TspProblem.distances` to `Arc<dyn DistanceSource>`, add `new` and `from_source` (`from_points` lands with `DistanceBackend` in task 6.1), and remove the redundant inherent query methods in this same PR; verify all 80 existing `TspProblem::new` call sites compile.
 - [ ] 3.4 Add the position-invariant check to `from_source` (`num_cities == cities.len()`, `pos2city_id(i) == cities[i].id`); verify a mismatched source fails the debug assertion.
 - [ ] 3.5 Update `Solution::from_parts` to accept `&dyn DistanceSource` (`Solution::new` is unchanged); verify reported totals match the pre-change tests.
@@ -33,7 +33,8 @@
 - [ ] 3.10 Update the CLI, API, WASM, and Qt constructors to the new field type; verify each crate builds (WASM and Qt built separately).
 - [ ] 3.11 Run the `matrix` config against the tracked baseline from task 2.11; verify every tour cost is unchanged for deterministic solvers and the runtime is within the documented refactor bound.
 - [ ] 3.12 Verify every published-optimum test (att48, ulysses16, gr17, burma14, …) reports the same cost as before the refactor for deterministic solvers.
-- [ ] 3.13 Write ADR 010 recording the distance-source boundary (trait, backends, selection signal) and add it to the `docs/adr/` index; verify the index links it.
+- [x] 3.13 Write ADR 010 recording the distance-source boundary (trait, backends, selection signal) and add it to the `docs/adr/` index; verify the index links it.
+- [x] 3.14 Apply the PR-665 review fixes: make the default `tour_length` allocation-free, document the `distances_from` panic contract, and strengthen the trait skeleton test; verify the lib tests.
 
 ## 4. Lin-Kernighan metric fix (explicit behaviour change)
 

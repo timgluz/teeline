@@ -53,6 +53,7 @@
 
 use std::collections::HashMap;
 
+use super::distance_source::DistanceSource;
 use super::kdtree::KDPoint;
 use super::{CityTable, DistanceType, NearestResult, NearestResultItem};
 
@@ -148,10 +149,21 @@ pub struct DistanceMatrix {
     items: Vec<f32>,
     cities: CityTable,
     city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
+    /// False for an EXPLICIT-weight matrix, whose cities are TSPLIB grid placeholders.
+    has_coordinates: bool,
 }
 
 impl DistanceMatrix {
     pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
+        Self::new_with_coordinates(n, distances, cities, false)
+    }
+
+    fn new_with_coordinates(
+        n: usize,
+        distances: Vec<f32>,
+        cities: CityTable,
+        has_coordinates: bool,
+    ) -> Self {
         let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
 
         assert!(n == city_idx.len(), "city_idx size differs from n cities");
@@ -169,6 +181,7 @@ impl DistanceMatrix {
             items: distances,
             cities,
             city_idx,
+            has_coordinates,
         }
     }
 
@@ -230,7 +243,9 @@ impl DistanceMatrix {
 
         distances.shrink_to_fit();
 
-        Ok(DistanceMatrix::new(n, distances, city_table))
+        Ok(DistanceMatrix::new_with_coordinates(
+            n, distances, city_table, true,
+        ))
     }
 
     pub fn len(&self) -> usize {
@@ -427,6 +442,32 @@ impl DistanceMatrix {
             );
         }
         distances
+    }
+}
+
+impl DistanceSource for DistanceMatrix {
+    fn num_cities(&self) -> usize {
+        self.n
+    }
+
+    fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
+        DistanceMatrix::distance_by_pos(self, pos1, pos2)
+    }
+
+    fn pos2city_id(&self, pos: usize) -> Option<usize> {
+        DistanceMatrix::pos2city_id(self, pos)
+    }
+
+    fn city_id2pos(&self, city_id: usize) -> Option<usize> {
+        DistanceMatrix::city_id2pos(self, city_id)
+    }
+
+    fn point_at(&self, pos: usize) -> Option<KDPoint> {
+        self.cities.get(&pos).copied()
+    }
+
+    fn has_coordinates(&self) -> bool {
+        self.has_coordinates
     }
 }
 

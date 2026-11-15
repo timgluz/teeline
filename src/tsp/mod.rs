@@ -8,6 +8,8 @@ pub use comparison::{ComparisonStats, compare_tours, tour_cost};
 pub mod convert;
 pub mod cuckoo_search;
 pub mod distance_matrix;
+pub mod distance_source;
+pub use distance_source::DistanceSource;
 pub mod flower_pollination;
 pub mod fourier;
 pub mod genetic_algorithm;
@@ -2006,7 +2008,7 @@ impl NearestResult {
         }
     }
 
-    fn add(&mut self, pt: KDPoint, new_distance: f32) {
+    pub(crate) fn add(&mut self, pt: KDPoint, new_distance: f32) {
         if self.n == 0 || pt.id == self.target.id {
             return;
         }

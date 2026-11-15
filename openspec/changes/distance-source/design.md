@@ -62,6 +62,8 @@ pub trait DistanceSource: Send + Sync {
 
 Providing defaults is the key correctness decision: the matrix and on-the-fly backends cannot drift in summation order (`tour_length_by_pos` adds the closing edge first today), id handling, or tie-breaking, because only `distance_by_pos` differs. The error/edge behaviours are preserved deliberately: `distance_by_pos(p,p)` returns `Ok(0.0)` before range checking, an unknown id makes `tour_length` return `0.0`, and `distances_from` panics on an unknown id.
 
+The hot-path translation in `tour_length` is single-pass and allocation-free; solvers call it inside candidate loops, and the pre-trait version allocated a position vector per call.
+
 **Alternative considered:** a required method per backend (the current inherent API). It duplicates loops and invites drift, and the "byte-identical" claim would rest on every implementer redoing the arithmetic in the same order.
 
 `nearest_unvisited` takes `&dyn Fn(usize) -> bool` rather than `impl Fn` so the trait stays object-safe. Call sites pass `&|id| ..`.
@@ -198,7 +200,7 @@ The plan ships as a stack, one reviewable concern per PR. Each PR targets the pr
 | 1 | `docs/constitution-distance-source` | `master` | Constitution §4 amendment only (§8) | 1.1 |
 | 2 | `bench/distance-backend` | PR 1 | Tier scaffold (matrix config), scaling script, matrix baseline, report scaffold | 2.1–2.11 |
 | 3 | `refactor/add-distance-source-trait` | PR 2 | Trait + defaults + impl; keep inherent methods; no field change; ADR 010 | 3.1–3.2, 3.13 |
-| 4 | `refactor/use-distance-source` | PR 3 | Remove inherent methods, field switch, helpers, imports, constructors, no-regression | 3.3–3.12 |
+| 4 | `refactor/use-distance-source` | PR 3 | AGENTS.md, remove inherent methods, field switch, helpers, imports, constructors, no-regression | 1.2, 3.3–3.12 |
 | 5 | `fix/lk-declared-metric` | PR 4 | LK seed (incl. API `LKOptions` consumers) + metric fix + re-baseline | 4.1–4.3 |
 | 6 | `feat/on-the-fly-backend` | PR 5 | `OnTheFly` + conformance/equivalence | 5.1–5.8 |
 | 7 | `feat/distance-backend-selection` | PR 6 | Policy, `config.rs`, flag/TOML, WASM scoring, on-the-fly config, comparison, thresholds, gate/publication, 100k | 6.1–6.13 |
