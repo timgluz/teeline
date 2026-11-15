@@ -235,7 +235,7 @@ pub struct DistanceMatrix {
     items: PackedDistances,
     cities: CityTable,
     city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
-    /// False for an EXPLICIT-weight matrix, whose cities are TSPLIB grid placeholders.
+    /// False for an EXPLICIT-weight matrix: its city coordinates are a layout, not the distance source.
     has_coordinates: bool,
 }
 

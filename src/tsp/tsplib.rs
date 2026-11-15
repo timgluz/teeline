@@ -10,7 +10,7 @@ use regex::Regex;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::{CityTable, DistanceBackend, DistanceType, TspProblem};
+use super::{CityTable, DistanceBackend, DistanceType, TspProblem, embedding};
 
 const COORD_SECTION_KEY: &str = "NODE_COORD_SECTION";
 const DISPLAY_DATA_SECTION_KEY: &str = "DISPLAY_DATA_SECTION";
@@ -30,6 +30,7 @@ pub struct TspLibData {
     dimension: usize,
     raw_distances: Option<Vec<f32>>,
     pub distance_type: DistanceType,
+    has_real_coordinates: bool,
 }
 
 impl TspLibData {
@@ -48,7 +49,22 @@ impl TspLibData {
             dimension,
             raw_distances,
             distance_type,
+            has_real_coordinates: true,
         }
+    }
+
+    /// True when the file supplied coordinates (a node-coordinate or display-data section).
+    ///
+    /// Distinct from `DistanceSource::has_coordinates()`, which asks whether the distances are
+    /// computed from coordinates rather than read from an EXPLICIT matrix.
+    pub fn has_real_coordinates(&self) -> bool {
+        self.has_real_coordinates
+    }
+
+    /// Mark a parsed layout as derived rather than file-supplied.
+    pub fn without_real_coordinates(mut self) -> Self {
+        self.has_real_coordinates = false;
+        self
     }
 
     pub fn with_distance_type(mut self, dt: DistanceType) -> Self {
@@ -327,17 +343,27 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
         Some(packed)
     };
 
-    // Generate grid placeholder coords when no coord section was present
-    if cities.is_empty() && raw_distances.is_some() {
-        cities = grid_coords(dimension);
-    }
-
-    if cities.is_empty() && raw_distances.is_none() {
-        return Err("Found no valid city coordinates".to_string());
+    // A coordinate-less EXPLICIT file is a complete problem: derive a layout from its
+    // distances instead of handing solvers a meaningless grid.
+    let mut has_real_coordinates = true;
+    if cities.is_empty() {
+        match &raw_distances {
+            Some(distances) => {
+                cities = embedding::mds_embed(dimension, |i, j| {
+                    packed_distance(distances, dimension, i, j)
+                })
+                .into_iter()
+                .enumerate()
+                .map(|(index, coords)| KDPoint::new_with_id(index + 1, &coords))
+                .collect();
+                has_real_coordinates = false;
+            }
+            None => return Err("Found no valid city coordinates".to_string()),
+        }
     }
 
     let unspecified_val = "unspecified".to_string();
-    let dt = TspLibData::new(
+    let mut data = TspLibData::new(
         metadata
             .get("NAME")
             .unwrap_or(&unspecified_val)
@@ -353,10 +379,24 @@ fn process_lines<R: BufRead>(reader: R) -> Result<TspLibData, String> {
         raw_distances,
         distance_type,
     );
+    if !has_real_coordinates {
+        data = data.without_real_coordinates();
+    }
 
-    Ok(dt)
+    Ok(data)
 }
 
+/// Read one entry from the packed lower triangle produced by `parse_explicit`.
+fn packed_distance(distances: &[f32], n: usize, i: usize, j: usize) -> f32 {
+    if i == j {
+        return 0.0;
+    }
+    let (from, to) = (i.max(j), i.min(j));
+    debug_assert!(from < n, "packed distance index out of range");
+    distances[from * (from - 1) / 2 + to]
+}
+
+#[cfg(test)]
 fn grid_coords(n: usize) -> Vec<KDPoint> {
     let cols = (n as f64).sqrt().ceil() as usize;
     (0..n)
@@ -977,6 +1017,75 @@ mod tests {
         // Cities come from DISPLAY_DATA_SECTION, not grid
         assert_eq!(3, dt.len());
         assert_eq!(Some(10.0), dt.cities()[0].get(0));
+    }
+
+    #[test]
+    fn test_explicit_with_display_data_keeps_real_coordinates() {
+        let data = fixture("bays29.tsp");
+        assert!(data.has_explicit_weights());
+        assert!(data.has_real_coordinates());
+    }
+
+    #[test]
+    fn test_new_defaults_to_real_coordinates() {
+        let data = TspLibData::new(
+            "t".to_string(),
+            String::new(),
+            grid_coords(3),
+            3,
+            Some(vec![1.0, 2.0, 3.0]),
+            DistanceType::Explicit,
+        );
+        assert!(data.has_real_coordinates());
+    }
+
+    #[test]
+    fn test_explicit_without_coordinates_gets_a_derived_layout() {
+        let data = fixture("gr17.tsp");
+        assert!(data.has_explicit_weights());
+        assert!(!data.has_real_coordinates());
+        assert_eq!(data.len(), 17);
+        assert_ne!(
+            data.cities(),
+            grid_coords(17).as_slice(),
+            "placeholder grid must be replaced by the derived layout"
+        );
+    }
+
+    #[test]
+    fn test_ring6_explicit_gets_a_derived_layout() {
+        let data = fixture("ring6_explicit.tsp");
+        assert!(!data.has_real_coordinates());
+        assert_eq!(data.len(), 6);
+    }
+
+    #[test]
+    fn test_derived_layout_is_shared_by_cities_and_matrix() {
+        let data = fixture("gr17.tsp");
+        let cities = data.cities().to_vec();
+        let matrix = data.distance_matrix().unwrap();
+        let problem = TspProblem::new(cities.clone(), matrix);
+        for (pos, city) in cities.iter().enumerate() {
+            assert_eq!(&problem.cities[pos], city);
+            assert_eq!(problem.distances.point_at(pos).unwrap(), *city);
+        }
+    }
+
+    #[test]
+    fn test_derived_layout_matches_mds_on_the_packed_weights() {
+        let data = fixture("gr17.tsp");
+        let raw = data.raw_distances().unwrap();
+        let expected: Vec<[f32; 2]> = crate::tsp::embedding::mds_embed(17, |i, j| {
+            if i == j {
+                0.0
+            } else {
+                let (from, to) = (i.max(j), i.min(j));
+                raw[from * (from - 1) / 2 + to]
+            }
+        });
+        for (city, coords) in data.cities().iter().zip(expected) {
+            assert_eq!(city.coords, coords);
+        }
     }
 
     // ── parse_json_cities tests ───────────────────────────────────────────────

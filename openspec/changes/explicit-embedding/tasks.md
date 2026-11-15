@@ -9,10 +9,10 @@
 
 ## 2. Parse-time embedding
 
-- [ ] 2.1 Add `has_real_coordinates` to `TspLibData`, defaulting to `true` in `new`, plus a builder that clears it; verify every existing `TspLibData::new` call site still compiles and reports real coordinates.
-- [ ] 2.2 In `process_lines`, when `cities.is_empty() && raw_distances.is_some()`, build the city list from `mds_embed` instead of `grid_coords` and clear the flag; verify `gr17` and `ring6_explicit` parse with `has_real_coordinates == false` and non-placeholder coordinates, while `bays29` and `bayg29` (display data) stay `true`.
-- [ ] 2.3 Verify `TspLibData::cities()`, `distance_matrix().point_at(pos)`, and `TspProblem::new(data.cities().to_vec(), data.distance_matrix()?)` agree on `gr17`; verify `tests/space_filling_curve_test.rs`'s `load_problem("gr17.tsp")` now gets the derived layout.
-- [ ] 2.4 Update the stale comments in `src/tsp/distance_matrix.rs` ("whose cities are TSPLIB grid placeholders"), `src/tsp/distance_source.rs`, and `docs/adr/010-distance-source.md`; verify no comment still claims EXPLICIT cities are always placeholders.
+- [x] 2.1 Add `has_real_coordinates` to `TspLibData`, defaulting to `true` in `new`, plus a builder that clears it; verify every existing `TspLibData::new` call site still compiles and reports real coordinates.
+- [x] 2.2 In `process_lines`, when `cities.is_empty() && raw_distances.is_some()`, build the city list from `mds_embed` instead of `grid_coords` and clear the flag; verify `gr17` and `ring6_explicit` parse with `has_real_coordinates == false` and non-placeholder coordinates, while `bays29` and `bayg29` (display data) stay `true`.
+- [x] 2.3 Verify `TspLibData::cities()`, `distance_matrix().point_at(pos)`, and `TspProblem::new(data.cities().to_vec(), data.distance_matrix()?)` agree on `gr17`; verify `tests/space_filling_curve_test.rs`'s `load_problem("gr17.tsp")` now gets the derived layout.
+- [x] 2.4 Update the stale comments in `src/tsp/distance_matrix.rs` ("whose cities are TSPLIB grid placeholders"), `src/tsp/distance_source.rs`, and `docs/adr/010-distance-source.md`; verify no comment still claims EXPLICIT cities are always placeholders.
 
 ## 3. Problem construction and geometric solvers
 

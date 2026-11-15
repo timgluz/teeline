@@ -19,7 +19,7 @@ pub trait DistanceSource: Send + Sync {
     fn city_id2pos(&self, city_id: usize) -> Option<usize>;
     fn point_at(&self, pos: usize) -> Option<KDPoint>;
 
-    /// False when the cities are TSPLIB EXPLICIT placeholders rather than real coordinates.
+    /// False when the distances come from an EXPLICIT matrix rather than the city coordinates.
     fn has_coordinates(&self) -> bool {
         true
     }
