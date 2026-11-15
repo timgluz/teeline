@@ -62,6 +62,8 @@ pub trait DistanceSource: Send + Sync {
 
 Providing defaults is the key correctness decision: the matrix and on-the-fly backends cannot drift in summation order (`tour_length_by_pos` adds the closing edge first today), id handling, or tie-breaking, because only `distance_by_pos` differs. The error/edge behaviours are preserved deliberately: `distance_by_pos(p,p)` returns `Ok(0.0)` before range checking, an unknown id makes `tour_length` return `0.0`, and `distances_from` panics on an unknown id.
 
+The hot-path translation in `tour_length` is single-pass and allocation-free; solvers call it inside candidate loops, and the pre-trait version allocated a position vector per call.
+
 **Alternative considered:** a required method per backend (the current inherent API). It duplicates loops and invites drift, and the "byte-identical" claim would rest on every implementer redoing the arithmetic in the same order.
 
 `nearest_unvisited` takes `&dyn Fn(usize) -> bool` rather than `impl Fn` so the trait stays object-safe. Call sites pass `&|id| ..`.

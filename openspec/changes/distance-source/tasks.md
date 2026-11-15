@@ -34,6 +34,7 @@
 - [ ] 3.11 Run the `matrix` config against the tracked baseline from task 2.11; verify every tour cost is unchanged for deterministic solvers and the runtime is within the documented refactor bound.
 - [ ] 3.12 Verify every published-optimum test (att48, ulysses16, gr17, burma14, …) reports the same cost as before the refactor for deterministic solvers.
 - [x] 3.13 Write ADR 010 recording the distance-source boundary (trait, backends, selection signal) and add it to the `docs/adr/` index; verify the index links it.
+- [x] 3.14 Apply the PR-665 review fixes: make the default `tour_length` allocation-free, document the `distances_from` panic contract, and strengthen the trait skeleton test; verify the lib tests.
 
 ## 4. Lin-Kernighan metric fix (explicit behaviour change)
 

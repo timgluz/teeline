@@ -34,6 +34,12 @@ pub trait DistanceSource: Send + Sync {
     }
 
     /// Returns the full row in position order, including the zero at the city's own position.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `city_id` is not in the source. This preserves the pre-trait
+    /// `DistanceMatrix::distances_from` contract; callers that may hold an unknown id should
+    /// check `city_id2pos` first.
     fn distances_from(&self, city_id: usize) -> Vec<f32> {
         let pos = self.city_id2pos(city_id).expect("Unknown city id");
         let n = self.num_cities();
@@ -51,12 +57,26 @@ pub trait DistanceSource: Send + Sync {
         if path.len() < 2 {
             return 0.0;
         }
-        // Translate city IDs to positions upfront; unknown city ID → return 0.0.
-        let positions: Option<Vec<usize>> = path.iter().map(|&id| self.city_id2pos(id)).collect();
-        match positions {
-            None => 0.0,
-            Some(pos_path) => self.tour_length_by_pos(&pos_path),
+        // Single pass, same order as `tour_length_by_pos`: closing edge first, then the
+        // consecutive edges. Keeping it allocation-free matters because solvers call this
+        // inside candidate loops (`tabu_search::select`, simulated annealing, ...).
+        let Some(first) = self.city_id2pos(path[0]) else {
+            return 0.0;
+        };
+        let Some(last) = self.city_id2pos(*path.last().unwrap()) else {
+            return 0.0;
+        };
+        let mut total = self.distance_by_pos(last, first).unwrap_or(0.0);
+        let mut prev = first;
+        for &id in &path[1..path.len() - 1] {
+            let Some(next) = self.city_id2pos(id) else {
+                return 0.0;
+            };
+            total += self.distance_by_pos(prev, next).unwrap_or(0.0);
+            prev = next;
         }
+        total += self.distance_by_pos(prev, last).unwrap_or(0.0);
+        total
     }
 
     /// Position-based tour length — no id lookup per edge.
@@ -144,10 +164,19 @@ mod tests {
     /// `dyn` reference so object safety is part of the test, not an assumption.
     fn assert_skeleton(source: &dyn DistanceSource, n: usize) {
         assert_eq!(source.num_cities(), n);
+        assert!(source.has_coordinates());
         assert_eq!(source.distance_between(0, 0).unwrap(), 0.0);
+        assert_eq!(source.distances_from(0).len(), n);
         let tour: Vec<usize> = (0..n).collect();
         assert!(source.tour_length(&tour) > 0.0);
-        assert!(source.nearest(&source.point_at(0).unwrap(), 1).n == 1);
+        assert_eq!(source.tour_length_by_pos(&tour), source.tour_length(&tour));
+        let target = source.point_at(0).unwrap();
+        assert_eq!(source.nearest(&target, 1).nearest().len(), 1);
+        assert!(
+            source
+                .nearest_unvisited(&target, &|id| id != target.id)
+                .is_some()
+        );
     }
 
     #[test]
