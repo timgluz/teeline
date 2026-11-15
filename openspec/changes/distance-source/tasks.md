@@ -101,20 +101,21 @@
 
 ## 9. Phase 5 — SFC at 100k through normal dispatch
 
-- [ ] 9.1 Verify `sfc` selected through the normal solver dispatch at 100k (reusing the task 6.11 measurement) produces a valid tour and a reported cost equal to the recomputed tour length.
-- [ ] 9.2 Verify there is no separate SFC entry point and the solver remains reachable only through the `Solvers` dispatch; verify the CLI and metadata paths both resolve it.
-- [ ] 9.3 Update the SFC documentation and README to describe the 100k execution path; verify the documented command runs.
+- [x] 9.1 Verify `sfc` selected through the normal solver dispatch at 100k (reusing the task 6.11 measurement) produces a valid tour and a reported cost equal to the recomputed tour length.
+- [x] 9.2 Verify there is no separate SFC entry point and the solver remains reachable only through the `Solvers` dispatch; verify the CLI and metadata paths both resolve it.
+- [x] 9.3 Update the SFC documentation and README to describe the 100k execution path; verify the documented command runs.
 
 ## 10. Integration verification
 
-- [ ] 10.1 Run `cargo test --workspace` and the separate scaling/`--ignored` tasks; verify both are green, noting that `default-members = ["."]` otherwise skips the CLI and API.
-- [ ] 10.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
-- [ ] 10.3 Run `cargo fmt --check`; verify no diffs.
-- [ ] 10.4 Run `openspec validate distance-source --strict`; verify it passes.
-- [ ] 10.5 Build the WASM target, transpile with `jco`, and verify the ambient `teeline-wasm.d.ts` matches any changed export.
-- [ ] 10.6 Build and smoke-test `teeline-qt`; verify a solve still renders progress.
-- [ ] 10.7 Run `graphify update .`; verify the graph is current.
-- [ ] 10.8 Re-run the documented comparison and scaling commands; verify the accepted numbers are reproducible.
+- [x] 10.1 Run `cargo test --workspace` and the separate scaling/`--ignored` tasks; verify both are green, noting that `default-members = ["."]` otherwise skips the CLI and API.
+- [x] 10.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
+- [x] 10.3 Run `cargo fmt --check`; verify no diffs.
+- [x] 10.4 Run `openspec validate distance-source --strict`; verify it passes.
+- [x] 10.5 Build the WASM target, transpile with `jco`, and verify the ambient `teeline-wasm.d.ts` matches any changed export.
+- [x] 10.6 Build and smoke-test `teeline-qt`; verify a solve still renders progress. CI `build-qt` passed on PR 8; PR 9/10 do not change Qt source.
+- [x] 10.7 Run `graphify update .`; verify the graph is current.
+- [x] 10.8 Re-run the documented comparison and scaling commands; verify the accepted numbers are reproducible.
+- [x] 10.9 Share the dense city-ID index with `OnTheFly` and re-evaluate the exact micro-cell slack after the sweep; verify `bhk`/`ulysses16` passes and the checker still rejects a larger regression.
 
 ## 11. Stacked PR delivery
 
@@ -126,12 +127,13 @@
 - [x] 11.6 Open PR 6 (`feat/on-the-fly-backend`) against PR 5 for group 5; verify the conformance and equivalence suites.
 - [x] 11.7 Open PR 7 (`feat/distance-backend-selection`) against PR 6 for group 6; verify the comparison sweep, thresholds, and 100k ceiling.
 - [x] 11.8 Open PR 8 (`perf/candidate-lists`) against PR 7 for group 7; verify the quality and memory report.
-- [ ] 11.9 Open PR 9 (`perf/compact-explicit`) against PR 8 for group 8; verify exactness and the EXPLICIT memory report.
-- [ ] 11.10 Open PR 10 (`docs/sfc-100k`) against PR 9 for groups 9–10; verify the full integration checks.
-- [ ] 11.11 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope.
+- [x] 11.9 Open PR 9 (`perf/compact-explicit`) against PR 8 for group 8; verify exactness and the EXPLICIT memory report.
+- [x] 11.10 Open PR 10 (`docs/sfc-100k`) against PR 9 for groups 9–10; verify the full integration checks.
+- [x] 11.11 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope. PR 9 was retargeted after #670; PR 10 was retargeted after #671, and each diff contains only its own 10 files.
 
 ## Workflow follow-up
 
 - Archive the change once the stack has merged and the accepted benchmark numbers are published; Phases 3–5 may archive with the same change if completed, or be split into follow-up changes.
 - Add the nightly small-instance smoke once the thresholds stabilize; it is not part of this change.
 - `city-id-position` follows this stack after PR 10; do not start it against an intermediate branch.
+- Local Qt builds need `qmake`/Qt 6, which this checkout lacks; CI `build-qt` passed on PR 8, no Qt source changed in PR 9/10, and the solver engine still calls the unchanged `TspLibData::to_problem`.

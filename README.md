@@ -266,6 +266,10 @@ done
 
 Exact algorithms find the provably optimal tour but have exponential complexity — do not use on more than ~20 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics. (`savings`/`sav` is implemented but not yet documented.)
 
+### Large coordinate instances
+
+`sfc` is the intended 100k-city path: it never builds a distance matrix, and coordinate input above 20,000 cities selects the on-the-fly backend under the default `--distance-backend auto` policy. A 100k synthetic run takes about 0.23 s with 21 MB peak RSS. See [the SFC large-instance section](docs/algorithms/space-filling-curve.md#large-instances) and the [distance-source benchmarks](docs/benchmarks/distance-source.md). Other solvers remain O(n²) in memory or time, so the 100k claim is specific to `sfc`.
+
 ## Pipeline
 
 Local search algorithms (2-opt, 3-opt, SA, hill climbing, tabu, GA, PSO, CS, FPA, GSA) improve an existing tour; they do not construct one from scratch. Starting from a random or sequential tour wastes the early epochs escaping a bad initial state. **Warm-starting from a greedy Nearest Neighbour tour** gives the solver a much better region to refine, typically reducing the optimality gap by several percentage points at no extra tuning cost.

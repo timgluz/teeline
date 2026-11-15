@@ -4,15 +4,14 @@
 //! the TSPLIB primitive. Every lookup computes the distance, so the source needs O(n) memory
 //! instead of the matrix's O(n²). It is the backend that makes 100k-city instances possible.
 
-use std::collections::HashMap;
-
 use super::distance_matrix::{att_distance, ceil_2d_distance, euc_2d_distance, geo_distance};
+use super::id_index::IdIndex;
 use super::kdtree::KDPoint;
 use super::{DistanceSource, DistanceType};
 
 pub struct OnTheFly {
     cities: Vec<KDPoint>, // position-indexed, same order as TspProblem.cities
-    city_idx: HashMap<usize, usize>,
+    city_idx: IdIndex,
     distance: fn(&KDPoint, &KDPoint) -> f32,
 }
 
@@ -34,11 +33,7 @@ impl OnTheFly {
                 return Err("cannot compute EXPLICIT distances on the fly; use the matrix backend");
             }
         };
-        let city_idx: HashMap<usize, usize> = cities
-            .iter()
-            .enumerate()
-            .map(|(pos, city)| (city.id, pos))
-            .collect();
+        let city_idx = IdIndex::build(cities);
         if city_idx.len() != cities.len() {
             return Err("city ids must be unique");
         }
@@ -64,12 +59,23 @@ impl DistanceSource for OnTheFly {
         Ok((self.distance)(a, b))
     }
 
+    /// Resolve the dense index once per lookup instead of paying the trait default's two
+    /// `city_id2pos` calls; BHK and LK call this in their inner loops.
+    fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
+        if city_id1 == city_id2 {
+            return Ok(0.0);
+        }
+        let pos1 = self.city_idx.get(city_id1).ok_or("city_id1 not in index")?;
+        let pos2 = self.city_idx.get(city_id2).ok_or("city_id2 not in index")?;
+        self.distance_by_pos(pos1, pos2)
+    }
+
     fn pos2city_id(&self, pos: usize) -> Option<usize> {
         self.cities.get(pos).map(|city| city.id)
     }
 
     fn city_id2pos(&self, city_id: usize) -> Option<usize> {
-        self.city_idx.get(&city_id).copied()
+        self.city_idx.get(city_id)
     }
 
     fn point_at(&self, pos: usize) -> Option<KDPoint> {
@@ -123,6 +129,19 @@ mod tests {
             assert_eq!(source.point_at(pos).unwrap().id, id);
         }
         assert!(source.distance_by_pos(0, 99).is_err());
+    }
+
+    #[test]
+    fn sparse_ids_use_the_map_index() {
+        let cities = vec![
+            KDPoint::new_with_id(10, &[0.0, 0.0]),
+            KDPoint::new_with_id(20, &[3.0, 4.0]),
+            KDPoint::new_with_id(30, &[0.0, 1.0]),
+        ];
+        let source = OnTheFly::new(&cities, DistanceType::Euc2D).unwrap();
+        assert_eq!(source.city_id2pos(20), Some(1));
+        assert_eq!(source.distance_between(10, 20).unwrap(), 5.0);
+        assert!(source.distance_between(10, 99).is_err());
     }
 
     #[test]
