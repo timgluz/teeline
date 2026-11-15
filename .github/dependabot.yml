@@ -1,20 +1,43 @@
 version: 2
 updates:
-  # Rust workspace (teeline core + teeline-cli + teeline-wasm + teeline-qt)
+  # Root Rust workspace: teeline core + teeline-cli + teeline-api.
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
 
-  # teeline-web npm packages
+  # teeline-qt is a separate Cargo workspace with its own Cargo.lock.
+  # qtbridge is a git dependency pinned to a backport commit; Dependabot
+  # only updates registry crates and leaves git sources alone.
+  - package-ecosystem: "cargo"
+    directory: "/teeline-qt"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # teeline-wasm is also a separate Cargo workspace and lockfile.
+  - package-ecosystem: "cargo"
+    directory: "/teeline-wasm"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+
+  # teeline-web npm packages.
   - package-ecosystem: "npm"
     directory: "/teeline-web"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
 
-  # GitHub Actions
+  # JS bindings that ship alongside the WASM crate.
+  - package-ecosystem: "npm"
+    directory: "/teeline-wasm/js-bindings"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # GitHub Actions.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
