@@ -1,14 +1,13 @@
 use std::time::Instant;
 
 use async_trait::async_trait;
-use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings};
 use teeline::tsp::tsplib;
 use teeline::tsp::{
-    AcoOptions, AppOptions, AspectScaling, CSOptions, FPAOptions, FourierOptions, GAOptions,
-    HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcCurveType, SfcOptions, Solvers,
-    TieBreaker, TspProblem, find_solver, solve_problem,
+    AcoOptions, AppOptions, AspectScaling, CSOptions, DistanceBackend, DistanceType, FPAOptions,
+    FourierOptions, GAOptions, HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcCurveType,
+    SfcOptions, Solvers, TieBreaker, TspProblem, find_solver, solve_problem,
 };
 
 use super::TspSolverService;
@@ -41,16 +40,14 @@ fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicO
 fn input_to_problem(input: &TspInput) -> Result<TspProblem, String> {
     if let Some(tsplib_str) = &input.tsplib {
         let data = tsplib::read_from_str(tsplib_str)?;
-        let dm = data.distance_matrix()?;
-        Ok(TspProblem::new(data.cities().to_vec(), dm))
+        data.to_problem(DistanceBackend::Auto)
     } else if let Some(cities) = &input.cities {
         let pts: Vec<KDPoint> = cities
             .iter()
             .enumerate()
             .map(|(i, c)| KDPoint::new_with_id(c.id.unwrap_or(i + 1), &[c.x, c.y]))
             .collect();
-        let dm = DistanceMatrix::from_cities(&pts).map_err(|e| e.to_string())?;
-        Ok(TspProblem::new(pts, dm))
+        TspProblem::from_points(pts, DistanceType::Euc2D, DistanceBackend::Auto)
     } else {
         Err("input must contain either `cities` or `tsplib`".to_string())
     }

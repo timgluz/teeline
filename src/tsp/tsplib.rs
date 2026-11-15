@@ -8,10 +8,9 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use super::CityTable;
-use super::DistanceType;
-use super::distance_matrix::{self, DistanceMatrix};
+use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
+use super::{CityTable, DistanceBackend, DistanceType, TspProblem};
 
 const COORD_SECTION_KEY: &str = "NODE_COORD_SECTION";
 const DISPLAY_DATA_SECTION_KEY: &str = "DISPLAY_DATA_SECTION";
@@ -93,8 +92,39 @@ impl TspLibData {
                     .collect();
                 Ok(DistanceMatrix::new(n, dists.clone(), city_table))
             }
-            None => Ok(distance_matrix::build(&self.cities, self.distance_type)),
+            None => {
+                DistanceMatrix::build(&self.cities, self.distance_type).map_err(|e| e.to_string())
+            }
         }
+    }
+
+    /// Build a problem with the selected backend.
+    ///
+    /// Selection is keyed off whether the file carries explicit weights, never the
+    /// `distance_type` field: `--distance-type` can override that field after parsing, while an
+    /// EXPLICIT file supplies only placeholder coordinates.
+    pub fn to_problem(&self, backend: DistanceBackend) -> Result<TspProblem, String> {
+        if self.has_explicit_weights() {
+            if backend == DistanceBackend::OnTheFly {
+                return Err(
+                    "EXPLICIT edge weights cannot use the on-the-fly backend; use matrix or auto"
+                        .to_string(),
+                );
+            }
+            let dm = self.distance_matrix()?;
+            return Ok(TspProblem::new(self.cities.clone(), dm));
+        }
+
+        if self.distance_type == DistanceType::Explicit {
+            return Err(
+                "coordinate input cannot use EXPLICIT distances; provide an EDGE_WEIGHT_SECTION \
+                 or choose a coordinate distance type"
+                    .to_string(),
+            );
+        }
+
+        let source = super::build_distance_source(&self.cities, self.distance_type, backend)?;
+        Ok(TspProblem::from_source(self.cities.clone(), source))
     }
 }
 
@@ -855,5 +885,50 @@ mod tests {
         let input = "NAME: a\nTYPE: ATSP\nDIMENSION: 2\nEDGE_WEIGHT_TYPE: EXPLICIT\nEDGE_WEIGHT_FORMAT: FULL_MATRIX\nEDGE_WEIGHT_SECTION\n0 1\n1 0\nEOF\n";
         let err = read_from_str(input).unwrap_err();
         assert!(err.contains("ATSP"), "expected ATSP in error, got: {err}");
+    }
+
+    fn fixture(path: &str) -> TspLibData {
+        read_from_file(Path::new(&format!(
+            "{}/tests/fixtures/{path}",
+            env!("CARGO_MANIFEST_DIR")
+        )))
+        .unwrap_or_else(|e| panic!("{path} must parse: {e}"))
+    }
+
+    #[test]
+    fn explicit_input_rejects_the_on_the_fly_backend() {
+        let data = fixture("ring6_explicit.tsp");
+        assert!(data.has_explicit_weights());
+        assert!(data.to_problem(DistanceBackend::OnTheFly).is_err());
+        assert!(data.to_problem(DistanceBackend::Auto).is_ok());
+    }
+
+    #[test]
+    fn coordinate_input_rejects_explicit_distance_type() {
+        let data = fixture("berlin52.tsp").with_distance_type(DistanceType::Explicit);
+        let err = data
+            .to_problem(DistanceBackend::Auto)
+            .err()
+            .expect("coordinate input must reject EXPLICIT");
+        assert!(err.contains("EXPLICIT"), "got: {err}");
+    }
+
+    #[test]
+    fn explicit_weights_survive_a_coordinate_type_override() {
+        let data = fixture("ring6_explicit.tsp").with_distance_type(DistanceType::Euc2D);
+        let problem = data.to_problem(DistanceBackend::Auto).unwrap();
+        assert_eq!(problem.distances.tour_length(&[1, 2, 3, 4, 5, 6]), 60.0);
+    }
+
+    #[test]
+    fn coordinate_backends_agree_on_a_small_instance() {
+        let data = fixture("berlin52.tsp");
+        let route: Vec<usize> = data.cities().iter().map(|c| c.id).collect();
+        let auto = data.to_problem(DistanceBackend::Auto).unwrap();
+        let matrix = data.to_problem(DistanceBackend::Matrix).unwrap();
+        let onfly = data.to_problem(DistanceBackend::OnTheFly).unwrap();
+        let expected = matrix.distances.tour_length(&route);
+        assert_eq!(auto.distances.tour_length(&route), expected);
+        assert_eq!(onfly.distances.tour_length(&route), expected);
     }
 }

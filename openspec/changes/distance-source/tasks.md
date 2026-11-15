@@ -55,9 +55,9 @@
 
 ## 6. Phase 2 — Selection policy and backend comparison
 
-- [ ] 6.1 Add `DistanceBackend`, `to_problem` keyed off `has_explicit_weights()`, and `from_points`; verify explicit weights + a coordinate `--distance-type` override still use the materialized backend.
-- [ ] 6.2 Replace the `distance_matrix::build(..).unwrap()` panic with an error return; verify coordinate input + `--distance-type explicit` returns a descriptive error without panicking.
-- [ ] 6.3 Add the threshold constant and boundary tests at threshold−1, threshold, and threshold+1; verify `Auto` picks the expected backend.
+- [x] 6.1 Add `DistanceBackend`, `to_problem` keyed off `has_explicit_weights()`, and `from_points`; verify explicit weights + a coordinate `--distance-type` override still use the materialized backend.
+- [x] 6.2 Replace the `distance_matrix::build(..).unwrap()` panic with an error return; verify coordinate input + `--distance-type explicit` returns a descriptive error without panicking.
+- [x] 6.3 Add the threshold constant and boundary tests at threshold−1, threshold, and threshold+1; verify `Auto` picks the expected backend.
 - [ ] 6.4 Extend `src/config.rs` to parse a top-level `distance_backend`, add the CLI flag, and add `tests/pipeline_config_test.rs` coverage; verify valid values parse, unknown values are rejected, and the CLI wins over TOML without a clap `default_value` shadowing it.
 - [ ] 6.5 Wire the API, WASM, and Qt constructors to the shared policy constructor; verify each crate builds and one end-to-end solve per surface succeeds.
 - [ ] 6.6 Fix the WASM scoring-only paths (`compare_tours_from_input`, `tour_distance_from_input`) to pick `Matrix` for explicit weights and `OnTheFly` for coordinates; verify an EXPLICIT TSPLIB input still scores in WASM.
@@ -65,7 +65,7 @@
 - [ ] 6.8 Set the per-family runtime tolerance and the memory expectation from the sweep using medians/distributions across the repeated runs, and record them in `docs/benchmarks/distance-source.md`; verify the numbers match the raw rows and no claim rests on a single run.
 - [ ] 6.9 Add `scripts/check-distance-benchmarks.py` that reads the local JSONL and fails when a runtime or memory bound is violated; verify a deliberately slower run fails the check.
 - [ ] 6.10 Flip the default to `Auto` only after tasks 6.8 and 6.9; verify the documented threshold equals the measured one.
-- [ ] 6.11 Add the 100k-city SFC end-to-end measurement in a fresh process; verify it returns a valid tour with peak RSS below 1 GiB.
+- [x] 6.11 Add the 100k-city SFC end-to-end measurement in a fresh process; verify it returns a valid tour with peak RSS below 1 GiB.
 - [ ] 6.12 Document the flag, threshold, and memory/CPU trade-off; verify the documented commands run as written.
 - [ ] 6.13 Document the manual per-release gate and keep the comparison run file out of `publish-benchmarks.sh`; verify the public leaderboard's configs are unchanged and the comparison report is linked from the benchmark docs.
 

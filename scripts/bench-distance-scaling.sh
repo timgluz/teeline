@@ -129,16 +129,18 @@ for n in "${SIZES[@]}"; do
     row="$(jq -cn \
       --argjson size "$n" --arg solver "$SOLVER" --arg status "$status" \
       --argjson wall "$wall" --argjson rss "$rss" --argjson tour "$tour" \
-      --argjson m "$MEASUREMENT" --args "${EXTRA_ARGS[@]}" \
+      --argjson m "$MEASUREMENT" --args \
       '{size:$size, solver:$solver, status:$status, wall_s:$wall,
-        peak_rss_kb:$rss, tour_cost:$tour, args:$ARGS.positional, measurement:$m}')"
+        peak_rss_kb:$rss, tour_cost:$tour, args:$ARGS.positional, measurement:$m}' \
+      -- "${EXTRA_ARGS[@]}")"
   else
     row="$(jq -cn \
       --argjson size "$n" --arg solver "$SOLVER" --arg status "$status" \
       --argjson wall "$wall" --argjson rss "${rss:-null}" --arg reason "$reason" \
-      --argjson m "$MEASUREMENT" --args "${EXTRA_ARGS[@]}" \
+      --argjson m "$MEASUREMENT" --args \
       '{size:$size, solver:$solver, status:$status, wall_s:$wall,
-        peak_rss_kb:$rss, reason:$reason, args:$ARGS.positional, measurement:$m}')"
+        peak_rss_kb:$rss, reason:$reason, args:$ARGS.positional, measurement:$m}' \
+      -- "${EXTRA_ARGS[@]}")"
   fi
   printf '%s\n' "$row" >>"$OUT"
   printf '    %-8s %-8s wall=%ss rss=%sKB%s\n' "$n" "$status" "$wall" "${rss:-?}" \

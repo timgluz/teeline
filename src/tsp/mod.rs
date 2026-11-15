@@ -40,6 +40,7 @@ pub mod three_opt;
 pub mod tsplib;
 pub mod two_opt;
 
+use crate::tsp::distance_matrix::DistanceMatrix;
 use crate::tsp::kdtree::KDPoint;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -243,6 +244,126 @@ impl FromStr for DistanceType {
             "CEIL_2D" | "CEIL2D" => Ok(DistanceType::Ceil2D),
             other => Err(format!("unsupported distance type: {other}")),
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Distance backend selection
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DistanceBackend {
+    /// Matrix at or below the threshold, on-the-fly above it.
+    #[default]
+    Auto,
+    Matrix,
+    OnTheFly,
+}
+
+impl DistanceBackend {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DistanceBackend::Auto => "auto",
+            DistanceBackend::Matrix => "matrix",
+            DistanceBackend::OnTheFly => "on-the-fly",
+        }
+    }
+}
+
+impl FromStr for DistanceBackend {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "auto" => Ok(DistanceBackend::Auto),
+            "matrix" => Ok(DistanceBackend::Matrix),
+            "on-the-fly" | "on_the_fly" | "onthefly" => Ok(DistanceBackend::OnTheFly),
+            other => Err(format!("unsupported distance backend: {other}")),
+        }
+    }
+}
+
+/// Above this city count, `Auto` switches coordinate input to the on-the-fly backend.
+/// The value is a starting hypothesis; the benchmark report must confirm it before `Auto`
+/// becomes the documented default behavior.
+pub const AUTO_ON_THE_FLY_THRESHOLD: usize = 20_000;
+
+/// Pure selection rule, split out so the threshold boundary is testable without building a
+/// 20k-city matrix.
+pub(crate) fn selects_on_the_fly(n: usize, backend: DistanceBackend) -> bool {
+    match backend {
+        DistanceBackend::Matrix => false,
+        DistanceBackend::OnTheFly => true,
+        DistanceBackend::Auto => n > AUTO_ON_THE_FLY_THRESHOLD,
+    }
+}
+
+/// Build the distance source selected by `backend` for coordinate input.
+///
+/// EXPLICIT is rejected: the parser supplies only placeholder coordinates for those files, so
+/// a coordinate-computed source would silently optimize the wrong objective.
+pub(crate) fn build_distance_source(
+    cities: &[KDPoint],
+    dt: DistanceType,
+    backend: DistanceBackend,
+) -> Result<Arc<dyn DistanceSource>, String> {
+    if dt == DistanceType::Explicit {
+        return Err(
+            "EXPLICIT distances cannot be computed from coordinates; provide edge weights"
+                .to_string(),
+        );
+    }
+
+    let use_on_the_fly = selects_on_the_fly(cities.len(), backend);
+
+    if use_on_the_fly {
+        Ok(Arc::new(OnTheFly::new(cities, dt)?))
+    } else {
+        Ok(Arc::new(
+            DistanceMatrix::build(cities, dt).map_err(|e| e.to_string())?,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod distance_backend_tests {
+    use super::*;
+
+    #[test]
+    fn backend_names_round_trip() {
+        for backend in [
+            DistanceBackend::Auto,
+            DistanceBackend::Matrix,
+            DistanceBackend::OnTheFly,
+        ] {
+            assert_eq!(
+                backend.as_str().parse::<DistanceBackend>().unwrap(),
+                backend
+            );
+        }
+        assert_eq!(
+            "on_the_fly".parse::<DistanceBackend>().unwrap(),
+            DistanceBackend::OnTheFly
+        );
+        assert!("unknown".parse::<DistanceBackend>().is_err());
+    }
+
+    #[test]
+    fn auto_threshold_switches_to_on_the_fly() {
+        assert!(!selects_on_the_fly(
+            AUTO_ON_THE_FLY_THRESHOLD - 1,
+            DistanceBackend::Auto
+        ));
+        assert!(!selects_on_the_fly(
+            AUTO_ON_THE_FLY_THRESHOLD,
+            DistanceBackend::Auto
+        ));
+        assert!(selects_on_the_fly(
+            AUTO_ON_THE_FLY_THRESHOLD + 1,
+            DistanceBackend::Auto
+        ));
+        assert!(!selects_on_the_fly(usize::MAX, DistanceBackend::Matrix));
+        assert!(selects_on_the_fly(2, DistanceBackend::OnTheFly));
     }
 }
 
@@ -1953,6 +2074,16 @@ impl TspProblem {
             );
         }
         TspProblem { cities, distances }
+    }
+
+    /// Build a coordinate source according to the selection policy.
+    pub fn from_points(
+        cities: Vec<KDPoint>,
+        dt: DistanceType,
+        backend: DistanceBackend,
+    ) -> Result<Self, String> {
+        let source = build_distance_source(&cities, dt, backend)?;
+        Ok(Self::from_source(cities, source))
     }
 }
 

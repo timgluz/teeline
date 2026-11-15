@@ -91,6 +91,19 @@ Two findings:
    is as important as changing the O(n²) layout; the Phase 4 work should measure them
    separately.
 
+## On-the-fly scaling result
+
+`sfc` with `--distance-backend on-the-fly`, same synthetic generator:
+
+| Cities | Status | Wall | Peak RSS |
+|---:|---|---:|---:|
+| 1,000 | ok | 0.0153s | 7.1 MB |
+| 10,000 | ok | 0.0383s | 8.5 MB |
+| 100,000 | ok | 0.2220s | 23.3 MB |
+
+The 100k run stays under 1 GiB with three orders of magnitude of headroom; the matrix run at
+the same size was killed at 25.76 GiB. This is the acceptance path for #647.
+
 ## LK metric-fix re-baseline
 
 LK used to build a private EUC_2D matrix, so it optimized the wrong objective on GEO, ATT,
