@@ -399,12 +399,34 @@ jobs:
           PYEOF
       - name: Package AppImage
         env:
-          QMLPATHS: ${{ github.workspace }}/teeline-qt/src
+          # linuxdeploy-plugin-qt reads QML_SOURCES_PATHS (not QMLPATHS). Without it the
+          # AppImage ships Qt libraries but no QtQuick modules and fails at QML load.
+          QML_SOURCES_PATHS: ${{ github.workspace }}/teeline-qt/src
+          # Bundle the offscreen platform so CI can smoke-test the bundle headlessly.
+          EXTRA_PLATFORM_PLUGINS: "libqoffscreen.so"
           LD_LIBRARY_PATH: ${{ env.QT_ROOT_DIR }}/lib
         run: |
           ./linuxdeploy-x86_64.AppImage --appdir=AppDir --plugin qt --output appimage
           # linuxdeploy names the file using the desktop entry Name + arch
           mv Teeline_Qt-x86_64.AppImage "teeline-qt-${{ needs.plan.outputs.tag }}-linux-x86_64.AppImage"
+      - name: Verify QML modules were bundled
+        run: |
+          test -d AppDir/usr/qml/QtQuick
+          test -d AppDir/usr/qml/QtQuick/Controls
+      - name: Smoke-test the AppImage (offscreen)
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout 8 "./teeline-qt-${{ needs.plan.outputs.tag }}-linux-x86_64.AppImage" > smoke.log 2>&1
+          rc=$?
+          cat smoke.log
+          if grep -q "failed to load component" smoke.log; then
+            echo "AppImage failed to load its QML modules"
+            exit 1
+          fi
+          # 124 means timeout killed a running event loop; 0 means it exited cleanly.
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+            exit "$rc"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: qt-linux
