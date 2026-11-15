@@ -10,7 +10,7 @@ ApplicationWindow {
     id: root
     visible: true
     width: 900
-    height: 640
+    height: 780
     // The loaded page (metadata, mini-map, opt tour, five recent rows, action
     // bar) needs ~760px. Below that the ColumnLayout squeezes and later items
     // cover the buttons, so they stop receiving clicks.
