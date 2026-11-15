@@ -228,7 +228,7 @@ impl FileLoader {
                 {
                     let opt_path = parent.join(format!("{}.opt.tour", stem.to_string_lossy()));
                     if opt_path.exists() {
-                        self.load_opt_tour(opt_path.to_string_lossy().into_owned());
+                        self.try_load_sibling_opt_tour(opt_path.to_string_lossy().into_owned());
                     }
                 }
             }
@@ -239,47 +239,59 @@ impl FileLoader {
         }
     }
 
+    /// Best-effort sibling opt-tour load. A malformed `.opt.tour` beside the problem
+    /// (for example a TSPLIB stub with an empty `TOUR_SECTION`) must not turn a
+    /// successful problem load into an error banner.
+    fn try_load_sibling_opt_tour(&mut self, path: String) {
+        if let Err(error) = self.apply_opt_tour(&path) {
+            eprintln!("[FileLoader] ignoring sibling opt tour {path}: {error}");
+            self.set_has_opt_tour(false);
+            self.set_opt_tour_route_json("[]".to_string());
+            self.set_opt_tour_cost(0.0);
+            self.set_opt_tour_file_path(String::new());
+        }
+    }
+
     /// Load a known-optimal .opt.tour file and compute its cost against the loaded problem.
     #[qslot]
     fn load_opt_tour(&mut self, path: String) {
-        let clean = path.strip_prefix("file://").unwrap_or(&path).to_string();
+        if let Err(error) = self.apply_opt_tour(&path) {
+            self.set_error_message(error);
+        }
+    }
+
+    /// Shared opt-tour loader. Returns the user-facing error without setting the banner.
+    fn apply_opt_tour(&mut self, path: &str) -> Result<(), String> {
+        let clean = path.strip_prefix("file://").unwrap_or(path).to_string();
 
         if self.cached_cities.is_empty() {
-            self.set_error_message("Load a .tsp file before loading an optimal tour".to_string());
-            return;
+            return Err("Load a .tsp file before loading an optimal tour".to_string());
         }
 
-        match opt_tour::read_from_file(Path::new(&clean)) {
-            Ok(opt) => {
-                // Validate: dimension and city IDs must match the loaded problem
-                if opt.route.len() != self.cached_cities.len() {
-                    self.set_error_message(format!(
-                        "opt.tour has {} cities but problem has {}",
-                        opt.route.len(),
-                        self.cached_cities.len()
-                    ));
-                    return;
-                }
-                let valid_ids: std::collections::HashSet<usize> =
-                    self.cached_cities.iter().map(|c| c.id).collect();
-                if opt.route.iter().any(|id| !valid_ids.contains(id)) {
-                    self.set_error_message(
-                        "opt.tour contains city IDs not in the loaded problem".to_string(),
-                    );
-                    return;
-                }
+        let opt =
+            opt_tour::read_from_file(Path::new(&clean)).map_err(|e| format!("opt.tour: {e}"))?;
 
-                let cost = tour_cost(&opt.route, &self.cached_cities);
-                self.set_opt_tour_route_json(route_to_json(&opt.route));
-                self.set_opt_tour_cost(cost);
-                self.set_opt_tour_file_path(clean);
-                self.set_has_opt_tour(true);
-                self.set_error_message(String::new());
-            }
-            Err(e) => {
-                self.set_error_message(format!("opt.tour: {e}"));
-            }
+        // Validate: dimension and city IDs must match the loaded problem
+        if opt.route.len() != self.cached_cities.len() {
+            return Err(format!(
+                "opt.tour has {} cities but problem has {}",
+                opt.route.len(),
+                self.cached_cities.len()
+            ));
         }
+        let valid_ids: std::collections::HashSet<usize> =
+            self.cached_cities.iter().map(|c| c.id).collect();
+        if opt.route.iter().any(|id| !valid_ids.contains(id)) {
+            return Err("opt.tour contains city IDs not in the loaded problem".to_string());
+        }
+
+        let cost = tour_cost(&opt.route, &self.cached_cities);
+        self.set_opt_tour_route_json(route_to_json(&opt.route));
+        self.set_opt_tour_cost(cost);
+        self.set_opt_tour_file_path(clean);
+        self.set_has_opt_tour(true);
+        self.set_error_message(String::new());
+        Ok(())
     }
 }
 
