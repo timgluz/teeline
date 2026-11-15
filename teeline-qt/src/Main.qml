@@ -99,7 +99,10 @@ ApplicationWindow {
                     Button {
                         Layout.alignment: Qt.AlignHCenter
                         text: "Browse…"
-                        onClicked: fileDialog.open()
+                        onClicked: {
+                            fileDialog.selectedNameFilter = "TSPLIB files (*.tsp)"
+                            fileDialog.open()
+                        }
                     }
                 }
 
@@ -138,6 +141,13 @@ ApplicationWindow {
                     Text { text: FileLoader.cityCount;      color: theme.textPrimary; font.pixelSize: 14 }
                     Text { text: "Edge weights:";  color: theme.textMuted; font.pixelSize: 12 }
                     Text { text: FileLoader.edgeWeightType; color: theme.textPrimary; font.pixelSize: 14 }
+                    Button {
+                        text: "Open another .tsp…"
+                        onClicked: {
+                            fileDialog.selectedNameFilter = "TSPLIB files (*.tsp)"
+                            fileDialog.open()
+                        }
+                    }
                 }
 
                 Canvas {
@@ -191,7 +201,10 @@ ApplicationWindow {
                 }
                 Button {
                     text: FileLoader.hasOptTour ? "Replace…" : "Browse…"
-                    onClicked: optTourDialog.open()
+                    onClicked: {
+                        optTourDialog.selectedNameFilter = "Tour files (*.tour *.opt.tour)"
+                        optTourDialog.open()
+                    }
                 }
             }
 
