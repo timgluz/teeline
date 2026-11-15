@@ -2,10 +2,10 @@
 
 ## 1. Embedding module
 
-- [ ] 1.1 Add `src/tsp/embedding.rs` with `mds_embed(n, distance)` using `f64` internals, double-centering, zero-mean trigonometric start vectors (`cos`/`sin`), per-iteration re-centering, unshifted deflation with a recomputed shift, Gram–Schmidt against the first axis, and sign canonicalization for both axes; verify a unit test reconstructs a planar point set up to translation, rotation, and reflection.
-- [ ] 1.2 Add isotropic (square and `ring6_explicit`), collinear, high-aspect-ratio, non-Euclidean, repeated-derivation, and `n = 2` tests; verify every case is finite and deterministic, the isotropic case keeps two dimensions, and the collinear case does not fabricate a second axis.
-- [ ] 1.3 Register the module in `src/tsp/mod.rs` and document why classical MDS, why hand-rolled power iteration, the `f64` choice, the O(n²) scratch, the EXPLICIT-only scope, and the relationship to `scripts/lib/problem-minimap.mjs`; verify `cargo test -p teeline embedding` passes and the docs explain the limits.
-- [ ] 1.4 Write ADR 012 recording the derived-layout decision, the `has_real_coordinates` versus `DistanceSource::has_coordinates` split, and the corrected power-iteration recipe, then add it to `docs/adr/README.md`; verify the index links it and notes the `city-id-position` ADR-number collision.
+- [x] 1.1 Add `src/tsp/embedding.rs` with `mds_embed(n, distance)` using `f64` internals, double-centering, zero-mean trigonometric start vectors (`cos`/`sin`), per-iteration re-centering, unshifted deflation with a recomputed shift, Gram–Schmidt against the first axis, and sign canonicalization for both axes; verify a unit test reconstructs a planar point set up to translation, rotation, and reflection.
+- [x] 1.2 Add isotropic (square and a regular hexagon), collinear, high-aspect-ratio, non-Euclidean (`ring6_explicit`), repeated-derivation, and `n = 2` tests; verify every case is finite and deterministic, the isotropic case keeps two dimensions, and the collinear case does not fabricate a second axis.
+- [x] 1.3 Register the module in `src/tsp/mod.rs` and document why classical MDS, why hand-rolled power iteration, the `f64` choice, the O(n²) scratch, the EXPLICIT-only scope, and the relationship to `scripts/lib/problem-minimap.mjs`; verify `cargo test -p teeline embedding` passes and the docs explain the limits.
+- [x] 1.4 Write ADR 012 recording the derived-layout decision, the `has_real_coordinates` versus `DistanceSource::has_coordinates` split, and the corrected power-iteration recipe, then add it to `docs/adr/README.md`; verify the index links it and notes the `city-id-position` ADR-number collision.
 
 ## 2. Parse-time embedding
 
