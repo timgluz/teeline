@@ -95,12 +95,21 @@ pub(crate) fn mds_embed(n: usize, distance: impl Fn(usize, usize) -> f32) -> Vec
     let first_scale = first_value.max(0.0).sqrt();
     let second_scale = second_value.max(0.0).sqrt();
 
-    let mut xs: Vec<f64> = (0..n).map(|i| first[i] * first_scale).collect();
-    let mut ys: Vec<f64> = (0..n).map(|i| second[i] * second_scale).collect();
-    centre(&mut xs);
-    centre(&mut ys);
+    // Centre the scaled axes in one pass. Subtracting the mean of the scaled values is the same
+    // arithmetic the per-axis `centre` helper did, so the coordinates stay bit-identical.
+    let first_mean = first.iter().map(|&x| x * first_scale).sum::<f64>() / n as f64;
+    let second_mean = second.iter().map(|&y| y * second_scale).sum::<f64>() / n as f64;
 
-    (0..n).map(|i| [xs[i] as f32, ys[i] as f32]).collect()
+    first
+        .iter()
+        .zip(&second)
+        .map(|(&x, &y)| {
+            [
+                (x * first_scale - first_mean) as f32,
+                (y * second_scale - second_mean) as f32,
+            ]
+        })
+        .collect()
 }
 
 fn finite_distance(distance: f32) -> f64 {
