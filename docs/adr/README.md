@@ -13,7 +13,7 @@ principles every decision must respect; an ADR must not contradict it.
 | --- | --- | --- |
 | [001](001-tracing.md) | Structured logging via `tracing` to stderr | Accepted |
 | [002](002-taskfile.md) | Taskfile as task runner | Accepted |
-| [003](003-coverage.md) | Test coverage via `cargo-llvm-cov` | Accepted |
+| [003](003-coverage.md) | Test coverage via `cargo-llvm-cov` | Superseded by 011 |
 | [004](004-egui-migration.md) | Replace `piston_window` with egui/eframe | Superseded by 008 |
 | [005](005-validation-approach.md) | Hand-rolled validation over `garde` | Accepted |
 | [006](006-teeline-gui-extraction.md) | Extract eframe GUI into `teeline-gui` | Superseded by 008 |
@@ -21,6 +21,7 @@ principles every decision must respect; an ADR must not contradict it.
 | [008](008-qt-gui.md) | Qt 6/QML desktop GUI in `teeline-qt` | Accepted |
 | [009](009-wasm-component-model.md) | WebAssembly Component Model for solver exposure | Accepted |
 | [010](010-distance-source.md) | Distance-source boundary with swappable backends | Proposed |
+| [011](011-remove-codecov.md) | Remove Codecov from CI | Accepted |
 
 ## Adding an ADR
 

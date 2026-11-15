@@ -39,14 +39,3 @@ jobs:
         run: task test:e2e:auth
       - name: Clippy
         run: cargo clippy -p teeline-api -- -D warnings
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Coverage
-        run: cargo llvm-cov -p teeline-api --lcov --output-path lcov.info
-      - name: Upload coverage
-        uses: codecov/codecov-action@v7
-        with:
-          files: lcov.info
-          flags: api
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
