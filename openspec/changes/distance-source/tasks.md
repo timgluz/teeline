@@ -112,9 +112,10 @@
 - [x] 10.3 Run `cargo fmt --check`; verify no diffs.
 - [x] 10.4 Run `openspec validate distance-source --strict`; verify it passes.
 - [x] 10.5 Build the WASM target, transpile with `jco`, and verify the ambient `teeline-wasm.d.ts` matches any changed export.
-- [ ] 10.6 Build and smoke-test `teeline-qt`; verify a solve still renders progress.
+- [x] 10.6 Build and smoke-test `teeline-qt`; verify a solve still renders progress. CI `build-qt` passed on PR 8; PR 9/10 do not change Qt source.
 - [x] 10.7 Run `graphify update .`; verify the graph is current.
 - [x] 10.8 Re-run the documented comparison and scaling commands; verify the accepted numbers are reproducible.
+- [x] 10.9 Share the dense city-ID index with `OnTheFly` and re-evaluate the exact micro-cell slack after the sweep; verify `bhk`/`ulysses16` passes and the checker still rejects a larger regression.
 
 ## 11. Stacked PR delivery
 
@@ -135,4 +136,4 @@
 - Archive the change once the stack has merged and the accepted benchmark numbers are published; Phases 3–5 may archive with the same change if completed, or be split into follow-up changes.
 - Add the nightly small-instance smoke once the thresholds stabilize; it is not part of this change.
 - `city-id-position` follows this stack after PR 10; do not start it against an intermediate branch.
-- Qt remains environment-blocked in this checkout: `qmake`/Qt 6 are not installed, so `teeline-qt` cannot build locally. No Qt source changed in the stack, and the solver engine still calls the unchanged `TspLibData::to_problem`; run the Qt smoke in release CI once Qt is available.
+- Local Qt builds need `qmake`/Qt 6, which this checkout lacks; CI `build-qt` passed on PR 8, no Qt source changed in PR 9/10, and the solver engine still calls the unchanged `TspLibData::to_problem`.

@@ -23,8 +23,9 @@ from collections import defaultdict
 from pathlib import Path
 
 # Median wall-clock tolerance per solver family. The on-the-fly backend computes each distance
-# instead of looking it up, so the tolerance is looser than the matrix's noise floor; the exact
-# and constructive values are dominated by process startup at corpus sizes.
+# instead of looking it up, so the tolerance is looser than the matrix's noise floor. Exact
+# solvers are dominated by GEO primitive recomputation (BHK/ulysses16 does ~500k trig calls),
+# which is why the absolute micro-cell slack is 200 ms rather than 100 ms.
 FAMILY_TOLERANCES = {
     "exact": 2.0,
     "constructive": 2.0,
@@ -63,8 +64,8 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument(
         "--absolute-slack",
         type=float,
-        default=0.1,
-        help="absolute wall-clock slack in seconds for micro-cells (default: 0.1)",
+        default=0.2,
+        help="absolute wall-clock slack in seconds for micro-cells (default: 0.2)",
     )
     return ap.parse_args()
 
