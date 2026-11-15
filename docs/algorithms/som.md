@@ -106,6 +106,13 @@ learning_rate = 0.9
   unusually large.
 - **Quality**: on berlin52, typical gap is ~5–15% standalone. Piping into 2-opt routinely
   reduces this to ~3–7%.
+- **Explicit instances without coordinates**: SOM trains on a 2D layout derived from the
+  distance matrix with classical MDS; the tour is scored with the exact matrix, but map quality
+  depends on the derived geometry.
+
+## Benchmarks
+
+Published results for this solver are rendered below.
 
 ## References
 
