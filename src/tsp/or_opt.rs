@@ -1,5 +1,5 @@
 use super::DistanceSource;
-use super::candidate_list;
+use super::candidate_list::{self, CandidateList};
 use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
@@ -43,17 +43,16 @@ pub fn solve(
     }
 
     // A candidate list is a pruning heuristic: every relocation is still scored with the exact
-    // distance source. EXPLICIT inputs carry placeholder coordinates, so they keep the full scan.
-    let candidates = if distances.has_coordinates() {
-        Some(candidate_list::build(
-            cities,
-            opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K),
-        ))
+    // distance source. EXPLICIT inputs carry placeholder coordinates, so they keep the full
+    // scan. When k covers every city there is nothing to prune, so the full scan is cheaper.
+    let k = opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K);
+    let candidates = if distances.has_coordinates() && k < n.saturating_sub(1) {
+        Some(CandidateList::build(cities, k))
     } else {
         None
     };
 
-    while let Some(best) = find_best_move(&path, distances.as_ref(), candidates.as_deref()) {
+    while let Some(best) = find_best_move(&path, distances.as_ref(), candidates.as_ref()) {
         let (_, i, j, seg_len, reversed) = best;
 
         #[cfg(debug_assertions)]
@@ -92,10 +91,11 @@ pub fn solve(
 fn find_best_move(
     path: &[usize],
     distances: &dyn DistanceSource,
-    candidates: Option<&[Vec<usize>]>,
+    candidates: Option<&CandidateList>,
 ) -> Option<(f32, usize, usize, usize, bool)> {
     let n = path.len();
-    let pos = candidates.map(|_| candidate_list::positions(path));
+    let route_positions = candidates.map(|candidates| candidates.route_positions(path));
+    let mut js = Vec::new();
     // -1e-3 threshold avoids infinite loops from f32 rounding at large coordinate scales.
     let mut best_delta = -1e-3_f32;
     let mut best: Option<(f32, usize, usize, usize, bool)> = None;
@@ -130,19 +130,10 @@ fn find_best_move(
                 + distances.distance_between(last_seg, d).unwrap_or(f32::MAX)
                 - distances.distance_between(a, d).unwrap_or(f32::MAX);
 
-            // Try inserting the segment after every valid position j. With a candidate list,
-            // only positions adjacent to the segment endpoints are considered; exact
-            // distances still score every move.
-            let js: Vec<usize> = match (candidates, pos.as_deref()) {
-                (Some(cands), Some(pos)) => {
-                    candidate_list::candidate_positions(cands, pos, first_seg, last_seg)
-                }
-                _ => (0..n).collect(),
-            };
-            for j in js {
+            let mut consider = |j: usize| {
                 // Forbidden window: {prev, i, i+1, ..., i+seg_len-1}
                 if j == prev || (j >= i && j < i + seg_len) {
-                    continue;
+                    return;
                 }
                 // For non-wrapping forbidden window (prev < i), also OK:
                 // j < prev or j >= i+seg_len are both valid.
@@ -176,6 +167,30 @@ fn find_best_move(
                         best = Some((rev_delta, i, j, seg_len, true));
                     }
                 }
+            };
+
+            // With a candidate list, only positions adjacent to the segment endpoints are
+            // considered; exact distances still score every move. EXPLICIT inputs take the
+            // full scan, reusing the same closure and scratch buffer.
+            match (candidates, route_positions.as_deref()) {
+                (Some(candidates), Some(route_positions)) => {
+                    candidate_list::candidate_positions_into(
+                        candidates,
+                        route_positions,
+                        n,
+                        first_seg,
+                        last_seg,
+                        &mut js,
+                    );
+                    for &j in &js {
+                        consider(j);
+                    }
+                }
+                _ => {
+                    for j in 0..n {
+                        consider(j);
+                    }
+                }
             }
         }
     }
@@ -206,7 +221,7 @@ fn apply_relocation(tour: &mut Vec<usize>, i: usize, seg_len: usize, j: usize, r
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
+    use crate::tsp::{DistanceSource, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn make_problem(coords: &[[f32; 2]]) -> TspProblem {
         let cities =
@@ -289,6 +304,58 @@ mod tests {
             result.is_none(),
             "expected no improvement on optimal square tour, got {result:?}"
         );
+    }
+
+    #[test]
+    fn find_best_move_with_candidates_matches_full_scan() {
+        let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [5.0, 5.0], [2.0, 0.0], [3.0, 0.0]]);
+        let path: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
+        let full = find_best_move(&path, problem.distances.as_ref(), None);
+
+        // k = n - 1 makes every other city a candidate, so the pruned scan must find the
+        // same move as the full scan.
+        let candidates = CandidateList::build(&problem.cities, 4);
+        let pruned = find_best_move(&path, problem.distances.as_ref(), Some(&candidates));
+        assert_eq!(full, pruned);
+    }
+
+    #[test]
+    fn explicit_input_keeps_the_full_scan_and_improves() {
+        let n = 20;
+        let cities = kdtree::build_points(&(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>());
+        let city_table: crate::tsp::CityTable = cities
+            .iter()
+            .enumerate()
+            .map(|(i, city)| (i, *city))
+            .collect();
+        // Ring metric: moving one step costs 1, wrapping costs 1.
+        let mut packed = Vec::with_capacity(n * (n - 1) / 2);
+        for i in 1..n {
+            for j in 0..i {
+                let delta = i - j;
+                packed.push(delta.min(n - delta) as f32);
+            }
+        }
+        let dm = distance_matrix::DistanceMatrix::new(n, packed, city_table);
+        assert!(
+            !dm.has_coordinates(),
+            "EXPLICIT matrices must not advertise coordinates"
+        );
+
+        let problem = TspProblem::new(cities, dm);
+        let mut start: Vec<usize> = (0..n).collect();
+        start.swap(1, 2); // identity with 1 and 2 swapped: one Or-1 move from the ring order
+        let start_cost = problem.distances.tour_length(&start);
+
+        let result = solve(&problem, &HeuristicOptions::default(), None, Some(&start));
+        assert!(
+            result.total < start_cost,
+            "or-opt must improve the bad start ({start_cost}), got {}",
+            result.total
+        );
+        let mut ids = result.route().to_vec();
+        ids.sort_unstable();
+        assert_eq!(ids, (0..n).collect::<Vec<_>>());
     }
 
     // ------------------------------------------------------------------

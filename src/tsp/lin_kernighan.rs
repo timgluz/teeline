@@ -1,4 +1,5 @@
 use super::DistanceSource;
+use super::candidate_list::CandidateList;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
     HeuristicOptions, LKOptions, Solution, TspProblem, kdtree::KDPoint, nearest_neighbor,
@@ -7,8 +8,8 @@ use crate::tsp::{
 use rand::{RngExt, SeedableRng};
 use std::sync::mpsc;
 
-pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> Vec<Vec<usize>> {
-    super::candidate_list::build(cities, k)
+pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> CandidateList {
+    super::candidate_list::CandidateList::build(cities, k)
 }
 
 fn send_progress(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize], dist: f32) {
@@ -258,7 +259,7 @@ fn find_lk_chain(
     next: &[usize],
     prev: &[usize],
     dm: &dyn DistanceSource,
-    candidates: &[Vec<usize>],
+    candidates: &CandidateList,
 ) -> bool {
     // After at least one add-remove pair, try closing with edge (t_open, t1).
     if depth >= 1 {
@@ -272,7 +273,7 @@ fn find_lk_chain(
         return false;
     }
 
-    for &t_next in &candidates[t_open] {
+    for &t_next in candidates.neighbours(t_open) {
         // LK positive-gain bound: candidates sorted by distance, so break (not continue).
         let g1 = gain - d(dm, t_open, t_next);
         if g1 <= EPS {
@@ -331,7 +332,7 @@ fn find_lk_move(
     next: &[usize],
     prev: &[usize],
     dm: &dyn DistanceSource,
-    candidates: &[Vec<usize>],
+    candidates: &CandidateList,
     max_depth: usize,
     city_ids: &[usize],
 ) -> Option<Vec<usize>> {
@@ -439,7 +440,7 @@ fn apply_lk_chain(chain: &[usize], tour: &mut [usize], pos: &mut [usize]) {
 fn lk_pass(
     tour: &mut [usize],
     pos: &mut [usize],
-    candidates: &[Vec<usize>],
+    candidates: &CandidateList,
     dm: &dyn DistanceSource,
     max_depth: usize,
 ) -> bool {
@@ -505,8 +506,9 @@ mod tests {
     fn build_candidates_returns_k_nearest_for_each_city() {
         let pts = build_points(6);
         let cands = build_candidates(&pts, 3);
-        assert_eq!(cands.len(), 6);
-        for (i, row) in cands.iter().enumerate() {
+        assert_eq!(cands.num_cities(), 6);
+        for i in 0..cands.num_cities() {
+            let row = cands.neighbours(i);
             assert_eq!(row.len(), 3, "city {i} must have 3 candidates");
             assert!(!row.contains(&i), "city {i} must not be its own candidate");
         }
@@ -517,7 +519,8 @@ mod tests {
         let pts = build_points(6);
         let dm = distance_matrix::from_cities(&pts);
         let cands = build_candidates(&pts, 4);
-        for (i, row) in cands.iter().enumerate() {
+        for i in 0..cands.num_cities() {
+            let row = cands.neighbours(i);
             let dists: Vec<f32> = row
                 .iter()
                 .map(|&j| dm.distance_between(i, j).unwrap_or(f32::MAX))
@@ -532,8 +535,8 @@ mod tests {
     fn build_candidates_k_clamps_to_n_minus_1() {
         let pts = build_points(4);
         let cands = build_candidates(&pts, 10);
-        for row in &cands {
-            assert!(row.len() <= 3);
+        for i in 0..cands.num_cities() {
+            assert!(cands.neighbours(i).len() <= 3);
         }
     }
 
@@ -973,7 +976,7 @@ mod tests {
             let start = Instant::now();
             let candidates = build_candidates(&pts, 5);
             let elapsed = start.elapsed();
-            assert_eq!(candidates.len(), n);
+            assert_eq!(candidates.num_cities(), n);
             println!("build_candidates n={n} k=5: {elapsed:?}");
         }
     }

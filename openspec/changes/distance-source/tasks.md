@@ -80,6 +80,11 @@
 - [x] 7.3 Measure memory and runtime against the full-neighbourhood evaluation on `a280` and `att532`; verify the report gains before/after rows.
 - [x] 7.4 Add a quality test comparing candidate-list tours to the published optima (`a280` 2579, `att532` 27686) using seeded or median runs; verify the gap is within the documented tolerance.
 - [x] 7.5 Document candidate-list usage, its raw-Euclidean geo-ranking caveat, and its tolerance, and note the expected baseline updates for `2opt`/`or_opt`; verify the document matches the benchmark report.
+- [x] 7.6 Index candidate rows by dense city position, with a bounded map fallback for sparse external IDs and safe lookups for unknown IDs; verify non-contiguous and sparse-ID tests and that memory stays O(n·k + n).
+- [x] 7.7 Return the cyclic predecessor of route position 0, reuse a scratch buffer for candidate positions, and unit-test wrap-around, dedup, and empty-route cases; verify the or-opt last-insertion position is considered.
+- [x] 7.8 Restore first-improvement on the full-scan path, gate candidate construction when `k` covers every city, and compute `tour_length` only for progress/trace; verify the full-scan baseline returns to its pre-candidate-list cost and runtime.
+- [x] 7.9 Add a candidate-list `find_best_move` test and an EXPLICIT `or_opt` solve above the candidate floor; verify the EXPLICIT path keeps the full scan and improves a bad start.
+- [x] 7.10 Re-run the five-run candidate-vs-full comparison after the review fixes and update the report; verify the documented speedups and gaps match the medians.
 
 ## 8. Phase 4 — Compact EXPLICIT storage
 

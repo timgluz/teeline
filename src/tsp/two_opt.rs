@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use super::DistanceSource;
-use super::candidate_list;
+use super::candidate_list::{self, CandidateList};
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
@@ -33,25 +33,50 @@ pub fn solve(
 
     // A candidate list is a pruning heuristic: every move is still scored with the exact
     // distance source. EXPLICIT inputs carry placeholder coordinates, so they keep the full
-    // scan instead of ranking meaningless neighbours.
-    let candidates = if distances.has_coordinates() {
-        Some(candidate_list::build(
-            cities,
-            opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K),
-        ))
+    // scan instead of ranking meaningless neighbours. When k covers every city there is
+    // nothing to prune, so the full scan is also cheaper than building the table.
+    let k = opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K);
+    let candidates = if distances.has_coordinates() && k < cities.len().saturating_sub(1) {
+        Some(CandidateList::build(cities, k))
     } else {
         None
     };
 
     let n_indices = cities.len() - 1;
+    match candidates {
+        Some(candidates) => best_improvement_passes(
+            &mut path,
+            distances.as_ref(),
+            &candidates,
+            n_indices,
+            progress_tx,
+        ),
+        None => first_improvement_passes(&mut path, distances.as_ref(), n_indices, progress_tx),
+    }
+
+    if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::Done);
+    }
+    Solution::from_parts(&path, cities, distances.as_ref())
+}
+
+/// Best-improvement pass over candidate endpoints.
+///
+/// The route is unchanged while candidates are evaluated, so one position map stays valid for
+/// the whole pass. A candidate list keeps each pass at O(n·k); the alternative, first
+/// improvement, would need to repair the map after every accepted swap.
+fn best_improvement_passes(
+    path: &mut [usize],
+    distances: &dyn DistanceSource,
+    candidates: &CandidateList,
+    n_indices: usize,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+) {
     let mut improved = true;
+    let mut js = Vec::new();
     while improved {
         improved = false;
-        // Best-improvement pass: the route is unchanged while candidates are evaluated, so
-        // the position map stays valid for the whole pass.
-        let pos = candidates
-            .as_ref()
-            .map(|_| candidate_list::positions(&path));
+        let route_positions = candidates.route_positions(path);
         let mut best: Option<(f32, usize, usize)> = None;
 
         for i in 0..(n_indices - 2) {
@@ -59,36 +84,87 @@ pub fn solve(
                 let _ = tx.send(ProgressMessage::CityChange(path[i]));
             }
 
-            if let (Some(cands), Some(pos)) = (&candidates, &pos) {
-                let js = candidate_list::candidate_positions(cands, pos, path[i], path[i + 1]);
-                for j in js {
-                    if j <= i + 1 || j >= n_indices {
-                        continue;
-                    }
-                    consider_move(&path, distances.as_ref(), i, j, &mut best);
+            candidate_list::candidate_positions_into(
+                candidates,
+                &route_positions,
+                path.len(),
+                path[i],
+                path[i + 1],
+                &mut js,
+            );
+            for &j in &js {
+                if j <= i + 1 || j >= n_indices {
+                    continue;
                 }
-            } else {
-                for j in (i + 2)..n_indices {
-                    consider_move(&path, distances.as_ref(), i, j, &mut best);
-                }
+                consider_move(path, distances, i, j, &mut best);
             }
         }
 
         if let Some((_, i, j)) = best {
-            swap_2opt(&mut path, i + 1, j);
+            swap_2opt(path, i + 1, j);
             improved = true;
-            let new_len = distances.tour_length(&path);
-            if let Some(tx) = progress_tx {
-                let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), new_len));
-            }
-            tracing::debug!(i, j, tour_length = new_len, "2-opt: improvement");
+            report_improvement(path, distances, i, j, progress_tx);
         }
     }
+}
 
-    if let Some(tx) = progress_tx {
-        let _ = tx.send(ProgressMessage::Done);
+/// First-improvement full scan, used when no candidate list is available.
+///
+/// Applying a swap immediately keeps the original 2-opt shape: multiple improvements can land
+/// in one pass, which matters on EXPLICIT instances where every move is a full scan anyway.
+fn first_improvement_passes(
+    path: &mut [usize],
+    distances: &dyn DistanceSource,
+    n_indices: usize,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+) {
+    let mut improved = true;
+    while improved {
+        improved = false;
+        for i in 0..(n_indices - 2) {
+            if let Some(tx) = progress_tx {
+                let _ = tx.send(ProgressMessage::CityChange(path[i]));
+            }
+
+            for j in (i + 2)..n_indices {
+                let current_distance = distances
+                    .distance_between(path[i], path[i + 1])
+                    .expect("two_opt: invalid city pair")
+                    + distances
+                        .distance_between(path[j], path[j + 1])
+                        .expect("two_opt: invalid city pair");
+
+                let new_distance = distances
+                    .distance_between(path[i], path[j])
+                    .expect("two_opt: invalid city pair")
+                    + distances
+                        .distance_between(path[i + 1], path[j + 1])
+                        .expect("two_opt: invalid city pair");
+
+                if new_distance < current_distance {
+                    swap_2opt(path, i + 1, j);
+                    improved = true;
+                    report_improvement(path, distances, i, j, progress_tx);
+                }
+            }
+        }
     }
-    Solution::from_parts(&path, cities, distances.as_ref())
+}
+
+fn report_improvement(
+    path: &[usize],
+    distances: &dyn DistanceSource,
+    i: usize,
+    j: usize,
+    progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
+) {
+    if progress_tx.is_some() || tracing::enabled!(tracing::Level::DEBUG) {
+        let new_len = distances.tour_length(path);
+        if let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::PathUpdate(Route::new(path), new_len));
+        }
+        tracing::debug!(i, j, tour_length = new_len, "2-opt: improvement");
+    }
 }
 
 /// Evaluate the 2-opt move between positions `i` and `j`, retaining the best negative delta.
@@ -134,12 +210,7 @@ fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
     if from >= to {
         return;
     }
-
-    let reversed_seq: Vec<usize> = path[from..=to].iter().copied().rev().collect();
-
-    for (i, swapped_val) in reversed_seq.iter().enumerate() {
-        path[from + i] = *swapped_val;
-    }
+    path[from..=to].reverse();
 }
 
 #[cfg(test)]
