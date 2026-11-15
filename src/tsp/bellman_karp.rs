@@ -9,9 +9,9 @@
 ///
 ///
 ///
+use super::DistanceSource;
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
@@ -54,7 +54,7 @@ pub fn solve(
 
     let selected_set = (1 << n_others) - 1;
     for city_pos in 0..n_others {
-        solve_bhk(&mut opt, dists, selected_set, city_pos);
+        solve_bhk(&mut opt, dists.as_ref(), selected_set, city_pos);
     }
 
     tracing::info!("BHK: DP complete");
@@ -75,7 +75,7 @@ pub fn solve(
         .fold(f32::MAX, f32::min);
 
     tracing::info!(optimal_distance, "BHK: optimal tour found");
-    let route_vec = read_optimal_route(&opt, dists, n_cities, optimal_distance);
+    let route_vec = read_optimal_route(&opt, dists.as_ref(), n_cities, optimal_distance);
 
     let route = Route::new(route_vec.as_ref());
     if let Some(tx) = progress_tx {
@@ -83,12 +83,12 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::from_parts(&route_vec, cities, distances)
+    Solution::from_parts(&route_vec, cities, distances.as_ref())
 }
 
 fn solve_bhk(
     opt: &mut DPTable,
-    dm: &DistanceMatrix,
+    dm: &dyn DistanceSource,
     selected_set: FlagSet,
     city_pos: usize,
 ) -> f32 {
@@ -119,7 +119,12 @@ fn solve_bhk(
     opt[city_pos][selected_pos]
 }
 
-fn read_optimal_route(opt: &DPTable, dm: &DistanceMatrix, n: usize, best_val: f32) -> Vec<usize> {
+fn read_optimal_route(
+    opt: &DPTable,
+    dm: &dyn DistanceSource,
+    n: usize,
+    best_val: f32,
+) -> Vec<usize> {
     let mut route_ids = vec![0; n];
     route_ids[0] = n - 1;
 

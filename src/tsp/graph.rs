@@ -4,7 +4,7 @@
 //! rewrite of `christofides`'s matching step, or a savings-algorithm solver, can
 //! reuse `UnionFind`/`sorted_edges` without duplicating them.
 
-use super::distance_matrix::DistanceMatrix;
+use super::DistanceSource;
 
 /// Disjoint-set over position indices `0..n`, with path compression and union by rank.
 pub(crate) struct UnionFind {
@@ -56,7 +56,7 @@ impl UnionFind {
 /// working-set size of this O(n²) list — meaningful at the few-thousand-city scale
 /// where this list's memory dominates (e.g. ~1.2GB as `(f32, usize, usize)` at
 /// n=10,000 on a 64-bit target, vs ~600MB as `(f32, u32, u32)`).
-pub(crate) fn sorted_edges(n: usize, distances: &DistanceMatrix) -> Vec<(f32, u32, u32)> {
+pub(crate) fn sorted_edges(n: usize, distances: &dyn DistanceSource) -> Vec<(f32, u32, u32)> {
     let mut edges = Vec::with_capacity(n * (n.saturating_sub(1)) / 2);
     for i in 0..n {
         for j in (i + 1)..n {
@@ -193,6 +193,7 @@ pub(crate) fn hamiltonian_cycle_to_path(n: usize, edges: &[(usize, usize)]) -> V
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::distance_matrix::DistanceMatrix;
     use crate::tsp::{distance_matrix, kdtree};
     use rand::RngExt;
 

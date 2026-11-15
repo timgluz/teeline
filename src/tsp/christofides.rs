@@ -1,3 +1,4 @@
+use super::DistanceSource;
 use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
@@ -26,11 +27,11 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, distances);
+        return Solution::from_parts(&path, cities, distances.as_ref());
     }
 
     // Step 1: Minimum Spanning Tree via Prim's.
-    let mst_edges = prim_mst(n, distances);
+    let mst_edges = prim_mst(n, distances.as_ref());
 
     // Emit a placeholder progress update so the viz window doesn't appear frozen.
     if let Some(tx) = progress_tx {
@@ -46,7 +47,7 @@ pub fn solve(
     );
 
     // Step 3: Greedy minimum-weight perfect matching on odd-degree nodes.
-    let matching = greedy_matching(&odd, distances, n);
+    let matching = greedy_matching(&odd, distances.as_ref(), n);
 
     // Step 4: Build multigraph (MST edges ∪ matching edges).
     let mut adj = build_multigraph(n, &mst_edges, &matching);
@@ -64,7 +65,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, cities, distances.as_ref())
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +73,7 @@ pub fn solve(
 // ---------------------------------------------------------------------------
 
 /// Returns MST edges as `(pos_a, pos_b)` position-index pairs.
-fn prim_mst(n: usize, distances: &super::distance_matrix::DistanceMatrix) -> Vec<(usize, usize)> {
+fn prim_mst(n: usize, distances: &dyn DistanceSource) -> Vec<(usize, usize)> {
     let mut in_mst = vec![false; n];
     let mut key = vec![f32::MAX; n]; // minimum edge weight to bring each vertex into the tree
     let mut parent = vec![usize::MAX; n];
@@ -135,11 +136,7 @@ fn odd_degree_nodes(mst_edges: &[(usize, usize)], n: usize) -> Vec<usize> {
 ///
 /// `matched` is indexed by position (0..n), not by index into `odd`, so it is
 /// sized to `n` even though only `odd.len()` positions are relevant.
-fn greedy_matching(
-    odd: &[usize],
-    distances: &super::distance_matrix::DistanceMatrix,
-    n: usize,
-) -> Vec<(usize, usize)> {
+fn greedy_matching(odd: &[usize], distances: &dyn DistanceSource, n: usize) -> Vec<(usize, usize)> {
     let k = odd.len();
     let mut pairs: Vec<(f32, usize, usize)> = Vec::with_capacity(k * k / 2);
     for i in 0..k {
@@ -264,7 +261,7 @@ mod tests {
     fn prim_mst_has_n_minus_1_edges() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.]]);
         let n = problem.cities.len();
-        let edges = prim_mst(n, &problem.distances);
+        let edges = prim_mst(n, problem.distances.as_ref());
         assert_eq!(edges.len(), n - 1, "MST must have exactly n-1 edges");
         // All positions reachable
         let mut reachable = vec![false; n];
@@ -282,7 +279,7 @@ mod tests {
         // Optimal MST is the chain itself; weight = 4.0.
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.], [4., 0.]]);
         let n = problem.cities.len();
-        let edges = prim_mst(n, &problem.distances);
+        let edges = prim_mst(n, problem.distances.as_ref());
         let weight: f32 = edges
             .iter()
             .map(|&(u, v)| problem.distances.distance_by_pos(u, v).unwrap())
@@ -328,9 +325,9 @@ mod tests {
         // 5-node layout; verify each odd-degree node appears exactly once in the matching.
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
-        let mst = prim_mst(n, &problem.distances);
+        let mst = prim_mst(n, problem.distances.as_ref());
         let odd = odd_degree_nodes(&mst, n);
-        let matching = greedy_matching(&odd, &problem.distances, n);
+        let matching = greedy_matching(&odd, problem.distances.as_ref(), n);
 
         // Each odd-degree position must appear exactly once in the matching.
         let mut count = vec![0u32; n];
@@ -351,9 +348,9 @@ mod tests {
     fn eulerian_circuit_length_equals_edges_plus_one() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
-        let mst = prim_mst(n, &problem.distances);
+        let mst = prim_mst(n, problem.distances.as_ref());
         let odd = odd_degree_nodes(&mst, n);
-        let matching = greedy_matching(&odd, &problem.distances, n);
+        let matching = greedy_matching(&odd, problem.distances.as_ref(), n);
         let total_edges = mst.len() + matching.len();
         let mut adj = build_multigraph(n, &mst, &matching);
         let circuit = hierholzer(&mut adj, 0);

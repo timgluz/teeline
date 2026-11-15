@@ -52,14 +52,16 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 
 - `Solvers` enum — lists every algorithm with string aliases (e.g. `"nn"` → `NearestNeighbor`, `"2opt"` → `TwoOpt`)
 - `AppOptions` — pure config container; one optional option struct per solver plus shared `HeuristicOptions`
-- `TspProblem` — cities plus a precomputed `DistanceMatrix`
-- `Solution` — tour route, cities, and total distance computed from the distance matrix
-- `NearestResult` / `NearestResultItem` — returned by both KD-tree and distance matrix nearest-neighbor lookups
+- `TspProblem` — cities plus `Arc<dyn DistanceSource>`; `new` wraps a concrete source, `from_source` shares one
+- `Solution` — tour route, cities, and total distance computed from the problem's distance source
+- `DistanceSource` — the distance-query trait (`src/tsp/distance_source.rs`); positions are dense indices into the city list, city IDs are external, and the shared defaults keep backends byte-identical
+- `NearestResult` / `NearestResultItem` — returned by both KD-tree and distance-source nearest-neighbor lookups
 
 **Spatial data structures:**
 
 - `src/tsp/kdtree.rs` — KD-tree for fast nearest-neighbor queries; `KDPoint` is the shared city/point type used everywhere
-- `src/tsp/distance_matrix.rs` — brute-force O(n²) alternative; both expose the same `nearest(&pt, n)` interface
+- `src/tsp/distance_matrix.rs` — the `Matrix` backend: a packed O(n²) lower triangle implementing `DistanceSource`; a brute-force alternative to the KD-tree
+- `src/tsp/distance_source.rs` — the `DistanceSource` trait, its shared defaults, and the backend contract
 
 **Input:** `src/tsp/tsplib.rs` — state-machine parser for TSPLIB format; accepts `NODE_COORD_SECTION` and `DISPLAY_DATA_SECTION`; reads from file or stdin.
 

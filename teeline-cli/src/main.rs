@@ -10,8 +10,8 @@ use teeline::config::{
     select_pipeline_source,
 };
 use teeline::tsp::{
-    self, AppOptions, SOMOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
-    list_solvers,
+    self, AppOptions, DistanceSource, SOMOptions, Solution, SolverKind, Solvers, TspProblem,
+    distance_matrix, list_solvers,
     pipeline::{PipelineStage, run_pipeline, stage_warnings},
     tsplib,
 };

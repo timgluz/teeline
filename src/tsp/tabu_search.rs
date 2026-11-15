@@ -1,8 +1,8 @@
+use super::DistanceSource;
 use std::collections::VecDeque;
 use std::sync::mpsc;
 
 use super::budget::Budget;
-use super::distance_matrix::DistanceMatrix;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
@@ -50,7 +50,7 @@ pub fn solve(
     while budget.record(improved) {
         let epoch = budget.index();
         let best_at_epoch_start = best_distance;
-        let (local_best, local_distance) = select(distances, &u, &tabu_list);
+        let (local_best, local_distance) = select(distances.as_ref(), &u, &tabu_list);
         if local_distance < best_distance {
             best_route = local_best.clone();
             best_distance = local_distance;
@@ -82,10 +82,10 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(best_route.route(), cities, distances)
+    Solution::from_parts(best_route.route(), cities, distances.as_ref())
 }
 
-fn select(distances: &DistanceMatrix, route: &Route, tabu_list: &TabuList) -> (Route, f32) {
+fn select(distances: &dyn DistanceSource, route: &Route, tabu_list: &TabuList) -> (Route, f32) {
     let local_best = distances.tour_length(route.route());
 
     let mut candidate = route.random_successor();

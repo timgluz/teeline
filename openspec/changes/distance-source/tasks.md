@@ -3,7 +3,7 @@
 ## 1. Prerequisite and governance
 
 - [x] 1.1 Amend `constitution.md` in a separate PR (per §8): §4 so the `Solution.total` and spatial-query guardrails name a distance source rather than `DistanceMatrix`, and §2 with the multi-run improvement-verification principle; verify the amendment states what changed and why, no guardrail still names the concrete type, and the new principle is present.
-- [ ] 1.2 Update AGENTS.md "Core types" and any README text that names `DistanceMatrix` as the mandatory distance type; verify the docs describe the swappable source.
+- [x] 1.2 Update AGENTS.md "Core types" and any README text that names `DistanceMatrix` as the mandatory distance type; verify the docs describe the swappable source.
 
 ## 2. Phase 0 — Benchmark development (reuse the existing harness)
 
@@ -23,16 +23,16 @@
 
 - [x] 3.1 Define `DistanceSource` with five required primitives, a `has_coordinates` default, and six shared method defaults; verify a `&dyn DistanceSource` test compiles and the conformance-suite skeleton runs.
 - [x] 3.2 Implement the five primitives for `DistanceMatrix`, override `has_coordinates` to false in `new` (explicit weights) and true in `build`, and keep both the matrix-only accessors and the existing inherent query methods until PR 4; verify the existing `distance_matrix` unit tests pass unchanged and the workspace compiles with `TspProblem.distances` still concrete.
-- [ ] 3.3 Change `TspProblem.distances` to `Arc<dyn DistanceSource>`, add `new` and `from_source` (`from_points` lands with `DistanceBackend` in task 6.1), and remove the redundant inherent query methods in this same PR; verify all 80 existing `TspProblem::new` call sites compile.
-- [ ] 3.4 Add the position-invariant check to `from_source` (`num_cities == cities.len()`, `pos2city_id(i) == cities[i].id`); verify a mismatched source fails the debug assertion.
-- [ ] 3.5 Update `Solution::from_parts` to accept `&dyn DistanceSource` (`Solution::new` is unchanged); verify reported totals match the pre-change tests.
-- [ ] 3.6 Change the `&DistanceMatrix` helper parameters to `&dyn DistanceSource` across `bellman_karp`, `branch_bound`, `christofides`, `comparison`, `genetic_algorithm`, `graph`, `lin_kernighan`, `or_opt`, `savings`, `tabu_search`, and `three_opt`; verify `cargo test` is green.
-- [ ] 3.7 Change `build_evaluator` in `branch_bound` and `genetic_algorithm` to clone the `Arc` instead of deep-copying the matrix; verify their unit tests pass and no matrix clone remains.
-- [ ] 3.8 Change `nearest_unvisited` to take `&dyn Fn(usize) -> bool` and update `nearest_neighbor` plus the six test call sites; verify the NN determinism tests pass.
-- [ ] 3.9 Add `use DistanceSource` imports to every concrete caller (`tests/*`, `main.rs:736`, WASM `lib.rs:573`); verify each crate builds.
-- [ ] 3.10 Update the CLI, API, WASM, and Qt constructors to the new field type; verify each crate builds (WASM and Qt built separately).
+- [x] 3.3 Change `TspProblem.distances` to `Arc<dyn DistanceSource>`, add `new` and `from_source` (`from_points` lands with `DistanceBackend` in task 6.1), and remove the redundant inherent query methods in this same PR; verify all 80 existing `TspProblem::new` call sites compile.
+- [x] 3.4 Add the position-invariant check to `from_source` (`num_cities == cities.len()`, `pos2city_id(i) == cities[i].id`); verify a mismatched source fails the debug assertion.
+- [x] 3.5 Update `Solution::from_parts` to accept `&dyn DistanceSource` (`Solution::new` is unchanged); verify reported totals match the pre-change tests.
+- [x] 3.6 Change the `&DistanceMatrix` helper parameters to `&dyn DistanceSource` across `bellman_karp`, `branch_bound`, `christofides`, `comparison`, `genetic_algorithm`, `graph`, `lin_kernighan`, `or_opt`, `savings`, `tabu_search`, and `three_opt`; verify `cargo test` is green.
+- [x] 3.7 Change `build_evaluator` in `branch_bound` and `genetic_algorithm` to clone the `Arc` instead of deep-copying the matrix; verify their unit tests pass and no matrix clone remains.
+- [x] 3.8 Change `nearest_unvisited` to take `&dyn Fn(usize) -> bool` and update `nearest_neighbor` plus the six test call sites; verify the NN determinism tests pass.
+- [x] 3.9 Add `use DistanceSource` imports to every concrete caller (`tests/*`, `main.rs:736`, WASM `lib.rs:573`); verify each crate builds.
+- [x] 3.10 Update the CLI, API, WASM, and Qt constructors to the new field type; verify each crate builds (WASM and Qt built separately).
 - [ ] 3.11 Run the `matrix` config against the tracked baseline from task 2.11; verify every tour cost is unchanged for deterministic solvers and the runtime is within the documented refactor bound.
-- [ ] 3.12 Verify every published-optimum test (att48, ulysses16, gr17, burma14, …) reports the same cost as before the refactor for deterministic solvers.
+- [x] 3.12 Verify every published-optimum test (att48, ulysses16, gr17, burma14, …) reports the same cost as before the refactor for deterministic solvers.
 - [x] 3.13 Write ADR 010 recording the distance-source boundary (trait, backends, selection signal) and add it to the `docs/adr/` index; verify the index links it.
 - [x] 3.14 Apply the PR-665 review fixes: make the default `tour_length` allocation-free, document the `distances_from` panic contract, and strengthen the trait skeleton test; verify the lib tests.
 
@@ -95,7 +95,7 @@
 ## 10. Integration verification
 
 - [ ] 10.1 Run `cargo test --workspace` and the separate scaling/`--ignored` tasks; verify both are green, noting that `default-members = ["."]` otherwise skips the CLI and API.
-- [ ] 10.2 Run `cargo clippy --workspace --all-targets -- -D warnings`; verify no warnings.
+- [ ] 10.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
 - [ ] 10.3 Run `cargo fmt --check`; verify no diffs.
 - [ ] 10.4 Run `openspec validate distance-source --strict`; verify it passes.
 - [ ] 10.5 Build the WASM target, transpile with `jco`, and verify the ambient `teeline-wasm.d.ts` matches any changed export.

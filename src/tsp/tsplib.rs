@@ -378,6 +378,7 @@ fn coords_from_text<S: AsRef<str>>(line_no: usize, txt: S) -> Result<KDPoint, St
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::distance_source::DistanceSource;
 
     // ── existing tests ────────────────────────────────────────────────────────
 

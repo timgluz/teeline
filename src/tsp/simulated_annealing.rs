@@ -177,7 +177,7 @@ pub fn solve(
         epoch_capped: !converged && !cooled && budget.epoch() >= epoch_limit,
     };
     (
-        Solution::from_parts(best_route.route(), cities, distances),
+        Solution::from_parts(best_route.route(), cities, distances.as_ref()),
         stats,
     )
 }

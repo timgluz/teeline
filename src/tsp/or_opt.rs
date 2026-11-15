@@ -1,6 +1,6 @@
+use super::DistanceSource;
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
@@ -30,7 +30,7 @@ pub fn solve(
 
     if n < 4 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        return Solution::from_parts(&path, cities, distances);
+        return Solution::from_parts(&path, cities, distances.as_ref());
     }
 
     let mut path: Vec<usize> = init_tour
@@ -41,7 +41,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
     }
 
-    while let Some(best) = find_best_move(&path, distances) {
+    while let Some(best) = find_best_move(&path, distances.as_ref()) {
         let (_, i, j, seg_len, reversed) = best;
 
         #[cfg(debug_assertions)]
@@ -70,7 +70,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, cities, distances.as_ref())
 }
 
 /// Scan all Or-1/2/3 relocations and return the best improving move, or `None`.
@@ -79,7 +79,7 @@ pub fn solve(
 /// `delta` is the change in total tour length (negative = improvement).
 fn find_best_move(
     path: &[usize],
-    distances: &DistanceMatrix,
+    distances: &dyn DistanceSource,
 ) -> Option<(f32, usize, usize, usize, bool)> {
     let n = path.len();
     // -1e-3 threshold avoids infinite loops from f32 rounding at large coordinate scales.
@@ -250,7 +250,7 @@ mod tests {
         // Moving city 2 elsewhere should be profitable.
         let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [5.0, 5.0], [2.0, 0.0], [3.0, 0.0]]);
         let path: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
-        let result = find_best_move(&path, &problem.distances);
+        let result = find_best_move(&path, problem.distances.as_ref());
         assert!(result.is_some(), "expected an improving move");
         let (delta, _, _, _, _) = result.unwrap();
         assert!(
@@ -264,7 +264,7 @@ mod tests {
         // Square: [0,1,2,3] is already optimal (perimeter tour).
         let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
         let path = vec![0, 1, 2, 3];
-        let result = find_best_move(&path, &problem.distances);
+        let result = find_best_move(&path, problem.distances.as_ref());
         assert!(
             result.is_none(),
             "expected no improvement on optimal square tour, got {result:?}"

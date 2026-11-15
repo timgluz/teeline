@@ -47,7 +47,7 @@ pub fn solve(
         // the matrix's own cities, `None` means an invariant broke, and a quiet break would
         // return a truncated tour as if it were a solution.
         let nearest = distances
-            .nearest_unvisited(current_city, |id| {
+            .nearest_unvisited(current_city, &|id| {
                 id != current_id && unvisited.contains(&id)
             })
             .expect("unvisited is non-empty and current_city came from the matrix's own cities");
@@ -63,7 +63,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, cities, distances.as_ref())
 }
 
 #[cfg(test)]

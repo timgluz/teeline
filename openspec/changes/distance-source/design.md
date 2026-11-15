@@ -193,7 +193,7 @@ Reuse `scripts/bench-matrix.sh` (GNU `time -v` peak RSS in a fresh process per c
 
 ## Delivery: stacked PRs
 
-The plan ships as a stack, one reviewable concern per PR. Each PR targets the previous PR's branch, carries its own tests and docs, and passes `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo fmt --check` before review. After a PR merges, retarget the next one to the new base and confirm its diff shows only its own scope. Branches follow AGENTS.md's `type/short-description`; PRs open with `gh pr create`.
+The plan ships as a stack, one reviewable concern per PR. Each PR targets the previous PR's branch, carries its own tests and docs, and passes `cargo test --workspace`, the repo gate `cargo clippy --workspace -- -D warnings`, and `cargo fmt --check` before review. After a PR merges, retarget the next one to the new base and confirm its diff shows only its own scope. Branches follow AGENTS.md's `type/short-description`; PRs open with `gh pr create`.
 
 | # | Branch | Base | Scope | Tasks |
 |---|---|---|---|---|

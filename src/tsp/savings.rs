@@ -1,6 +1,6 @@
+use super::DistanceSource;
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
 use super::graph::{hamiltonian_cycle_to_path, select_edges};
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
@@ -48,7 +48,7 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, distances);
+        return Solution::from_parts(&path, cities, distances.as_ref());
     }
 
     // Step 1: pick the hub as the city nearest the coordinate centroid.
@@ -62,7 +62,7 @@ pub fn solve(
     }
 
     // Step 2: all pairwise edges, ranked by savings (descending).
-    let edges = sorted_edges_by_savings(n, hub, distances);
+    let edges = sorted_edges_by_savings(n, hub, distances.as_ref());
 
     // Step 3: greedily accept edges subject to degree <= 2 and no-premature-cycle
     // (shared with greedy_edge — only the sort order above differs).
@@ -78,7 +78,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, cities, distances.as_ref())
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn hub_position(cities: &[KDPoint]) -> usize {
 fn sorted_edges_by_savings(
     n: usize,
     hub: usize,
-    distances: &DistanceMatrix,
+    distances: &dyn DistanceSource,
 ) -> Vec<(f32, u32, u32)> {
     let mut edges = Vec::with_capacity(n * (n.saturating_sub(1)) / 2);
     for i in 0..n {
@@ -202,14 +202,14 @@ mod tests {
     fn savings_list_has_n_choose_2_entries() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.]]);
         let n = problem.cities.len();
-        let edges = sorted_edges_by_savings(n, 0, &problem.distances);
+        let edges = sorted_edges_by_savings(n, 0, problem.distances.as_ref());
         assert_eq!(edges.len(), n * (n - 1) / 2);
     }
 
     #[test]
     fn savings_list_is_sorted_descending() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.]]);
-        let edges = sorted_edges_by_savings(4, 0, &problem.distances);
+        let edges = sorted_edges_by_savings(4, 0, problem.distances.as_ref());
         for pair in edges.windows(2) {
             assert!(
                 pair[0].0 >= pair[1].0,
@@ -224,7 +224,7 @@ mod tests {
     fn savings_for_hub_pair_is_zero() {
         // Any pair involving the hub has savings 0.
         let problem = make_problem(&[[0., 0.], [5., 0.], [10., 0.]]);
-        let edges = sorted_edges_by_savings(3, 0, &problem.distances);
+        let edges = sorted_edges_by_savings(3, 0, problem.distances.as_ref());
         for &(_s, i, j) in &edges {
             if i as usize == 0 || j as usize == 0 {
                 // hub-involving pair

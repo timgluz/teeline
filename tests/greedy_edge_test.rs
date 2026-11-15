@@ -1,5 +1,6 @@
-/// Integration tests for the Greedy Edge Construction TSP solver.
 use std::path::Path;
+/// Integration tests for the Greedy Edge Construction TSP solver.
+use teeline::tsp::DistanceSource;
 use teeline::tsp::{
     AppOptions, HeuristicOptions, Solvers, TspProblem, distance_matrix, greedy_edge, kdtree,
     pipeline, tsplib,

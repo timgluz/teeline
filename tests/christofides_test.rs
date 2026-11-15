@@ -1,9 +1,10 @@
+use std::path::Path;
 /// Integration tests for the Christofides approximation TSP solver.
 ///
 /// Fast tests run berlin52 with default options for structural validation.
 /// The quality test is marked #[ignore] and can be run with:
 ///   cargo test --test christofides_test -- --include-ignored
-use std::path::Path;
+use teeline::tsp::DistanceSource;
 use teeline::tsp::{HeuristicOptions, TspProblem, christofides, distance_matrix, kdtree, tsplib};
 
 // ─── helpers ─────────────────────────────────────────────────────────────────

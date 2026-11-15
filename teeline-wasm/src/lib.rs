@@ -9,8 +9,8 @@ use bindings::Guest;
 use teeline::tsp::comparison;
 use teeline::tsp::{
     distance_matrix::DistanceMatrix, kdtree::KDPoint, AcoOptions, AppOptions, CSOptions,
-    FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions, SfcOptions, Solvers,
-    TspProblem,
+    DistanceSource, FPAOptions, FourierOptions, GAOptions, HeuristicOptions, SAOptions,
+    SfcOptions, Solvers, TspProblem,
 };
 
 struct Component;

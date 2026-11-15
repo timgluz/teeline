@@ -512,7 +512,7 @@ In short:
 3. Add tests — unit tests go inline with the source file; library integration tests go in `tests/`; CLI end-to-end tests go in `tests/e2e/` as BATS scripts.
 4. Open a pull request and wait for a code review.
 
-When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, then register it in four places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, the `tsp::solve` dispatch match arm, and `Solvers::all_meta()` (the catalogue used by the `solvers` subcommand). The WASM surface picks it up automatically.
+When adding a new solver, follow the pattern of the existing ones: a `solve` function taking `&TspProblem` (which carries the cities and the `DistanceSource`) plus that solver's options, in its own file under `src/tsp/`, then register it in four places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, the `tsp::solve` dispatch match arm, and `Solvers::all_meta()` (the catalogue used by the `solvers` subcommand). The WASM surface picks it up automatically.
 
 ---
 
