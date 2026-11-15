@@ -100,7 +100,7 @@ ApplicationWindow {
                         Layout.alignment: Qt.AlignHCenter
                         text: "Browse…"
                         onClicked: {
-                            fileDialog.selectedNameFilter = "TSPLIB files (*.tsp)"
+                            fileDialog.selectedNameFilter.index = 0
                             fileDialog.open()
                         }
                     }
@@ -144,7 +144,7 @@ ApplicationWindow {
                     Button {
                         text: "Open another .tsp…"
                         onClicked: {
-                            fileDialog.selectedNameFilter = "TSPLIB files (*.tsp)"
+                            fileDialog.selectedNameFilter.index = 0
                             fileDialog.open()
                         }
                     }
@@ -202,7 +202,7 @@ ApplicationWindow {
                 Button {
                     text: FileLoader.hasOptTour ? "Replace…" : "Browse…"
                     onClicked: {
-                        optTourDialog.selectedNameFilter = "Tour files (*.tour *.opt.tour)"
+                        optTourDialog.selectedNameFilter.index = 0
                         optTourDialog.open()
                     }
                 }
@@ -228,7 +228,7 @@ ApplicationWindow {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: FileLoader.loadFile(modelData)
+                            onClicked: Qt.callLater(function() { FileLoader.loadFile(modelData) })
                         }
                     }
                 }
