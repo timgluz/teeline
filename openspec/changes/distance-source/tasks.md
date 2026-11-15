@@ -52,6 +52,9 @@
 - [x] 5.6 Add a seeded LK equivalence test on a GEO fixture against both backends; verify identical tours and costs, and that the cost equals the GEO recomputation.
 - [x] 5.7 Verify `from_cities_unrounded` remains test-only and is not represented by either backend; verify the conformance suite excludes it explicitly.
 - [x] 5.8 Add a conformance case with 1-based and non-contiguous city IDs (for example 10, 20, 30); verify `pos2city_id`/`city_id2pos` round-trip, both backends agree, and the reported tour preserves the original IDs.
+- [x] 5.9 Extend the conformance contract test with the second-argument out-of-range cases, unknown IDs at the start/middle/end of a tour, and element-wise `distances_from` checks; verify both backends pass.
+- [x] 5.10 Add `TwoOpt` and `OrOpt` backend-equivalence cases on GEO and ATT fixtures, including an instance smaller than the candidate floor; verify identical tours and costs.
+- [x] 5.11 Add numeric assertions and a solver run to the non-contiguous-ID case; verify the expected distances, tour total, and original IDs are checked directly rather than only cross-backend.
 
 ## 6. Phase 2 — Selection policy and backend comparison
 
@@ -59,7 +62,7 @@
 - [x] 6.2 Replace the `distance_matrix::build(..).unwrap()` panic with an error return; verify coordinate input + `--distance-type explicit` returns a descriptive error without panicking.
 - [x] 6.3 Add the threshold constant and boundary tests at threshold−1, threshold, and threshold+1; verify `Auto` picks the expected backend.
 - [x] 6.4 Extend `src/config.rs` to parse a top-level `distance_backend`, add the CLI flag, and add `tests/pipeline_config_test.rs` coverage; verify valid values parse, unknown values are rejected, and the CLI wins over TOML without a clap `default_value` shadowing it.
-- [ ] 6.5 Wire the API, WASM, and Qt constructors to the shared policy constructor; verify each crate builds and one end-to-end solve per surface succeeds.
+- [x] 6.5 Wire the API, WASM, and Qt constructors to the shared policy constructor; verify each crate builds and one end-to-end solve per surface succeeds.
 - [x] 6.6 Fix the WASM scoring-only paths (`compare_tours_from_input`, `tour_distance_from_input`) to pick `Matrix` for explicit weights and `OnTheFly` for coordinates; verify an EXPLICIT TSPLIB input still scores in WASM.
 - [x] 6.7 Add the `on-the-fly` config family (`on-the-fly`, `on-the-fly-3opt`, `on-the-fly-fixed`) to `tier-distance.toml`, make every config in `tier-distance*.toml` pass `--distance-backend` explicitly, then run the comparison sweep with at least five runs per cell; verify the same cells appear under both backends, only `status: ok` rows are compared, and the report states the memory ratio and runtime ratio per family.
 - [x] 6.8 Set the per-family runtime tolerance and the memory expectation from the sweep using medians/distributions across the repeated runs, and record them in `docs/benchmarks/distance-source.md`; verify the numbers match the raw rows and no claim rests on a single run.
@@ -68,14 +71,20 @@
 - [x] 6.11 Add the 100k-city SFC end-to-end measurement in a fresh process; verify it returns a valid tour with peak RSS below 1 GiB.
 - [x] 6.12 Document the flag, threshold, and memory/CPU trade-off; verify the documented commands run as written.
 - [x] 6.13 Document the manual per-release gate and keep the comparison run file out of `publish-benchmarks.sh`; verify the public leaderboard's configs are unchanged and the comparison report is linked from the benchmark docs.
+- [x] 6.14 Pair every `matrix*` config in `tier-distance-large.toml` with an `on-the-fly*` config for the same solver/dataset cells; verify the checker sees the large and xlarge cells as paired.
 
 ## 7. Phase 3 — Candidate-list move evaluation for local search
 
-- [ ] 7.1 Extend the KD-tree k-nearest candidate lists to `two_opt` and `or_opt` (LK already has them), bounding move evaluation rather than adding a `DistanceSource`; verify each city's candidate set on a fixture, address the narrow `n_nearest` default of 3, and use `has_coordinates()` to skip candidate pruning on EXPLICIT placeholder coordinates.
-- [ ] 7.2 Verify `two_opt`, `or_opt`, and `lin_kernighan` still score moves with exact distances from the problem's source; verify each returns a valid tour.
-- [ ] 7.3 Measure memory and runtime against the full-neighbourhood evaluation on `a280` and `att532`; verify the report gains before/after rows.
-- [ ] 7.4 Add a quality test comparing candidate-list tours to the published optima (`a280` 2579, `att532` 27686) using seeded or median runs; verify the gap is within the documented tolerance.
-- [ ] 7.5 Document candidate-list usage, its raw-Euclidean geo-ranking caveat, and its tolerance, and note the expected baseline updates for `2opt`/`or_opt`; verify the document matches the benchmark report.
+- [x] 7.1 Extend the KD-tree k-nearest candidate lists to `two_opt` and `or_opt` (LK already has them), bounding move evaluation rather than adding a `DistanceSource`; verify each city's candidate set on a fixture, address the narrow `n_nearest` default of 3, and use `has_coordinates()` to skip candidate pruning on EXPLICIT placeholder coordinates.
+- [x] 7.2 Verify `two_opt`, `or_opt`, and `lin_kernighan` still score moves with exact distances from the problem's source; verify each returns a valid tour.
+- [x] 7.3 Measure memory and runtime against the full-neighbourhood evaluation on `a280` and `att532`; verify the report gains before/after rows.
+- [x] 7.4 Add a quality test comparing candidate-list tours to the published optima (`a280` 2579, `att532` 27686) using seeded or median runs; verify the gap is within the documented tolerance.
+- [x] 7.5 Document candidate-list usage, its raw-Euclidean geo-ranking caveat, and its tolerance, and note the expected baseline updates for `2opt`/`or_opt`; verify the document matches the benchmark report.
+- [x] 7.6 Index candidate rows by dense city position, with a bounded map fallback for sparse external IDs and safe lookups for unknown IDs; verify non-contiguous and sparse-ID tests and that memory stays O(n·k + n).
+- [x] 7.7 Return the cyclic predecessor of route position 0, reuse a scratch buffer for candidate positions, and unit-test wrap-around, dedup, and empty-route cases; verify the or-opt last-insertion position is considered.
+- [x] 7.8 Restore first-improvement on the full-scan path, gate candidate construction when `k` covers every city, and compute `tour_length` only for progress/trace; verify the full-scan baseline returns to its pre-candidate-list cost and runtime.
+- [x] 7.9 Add a candidate-list `find_best_move` test and an EXPLICIT `or_opt` solve above the candidate floor; verify the EXPLICIT path keeps the full scan and improves a bad start.
+- [x] 7.10 Re-run the five-run candidate-vs-full comparison after the review fixes and update the report; verify the documented speedups and gaps match the medians.
 
 ## 8. Phase 4 — Compact EXPLICIT storage
 
@@ -111,8 +120,8 @@
 - [x] 11.4 Open PR 4 (`refactor/use-distance-source`) against PR 3 for tasks 3.3–3.12; verify the no-regression sweep and that the diff is mechanical.
 - [x] 11.5 Open PR 5 (`fix/lk-declared-metric`) against PR 4 for group 4; verify the seeded LK tests and the re-baseline note.
 - [x] 11.6 Open PR 6 (`feat/on-the-fly-backend`) against PR 5 for group 5; verify the conformance and equivalence suites.
-- [ ] 11.7 Open PR 7 (`feat/distance-backend-selection`) against PR 6 for group 6; verify the comparison sweep, thresholds, and 100k ceiling.
-- [ ] 11.8 Open PR 8 (`perf/candidate-lists`) against PR 7 for group 7; verify the quality and memory report.
+- [x] 11.7 Open PR 7 (`feat/distance-backend-selection`) against PR 6 for group 6; verify the comparison sweep, thresholds, and 100k ceiling.
+- [x] 11.8 Open PR 8 (`perf/candidate-lists`) against PR 7 for group 7; verify the quality and memory report.
 - [ ] 11.9 Open PR 9 (`perf/compact-explicit`) against PR 8 for group 8; verify exactness and the EXPLICIT memory report.
 - [ ] 11.10 Open PR 10 (`docs/sfc-100k`) against PR 9 for groups 9–10; verify the full integration checks.
 - [ ] 11.11 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope.

@@ -103,27 +103,55 @@ fn every_backend_obeys_the_conformance_contract() {
             let n = source.num_cities();
             assert!(source.has_coordinates(), "{fixture}/{name}");
             assert_eq!(source.tour_length(&[]), 0.0);
-            assert_eq!(source.tour_length(&[0]), 0.0);
 
             let first_id = source.pos2city_id(0).expect("position 0 exists");
+            let second_id = source.pos2city_id(1).expect("position 1 exists");
+            assert_eq!(source.tour_length(&[first_id]), 0.0);
             assert_eq!(source.city_id2pos(first_id), Some(0));
             assert_eq!(source.point_at(0).unwrap().id, first_id);
             assert_eq!(source.distance_between(first_id, first_id).unwrap(), 0.0);
             assert_eq!(source.distance_by_pos(0, 0).unwrap(), 0.0);
-            assert_eq!(source.distances_from(first_id).len(), n);
+
+            let row = source.distances_from(first_id);
+            assert_eq!(row.len(), n);
+            for (pos, &distance) in row.iter().enumerate() {
+                assert_eq!(
+                    distance,
+                    source.distance_by_pos(0, pos).unwrap(),
+                    "{fixture}/{name}: distances_from disagrees at position {pos}"
+                );
+            }
 
             assert!(
                 source.distance_by_pos(n, 0).is_err(),
-                "{fixture}/{name}: position == n must be out of range"
+                "{fixture}/{name}: first position == n must be out of range"
+            );
+            assert!(
+                source.distance_by_pos(0, n).is_err(),
+                "{fixture}/{name}: second position == n must be out of range"
             );
             assert!(
                 source.distance_between(usize::MAX, first_id).is_err(),
-                "{fixture}/{name}: unknown city id must be an error"
+                "{fixture}/{name}: unknown first city id must be an error"
+            );
+            assert!(
+                source.distance_between(first_id, usize::MAX).is_err(),
+                "{fixture}/{name}: unknown second city id must be an error"
             );
             assert_eq!(
                 source.tour_length(&[usize::MAX, first_id]),
                 0.0,
-                "{fixture}/{name}: unknown id must not make a tour"
+                "{fixture}/{name}: unknown id at the start must not make a tour"
+            );
+            assert_eq!(
+                source.tour_length(&[first_id, usize::MAX, second_id]),
+                0.0,
+                "{fixture}/{name}: unknown id in the middle must not make a tour"
+            );
+            assert_eq!(
+                source.tour_length(&[first_id, second_id, usize::MAX]),
+                0.0,
+                "{fixture}/{name}: unknown id at the end must not make a tour"
             );
 
             let target = source.point_at(0).unwrap();
@@ -157,6 +185,12 @@ fn deterministic_solvers_agree_across_backends() {
         ("berlin52.tsp", DistanceType::Euc2D, Solvers::TwoOpt),
         ("berlin52.tsp", DistanceType::Euc2D, Solvers::OrOpt),
         ("burma14.tsp", DistanceType::Geo, Solvers::BellmanKarp),
+        // Candidate lists rank neighbours by raw Euclidean coordinates, so cover the
+        // non-Euclidean metrics and an instance smaller than the candidate floor (14 < 16).
+        ("burma14.tsp", DistanceType::Geo, Solvers::TwoOpt),
+        ("burma14.tsp", DistanceType::Geo, Solvers::OrOpt),
+        ("att48.tsp", DistanceType::Att, Solvers::TwoOpt),
+        ("att48.tsp", DistanceType::Att, Solvers::OrOpt),
     ];
 
     for (fixture, dt, solver) in cases {
@@ -223,11 +257,9 @@ fn non_contiguous_city_ids_map_correctly() {
         assert_eq!(source.pos2city_id(2), Some(30), "{name}");
         assert_eq!(source.city_id2pos(20), Some(1), "{name}");
         assert_eq!(source.distance_between(10, 20).unwrap(), 5.0, "{name}");
-        assert_eq!(
-            source.distance_between(20, 30).unwrap(),
-            onfly.distance_between(20, 30).unwrap(),
-            "{name}"
-        );
+        // EUC_2D rounds each edge: sqrt(3^2 + 3^2) = 4.24.. -> 4.
+        assert_eq!(source.distance_between(20, 30).unwrap(), 4.0, "{name}");
+        assert_eq!(source.tour_length(&route), 10.0, "{name}");
     }
 
     assert_eq!(
@@ -235,4 +267,13 @@ fn non_contiguous_city_ids_map_correctly() {
         onfly.tour_length(&route),
         "tour length must use the original city IDs, not positions"
     );
+
+    // A solver must return original city IDs, never dense positions.
+    let problem = TspProblem::new(cities, matrix);
+    let solution = solve_problem(Solvers::NearestNeighbor, &problem, &AppOptions::default())
+        .expect("nearest neighbor solves");
+    let mut ids = solution.route().to_vec();
+    ids.sort_unstable();
+    assert_eq!(ids, vec![10, 20, 30], "route must keep the original IDs");
+    assert_eq!(solution.total, 10.0);
 }

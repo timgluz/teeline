@@ -53,3 +53,25 @@ args = ["--epochs", "1000", "--distance-backend", "matrix"]
 solvers = ["nn", "space_filling_curve"]
 instances = ["pla33810"]
 args = ["--distance-backend", "matrix"]
+
+# Paired on-the-fly configs: every (solver, dataset) cell must appear under both backends so
+# the comparison checker can score it.
+[configs.on-the-fly]
+solvers = ["2opt", "or_opt", "nn", "space_filling_curve"]
+instances = ["dsj1000", "pla7397"]
+args = ["--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-lk]
+solvers = ["lk"]
+instances = ["dsj1000"]
+args = ["--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-fixed]
+solvers = ["tabu"]
+instances = ["dsj1000", "pla7397"]
+args = ["--epochs", "1000", "--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-xlarge]
+solvers = ["nn", "space_filling_curve"]
+instances = ["pla33810"]
+args = ["--distance-backend", "on-the-fly"]
