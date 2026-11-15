@@ -8,6 +8,8 @@ hasExplainer: true
 
 # Lin-Kernighan ILS
 
+<!-- The #benchmarks anchor is rendered by AlgorithmBenchmarks, not by a heading in this file. -->
+<!-- markdownlint-disable MD051 -->
 | | |
 | --- | --- |
 | **Alias** | `lk`, `lin_kernighan` |
@@ -82,7 +84,7 @@ max_depth = 3
 n_nearest = 8
 ```
 
-## Benchmarks
+## Benchmark
 
 | Instance | Optimal | This solver (default) | Gap |
 | --- | --- | --- | --- |
