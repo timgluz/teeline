@@ -12,8 +12,7 @@
 //! sparse IDs (10, 20, 30, …) would otherwise size the table by the largest ID instead of by
 //! the city count.
 
-use std::collections::HashMap;
-
+use super::id_index::IdIndex;
 use super::kdtree::{self, KDPoint};
 
 /// The generic `n_nearest` default (3) is a branch-and-bound beam width, not a useful
@@ -22,44 +21,6 @@ use super::kdtree::{self, KDPoint};
 /// Measured on a280/att532: 16 keeps or-opt within 1.3% of the full-neighbourhood tour while
 /// running 9–21x faster; two-opt is slightly faster and finds no worse tours.
 pub(crate) const MIN_CANDIDATE_K: usize = 16;
-
-/// City ID → dense position, using a vector for the usual compact IDs and a map only when the
-/// ID range would make that vector disproportionately large.
-enum IdIndex {
-    Dense(Vec<usize>),
-    Sparse(HashMap<usize, usize>),
-}
-
-impl IdIndex {
-    fn build(cities: &[KDPoint]) -> Self {
-        let max_id = cities.iter().map(|c| c.id).max().unwrap_or(0);
-        if max_id < cities.len().saturating_mul(4).max(1) {
-            let mut dense = vec![usize::MAX; max_id + 1];
-            for (pos, city) in cities.iter().enumerate() {
-                dense[city.id] = pos;
-            }
-            Self::Dense(dense)
-        } else {
-            Self::Sparse(
-                cities
-                    .iter()
-                    .enumerate()
-                    .map(|(pos, city)| (city.id, pos))
-                    .collect(),
-            )
-        }
-    }
-
-    fn get(&self, city_id: usize) -> Option<usize> {
-        match self {
-            Self::Dense(positions) => positions
-                .get(city_id)
-                .copied()
-                .filter(|&pos| pos != usize::MAX),
-            Self::Sparse(positions) => positions.get(&city_id).copied(),
-        }
-    }
-}
 
 pub(crate) struct CandidateList {
     /// Neighbour city IDs, indexed by the city's dense position in `cities`.
