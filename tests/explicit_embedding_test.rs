@@ -6,8 +6,9 @@
 
 use std::path::Path;
 use teeline::tsp::{
-    DistanceBackend, FourierOptions, HeuristicOptions, LKOptions, SOMOptions, SfcOptions,
-    TspProblem, branch_bound, fourier, kdtree::KDPoint, lin_kernighan, nearest_neighbor, som,
+    AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, FourierOptions, GAOptions,
+    HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcOptions, Solvers, TspProblem,
+    branch_bound, fourier, kdtree::KDPoint, lin_kernighan, nearest_neighbor, solve_problem, som,
     space_filling_curve, tsplib,
 };
 
@@ -159,6 +160,80 @@ fn lin_kernighan_returns_valid_tours_on_explicit_with_display_data() {
         assert!(
             is_valid(solution.route(), &problem),
             "{name} lk tour is invalid"
+        );
+    }
+}
+
+#[test]
+fn every_registered_solver_returns_a_valid_tour_on_gr17() {
+    let problem = load("gr17.tsp").to_problem(DistanceBackend::Auto).unwrap();
+
+    let heuristic = HeuristicOptions {
+        epochs: 5,
+        ..Default::default()
+    };
+    let options = AppOptions {
+        sa: Some(SAOptions {
+            heuristic: heuristic.clone(),
+            cooling_rate: 0.1,
+            max_temperature: 10.0,
+            min_temperature: 1.0,
+        }),
+        ga: Some(GAOptions {
+            heuristic: heuristic.clone(),
+            ..Default::default()
+        }),
+        cs: Some(CSOptions {
+            heuristic: heuristic.clone(),
+            ..Default::default()
+        }),
+        fpa: Some(FPAOptions {
+            heuristic: heuristic.clone(),
+            ..Default::default()
+        }),
+        lk: Some(LKOptions {
+            heuristic: heuristic.clone(),
+            max_depth: 5,
+            seed: Some(1),
+        }),
+        fourier: Some(FourierOptions {
+            k_max: 2,
+            m: 30,
+            epochs: 5,
+            ..Default::default()
+        }),
+        sfc: Some(SfcOptions {
+            multi_orientation: 1,
+            ..Default::default()
+        }),
+        som: Some(SOMOptions {
+            epochs: 50,
+            ..Default::default()
+        }),
+        aco: Some(AcoOptions {
+            heuristic: heuristic.clone(),
+            num_ants: 4,
+            ..Default::default()
+        }),
+        heuristic: Some(heuristic),
+    };
+
+    for meta in Solvers::all_meta() {
+        let solver = meta
+            .name
+            .parse::<Solvers>()
+            .unwrap_or_else(|e| panic!("{}: {e}", meta.name));
+        let solution = solve_problem(solver, &problem, &options)
+            .unwrap_or_else(|e| panic!("{} failed: {e}", meta.name));
+        assert!(
+            is_valid(solution.route(), &problem),
+            "{} returned an invalid tour",
+            meta.name
+        );
+        assert!(
+            solution.total.is_finite(),
+            "{} returned a non-finite cost",
+            meta.name
         );
     }
 }

@@ -38,14 +38,14 @@
 
 ## 6. Integration checks
 
-- [ ] 6.1 Run `cargo test --workspace` and verify it is green.
-- [ ] 6.2 Run `cargo clippy --workspace -- -D warnings` and verify no warnings.
-- [ ] 6.3 Run `cargo fmt --check` and verify no diffs.
-- [ ] 6.4 Add a budget-limited integration test that every registered solver returns a valid permutation and finite cost on `gr17`, setting small budgets for all ten `AppOptions` structs (`heuristic`, `sa`, `ga`, `cs`, `fpa`, `lk`, `fourier`, `sfc`, `som`, `aco`); verify it completes and passes.
-- [ ] 6.5 Compare CLI output before and after: coordinate fixtures (`berlin52`, `att48`, `burma14`) must be byte-identical; `gr17` must improve; `bayg29`/`bays29` LK tours may change and must be re-measured and reflected in `bench/solvers.json` notes if a recorded cost moves.
-- [ ] 6.6 Build the out-of-workspace `teeline-wasm` and `teeline-qt` targets and verify both build and show the derived layout on `gr17`.
-- [ ] 6.7 Run `./tests/bats/bin/bats tests/e2e/bench-matrix.bats tests/e2e/publish-benchmarks.bats`, plus `npm --prefix teeline-web test` and `npm --prefix teeline-web run build`; verify the harness, publisher, and web changes pass.
-- [ ] 6.8 Run `graphify update .` and verify the graph is current.
+- [x] 6.1 Run `cargo test --workspace` and verify it is green.
+- [x] 6.2 Run `cargo clippy --workspace -- -D warnings` and verify no warnings.
+- [x] 6.3 Run `cargo fmt --check` and verify no diffs.
+- [x] 6.4 Add a budget-limited integration test that every registered solver returns a valid permutation and finite cost on `gr17`, setting small budgets for all ten `AppOptions` structs (`heuristic`, `sa`, `ga`, `cs`, `fpa`, `lk`, `fourier`, `sfc`, `som`, `aco`); verify it completes and passes.
+- [x] 6.5 Compare CLI output before and after: coordinate fixtures (`berlin52`, `att48`, `burma14`) must be byte-identical; `gr17` must improve; `bayg29`/`bays29` LK tours may change and must be re-measured and reflected in `bench/solvers.json` notes if a recorded cost moves.
+- [ ] 6.6 Build the out-of-workspace `teeline-wasm` and `teeline-qt` targets and verify both build and show the derived layout on `gr17`. WASM builds; Qt is blocked in this environment because `qmake` is absent.
+- [x] 6.7 Run `./tests/bats/bin/bats tests/e2e/bench-matrix.bats tests/e2e/publish-benchmarks.bats`, plus `npm --prefix teeline-web test` and `npm --prefix teeline-web run build`; verify the harness, publisher, and web changes pass.
+- [x] 6.8 Run `graphify update .` and verify the graph is current.
 
 ## Workflow follow-up
 
