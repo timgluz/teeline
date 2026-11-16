@@ -29,7 +29,7 @@
     "@simplewebauthn/server": "14.1.0",
     "astro": "^7.4.11",
     "preact": "^10.29.8",
-    "tailwindcss": "^4.3.4",
+    "tailwindcss": "^4.3.5",
     "teeline-wasm": "file:../teeline-wasm/js-bindings"
   },
   "devDependencies": {
