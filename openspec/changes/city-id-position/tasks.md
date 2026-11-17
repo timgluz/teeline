@@ -2,17 +2,17 @@
 
 ## 1. Foundation
 
-- [ ] 1.1 Write ADR 013 recording the `Position`-only boundary, distance-source index ownership, and fallible source construction; add it to the `docs/adr/` index and verify the index links it.
+- [x] 1.1 Write ADR 013 recording the `Position`-only boundary, distance-source index ownership, and fallible source construction; add it to the `docs/adr/` index and verify the index links it.
 - [ ] 1.2 Capture the pre-change baseline: build a `master` worktree in release, run `cargo bench --bench kdtree` and `cargo bench --bench distance_matrix` with `--save-baseline pre`, run `scripts/bench-distance-scaling.sh` for memory, and store the deterministic-solver fixture outputs.
 
 ## 2. PR 1 — Lin-Kernighan remap and position-storing candidate rows
 
-- [ ] 2.1 Change `CandidateList` rows to store neighbour **positions** (`Vec<Vec<Position>>` after PR 4; `Vec<Vec<usize>>` here), keeping the row index a position; preserve the city-ID tie-break in `build_from_distances` by sorting on `(distance, city_id)` before mapping to positions.
-- [ ] 2.2 Make `candidate_positions_into` consume positions directly so it no longer performs a `city_position` lookup per neighbour; verify 2-opt and or-opt tours are unchanged.
-- [ ] 2.3 Remap `lin_kernighan`'s tour to positions on entry and size `next`/`prev`/`used`/`adj`/`pos` by `n` (positions); switch `d()` to `distance_by_pos`.
-- [ ] 2.4 Map the final tour back to IDs with `pos2city_id`; handle an unknown `init_tour` ID with an error or the existing small-n fallback instead of indexing by the raw ID.
-- [ ] 2.5 Add tests with huge IDs (for example `10^12`) and unordered IDs (for example `[30, 10, 20]`) to `lin_kernighan` and the candidate list; verify the process does not allocate by the largest ID and the tour preserves the original IDs.
-- [ ] 2.6 Run the seeded LK quality checks and verify the tour length matches the pre-change baseline.
+- [x] 2.1 Change `CandidateList` rows to store neighbour **positions** (`Vec<Vec<Position>>` after PR 4; `Vec<Vec<usize>>` here), keeping the row index a position; preserve the city-ID tie-break in `build_from_distances` by sorting on `(distance, city_id)` before mapping to positions.
+- [x] 2.2 Make `candidate_positions_into` consume positions directly so it no longer performs a `city_position` lookup per neighbour; verify 2-opt and or-opt tours are unchanged.
+- [x] 2.3 Remap `lin_kernighan`'s tour to positions on entry and size `next`/`prev`/`used`/`adj`/`pos` by `n` (positions); switch `d()` to `distance_by_pos`.
+- [x] 2.4 Map the final tour back to IDs with `pos2city_id`; handle an unknown `init_tour` ID with an error or the existing small-n fallback instead of indexing by the raw ID.
+- [x] 2.5 Add tests with huge IDs (for example `10^12`) and unordered IDs (for example `[30, 10, 20]`) to `lin_kernighan` and the candidate list; verify the process does not allocate by the largest ID and the tour preserves the original IDs.
+- [x] 2.6 Run the seeded LK quality checks and verify the tour length matches the pre-change baseline.
 
 ## 3. PR 2 — Fallible index and small fixes
 

@@ -24,7 +24,7 @@ use super::kdtree::{self, KDPoint};
 pub(crate) const MIN_CANDIDATE_K: usize = 16;
 
 pub(crate) struct CandidateList {
-    /// Neighbour city IDs, indexed by the city's dense position in `cities`.
+    /// Neighbour positions, indexed by the city's dense position in `cities`.
     rows: Vec<Vec<usize>>,
     id_index: IdIndex,
 }
@@ -45,7 +45,7 @@ impl CandidateList {
                 .nearest(city, k)
                 .nearest()
                 .iter()
-                .map(|item| item.point.id)
+                .filter_map(|item| id_index.get(item.point.id))
                 .collect();
         }
         Self { rows, id_index }
@@ -75,14 +75,16 @@ impl CandidateList {
         }
 
         for (pos, row) in rows.iter_mut().enumerate() {
-            let mut neighbours: Vec<(f32, usize)> = (0..n)
+            // Keep the city-ID tie-break from the ID-storing version; resolve the position
+            // only after sorting so the candidate order is unchanged.
+            let mut neighbours: Vec<(f32, usize, usize)> = (0..n)
                 .filter(|&other| other != pos)
                 .filter_map(|other| {
                     let distance = distances.distance_by_pos(pos, other).ok()?;
                     if !distance.is_finite() {
                         return None;
                     }
-                    Some((distance, cities[other].id))
+                    Some((distance, cities[other].id, other))
                 })
                 .collect();
             neighbours.sort_by(|left, right| {
@@ -91,7 +93,7 @@ impl CandidateList {
                     .then_with(|| left.1.cmp(&right.1))
             });
             neighbours.truncate(k);
-            *row = neighbours.into_iter().map(|(_, city_id)| city_id).collect();
+            *row = neighbours.into_iter().map(|(_, _, other)| other).collect();
         }
 
         Self { rows, id_index }
@@ -102,11 +104,9 @@ impl CandidateList {
         self.rows.len()
     }
 
-    /// Neighbour city IDs for `city_id`; empty for an ID that is not part of the problem.
-    pub(crate) fn neighbours(&self, city_id: usize) -> &[usize] {
-        self.id_index
-            .get(city_id)
-            .map_or(&[], |pos| self.rows[pos].as_slice())
+    /// Neighbour positions for `pos`; empty for a position outside the problem.
+    pub(crate) fn neighbours_by_pos(&self, pos: usize) -> &[usize] {
+        self.rows.get(pos).map_or(&[], |row| row.as_slice())
     }
 
     pub(crate) fn city_position(&self, city_id: usize) -> Option<usize> {
@@ -144,14 +144,14 @@ pub(crate) fn candidate_positions_into(
         return;
     }
 
-    for &city in candidates
-        .neighbours(a)
-        .iter()
-        .chain(candidates.neighbours(b))
-    {
-        let Some(city_pos) = candidates.city_position(city) else {
-            continue;
-        };
+    let rows_a: &[usize] = candidates
+        .city_position(a)
+        .map_or(&[], |pos| candidates.neighbours_by_pos(pos));
+    let rows_b: &[usize] = candidates
+        .city_position(b)
+        .map_or(&[], |pos| candidates.neighbours_by_pos(pos));
+
+    for &city_pos in rows_a.iter().chain(rows_b) {
         let p = route_positions.get(city_pos).copied().unwrap_or(usize::MAX);
         if p == usize::MAX {
             continue;
@@ -205,10 +205,10 @@ mod tests {
         let matrix = explicit_matrix(vec![10.0, 20.0, 1.0, 1.0, 30.0, 30.0], &cities);
 
         let geometric = CandidateList::build(&cities, 1);
-        assert_eq!(geometric.neighbours(1), &[2]);
+        assert_eq!(geometric.neighbours_by_pos(0), &[1]);
 
         let exact = CandidateList::build_from_distances(&matrix, &cities, 1);
-        assert_eq!(exact.neighbours(1), &[4]);
+        assert_eq!(exact.neighbours_by_pos(0), &[3]);
     }
 
     #[test]
@@ -217,7 +217,7 @@ mod tests {
         let matrix = explicit_matrix(vec![f32::NAN, 20.0, 1.0, 1.0, 30.0, 30.0], &cities);
 
         let exact = CandidateList::build_from_distances(&matrix, &cities, 2);
-        assert_eq!(exact.neighbours(1), &[4, 3]);
+        assert_eq!(exact.neighbours_by_pos(0), &[3, 2]);
     }
 
     #[test]
@@ -229,11 +229,11 @@ mod tests {
             vec![2.0, 0.0],
         ]);
         let candidates = CandidateList::build(&cities, 2);
-        let row = candidates.neighbours(cities[0].id);
+        let row = candidates.neighbours_by_pos(0);
         assert_eq!(row.len(), 2);
-        assert!(!row.contains(&cities[0].id));
-        assert!(row.contains(&cities[1].id));
-        assert!(row.contains(&cities[3].id));
+        assert!(!row.contains(&0));
+        assert!(row.contains(&1));
+        assert!(row.contains(&3));
     }
 
     #[test]
@@ -244,7 +244,7 @@ mod tests {
         assert_eq!(candidates.num_cities(), 4);
         assert_eq!(candidates.city_position(10), Some(0));
         assert_eq!(candidates.city_position(40), Some(3));
-        assert!(candidates.neighbours(99).is_empty());
+        assert!(candidates.neighbours_by_pos(99).is_empty());
         assert_eq!(candidates.route_positions(&[30, 10, 40, 20]), [1, 3, 0, 2]);
     }
 
