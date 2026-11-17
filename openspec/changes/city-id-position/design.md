@@ -2,121 +2,142 @@
 
 ## Context
 
-See `proposal.md` for motivation. Current state that shapes the approach:
+See `proposal.md` for motivation. The current tree has four index spaces and four duplicated id→position structures:
 
-- `KDPoint.id` is a raw `usize` (`src/tsp/kdtree.rs:296`). `build_points` assigns `0..n`, TSPLIB assigns the file's IDs (`tsplib.rs:360-367`), and the API uses `c.id.unwrap_or(i + 1)`.
-- `DistanceMatrix` keeps a `city_idx: HashMap<usize, usize>` id→position and a `CityTable` position→point; the new `DistanceSource` exposes `pos2city_id`/`city_id2pos` as the conversion boundary.
-- `Solution` copies `cities` and rebuilds `cities_idx` at every construction (`mod.rs:1934`, `1951`); there are 34 `Solution::new`/`from_parts` sites.
-- Solvers split conventions: position-based (`christofides`, `greedy_edge`, `savings`, `fourier`), ID-based (`two_opt`, `or_opt`, `nearest_neighbor`, `three_opt`, `lin_kernighan`), and converting (`ant_colony`, `bellman_karp`).
-- `NearestResult::add` excludes by `pt.id == target.id`, which forced the Fourier `usize::MAX` sentinel.
-- The CLI, API, and WASM expose ordered city IDs; the output contract must not change.
+| Space | Meaning | Today | Target |
+| --- | --- | --- | --- |
+| **City ID** | external identifier; TSPLIB 1-based, API-arbitrary, possibly non-contiguous | `usize` in `KDPoint.id`, routes, `Solution.route` | stays `usize` (deferred) |
+| **Position** | dense `0..n` index into `problem.cities` (matrix row / point index) | `usize` in trait signatures and index maps | `Position` |
+| **Route rank** | slot index in a tour (`path[rank]`) | `usize` loop vars; `CandidateList::route_positions` values | stays `usize` (transient) |
+| **Auxiliary index** | Fourier curve sample, SOM neuron, SFC bucket | sometimes reuses `KDPoint.id` | stays local |
+
+The 23-solver census found 8 position-internal solvers (`christofides`, `greedy_edge`, `savings`, `som`, `space_filling_curve`, `fourier`, `ant_colony`, `bellman_karp`) and 15 ID-internal ones. Only the position-internal camp and the trait boundary need typing; 10 of the 15 ID-internal solvers never touch a position.
+
+Two reachable defects drive this plan:
+
+- `lin_kernighan` sizes `next`/`prev`/`used`/`adj`/`pos` by the largest city ID (`lin_kernighan.rs:101-135`, `344`, `393`), and the API accepts arbitrary IDs (`teeline-api/src/models/request.rs:244`), so a few huge IDs abort the process.
+- Coordinate input with duplicate IDs hits an `assert!` in `DistanceMatrix::from_parts` (`distance_matrix.rs:269`); only EXPLICIT input is validated (`tsplib.rs:247`).
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Make the position/ID distinction compile-time visible.
-- Own one canonical mapping, instead of rebuilding it per `Solution`.
-- One solver convention: positions internally, IDs at the tour/output boundary.
-- Remove the `KDPoint::new` id-0 collision and the `nearest` sentinel workaround.
-- Preserve every output byte and every distance semantic.
+- Fix the LK allocation crash and the duplicate-ID panic.
+- Type the position boundary with `Position` where IDs and positions actually meet.
+- Consolidate the canonical id→position index in the distance source and delete the dead `Solution` state.
+- Preserve output, solver quality, runtime, and memory.
 
 **Non-Goals:**
 
-- Changing the TSPLIB input/output contract or the distance metrics.
-- Exposing newtypes in JSON or the WIT surface; they convert to `u32`/`usize` at the boundary.
-- Changing any solver algorithm or result.
-- Reworking `TspProblem.cities` into a shared `Arc<[KDPoint]>`; that is a separate memory question.
+- A `CityId` newtype; typing `KDPoint.id`, `Solution.route`, `Route`, `init_tour`, `ProgressMessage`, or `validate_tour`.
+- Migrating the 15 ID-internal solvers.
+- Changing TSPLIB/JSON/WIT shapes or the Qt/WASM output types.
+- Removing the Fourier `usize::MAX` query sentinel (deferred; revisit only if it is free on `nearest_k5`).
+- Sharing `TspProblem.cities` via `Arc<[KDPoint]>`.
 
 ## Decisions
 
-### D1: `CityId(usize)` and `Position(usize)` newtypes
+### D1: `Position(usize)`, and defer `CityId`
 
 ```rust
-#[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct CityId(usize);
-
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Position(usize);
 ```
 
-`into_inner()`/`value()` exposes the raw number at serialization boundaries. Newtypes are zero-cost, prevent indexing one space with the other, and make signatures self-documenting. **Alternatives:** type aliases (no enforcement, rejected); documentation only (the current state, rejected).
+`into_inner()` exposes the raw index at the few `usize` boundaries. Newtypes are zero-cost, prevent a position from being passed where an ID is expected (and vice versa), and make the trait self-documenting.
 
-### D2: One `CityIndex` owns the mapping
+`CityId` is deferred because IDs already flow as `usize` through `Route`, `init_tour`, `ProgressMessage`, `validate_tour`, and 15 solvers; typing them spreads into the Qt/WASM boundary for little gain where the spaces never meet. **Revisit if** an ID-based solver moves to positions for speed, or another ID/position bug lands in ID-space solver code after this change.
 
-```rust
-pub struct CityIndex {
-    ids: Vec<CityId>,                 // position -> id
-    by_id: HashMap<CityId, Position>,
-}
-```
+### D2: The distance source owns a fallible `IdIndex`
 
-`TspProblem` owns an `Arc<CityIndex>`; the distance sources and `Solution` share it. Construction rejects duplicate IDs, mirroring `DistanceMatrix::new`/`OnTheFly::new`. `Solution` stops rebuilding `cities_idx` and holds the shared index plus its existing city copy. **Alternative:** each source keeps its own map — rejected, because that is exactly the duplication this change removes.
+- `IdIndex::build(cities) -> Result<IdIndex, &'static str>` rejects duplicate IDs (today `OnTheFly` and the parser each compare `len()` separately).
+- `DistanceMatrix` holds `IdIndex` plus `Vec<KDPoint>`; `OnTheFly` keeps its `IdIndex`.
+- `TspProblem` stays `{ cities, distances }` and does **not** build a second index; `pos2city_id`/`city_id2pos` expose the source's index through the trait. This avoids doubling memory at the 84 `TspProblem::new` sites, where the source was built separately.
+- `DistanceMatrix::new`/`from_explicit_slice` and `OnTheFly::new` return `Result`; the API maps duplicate/invalid IDs to 400, and WASM returns an error instead of trapping.
 
-### D3: `KDPoint` holds a `CityId`
+`CandidateList` keeps its own one-time `IdIndex` (O(n), already dense/sparse) because it needs id→row lookup at query time; the consolidation targets `DistanceMatrix`'s two HashMaps and `Solution`'s dead map, not a shared `Arc`.
 
-`pub struct KDPoint { pub id: CityId, pub coords: [f32; 2] }`. `KDPoint::new` (which silently sets `id = 0`) is removed; `new_with_id` becomes `new(id: CityId, coords)`. `build_points` assigns `CityId(i)` for tests, TSPLIB assigns the parsed ID, and the API assigns `CityId(c.id.unwrap_or(i + 1))`. This is the widest mechanical diff (every `KDPoint` literal and constructor), but it removes the collision at the source.
-
-### D4: The distance-source API uses positions and IDs explicitly
+### D3: `DistanceSource` position methods take `Position`
 
 ```rust
 fn distance_by_pos(&self, a: Position, b: Position) -> Result<f32, &'static str>;
-fn distance_between(&self, a: CityId, b: CityId) -> Result<f32, &'static str>;
-fn tour_length(&self, path: &[CityId]) -> f32;
-fn tour_length_by_pos(&self, path: &[Position]) -> f32;
+fn pos2city_id(&self, pos: Position) -> Option<usize>;
+fn city_id2pos(&self, id: usize) -> Option<Position>;
 fn point_at(&self, pos: Position) -> Option<KDPoint>;
-fn pos2city_id(&self, pos: Position) -> Option<CityId>;
-fn city_id2pos(&self, id: CityId) -> Option<Position>;
-fn distances_from(&self, id: CityId) -> Vec<f32>;
-fn nearest(&self, target: Position, n: usize) -> NearestResult;
-fn nearest_unvisited(
-    &self,
-    target: Position,
-    is_candidate: &dyn Fn(CityId) -> bool,
-) -> Option<NearestResultItem>;
+fn tour_length_by_pos(&self, path: &[Position]) -> f32;
 ```
 
-`nearest` now takes the query point's position and excludes it explicitly, instead of inferring exclusion from `target.id`. That removes the sentinel and the id-collision footgun in one step. The trait is new in `distance-source`, so this is a source-level change in-repo, not a public compatibility break.
+The ID-based methods (`distance_between`, `tour_length`, `distances_from`) and `nearest`/`nearest_unvisited` keep their current `usize`/`KDPoint` signatures. This is the minimal two-way check: a position cannot reach an ID slot and an ID cannot reach a position slot.
 
-### D5: One solver convention
+### D4: `CandidateList` rows store positions
 
-- Constructive/position solvers (`christofides`, `greedy_edge`, `savings`, `fourier`) keep `Vec<Position>` internally and map to `CityId` with `CityIndex::id_at` at the end.
-- Local-search solvers (`two_opt`, `or_opt`, `three_opt`, `lin_kernighan`, `nearest_neighbor`) keep `Vec<CityId>` routes and call `city_id2pos` only when they need a matrix position.
-- `ant_colony` and `bellman_karp` delete their local `to_pos`/`to_id` closures and use `CityIndex`.
-- `Solution.route` is `Vec<CityId>`; `route()` returns `&[CityId]` and a `route_ids()` helper yields `usize` for the output surfaces.
+Rows are indexed by position and currently store neighbour **IDs**; store neighbour **positions** instead (`rows: Vec<Vec<Position>>`). This is memory-neutral on 64-bit (`Position` is `#[repr(transparent)]` over `usize`), and it removes the per-neighbour `city_position` lookup from `candidate_positions_into`.
 
-### D6: Output surfaces convert at the edge
+- `build`/`build_from_distances` fill rows with positions.
+- `build_from_distances` must keep sorting ties by **city ID** (today it sorts `(distance, city_id)`); resolve the position after the sort so output order is unchanged.
+- `route_positions(&[usize]) -> Vec<usize>` keeps the documented `usize::MAX` "not in path" **rank** sentinel. It is not the Fourier query sentinel and is not removed.
 
-The CLI prints `CityId` as `usize`; the API and WASM map `CityId` to `u32` in their response builders. No JSON/WIT shape changes. `validate_tour` stays ID-based.
+### D5: `graph.rs` keeps its compact `u32` edge storage
 
-### D7: `TspProblem` owns the index
+`sorted_edges` packs O(n²) edge endpoints as `(f32, u32, u32)` to roughly halve the working set (~600MB vs ~1.2GB at n=10k, `graph.rs:54-58`). Do **not** store `Position` there. `Position` may appear at the `usize` boundary of `select_edges`/`hamiltonian_cycle_to_path` (memory-neutral), but the packed list stays `u32`.
 
-`TspProblem { cities: Vec<KDPoint>, index: Arc<CityIndex>, distances: Arc<dyn DistanceSource> }`. Constructors (`new`, `from_source`, `from_points`) build or accept the index once. The position invariant from `distance-source` (`index.id_at(i) == cities[i].id`, `index.len() == cities.len()`) is asserted once here.
+### D6: `lin_kernighan` remaps to positions
+
+- On entry, map the tour IDs to positions via `city_id2pos`; an unknown ID returns an error (or the existing n<4 fallback) instead of indexing or allocating by the ID.
+- Keep `next`/`prev`/`used`/`adj`/`pos` as `Vec<usize>` sized `n` and indexed by position; the scratch arrays stay `usize` internally.
+- Use `distance_by_pos` inside `d()`.
+- On exit, map positions back to IDs via `pos2city_id`.
+- Consume the position-storing candidate rows so the innermost neighbour loop needs no lookup.
+
+### D7: Small fixes
+
+- `branch_bound`: send the visited prefix `path[..k]` in progress updates instead of filtering `x != UNVISITED_NODE`, which drops city 0. Keep the constant.
+- `bellman_karp`: replace `pos2city_id(pos).unwrap_or(0)` with `expect`, since positions come from `0..n`.
+
+### D8: Delete dead `Solution` state and consolidate `DistanceMatrix`
+
+- `Solution { total: f32, route: Vec<usize> }`; delete `cities`, `cities_idx`, `cities()`, and `get_by_city_id()` (no callers in the repo). `Solution::new`/`from_parts` stop copying the city list and building the map.
+- `DistanceMatrix { n, items, cities: Vec<KDPoint>, city_idx: IdIndex, is_coordinate_metric }`; `point_at` indexes the `Vec`, `city_id2pos` delegates to `IdIndex`.
+- Delete the unused, ID-keyed `city_table_from_vec` (`mod.rs:2100`) and remove `CityTable` from `DistanceMatrix`; keep the alias only if another module still needs it.
+
+## Performance & Memory Budget
+
+Correctness wins over performance, but these are merge gates:
+
+- **Harnesses**: `cargo bench --bench kdtree`, `cargo bench --bench distance_matrix` (both criterion, `harness = false`), `scripts/bench-matrix.sh` for wall clock, `scripts/bench-distance-scaling.sh` for memory. (The earlier `bench/distance-backend` reference was a branch name, not a harness.)
+- **Baseline**: a `git worktree` of `master` built in release, used as `--binary`; record commit, `rustc -V`, and CPU for every run; same machine, pinned core, AC power.
+- **Capture before PR 1**: `distance_between` over 10k seeded random pairs (matrix and on-the-fly, dense and sparse IDs), `tour_length` on att532 and a 20k on-the-fly instance, `candidate_positions_into` on a280, and seeded LK on att532.
+- **Micro-bench gate**: no regression > +3% with p < 0.05 on two reruns; `nearest_k5` blocks at +2%.
+- **Wall-clock gate**: median of 10 runs > +5%, only for deterministic cells with a median ≥ 200 ms (2opt, or_opt, 3opt, nn, sfc, bhk, seeded LK). Report shorter cells; do not gate on them.
+- **Memory gate**: on-the-fly peak RSS > +2% or +1 MiB. `Position` must be memory-neutral where the underlying storage is `usize`; `graph.rs`'s `u32` list must not grow.
+- **Allocation gate**: a test-only counting allocator asserts zero allocations in `distance_between`, `position_of`, and `tour_length` loops.
+- **Expected wins**: a dense `IdIndex` replaces SipHash `HashMap` lookups in `DistanceMatrix` (likely faster for 2-opt/or-opt/3-opt/LK/SA/tabu); LK scratch memory drops from O(max_id) to O(n). Measure and report both.
+- **Where memory could rise**: a second index (avoided by D2), a redundant `ids` Vec (not in this plan), or `Option<CityId>` (not in this plan). None apply.
 
 ## Risks / Trade-offs
 
-- **Public surface churn** — `KDPoint.id` and `Solution::route()` types change; CLI/API/WASM/Qt must be updated in the same stack. WASM and Qt are out-of-workspace and easy to miss → build them explicitly.
-- **Wide mechanical diff** — every `KDPoint` literal and 34 `Solution` sites → split into the PRs below; the newtypes make missed conversions compile errors rather than silent bugs.
-- **Output contract regression** — a position leaking into the output would be a real bug → tests with 1-based and non-contiguous IDs assert the exact printed IDs.
-- **`nearest` API change** — Fourier and six test call sites → update in the same PR that changes the trait signature.
-- **Performance** — newtypes are `#[repr(transparent)]` and zero-cost; the only added lookup is the shared `CityIndex`, which replaces the per-`Solution` map.
-- **Stacking on `distance-source`** — the trait signatures change again → land after the full `distance-source` stack (PR 10), when the trait and solver conventions are stable.
+- **LK remap correctness** — the tour, tie-breaks, and chain reconstruction must be preserved. Gate with the existing LK tests, seeded quality runs, and a sparse/huge-ID test.
+- **Candidate row tie-breaks** — `build_from_distances` currently breaks ties by city ID; resolve positions after the sort to keep output order identical.
+- **Duplicate-ID propagation** — `DistanceMatrix::new` becomes fallible; API returns 400, WASM returns an error. Update the test helpers that call it.
+- **`Position` call-site churn** — ~79 call sites in `src` and ~23 in `tests`, none in the CLI/API/WASM/Qt crates, because output types do not change.
+- **Byte-identical verification** — only deterministic solvers can be compared by sha256; stochastic solvers must be checked as a valid permutation plus quality across runs. Seeding them is a separate change.
+- **Benchmark noise** — a 2% gate on a laptop sits at criterion's own noise floor; use the +3% micro threshold, median-of-10 wall clock, and the pinned-core protocol above.
 
 ## Migration Plan
 
-Behaviour-preserving stack:
-
-1. Write ADR 011, then add `CityId`, `Position`, `CityIndex` and their tests; no consumer changes yet.
-2. Switch `KDPoint.id` to `CityId`, update `build_points`/TSPLIB/API construction, `Solution.route` to `Vec<CityId>`, and all 34 `Solution` sites.
-3. Switch the `DistanceSource` signatures to the newtypes and `nearest` to `Position`; update Fourier and the six test sites.
-4. Migrate solvers to the one convention and delete the local `to_pos`/`to_id` converters.
-5. Remove `KDPoint::new` (id-0) and the Fourier sentinel; update docs, AGENTS.md core types, and graphify.
+1. Write ADR 013 (`Position` boundary, index ownership, fallible construction) and capture the baseline.
+2. PR 1: remap LK to positions and switch candidate rows to positions; add a huge/unordered-ID test.
+3. PR 2: make `IdIndex::build` fallible, propagate duplicate-ID errors to the API/WASM, fix `branch_bound` progress and `bellman_karp` `expect`.
+4. PR 3: consolidate `DistanceMatrix` onto `IdIndex` + `Vec<KDPoint>`, delete the dead `Solution` state and `city_table_from_vec`.
+5. PR 4: introduce `Position` on `DistanceSource`, `CandidateList`, `graph.rs`'s `usize` boundary, and the position-internal solvers (BHK, ACO, Christofides, Savings, Greedy Edge).
+6. Run the integration and performance gates; archive after the stack merges.
 
 Rollback is a stack revert; no data migration.
 
 ## Open Questions
 
-- Whether `route()` should return `&[CityId]` with a separate `route_ids()` (preferred) or keep `&[usize]` to reduce surface churn.
-- Whether `TspProblem.cities` should become `Arc<[KDPoint]>` so `Solution` shares the city copy — defer; it is a memory question, not an identity one.
+- `CandidateList::neighbours` should take a `Position` or a city ID after PR 4? Prefer `Position` once callers resolve their endpoints once.
+- Keep `route_positions`' `usize::MAX` sentinel (recommended, memory-neutral) or switch to `Option<usize>` (doubles the array)?
+- Should stochastic solvers get deterministic seeding in a separate PR so output can be sha256-gated?
+- Is the Fourier nearest exclusion worth doing if it is free on `nearest_k5`? Deferred.

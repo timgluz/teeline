@@ -141,15 +141,9 @@ fn backtrack(
     for candidate in candidates.iter() {
         make_move(path, k, *candidate, progress_tx);
 
-        let visited_path: Vec<usize> = path
-            .to_vec()
-            .iter()
-            .filter(|&&x| x != UNVISITED_NODE)
-            .copied()
-            .collect();
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::PathUpdate(
-                Route::new(&visited_path),
+                Route::new(&path[..=k]),
                 best_distance,
             ));
         }
@@ -530,6 +524,34 @@ mod tests {
             "n_nearest=4 gap {:.1}% should be < 10% vs exact {:.3}",
             gap * 100.0,
             exact.total,
+        );
+    }
+
+    #[test]
+    fn progress_path_includes_city_zero() {
+        let problem = tsp5_problem();
+        let (tx, rx) = mpsc::channel();
+        let opts = HeuristicOptions {
+            n_nearest: 0,
+            ..Default::default()
+        };
+
+        let _ = solve(&problem, &opts, Some(&tx), None);
+        drop(tx);
+
+        let updates: Vec<Vec<usize>> = rx
+            .iter()
+            .filter_map(|msg| match msg {
+                ProgressMessage::PathUpdate(route, _) => Some(route.route().to_vec()),
+                _ => None,
+            })
+            .collect();
+
+        // The first update is the sorted seed tour; the next comes from backtracking.
+        let visited = updates.get(1).expect("B&B must emit a visited-path update");
+        assert!(
+            visited.contains(&0),
+            "the first backtracking progress path must include city 0, got {visited:?}"
         );
     }
 }
