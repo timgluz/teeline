@@ -30,13 +30,13 @@ pub(crate) struct CandidateList {
 }
 
 impl CandidateList {
-    pub(crate) fn build(cities: &[KDPoint], k: usize) -> Self {
+    pub(crate) fn build(cities: &[KDPoint], k: usize) -> Option<Self> {
         let n = cities.len();
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index = IdIndex::build(cities).expect("TspProblem guarantees unique city ids");
+        let id_index = IdIndex::build(cities).ok()?;
         if n < 2 || k == 0 {
-            return Self { rows, id_index };
+            return Some(Self { rows, id_index });
         }
 
         let tree = kdtree::from_cities(cities);
@@ -53,7 +53,7 @@ impl CandidateList {
                 .collect();
             rows[pos] = row;
         }
-        Self { rows, id_index }
+        Some(Self { rows, id_index })
     }
 
     /// Build candidate rows from the exact distance matrix rather than the coordinates.
@@ -65,7 +65,7 @@ impl CandidateList {
         distances: &dyn DistanceSource,
         cities: &[KDPoint],
         k: usize,
-    ) -> Self {
+    ) -> Option<Self> {
         let n = cities.len();
         debug_assert_eq!(
             distances.num_cities(),
@@ -74,9 +74,9 @@ impl CandidateList {
         );
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index = IdIndex::build(cities).expect("TspProblem guarantees unique city ids");
+        let id_index = IdIndex::build(cities).ok()?;
         if n < 2 || k == 0 {
-            return Self { rows, id_index };
+            return Some(Self { rows, id_index });
         }
 
         for (pos, row) in rows.iter_mut().enumerate() {
@@ -101,7 +101,7 @@ impl CandidateList {
             *row = neighbours.into_iter().map(|(_, _, other)| other).collect();
         }
 
-        Self { rows, id_index }
+        Some(Self { rows, id_index })
     }
 
     #[cfg(test)]
@@ -209,10 +209,11 @@ mod tests {
         // Geometry puts city 2 next to city 1; the matrix makes city 4 closest.
         let matrix = explicit_matrix(vec![10.0, 20.0, 1.0, 1.0, 30.0, 30.0], &cities);
 
-        let geometric = CandidateList::build(&cities, 1);
+        let geometric = CandidateList::build(&cities, 1).expect("unique city ids");
         assert_eq!(geometric.neighbours_by_pos(0), &[1]);
 
-        let exact = CandidateList::build_from_distances(&matrix, &cities, 1);
+        let exact =
+            CandidateList::build_from_distances(&matrix, &cities, 1).expect("unique city ids");
         assert_eq!(exact.neighbours_by_pos(0), &[3]);
     }
 
@@ -221,7 +222,8 @@ mod tests {
         let cities = cities_at(&[1, 2, 3, 4]);
         let matrix = explicit_matrix(vec![f32::NAN, 20.0, 1.0, 1.0, 30.0, 30.0], &cities);
 
-        let exact = CandidateList::build_from_distances(&matrix, &cities, 2);
+        let exact =
+            CandidateList::build_from_distances(&matrix, &cities, 2).expect("unique city ids");
         assert_eq!(exact.neighbours_by_pos(0), &[3, 2]);
     }
 
@@ -233,7 +235,7 @@ mod tests {
             vec![10.0, 0.0],
             vec![2.0, 0.0],
         ]);
-        let candidates = CandidateList::build(&cities, 2);
+        let candidates = CandidateList::build(&cities, 2).expect("unique city ids");
         let row = candidates.neighbours_by_pos(0);
         assert_eq!(row.len(), 2);
         assert!(!row.contains(&0));
@@ -244,7 +246,7 @@ mod tests {
     #[test]
     fn rows_are_indexed_by_dense_position() {
         let cities = cities_at(&[10, 20, 30, 40]);
-        let candidates = CandidateList::build(&cities, 2);
+        let candidates = CandidateList::build(&cities, 2).expect("unique city ids");
 
         assert_eq!(candidates.num_cities(), 4);
         assert_eq!(candidates.city_position(10), Some(0));
@@ -256,7 +258,7 @@ mod tests {
     #[test]
     fn sparse_ids_do_not_size_the_table_by_the_largest_id() {
         let cities = cities_at(&[1_000_000, 2_000_000, 3_000_000]);
-        let candidates = CandidateList::build(&cities, 2);
+        let candidates = CandidateList::build(&cities, 2).expect("unique city ids");
 
         assert_eq!(candidates.num_cities(), 3);
         assert_eq!(candidates.city_position(1_000_000), Some(0));
@@ -279,7 +281,7 @@ mod tests {
             vec![3.0, 0.0],
             vec![4.0, 0.0],
         ]);
-        let candidates = CandidateList::build(&cities, 2);
+        let candidates = CandidateList::build(&cities, 2).expect("unique city ids");
         let path = vec![2, 0, 1, 3, 4];
         let route_positions = candidates.route_positions(&path);
 
@@ -294,7 +296,7 @@ mod tests {
     #[test]
     fn candidate_positions_dedup_overlapping_rows_and_skip_unknown_cities() {
         let cities = cities_at(&[10, 20, 30, 40]);
-        let candidates = CandidateList::build(&cities, 3);
+        let candidates = CandidateList::build(&cities, 3).expect("unique city ids");
         let path = vec![10, 20, 30, 40];
         let route_positions = candidates.route_positions(&path);
 
@@ -321,7 +323,7 @@ mod tests {
     #[test]
     fn candidate_positions_handles_an_empty_route() {
         let cities = cities_at(&[10, 20]);
-        let candidates = CandidateList::build(&cities, 1);
+        let candidates = CandidateList::build(&cities, 1).expect("unique city ids");
         let mut out = vec![7];
         candidate_positions_into(&candidates, &[], 0, 10, 20, &mut out);
         assert!(out.is_empty());

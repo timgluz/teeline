@@ -65,7 +65,7 @@ fn candidates_for(
     k: usize,
 ) -> Option<CandidateList> {
     if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
-        Some(CandidateList::build(cities, k))
+        CandidateList::build(cities, k)
     } else {
         None
     }

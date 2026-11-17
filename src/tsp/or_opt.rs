@@ -90,7 +90,7 @@ fn candidates_for(
     k: usize,
 ) -> Option<CandidateList> {
     if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
-        Some(CandidateList::build(cities, k))
+        CandidateList::build(cities, k)
     } else {
         None
     }
@@ -322,7 +322,7 @@ mod tests {
 
         // k = n - 1 makes every other city a candidate, so the pruned scan must find the
         // same move as the full scan.
-        let candidates = CandidateList::build(&problem.cities, 4);
+        let candidates = CandidateList::build(&problem.cities, 4).expect("unique city ids");
         let pruned = find_best_move(&path, problem.distances.as_ref(), Some(&candidates));
         assert_eq!(full, pruned);
     }

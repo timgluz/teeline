@@ -13,10 +13,20 @@ pub(crate) enum IdIndex {
     Sparse(HashMap<usize, usize>),
 }
 
+pub(crate) fn unique_city_ids(cities: &[KDPoint]) -> Result<(), &'static str> {
+    let mut seen = std::collections::HashSet::with_capacity(cities.len());
+    if cities.iter().all(|city| seen.insert(city.id)) {
+        Ok(())
+    } else {
+        Err("city ids must be unique")
+    }
+}
+
 impl IdIndex {
     pub(crate) fn build(cities: &[KDPoint]) -> Result<Self, &'static str> {
+        unique_city_ids(cities)?;
         let max_id = cities.iter().map(|city| city.id).max().unwrap_or(0);
-        let index = if max_id < cities.len().saturating_mul(4).max(1) {
+        Ok(if max_id < cities.len().saturating_mul(4).max(1) {
             let mut dense = vec![usize::MAX; max_id + 1];
             for (position, city) in cities.iter().enumerate() {
                 dense[city.id] = position;
@@ -30,11 +40,7 @@ impl IdIndex {
                     .map(|(position, city)| (city.id, position))
                     .collect(),
             )
-        };
-        if index.len() != cities.len() {
-            return Err("city ids must be unique");
-        }
-        Ok(index)
+        })
     }
 
     pub(crate) fn get(&self, city_id: usize) -> Option<usize> {
@@ -47,6 +53,7 @@ impl IdIndex {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         match self {
             Self::Dense(positions) => positions.iter().filter(|&&pos| pos != usize::MAX).count(),

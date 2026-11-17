@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -244,10 +244,7 @@ fn explicit_city_table(
         ));
     }
 
-    let unique: HashSet<usize> = cities.iter().map(|city| city.id).collect();
-    if unique.len() != n {
-        return Err("EXPLICIT input contains duplicate city IDs".to_string());
-    }
+    super::id_index::unique_city_ids(cities).map_err(|e| format!("EXPLICIT input: {e}"))?;
 
     let table = cities
         .iter()
@@ -1302,7 +1299,7 @@ mod tests {
             .into_problem(DistanceBackend::Auto)
             .err()
             .expect("mismatched input must fail");
-        assert!(err.contains("duplicate"), "{err}");
+        assert!(err.contains("city ids must be unique"), "{err}");
     }
 
     #[test]

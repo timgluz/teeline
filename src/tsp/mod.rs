@@ -2084,24 +2084,24 @@ impl TspProblem {
         cities: Vec<KDPoint>,
         distances: Arc<dyn DistanceSource>,
     ) -> Result<Self, String> {
-        debug_assert_eq!(
-            distances.num_cities(),
-            cities.len(),
-            "distance source has {} cities, problem has {}",
-            distances.num_cities(),
-            cities.len()
-        );
-        let mut seen = std::collections::HashSet::with_capacity(cities.len());
-        if !cities.iter().all(|city| seen.insert(city.id)) {
-            return Err("city ids must be unique".to_string());
+        if distances.num_cities() != cities.len() {
+            return Err(format!(
+                "distance source has {} cities, problem has {}",
+                distances.num_cities(),
+                cities.len()
+            ));
         }
+        let mut seen = std::collections::HashSet::with_capacity(cities.len());
         for (pos, city) in cities.iter().enumerate() {
-            debug_assert_eq!(
-                distances.pos2city_id(pos),
-                Some(city.id),
-                "distance source position {pos} does not match city id {}",
-                city.id
-            );
+            if distances.pos2city_id(pos) != Some(city.id) {
+                return Err(format!(
+                    "distance source position {pos} does not map to city id {}",
+                    city.id
+                ));
+            }
+            if !seen.insert(city.id) {
+                return Err("city ids must be unique".to_string());
+            }
         }
         Ok(TspProblem { cities, distances })
     }
