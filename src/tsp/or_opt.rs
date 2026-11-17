@@ -90,7 +90,13 @@ fn candidates_for(
     k: usize,
 ) -> Option<CandidateList> {
     if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
-        Some(CandidateList::build(cities, k))
+        match CandidateList::build(cities, k) {
+            Ok(candidates) => Some(candidates),
+            Err(e) => {
+                tracing::warn!(error = e, "candidate list unavailable; using the full scan");
+                None
+            }
+        }
     } else {
         None
     }
@@ -322,7 +328,7 @@ mod tests {
 
         // k = n - 1 makes every other city a candidate, so the pruned scan must find the
         // same move as the full scan.
-        let candidates = CandidateList::build(&problem.cities, 4);
+        let candidates = CandidateList::build(&problem.cities, 4).expect("unique city ids");
         let pruned = find_best_move(&path, problem.distances.as_ref(), Some(&candidates));
         assert_eq!(full, pruned);
     }
@@ -344,7 +350,7 @@ mod tests {
                 packed.push(delta.min(n - delta) as f32);
             }
         }
-        let dm = distance_matrix::DistanceMatrix::new(n, packed, city_table);
+        let dm = distance_matrix::DistanceMatrix::new(n, packed, city_table).unwrap();
         assert!(
             !dm.is_coordinate_metric(),
             "EXPLICIT matrices must not advertise coordinates"
@@ -442,7 +448,8 @@ mod tests {
             .enumerate()
             .map(|(position, city)| (position, *city))
             .collect();
-        let matrix = distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table);
+        let matrix =
+            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table).unwrap();
 
         assert!(candidates_for(&matrix, &cities, 2).is_none());
     }

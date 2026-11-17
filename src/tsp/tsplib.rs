@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -111,7 +111,7 @@ impl TspLibData {
                 let (n, city_table) = explicit_city_table(&self.cities, dists.len())?;
                 // Packs straight from the parsed weights; `DistanceMatrix::new` would require
                 // an O(n^2) clone first.
-                Ok(DistanceMatrix::from_explicit_slice(n, dists, city_table))
+                DistanceMatrix::from_explicit_slice(n, dists, city_table).map_err(|e| e.to_string())
             }
             None => {
                 DistanceMatrix::build(&self.cities, self.distance_type).map_err(|e| e.to_string())
@@ -136,7 +136,7 @@ impl TspLibData {
                 );
             }
             let dm = self.distance_matrix()?;
-            return Ok(TspProblem::new(self.cities.clone(), dm));
+            return TspProblem::try_new(self.cities.clone(), dm);
         }
 
         if self.distance_type == DistanceType::Explicit {
@@ -148,7 +148,7 @@ impl TspLibData {
         }
 
         let source = super::build_distance_source(&self.cities, self.distance_type, backend)?;
-        Ok(TspProblem::from_source(self.cities.clone(), source))
+        TspProblem::try_from_source(self.cities.clone(), source)
     }
 
     /// Consuming variant of [`Self::to_problem`].
@@ -171,8 +171,8 @@ impl TspLibData {
                 );
             }
             let (n, city_table) = explicit_city_table(&cities, distances.len())?;
-            let dm = DistanceMatrix::new(n, distances, city_table);
-            return Ok(TspProblem::new(cities, dm));
+            let dm = DistanceMatrix::new(n, distances, city_table).map_err(|e| e.to_string())?;
+            return TspProblem::try_new(cities, dm);
         }
 
         if distance_type == DistanceType::Explicit {
@@ -184,7 +184,7 @@ impl TspLibData {
         }
 
         let source = super::build_distance_source(&cities, distance_type, backend)?;
-        Ok(TspProblem::from_source(cities, source))
+        TspProblem::try_from_source(cities, source)
     }
 
     /// Like [`Self::to_problem`], but lets the caller reject a derived layout.
@@ -244,10 +244,7 @@ fn explicit_city_table(
         ));
     }
 
-    let unique: HashSet<usize> = cities.iter().map(|city| city.id).collect();
-    if unique.len() != n {
-        return Err("EXPLICIT input contains duplicate city IDs".to_string());
-    }
+    super::id_index::unique_city_ids(cities).map_err(|e| format!("EXPLICIT input: {e}"))?;
 
     let table = cities
         .iter()
@@ -1302,7 +1299,7 @@ mod tests {
             .into_problem(DistanceBackend::Auto)
             .err()
             .expect("mismatched input must fail");
-        assert!(err.contains("duplicate"), "{err}");
+        assert!(err.contains("city ids must be unique"), "{err}");
     }
 
     #[test]

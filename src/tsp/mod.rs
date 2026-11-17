@@ -2053,31 +2053,59 @@ pub struct TspProblem {
 impl TspProblem {
     /// Wraps a concrete source, so existing `TspProblem::new(cities, dm)` call sites keep
     /// compiling when the field became a trait object.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cities` and `distances` disagree (city count or position→id mapping) or
+    /// if the city IDs are not unique. Use [`Self::try_new`] for untrusted input.
     pub fn new(cities: Vec<KDPoint>, distances: impl DistanceSource + 'static) -> Self {
-        TspProblem {
-            cities,
-            distances: Arc::new(distances),
-        }
+        Self::from_source(cities, Arc::new(distances))
+    }
+
+    /// Fallible [`Self::new`] for callers holding untrusted city IDs.
+    pub fn try_new(
+        cities: Vec<KDPoint>,
+        distances: impl DistanceSource + 'static,
+    ) -> Result<Self, String> {
+        Self::try_from_source(cities, Arc::new(distances))
     }
 
     /// Shares an already-constructed source, as the selection policy returns.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cities` and `distances` disagree (city count or position→id mapping) or
+    /// if the city IDs are not unique. Use [`Self::try_from_source`] for untrusted input.
     pub fn from_source(cities: Vec<KDPoint>, distances: Arc<dyn DistanceSource>) -> Self {
-        debug_assert_eq!(
-            distances.num_cities(),
-            cities.len(),
-            "distance source has {} cities, problem has {}",
-            distances.num_cities(),
-            cities.len()
-        );
-        for (pos, city) in cities.iter().enumerate() {
-            debug_assert_eq!(
-                distances.pos2city_id(pos),
-                Some(city.id),
-                "distance source position {pos} does not match city id {}",
-                city.id
-            );
+        Self::try_from_source(cities, distances)
+            .unwrap_or_else(|e| panic!("invalid TspProblem: {e}"))
+    }
+
+    /// Fallible [`Self::from_source`]: rejects a city/source mismatch or duplicate city IDs.
+    pub fn try_from_source(
+        cities: Vec<KDPoint>,
+        distances: Arc<dyn DistanceSource>,
+    ) -> Result<Self, String> {
+        if distances.num_cities() != cities.len() {
+            return Err(format!(
+                "distance source has {} cities, problem has {}",
+                distances.num_cities(),
+                cities.len()
+            ));
         }
-        TspProblem { cities, distances }
+        let mut seen = std::collections::HashSet::with_capacity(cities.len());
+        for (pos, city) in cities.iter().enumerate() {
+            if distances.pos2city_id(pos) != Some(city.id) {
+                return Err(format!(
+                    "distance source position {pos} does not map to city id {}",
+                    city.id
+                ));
+            }
+            if !seen.insert(city.id) {
+                return Err("city ids must be unique".to_string());
+            }
+        }
+        Ok(TspProblem { cities, distances })
     }
 
     /// Build a coordinate source according to the selection policy.
@@ -2087,7 +2115,7 @@ impl TspProblem {
         backend: DistanceBackend,
     ) -> Result<Self, String> {
         let source = build_distance_source(&cities, dt, backend)?;
-        Ok(Self::from_source(cities, source))
+        Self::try_from_source(cities, source)
     }
 }
 

@@ -154,7 +154,10 @@ fn read_optimal_route(
 
     let route: Vec<usize> = route_ids
         .iter()
-        .map(|&pos| dm.pos2city_id(pos).unwrap_or(0))
+        .map(|&pos| {
+            dm.pos2city_id(pos)
+                .expect("reconstruction position came from 0..n")
+        })
         .collect();
 
     route

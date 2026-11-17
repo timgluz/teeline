@@ -55,6 +55,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use super::distance_source::DistanceSource;
+use super::id_index::unique_city_ids;
 use super::kdtree::KDPoint;
 use super::{CityTable, DistanceType};
 
@@ -243,13 +244,17 @@ impl DistanceMatrix {
     ///
     /// Values that fit in `u16` are stored at two bytes each; everything else stays `f32`.
     /// Both representations preserve every value exactly.
-    pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
+    pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Result<Self, &'static str> {
         Self::from_parts(n, PackedDistances::from_explicit(distances), cities, false)
     }
 
     /// Like [`Self::new`], but packs straight from a borrowed slice, so a caller holding the
     /// parsed weights does not have to clone them first.
-    pub fn from_explicit_slice(n: usize, distances: &[f32], cities: CityTable) -> Self {
+    pub fn from_explicit_slice(
+        n: usize,
+        distances: &[f32],
+        cities: CityTable,
+    ) -> Result<Self, &'static str> {
         Self::from_parts(
             n,
             PackedDistances::from_explicit_slice(distances),
@@ -263,30 +268,30 @@ impl DistanceMatrix {
         items: PackedDistances,
         cities: CityTable,
         is_coordinate_metric: bool,
-    ) -> Self {
+    ) -> Result<Self, &'static str> {
+        if cities.len() != n {
+            return Err("city table length does not match n");
+        }
         let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
 
-        assert!(n == city_idx.len(), "city_idx size differs from n cities");
+        if city_idx.len() != n {
+            return Err("city ids must be unique");
+        }
         let expected = n
             .checked_sub(1)
             .and_then(|previous| n.checked_mul(previous))
             .map(|pairs| pairs / 2)
             .unwrap_or(0);
-        assert_eq!(
-            items.len(),
-            expected,
-            "distances length {} != n*(n-1)/2={} for n={}",
-            items.len(),
-            expected,
-            n
-        );
-        DistanceMatrix {
+        if items.len() != expected {
+            return Err("distance count does not match n*(n-1)/2");
+        }
+        Ok(DistanceMatrix {
             n,
             items,
             cities,
             city_idx,
             is_coordinate_metric,
-        }
+        })
     }
 
     fn new_with_coordinates(
@@ -294,7 +299,7 @@ impl DistanceMatrix {
         distances: Vec<f32>,
         cities: CityTable,
         is_coordinate_metric: bool,
-    ) -> Self {
+    ) -> Result<Self, &'static str> {
         Self::from_parts(
             n,
             PackedDistances::F32(distances),
@@ -345,6 +350,8 @@ impl DistanceMatrix {
         if n < 2 {
             return Err("distance matrix requires at least 2 points");
         }
+        // Reject duplicate ids before building the O(n^2) distance vector.
+        unique_city_ids(cities)?;
 
         let size = n * (n - 1) / 2; // how many items on distance vec
 
@@ -361,9 +368,7 @@ impl DistanceMatrix {
 
         distances.shrink_to_fit();
 
-        Ok(DistanceMatrix::new_with_coordinates(
-            n, distances, city_table, true,
-        ))
+        DistanceMatrix::new_with_coordinates(n, distances, city_table, true)
     }
 
     pub fn len(&self) -> usize {
@@ -476,7 +481,7 @@ mod tests {
         let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
         let table: crate::tsp::CityTable =
             cities.iter().enumerate().map(|(i, c)| (i, *c)).collect();
-        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], table);
+        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], table).unwrap();
 
         // City 1 must be skipped despite being "closest" only in the sense that NaN loses
         // every ordinary comparison — a NaN in `best` would otherwise stick forever.
@@ -754,7 +759,7 @@ mod tests {
         let cities = explicit_cities(3);
         let packed = vec![0.0, 65_535.0, 1.0];
 
-        let narrow = DistanceMatrix::new(3, packed.clone(), cities.clone());
+        let narrow = DistanceMatrix::new(3, packed.clone(), cities.clone()).unwrap();
         assert_eq!(narrow.storage_kind(), "u16");
         assert_eq!(narrow.stored_bytes(), packed.len() * 2);
         assert_eq!(narrow.distance_by_pos(2, 0).unwrap(), 65_535.0);
@@ -769,7 +774,7 @@ mod tests {
             (vec![1.0, f32::INFINITY, 2.0], "f32"),
             (vec![1.0, f32::NEG_INFINITY, 2.0], "f32"),
         ] {
-            let matrix = DistanceMatrix::new(3, packed.clone(), cities.clone());
+            let matrix = DistanceMatrix::new(3, packed.clone(), cities.clone()).unwrap();
             assert_eq!(
                 matrix.storage_kind(),
                 expected_kind,
@@ -786,12 +791,12 @@ mod tests {
         let cities = explicit_cities(3);
 
         let narrow = [0.0, 65_535.0, 1.0];
-        let matrix = DistanceMatrix::from_explicit_slice(3, &narrow, cities.clone());
+        let matrix = DistanceMatrix::from_explicit_slice(3, &narrow, cities.clone()).unwrap();
         assert_eq!(matrix.storage_kind(), "u16");
         assert_eq!(matrix.distances().as_ref(), narrow.as_slice());
 
         let wide = [0.0, 65_536.0, 1.0];
-        let matrix = DistanceMatrix::from_explicit_slice(3, &wide, cities);
+        let matrix = DistanceMatrix::from_explicit_slice(3, &wide, cities).unwrap();
         assert_eq!(matrix.storage_kind(), "f32");
         assert_eq!(matrix.distances().as_ref(), wide.as_slice());
     }
@@ -804,10 +809,11 @@ mod tests {
         let values: Vec<f32> = (0..n * (n - 1) / 2).map(|i| (i % 60_000) as f32).collect();
         let cities = explicit_cities(n);
 
-        let compact = DistanceMatrix::new(n, values.clone(), cities.clone());
+        let compact = DistanceMatrix::new(n, values.clone(), cities.clone()).unwrap();
         assert_eq!(compact.storage_kind(), "u16");
         let reference =
-            DistanceMatrix::from_parts(n, PackedDistances::F32(values.clone()), cities, false);
+            DistanceMatrix::from_parts(n, PackedDistances::F32(values.clone()), cities, false)
+                .unwrap();
 
         for a in 0..n {
             for b in 0..n {
@@ -1039,5 +1045,16 @@ mod tests {
             3,
             "nearest to city 1 should be city 3, not city 2"
         );
+    }
+
+    #[test]
+    fn duplicate_ids_are_rejected_not_panicked() {
+        let cities = vec![
+            KDPoint::new_with_id(1, &[0.0, 0.0]),
+            KDPoint::new_with_id(1, &[1.0, 0.0]),
+            KDPoint::new_with_id(2, &[0.0, 1.0]),
+        ];
+        let result = DistanceMatrix::build(&cities, DistanceType::Euc2D);
+        assert!(result.is_err(), "duplicate IDs must return an error");
     }
 }

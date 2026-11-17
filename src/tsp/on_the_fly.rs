@@ -33,10 +33,7 @@ impl OnTheFly {
                 return Err("cannot compute EXPLICIT distances on the fly; use the matrix backend");
             }
         };
-        let city_idx = IdIndex::build(cities);
-        if city_idx.len() != cities.len() {
-            return Err("city ids must be unique");
-        }
+        let city_idx = IdIndex::build(cities)?;
         Ok(OnTheFly {
             cities: cities.to_vec(),
             city_idx,
