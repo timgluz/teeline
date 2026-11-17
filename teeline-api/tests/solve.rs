@@ -87,6 +87,8 @@ async fn solve_duplicate_city_ids_returns_400() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    let json = body_json(resp).await;
+    assert_eq!(json["error"], "city ids must be unique");
 }
 
 #[tokio::test]

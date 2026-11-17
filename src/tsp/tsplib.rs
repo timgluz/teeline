@@ -136,7 +136,7 @@ impl TspLibData {
                 );
             }
             let dm = self.distance_matrix()?;
-            return Ok(TspProblem::new(self.cities.clone(), dm));
+            return TspProblem::try_new(self.cities.clone(), dm);
         }
 
         if self.distance_type == DistanceType::Explicit {
@@ -148,7 +148,7 @@ impl TspLibData {
         }
 
         let source = super::build_distance_source(&self.cities, self.distance_type, backend)?;
-        Ok(TspProblem::from_source(self.cities.clone(), source))
+        TspProblem::try_from_source(self.cities.clone(), source)
     }
 
     /// Consuming variant of [`Self::to_problem`].
@@ -172,7 +172,7 @@ impl TspLibData {
             }
             let (n, city_table) = explicit_city_table(&cities, distances.len())?;
             let dm = DistanceMatrix::new(n, distances, city_table).map_err(|e| e.to_string())?;
-            return Ok(TspProblem::new(cities, dm));
+            return TspProblem::try_new(cities, dm);
         }
 
         if distance_type == DistanceType::Explicit {
@@ -184,7 +184,7 @@ impl TspLibData {
         }
 
         let source = super::build_distance_source(&cities, distance_type, backend)?;
-        Ok(TspProblem::from_source(cities, source))
+        TspProblem::try_from_source(cities, source)
     }
 
     /// Like [`Self::to_problem`], but lets the caller reject a derived layout.

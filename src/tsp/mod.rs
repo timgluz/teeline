@@ -2053,12 +2053,37 @@ pub struct TspProblem {
 impl TspProblem {
     /// Wraps a concrete source, so existing `TspProblem::new(cities, dm)` call sites keep
     /// compiling when the field became a trait object.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cities` contains duplicate IDs. Use [`Self::try_new`] for untrusted input.
     pub fn new(cities: Vec<KDPoint>, distances: impl DistanceSource + 'static) -> Self {
         Self::from_source(cities, Arc::new(distances))
     }
 
+    /// Fallible [`Self::new`] for callers holding untrusted city IDs.
+    pub fn try_new(
+        cities: Vec<KDPoint>,
+        distances: impl DistanceSource + 'static,
+    ) -> Result<Self, String> {
+        Self::try_from_source(cities, Arc::new(distances))
+    }
+
     /// Shares an already-constructed source, as the selection policy returns.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cities` contains duplicate IDs. Use [`Self::try_from_source`] for
+    /// untrusted input.
     pub fn from_source(cities: Vec<KDPoint>, distances: Arc<dyn DistanceSource>) -> Self {
+        Self::try_from_source(cities, distances).expect("TspProblem requires unique city ids")
+    }
+
+    /// Fallible [`Self::from_source`]: rejects duplicate city IDs.
+    pub fn try_from_source(
+        cities: Vec<KDPoint>,
+        distances: Arc<dyn DistanceSource>,
+    ) -> Result<Self, String> {
         debug_assert_eq!(
             distances.num_cities(),
             cities.len(),
@@ -2067,10 +2092,9 @@ impl TspProblem {
             cities.len()
         );
         let mut seen = std::collections::HashSet::with_capacity(cities.len());
-        assert!(
-            cities.iter().all(|city| seen.insert(city.id)),
-            "TspProblem requires unique city ids"
-        );
+        if !cities.iter().all(|city| seen.insert(city.id)) {
+            return Err("city ids must be unique".to_string());
+        }
         for (pos, city) in cities.iter().enumerate() {
             debug_assert_eq!(
                 distances.pos2city_id(pos),
@@ -2079,7 +2103,7 @@ impl TspProblem {
                 city.id
             );
         }
-        TspProblem { cities, distances }
+        Ok(TspProblem { cities, distances })
     }
 
     /// Build a coordinate source according to the selection policy.
@@ -2089,7 +2113,7 @@ impl TspProblem {
         backend: DistanceBackend,
     ) -> Result<Self, String> {
         let source = build_distance_source(&cities, dt, backend)?;
-        Ok(Self::from_source(cities, source))
+        Self::try_from_source(cities, source)
     }
 }
 

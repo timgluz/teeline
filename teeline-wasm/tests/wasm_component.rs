@@ -443,7 +443,11 @@ fn test_parse_and_solve_duplicate_city_ids_returns_err() {
     let result = instance
         .call_parse_and_solve(&mut store, "nn", input, default_options())
         .unwrap();
-    assert!(result.is_err(), "duplicate city ids must return Err");
+    let err = result.expect_err("duplicate city ids must return Err");
+    assert!(
+        err.contains("city ids must be unique"),
+        "expected the duplicate-id error, got: {err}"
+    );
 }
 
 #[test]

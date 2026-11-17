@@ -55,9 +55,17 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use super::distance_source::DistanceSource;
-use super::id_index::IdIndex;
 use super::kdtree::KDPoint;
 use super::{CityTable, DistanceType};
+
+fn unique_city_ids(cities: &[KDPoint]) -> Result<(), &'static str> {
+    let mut seen = std::collections::HashSet::with_capacity(cities.len());
+    if cities.iter().all(|city| seen.insert(city.id)) {
+        Ok(())
+    } else {
+        Err("city ids must be unique")
+    }
+}
 
 pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     // Full-precision PI, deliberately, not TSPLIB's truncated `PI = 3.141592` from the
@@ -351,7 +359,7 @@ impl DistanceMatrix {
             return Err("distance matrix requires at least 2 points");
         }
         // Reject duplicate ids before building the O(n^2) distance vector.
-        IdIndex::build(cities)?;
+        unique_city_ids(cities)?;
 
         let size = n * (n - 1) / 2; // how many items on distance vec
 
