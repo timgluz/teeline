@@ -2054,10 +2054,7 @@ impl TspProblem {
     /// Wraps a concrete source, so existing `TspProblem::new(cities, dm)` call sites keep
     /// compiling when the field became a trait object.
     pub fn new(cities: Vec<KDPoint>, distances: impl DistanceSource + 'static) -> Self {
-        TspProblem {
-            cities,
-            distances: Arc::new(distances),
-        }
+        Self::from_source(cities, Arc::new(distances))
     }
 
     /// Shares an already-constructed source, as the selection policy returns.
@@ -2068,6 +2065,11 @@ impl TspProblem {
             "distance source has {} cities, problem has {}",
             distances.num_cities(),
             cities.len()
+        );
+        let mut seen = std::collections::HashSet::with_capacity(cities.len());
+        assert!(
+            cities.iter().all(|city| seen.insert(city.id)),
+            "TspProblem requires unique city ids"
         );
         for (pos, city) in cities.iter().enumerate() {
             debug_assert_eq!(

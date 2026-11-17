@@ -141,10 +141,9 @@ fn backtrack(
     for candidate in candidates.iter() {
         make_move(path, k, *candidate, progress_tx);
 
-        let visited_path = path[..=k].to_vec();
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::PathUpdate(
-                Route::new(&visited_path),
+                Route::new(&path[..=k]),
                 best_distance,
             ));
         }

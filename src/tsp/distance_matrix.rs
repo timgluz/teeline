@@ -55,6 +55,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use super::distance_source::DistanceSource;
+use super::id_index::IdIndex;
 use super::kdtree::KDPoint;
 use super::{CityTable, DistanceType};
 
@@ -268,9 +269,12 @@ impl DistanceMatrix {
         cities: CityTable,
         is_coordinate_metric: bool,
     ) -> Result<Self, &'static str> {
+        if cities.len() != n {
+            return Err("city table length does not match n");
+        }
         let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
 
-        if n != city_idx.len() {
+        if city_idx.len() != n {
             return Err("city ids must be unique");
         }
         let expected = n
@@ -346,6 +350,8 @@ impl DistanceMatrix {
         if n < 2 {
             return Err("distance matrix requires at least 2 points");
         }
+        // Reject duplicate ids before building the O(n^2) distance vector.
+        IdIndex::build(cities)?;
 
         let size = n * (n - 1) / 2; // how many items on distance vec
 

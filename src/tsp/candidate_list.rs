@@ -34,8 +34,7 @@ impl CandidateList {
         let n = cities.len();
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index =
-            IdIndex::build(cities).expect("problem construction rejects duplicate city ids");
+        let id_index = IdIndex::build(cities).expect("TspProblem guarantees unique city ids");
         if n < 2 || k == 0 {
             return Self { rows, id_index };
         }
@@ -75,8 +74,7 @@ impl CandidateList {
         );
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index =
-            IdIndex::build(cities).expect("problem construction rejects duplicate city ids");
+        let id_index = IdIndex::build(cities).expect("TspProblem guarantees unique city ids");
         if n < 2 || k == 0 {
             return Self { rows, id_index };
         }
