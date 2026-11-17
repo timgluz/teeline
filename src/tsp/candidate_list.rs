@@ -41,12 +41,18 @@ impl CandidateList {
 
         let tree = kdtree::from_cities(cities);
         for (pos, city) in cities.iter().enumerate() {
-            rows[pos] = tree
-                .nearest(city, k)
-                .nearest()
+            let result = tree.nearest(city, k);
+            let nearest = result.nearest();
+            let row: Vec<usize> = nearest
                 .iter()
                 .filter_map(|item| id_index.get(item.point.id))
                 .collect();
+            debug_assert_eq!(
+                row.len(),
+                nearest.len(),
+                "every KD-tree point must be in the city index"
+            );
+            rows[pos] = row;
         }
         Self { rows, id_index }
     }

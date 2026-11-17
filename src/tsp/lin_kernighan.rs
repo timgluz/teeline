@@ -12,9 +12,15 @@ pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> CandidateList {
     super::candidate_list::CandidateList::build(cities, k)
 }
 
-fn send_progress(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize], dist: f32) {
+fn send_progress(
+    tx: Option<&mpsc::Sender<ProgressMessage>>,
+    positions: &[usize],
+    dm: &dyn DistanceSource,
+    dist: f32,
+) {
     if let Some(tx) = tx {
-        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(path), dist));
+        let path = positions_to_ids(positions, dm);
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), dist));
     }
 }
 
@@ -41,7 +47,7 @@ pub fn solve(
         None => nearest_neighbor_positions(problem, dm),
     };
 
-    if best_positions.len() < 4 || best_positions.len() != n {
+    if n < 4 || !is_permutation(&best_positions, n) {
         let ids = positions_to_ids(&best_positions, dm);
         return Solution::new(&ids, problem);
     }
@@ -56,11 +62,7 @@ pub fn solve(
     );
     drop(init_pos);
     let mut best_dist = tour_distance(&best_positions, dm);
-    send_progress(
-        progress_tx,
-        &positions_to_ids(&best_positions, dm),
-        best_dist,
-    );
+    send_progress(progress_tx, &best_positions, dm, best_dist);
 
     let mut rng = rand::rngs::StdRng::seed_from_u64(opts.seed.unwrap_or_else(rand::random::<u64>));
     let mut platoo = 0usize;
@@ -79,11 +81,7 @@ pub fn solve(
             best_positions = candidate;
             best_dist = dist;
             platoo = 0;
-            send_progress(
-                progress_tx,
-                &positions_to_ids(&best_positions, dm),
-                best_dist,
-            );
+            send_progress(progress_tx, &best_positions, dm, best_dist);
         } else {
             platoo += 1;
             if platoo >= opts.heuristic.platoo_epochs {
@@ -123,12 +121,29 @@ fn d(dm: &dyn DistanceSource, a: usize, b: usize) -> f32 {
 // ── Flat-tour helpers (kept for solve() and tests) ────────────────────────────
 
 fn make_pos(tour: &[usize], n: usize) -> Vec<usize> {
-    debug_assert_eq!(tour.len(), n, "tour must visit every position");
+    debug_assert!(
+        is_permutation(tour, n),
+        "tour must be a permutation of 0..n"
+    );
     let mut pos = vec![0usize; n];
     for (rank, &city_pos) in tour.iter().enumerate() {
         pos[city_pos] = rank;
     }
     pos
+}
+
+fn is_permutation(positions: &[usize], n: usize) -> bool {
+    if positions.len() != n {
+        return false;
+    }
+    let mut seen = vec![false; n];
+    for &p in positions {
+        if p >= n || seen[p] {
+            return false;
+        }
+        seen[p] = true;
+    }
+    true
 }
 
 fn tour_distance(tour: &[usize], dm: &dyn DistanceSource) -> f32 {
@@ -986,6 +1001,20 @@ mod tests {
         let mut ids = sol.route().to_vec();
         ids.sort();
         assert_eq!(ids, vec![base, base + 1, base + 2, base + 3]);
+    }
+
+    #[test]
+    fn duplicate_ids_in_init_tour_are_returned_unoptimized() {
+        let pts = hexagon_pts();
+        let dm = distance_matrix::from_cities_unrounded(&pts);
+        let problem = crate::tsp::TspProblem::new(pts, dm);
+        let mut opts = LKOptions::default();
+        opts.heuristic.epochs = 1;
+        let init = vec![0usize, 2, 4, 1, 3, 3]; // duplicate 3, missing 5
+
+        let sol = solve(&problem, &opts, None, Some(&init));
+
+        assert_eq!(sol.route(), init.as_slice());
     }
 
     // ── build_candidates timing (see docs/algorithms/lin-kernighan.md "Notes") ──
