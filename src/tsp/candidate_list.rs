@@ -30,13 +30,13 @@ pub(crate) struct CandidateList {
 }
 
 impl CandidateList {
-    pub(crate) fn build(cities: &[KDPoint], k: usize) -> Option<Self> {
+    pub(crate) fn build(cities: &[KDPoint], k: usize) -> Result<Self, &'static str> {
         let n = cities.len();
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index = IdIndex::build(cities).ok()?;
+        let id_index = IdIndex::build(cities)?;
         if n < 2 || k == 0 {
-            return Some(Self { rows, id_index });
+            return Ok(Self { rows, id_index });
         }
 
         let tree = kdtree::from_cities(cities);
@@ -53,7 +53,7 @@ impl CandidateList {
                 .collect();
             rows[pos] = row;
         }
-        Some(Self { rows, id_index })
+        Ok(Self { rows, id_index })
     }
 
     /// Build candidate rows from the exact distance matrix rather than the coordinates.
@@ -65,7 +65,7 @@ impl CandidateList {
         distances: &dyn DistanceSource,
         cities: &[KDPoint],
         k: usize,
-    ) -> Option<Self> {
+    ) -> Result<Self, &'static str> {
         let n = cities.len();
         debug_assert_eq!(
             distances.num_cities(),
@@ -74,9 +74,9 @@ impl CandidateList {
         );
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index = IdIndex::build(cities).ok()?;
+        let id_index = IdIndex::build(cities)?;
         if n < 2 || k == 0 {
-            return Some(Self { rows, id_index });
+            return Ok(Self { rows, id_index });
         }
 
         for (pos, row) in rows.iter_mut().enumerate() {
@@ -101,7 +101,7 @@ impl CandidateList {
             *row = neighbours.into_iter().map(|(_, _, other)| other).collect();
         }
 
-        Some(Self { rows, id_index })
+        Ok(Self { rows, id_index })
     }
 
     #[cfg(test)]

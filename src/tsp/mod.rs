@@ -2056,7 +2056,8 @@ impl TspProblem {
     ///
     /// # Panics
     ///
-    /// Panics if `cities` contains duplicate IDs. Use [`Self::try_new`] for untrusted input.
+    /// Panics if `cities` and `distances` disagree (city count or position→id mapping) or
+    /// if the city IDs are not unique. Use [`Self::try_new`] for untrusted input.
     pub fn new(cities: Vec<KDPoint>, distances: impl DistanceSource + 'static) -> Self {
         Self::from_source(cities, Arc::new(distances))
     }
@@ -2073,13 +2074,14 @@ impl TspProblem {
     ///
     /// # Panics
     ///
-    /// Panics if `cities` contains duplicate IDs. Use [`Self::try_from_source`] for
-    /// untrusted input.
+    /// Panics if `cities` and `distances` disagree (city count or position→id mapping) or
+    /// if the city IDs are not unique. Use [`Self::try_from_source`] for untrusted input.
     pub fn from_source(cities: Vec<KDPoint>, distances: Arc<dyn DistanceSource>) -> Self {
-        Self::try_from_source(cities, distances).expect("TspProblem requires unique city ids")
+        Self::try_from_source(cities, distances)
+            .unwrap_or_else(|e| panic!("invalid TspProblem: {e}"))
     }
 
-    /// Fallible [`Self::from_source`]: rejects duplicate city IDs.
+    /// Fallible [`Self::from_source`]: rejects a city/source mismatch or duplicate city IDs.
     pub fn try_from_source(
         cities: Vec<KDPoint>,
         distances: Arc<dyn DistanceSource>,

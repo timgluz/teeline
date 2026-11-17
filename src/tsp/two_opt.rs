@@ -65,7 +65,13 @@ fn candidates_for(
     k: usize,
 ) -> Option<CandidateList> {
     if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
-        CandidateList::build(cities, k)
+        match CandidateList::build(cities, k) {
+            Ok(candidates) => Some(candidates),
+            Err(e) => {
+                tracing::warn!(error = e, "candidate list unavailable; using the full scan");
+                None
+            }
+        }
     } else {
         None
     }

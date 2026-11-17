@@ -8,7 +8,10 @@ use crate::tsp::{
 use rand::{RngExt, SeedableRng};
 use std::sync::mpsc;
 
-pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> Option<CandidateList> {
+pub(crate) fn build_candidates(
+    cities: &[KDPoint],
+    k: usize,
+) -> Result<CandidateList, &'static str> {
     super::candidate_list::CandidateList::build(cities, k)
 }
 
@@ -51,9 +54,15 @@ pub fn solve(
     } else {
         CandidateList::build_from_distances(dm, &problem.cities, k)
     };
-    let Some(candidates) = candidates else {
-        // The problem's city IDs are not unique; return the seed unoptimized.
-        return Solution::new(&positions_to_ids(&best_positions, dm), problem);
+    let candidates = match candidates {
+        Ok(candidates) => candidates,
+        Err(e) => {
+            tracing::warn!(
+                error = e,
+                "LK candidate list unavailable; returning the seed tour"
+            );
+            return Solution::new(&positions_to_ids(&best_positions, dm), problem);
+        }
     };
 
     let mut init_pos = make_pos(&best_positions, n);
