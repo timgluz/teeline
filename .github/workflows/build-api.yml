@@ -21,7 +21,9 @@ env:
 
 jobs:
   build-api:
-    runs-on: ubuntu-latest
+    # hurl's prebuilt Linux binary links libxml2.so.2; Ubuntu 26.04 ships
+    # libxml2-16 (libxml2.so.16), so keep this job on the 24.04 image.
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v7
@@ -33,6 +35,8 @@ jobs:
         run: cargo test -p teeline-api --verbose
       - name: Install mise tools (hurl)
         uses: jdx/mise-action@v5.2.8
+      - name: Install hurl runtime dependencies
+        run: sudo apt-get update && sudo apt-get install -y libxml2
       - name: Run hurl e2e tests (teeline-api)
         run: task test:e2e:api
       - name: Run hurl e2e auth tests (teeline-api)
