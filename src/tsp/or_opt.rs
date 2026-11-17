@@ -344,7 +344,7 @@ mod tests {
                 packed.push(delta.min(n - delta) as f32);
             }
         }
-        let dm = distance_matrix::DistanceMatrix::new(n, packed, city_table);
+        let dm = distance_matrix::DistanceMatrix::new(n, packed, city_table).unwrap();
         assert!(
             !dm.is_coordinate_metric(),
             "EXPLICIT matrices must not advertise coordinates"
@@ -442,7 +442,8 @@ mod tests {
             .enumerate()
             .map(|(position, city)| (position, *city))
             .collect();
-        let matrix = distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table);
+        let matrix =
+            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table).unwrap();
 
         assert!(candidates_for(&matrix, &cities, 2).is_none());
     }

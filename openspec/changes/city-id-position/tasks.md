@@ -16,12 +16,12 @@
 
 ## 3. PR 2 — Fallible index and small fixes
 
-- [ ] 3.1 Change `IdIndex::build` to return `Result` and reject duplicate IDs; verify dense, sparse, non-contiguous, and duplicate inputs.
-- [ ] 3.2 Propagate the fallible construction through `OnTheFly::new`, `DistanceMatrix::new`/`from_explicit_slice`, and the `TspProblem` constructors; update the test helpers that call them.
-- [ ] 3.3 Map duplicate/invalid IDs to HTTP 400 in `teeline-api` and to an error (not a trap) in `teeline-wasm`; verify both surfaces.
-- [ ] 3.4 Change `branch_bound`'s progress update to send the visited prefix `path[..k]` so city 0 is not filtered out; keep `UNVISITED_NODE`.
-- [ ] 3.5 Replace `bellman_karp`'s `pos2city_id(..).unwrap_or(0)` with `expect`, since the position comes from `0..n`.
-- [ ] 3.6 Add duplicate-ID tests for coordinate input, EXPLICIT input, the API, and WASM; verify the error path instead of the panic/trap.
+- [x] 3.1 Change `IdIndex::build` to return `Result` and reject duplicate IDs; verify dense, sparse, non-contiguous, and duplicate inputs.
+- [x] 3.2 Propagate the fallible construction through `OnTheFly::new`, `DistanceMatrix::new`/`from_explicit_slice`, and the `TspProblem` constructors; update the test helpers that call them.
+- [x] 3.3 Map duplicate/invalid IDs to HTTP 400 in `teeline-api` and to an error (not a trap) in `teeline-wasm`; verify both surfaces.
+- [x] 3.4 Change `branch_bound`'s progress update to send the visited prefix `path[..k]` so city 0 is not filtered out; keep `UNVISITED_NODE`.
+- [x] 3.5 Replace `bellman_karp`'s `pos2city_id(..).unwrap_or(0)` with `expect`, since the position comes from `0..n`.
+- [x] 3.6 Add duplicate-ID tests for coordinate input, EXPLICIT input, the API, and WASM; verify the error path instead of the panic/trap.
 
 ## 4. PR 3 — Index consolidation and dead-code removal
 

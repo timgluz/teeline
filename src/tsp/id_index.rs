@@ -14,9 +14,9 @@ pub(crate) enum IdIndex {
 }
 
 impl IdIndex {
-    pub(crate) fn build(cities: &[KDPoint]) -> Self {
+    pub(crate) fn build(cities: &[KDPoint]) -> Result<Self, &'static str> {
         let max_id = cities.iter().map(|city| city.id).max().unwrap_or(0);
-        if max_id < cities.len().saturating_mul(4).max(1) {
+        let index = if max_id < cities.len().saturating_mul(4).max(1) {
             let mut dense = vec![usize::MAX; max_id + 1];
             for (position, city) in cities.iter().enumerate() {
                 dense[city.id] = position;
@@ -30,7 +30,11 @@ impl IdIndex {
                     .map(|(position, city)| (city.id, position))
                     .collect(),
             )
+        };
+        if index.len() != cities.len() {
+            return Err("city ids must be unique");
         }
+        Ok(index)
     }
 
     pub(crate) fn get(&self, city_id: usize) -> Option<usize> {
@@ -63,7 +67,7 @@ mod tests {
 
     #[test]
     fn empty_input_is_an_empty_dense_index() {
-        let index = IdIndex::build(&[]);
+        let index = IdIndex::build(&[]).unwrap();
         assert!(matches!(index, IdIndex::Dense(_)));
         assert_eq!(index.len(), 0);
         assert_eq!(index.get(0), None);
@@ -72,18 +76,18 @@ mod tests {
     #[test]
     fn chooses_dense_at_the_boundary() {
         // n = 3, so the threshold is max_id < 12.
-        let dense = IdIndex::build(&cities(&[0, 5, 11]));
+        let dense = IdIndex::build(&cities(&[0, 5, 11])).unwrap();
         assert!(matches!(dense, IdIndex::Dense(_)));
         assert_eq!(dense.len(), 3);
 
-        let sparse = IdIndex::build(&cities(&[0, 5, 12]));
+        let sparse = IdIndex::build(&cities(&[0, 5, 12])).unwrap();
         assert!(matches!(sparse, IdIndex::Sparse(_)));
         assert_eq!(sparse.len(), 3);
     }
 
     #[test]
     fn dense_index_handles_holes_and_the_last_position() {
-        let index = IdIndex::build(&cities(&[0, 2, 5]));
+        let index = IdIndex::build(&cities(&[0, 2, 5])).unwrap();
         assert!(matches!(index, IdIndex::Dense(_)));
         assert_eq!(index.len(), 3);
         assert_eq!(index.get(1), None);
@@ -94,7 +98,7 @@ mod tests {
 
     #[test]
     fn sparse_index_handles_usize_max_without_allocating_by_id() {
-        let index = IdIndex::build(&cities(&[0, usize::MAX]));
+        let index = IdIndex::build(&cities(&[0, usize::MAX])).unwrap();
         assert!(matches!(index, IdIndex::Sparse(_)));
         assert_eq!(index.len(), 2);
         assert_eq!(index.get(usize::MAX), Some(1));
@@ -102,17 +106,8 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_ids_collapse_in_both_modes() {
-        let dense = IdIndex::build(&cities(&[1, 1]));
-        assert!(matches!(dense, IdIndex::Dense(_)));
-        assert_eq!(
-            dense.len(),
-            1,
-            "duplicates must not pass the uniqueness check"
-        );
-
-        let sparse = IdIndex::build(&cities(&[10, 10]));
-        assert!(matches!(sparse, IdIndex::Sparse(_)));
-        assert_eq!(sparse.len(), 1);
+    fn duplicate_ids_are_rejected() {
+        assert!(IdIndex::build(&cities(&[1, 1])).is_err());
+        assert!(IdIndex::build(&cities(&[10, 10])).is_err());
     }
 }

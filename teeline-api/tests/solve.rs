@@ -76,6 +76,20 @@ async fn solve_route_contains_all_cities() {
 }
 
 #[tokio::test]
+async fn solve_duplicate_city_ids_returns_400() {
+    let body = r#"{"solver":"nn","input":{"cities":[
+        {"id":1,"x":0.0,"y":0.0},
+        {"id":1,"x":1.0,"y":0.0},
+        {"id":2,"x":0.5,"y":1.0}
+    ]}}"#;
+    let resp = make_app()
+        .oneshot(post("/api/v1/solve", json_body(body)))
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
 async fn solve_unknown_solver_returns_400() {
     let body = format!(r#"{{"solver":"does_not_exist","input":{TINY_CITIES}}}"#);
     let resp = make_app()

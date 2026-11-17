@@ -34,7 +34,8 @@ impl CandidateList {
         let n = cities.len();
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index = IdIndex::build(cities);
+        let id_index =
+            IdIndex::build(cities).expect("problem construction rejects duplicate city ids");
         if n < 2 || k == 0 {
             return Self { rows, id_index };
         }
@@ -74,7 +75,8 @@ impl CandidateList {
         );
         let k = k.min(n.saturating_sub(1));
         let mut rows = vec![Vec::new(); n];
-        let id_index = IdIndex::build(cities);
+        let id_index =
+            IdIndex::build(cities).expect("problem construction rejects duplicate city ids");
         if n < 2 || k == 0 {
             return Self { rows, id_index };
         }
@@ -200,7 +202,7 @@ mod tests {
             .enumerate()
             .map(|(position, city)| (position, *city))
             .collect();
-        DistanceMatrix::new(cities.len(), distances, table)
+        DistanceMatrix::new(cities.len(), distances, table).unwrap()
     }
 
     #[test]

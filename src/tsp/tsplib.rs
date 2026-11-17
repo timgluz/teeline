@@ -111,7 +111,8 @@ impl TspLibData {
                 let (n, city_table) = explicit_city_table(&self.cities, dists.len())?;
                 // Packs straight from the parsed weights; `DistanceMatrix::new` would require
                 // an O(n^2) clone first.
-                Ok(DistanceMatrix::from_explicit_slice(n, dists, city_table))
+                Ok(DistanceMatrix::from_explicit_slice(n, dists, city_table)
+                    .map_err(|e| e.to_string())?)
             }
             None => {
                 DistanceMatrix::build(&self.cities, self.distance_type).map_err(|e| e.to_string())
@@ -171,7 +172,7 @@ impl TspLibData {
                 );
             }
             let (n, city_table) = explicit_city_table(&cities, distances.len())?;
-            let dm = DistanceMatrix::new(n, distances, city_table);
+            let dm = DistanceMatrix::new(n, distances, city_table).map_err(|e| e.to_string())?;
             return Ok(TspProblem::new(cities, dm));
         }
 

@@ -437,6 +437,16 @@ fn test_parse_and_solve_one_city_json_returns_err() {
 }
 
 #[test]
+fn test_parse_and_solve_duplicate_city_ids_returns_err() {
+    let (mut store, instance) = make_instance();
+    let input = r#"[{"id":1,"x":0.0,"y":0.0},{"id":1,"x":1.0,"y":0.0},{"id":2,"x":0.5,"y":1.0}]"#;
+    let result = instance
+        .call_parse_and_solve(&mut store, "nn", input, default_options())
+        .unwrap();
+    assert!(result.is_err(), "duplicate city ids must return Err");
+}
+
+#[test]
 fn test_parse_and_solve_bad_solver_returns_err() {
     let (mut store, instance) = make_instance();
     let result = instance

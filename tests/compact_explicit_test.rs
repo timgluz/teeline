@@ -85,7 +85,7 @@ fn wide_explicit_weights_stay_f32_and_solve_exactly() {
     }
     assert!(raw.iter().all(|&weight| weight > 65_535.0));
 
-    let matrix = DistanceMatrix::new(n, raw.clone(), table);
+    let matrix = DistanceMatrix::new(n, raw.clone(), table).unwrap();
     assert_eq!(matrix.storage_kind(), "f32");
     assert_eq!(matrix.stored_bytes(), raw.len() * 4);
 
@@ -110,7 +110,7 @@ fn fractional_and_negative_weights_fall_back_to_f32() {
         .collect();
 
     let raw = vec![1.0, 2.5, 3.0, -4.0, 5.0, 6.0];
-    let matrix = DistanceMatrix::new(n, raw.clone(), table);
+    let matrix = DistanceMatrix::new(n, raw.clone(), table).unwrap();
     assert_eq!(matrix.storage_kind(), "f32");
     assert_eq!(matrix.stored_bytes(), raw.len() * 4);
     assert_eq!(matrix.distances().as_ref(), raw.as_slice());

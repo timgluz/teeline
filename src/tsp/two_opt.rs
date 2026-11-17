@@ -316,7 +316,8 @@ mod tests {
             .enumerate()
             .map(|(position, city)| (position, *city))
             .collect();
-        let matrix = distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table);
+        let matrix =
+            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table).unwrap();
 
         assert!(candidates_for(&matrix, &cities, 2).is_none());
     }
