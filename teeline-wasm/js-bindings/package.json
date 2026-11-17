@@ -12,6 +12,6 @@
   "type": "module",
   "types": "./teeline_wasm.d.ts",
   "dependencies": {
-    "@bytecodealliance/preview2-shim": "^0.17.9"
+    "@bytecodealliance/preview2-shim": "^0.31.1"
   }
 }
