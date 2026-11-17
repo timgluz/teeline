@@ -23,6 +23,7 @@ principles every decision must respect; an ADR must not contradict it.
 | [010](010-distance-source.md) | Distance-source boundary with swappable backends | Proposed |
 | [011](011-remove-codecov.md) | Remove Codecov from CI | Accepted |
 | [012](012-explicit-embedding.md) | Derived 2D layouts for coordinate-less EXPLICIT instances | Proposed |
+| [013](013-city-id-position.md) | Position boundary; defer the `CityId` newtype | Proposed |
 
 ## Adding an ADR
 
