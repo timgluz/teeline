@@ -62,7 +62,7 @@ procedure MemeticEAX(cities, epochs, pop_size, children_per_pair):
 | `children_per_pair` | `--children-per-pair` | 15 | ≥ 1 | Offspring considered per parent |
 | `strategy` | `--strategy` | `hybrid` | `single_ab`, `rand`, `hybrid` | E-set selection |
 | `stall_epochs` | `--stall-epochs` | 50 | ≥ 1 | `hybrid` switches to `single_ab` after this many stagnant generations; the solver stops at twice this count |
-| `candidate_k` | `--candidate-k` | 20 | ≥ 1 | Nearest-neighbour list size for patching and local search |
+| `candidate_k` | `--candidate-k` | 20 | ≥ 1 | Nearest-neighbour list size for local search; patching uses at most `min(candidate_k, 15)` |
 | `seed` | `--seed` | system entropy | any `u64` | Fixed RNG seed for reproducible runs |
 
 `--stall-epochs` falls back to `--stagnation_epochs` and `--candidate-k` to `--n_nearest`

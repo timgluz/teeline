@@ -32,23 +32,45 @@ pub(crate) fn reverse_segment(tour: &mut [usize], from: usize, to: usize) {
 }
 
 /// Reverses `tour[from..=to]` and keeps `pos` consistent with the new ranks.
+///
+/// On a cyclic tour, reversing the complement `to+1 ..= from-1` yields the same tour, so the
+/// shorter side is reversed. The average move cost therefore halves, and the worst case stays
+/// at `n / 2` instead of `n`.
 pub(crate) fn reverse_segment_with_pos(
     tour: &mut [usize],
     pos: &mut [usize],
     from: usize,
     to: usize,
 ) {
-    let mut left = from;
-    let mut right = to;
+    let n = tour.len();
+    if n < 2 || from >= to {
+        return;
+    }
+    let inside = to - from + 1;
+    if inside <= n / 2 {
+        reverse_cyclic(tour, pos, from, inside);
+    } else {
+        reverse_cyclic(tour, pos, (to + 1) % n, n - inside);
+    }
+}
+
+/// Reverses `len` consecutive tour positions starting at `start`, wrapping at `n`.
+fn reverse_cyclic(tour: &mut [usize], pos: &mut [usize], start: usize, len: usize) {
+    let n = tour.len();
+    let mut left = 0usize;
+    let mut right = len.saturating_sub(1);
     while left < right {
-        tour.swap(left, right);
-        pos[tour[left]] = left;
-        pos[tour[right]] = right;
+        let a = (start + left) % n;
+        let b = (start + right) % n;
+        tour.swap(a, b);
+        pos[tour[a]] = a;
+        pos[tour[b]] = b;
         left += 1;
         right -= 1;
     }
     if left == right {
-        pos[tour[left]] = left;
+        let a = (start + left) % n;
+        pos[tour[a]] = a;
     }
 }
 
@@ -73,6 +95,40 @@ mod tests {
         let mut tour = [0usize, 1, 2, 3, 4];
         reverse_segment(&mut tour, 1, 3);
         assert_eq!(tour, [0, 3, 2, 1, 4]);
+    }
+
+    #[test]
+    fn shorter_side_reversal_matches_an_in_place_reversal() {
+        use std::collections::HashSet;
+
+        let key = |a: usize, b: usize| if a < b { (a, b) } else { (b, a) };
+        for n in 5..=12 {
+            for from in 1..n {
+                for to in (from + 1)..n {
+                    let tour: Vec<usize> = (0..n).collect();
+                    let mut shorter = tour.clone();
+                    let mut pos: Vec<usize> = (0..n).collect();
+                    reverse_segment_with_pos(&mut shorter, &mut pos, from, to);
+
+                    let mut in_place = tour.clone();
+                    in_place[from..=to].reverse();
+
+                    let shorter_edges: HashSet<_> = (0..n)
+                        .map(|i| key(shorter[i], shorter[(i + 1) % n]))
+                        .collect();
+                    let in_place_edges: HashSet<_> = (0..n)
+                        .map(|i| key(in_place[i], in_place[(i + 1) % n]))
+                        .collect();
+                    assert_eq!(
+                        shorter_edges, in_place_edges,
+                        "n={n} from={from} to={to}: reversal must preserve the cyclic edge set"
+                    );
+                    for (rank, &city) in shorter.iter().enumerate() {
+                        assert_eq!(pos[city], rank, "n={n} from={from} to={to}: pos is stale");
+                    }
+                }
+            }
+        }
     }
 
     #[test]

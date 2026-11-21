@@ -100,15 +100,28 @@ impl TourGraph {
         current == 0 && seen.into_iter().all(|s| s)
     }
 
-    pub(crate) fn edge_sum(&self, distances: &dyn DistanceSource) -> f32 {
+    /// Tour length in `f64`.
+    ///
+    /// Summing `f32` edge lengths in `f32` loses the last bits at large-instance costs (one
+    /// ulp is ~2 at dsj1000's 1.9e7), which makes equal-length tours compare differently.
+    /// f64 accumulation removes that, and this walks the adjacency in place instead of
+    /// allocating a tour vector for every member.
+    pub(crate) fn edge_sum(&self, distances: &dyn DistanceSource) -> f64 {
         let n = self.nbr.len();
         if n < 2 {
             return 0.0;
         }
-        let tour = self.to_tour(0);
-        (0..n)
-            .map(|i| distance(distances, tour[i], tour[(i + 1) % n]))
-            .sum()
+        let mut sum = 0.0f64;
+        let mut prev = usize::MAX;
+        let mut current = 0;
+        for _ in 0..n {
+            let [a, b] = self.nbr[current];
+            let next = if a != prev { a } else { b };
+            sum += distance(distances, current, next) as f64;
+            prev = current;
+            current = next;
+        }
+        sum
     }
 
     /// Builds a graph from an explicit neighbour table. The caller is responsible for the
