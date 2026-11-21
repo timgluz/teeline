@@ -31,7 +31,7 @@ pub fn solve(
 
     if n < 4 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        return Solution::from_parts(&path, cities, distances.as_ref());
+        return Solution::from_parts(&path, distances.as_ref());
     }
 
     let mut path: Vec<usize> = init_tour
@@ -77,7 +77,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&path, cities, distances.as_ref())
+    Solution::from_parts(&path, distances.as_ref())
 }
 
 /// Scan all Or-1/2/3 relocations and return the best improving move, or `None`.
@@ -337,11 +337,6 @@ mod tests {
     fn explicit_input_keeps_the_full_scan_and_improves() {
         let n = 20;
         let cities = kdtree::build_points(&(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>());
-        let city_table: crate::tsp::CityTable = cities
-            .iter()
-            .enumerate()
-            .map(|(i, city)| (i, *city))
-            .collect();
         // Ring metric: moving one step costs 1, wrapping costs 1.
         let mut packed = Vec::with_capacity(n * (n - 1) / 2);
         for i in 1..n {
@@ -350,7 +345,7 @@ mod tests {
                 packed.push(delta.min(n - delta) as f32);
             }
         }
-        let dm = distance_matrix::DistanceMatrix::new(n, packed, city_table).unwrap();
+        let dm = distance_matrix::DistanceMatrix::new(n, packed, cities.clone()).unwrap();
         assert!(
             !dm.is_coordinate_metric(),
             "EXPLICIT matrices must not advertise coordinates"
@@ -437,19 +432,13 @@ mod tests {
 
     #[test]
     fn explicit_input_skips_the_candidate_list() {
-        use crate::tsp::CityTable;
-
         let n = 6;
         let cities: Vec<kdtree::KDPoint> = (0..n)
             .map(|i| kdtree::KDPoint::new_with_id(i + 1, &[i as f32, 0.0]))
             .collect();
-        let table: CityTable = cities
-            .iter()
-            .enumerate()
-            .map(|(position, city)| (position, *city))
-            .collect();
         let matrix =
-            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table).unwrap();
+            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], cities.clone())
+                .unwrap();
 
         assert!(candidates_for(&matrix, &cities, 2).is_none());
     }

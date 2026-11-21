@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use teeline::tsp::{
-    AppOptions, CityTable, DistanceBackend, Solvers, TspProblem,
+    AppOptions, DistanceBackend, Solvers, TspProblem,
     distance_matrix::DistanceMatrix,
     kdtree::{self, KDPoint},
     solve_problem, tsplib,
@@ -71,11 +71,6 @@ fn wide_explicit_weights_stay_f32_and_solve_exactly() {
             .map(|i| vec![i as f32, (i % 5) as f32])
             .collect::<Vec<_>>(),
     );
-    let table: CityTable = cities
-        .iter()
-        .enumerate()
-        .map(|(position, city)| (position, *city))
-        .collect();
 
     let mut raw = Vec::with_capacity(n * (n - 1) / 2);
     for i in 1..n {
@@ -85,7 +80,7 @@ fn wide_explicit_weights_stay_f32_and_solve_exactly() {
     }
     assert!(raw.iter().all(|&weight| weight > 65_535.0));
 
-    let matrix = DistanceMatrix::new(n, raw.clone(), table).unwrap();
+    let matrix = DistanceMatrix::new(n, raw.clone(), cities.clone()).unwrap();
     assert_eq!(matrix.storage_kind(), "f32");
     assert_eq!(matrix.stored_bytes(), raw.len() * 4);
 
@@ -103,14 +98,9 @@ fn wide_explicit_weights_stay_f32_and_solve_exactly() {
 fn fractional_and_negative_weights_fall_back_to_f32() {
     let n = 4;
     let cities = kdtree::build_points(&(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>());
-    let table: CityTable = cities
-        .iter()
-        .enumerate()
-        .map(|(position, city)| (position, *city))
-        .collect();
 
     let raw = vec![1.0, 2.5, 3.0, -4.0, 5.0, 6.0];
-    let matrix = DistanceMatrix::new(n, raw.clone(), table).unwrap();
+    let matrix = DistanceMatrix::new(n, raw.clone(), cities).unwrap();
     assert_eq!(matrix.storage_kind(), "f32");
     assert_eq!(matrix.stored_bytes(), raw.len() * 4);
     assert_eq!(matrix.distances().as_ref(), raw.as_slice());

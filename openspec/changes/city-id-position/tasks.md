@@ -25,11 +25,11 @@
 
 ## 4. PR 3 — Index consolidation and dead-code removal
 
-- [ ] 4.1 Replace `DistanceMatrix`'s `city_idx: HashMap` and position-keyed `CityTable` with `IdIndex` + `Vec<KDPoint>`; verify `point_at`, `pos2city_id`, `city_id2pos`, `distance_between`, and `tour_length`.
-- [ ] 4.2 Reduce `Solution` to `{ total, route }`; delete `cities`, `cities_idx`, `cities()`, and `get_by_city_id()` (no callers), and stop copying the city list or building the map in `Solution::new`/`from_parts`.
-- [ ] 4.3 Delete the unused, ID-keyed `city_table_from_vec`; remove `CityTable` from `DistanceMatrix` and keep the alias only if another module still needs it.
-- [ ] 4.4 Verify the matrix backend's tours and `Solution` totals are identical to the pre-change baseline.
-- [ ] 4.5 Benchmark `distance_between`/`tour_length` on the matrix backend (dense IDs and sparse IDs) and record whether the dense `IdIndex` improves on the SipHash `HashMap`.
+- [x] 4.1 Replace `DistanceMatrix`'s `city_idx: HashMap` and position-keyed `CityTable` with `IdIndex` + `Vec<KDPoint>`; verify `point_at`, `pos2city_id`, `city_id2pos`, `distance_between`, and `tour_length`.
+- [x] 4.2 Reduce `Solution` to `{ total, route }`; delete `cities`, `cities_idx`, `cities()`, and `get_by_city_id()` (no callers), and stop copying the city list or building the map in `Solution::new`/`from_parts`.
+- [x] 4.3 Delete the unused, ID-keyed `city_table_from_vec`; remove `CityTable` from `DistanceMatrix` and keep the alias only if another module still needs it.
+- [x] 4.4 Verify the matrix backend's tours and `Solution` totals are identical to the pre-change baseline.
+- [x] 4.5 Benchmark `distance_between`/`tour_length` on the matrix backend (dense IDs and sparse IDs) and record whether the dense `IdIndex` improves on the SipHash `HashMap`.
 
 ## 5. PR 4 — `Position` newtype
 

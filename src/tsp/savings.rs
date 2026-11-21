@@ -48,7 +48,7 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, distances.as_ref());
+        return Solution::from_parts(&path, distances.as_ref());
     }
 
     // Step 1: pick the hub as the city nearest the coordinate centroid.
@@ -78,7 +78,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::from_parts(&path, cities, distances.as_ref())
+    Solution::from_parts(&path, distances.as_ref())
 }
 
 // ---------------------------------------------------------------------------

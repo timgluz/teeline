@@ -35,8 +35,8 @@ The root workspace members are `teeline`, `teeline-cli`, and `teeline-api`.
   `DistanceMatrix`.
 - `AppOptions` — pure configuration shell; one optional option struct per solver
   (`SAOptions`, `GAOptions`, `LKOptions`, …) plus the shared `HeuristicOptions`.
-- `Solution` — a tour plus its cost: private `route` and `cities`, public `total`
-  computed from the distance matrix at construction.
+- `Solution` — a tour plus its cost: private `route`, public `total` computed from the
+  distance source at construction.
 - `Route` — ordered city IDs with shuffling and 2-opt helpers used by solvers.
 - `KDPoint` / `DistanceMatrix` / `NearestResult` — spatial types (see
   [patterns](patterns.md)).

@@ -184,7 +184,6 @@ pub(crate) fn candidate_positions(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::CityTable;
     use crate::tsp::distance_matrix::DistanceMatrix;
 
     fn cities_at(ids: &[usize]) -> Vec<KDPoint> {
@@ -195,12 +194,7 @@ mod tests {
     }
 
     fn explicit_matrix(distances: Vec<f32>, cities: &[KDPoint]) -> DistanceMatrix {
-        let table: CityTable = cities
-            .iter()
-            .enumerate()
-            .map(|(position, city)| (position, *city))
-            .collect();
-        DistanceMatrix::new(cities.len(), distances, table).unwrap()
+        DistanceMatrix::new(cities.len(), distances, cities.to_vec()).unwrap()
     }
 
     #[test]

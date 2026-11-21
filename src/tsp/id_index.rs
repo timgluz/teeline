@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use super::kdtree::KDPoint;
 
+#[derive(Debug, Clone)]
 pub(crate) enum IdIndex {
     Dense(Vec<usize>),
     Sparse(HashMap<usize, usize>),
