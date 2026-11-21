@@ -92,8 +92,7 @@ impl Default for MemeticEaxOptions {
     fn default() -> Self {
         MemeticEaxOptions {
             // Lower than the shared 500: at 500, dsj1000 runs regularly exceeded the
-            // 300-second meta benchmark budget; 250 keeps it inside without losing
-            // quality on the smaller instances.
+            // 300-second meta benchmark budget; 250 keeps the default inside it.
             epochs: 250,
             pop_size: 100,
             children_per_pair: 15,

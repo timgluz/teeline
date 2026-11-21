@@ -27,9 +27,11 @@ export interface SolveOptions {
   eaxCandidateK: number
 }
 
-export function defaultSolveOptions(): SolveOptions {
+export function defaultSolveOptions(solverId?: string): SolveOptions {
   return {
-    epochs: 500,
+    // EAX's solver-specific default is lower than the shared 500: at 500, dsj1000
+    // regularly exceeded the 300-second meta benchmark budget.
+    epochs: solverId === 'eax' ? 250 : 500,
     platooEpochs: 50,
     coolingRate: 0.0001,
     maxTemperature: 1000.0,

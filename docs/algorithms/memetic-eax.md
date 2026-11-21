@@ -102,8 +102,9 @@ teeline pipeline --config eax.toml -i data/tsplib/berlin52.tsp
 EAX is heavier per epoch than Lin-Kernighan or 2-opt: each child runs a crossover, a
 patching pass, and a local 2-opt polish. The default is **250 generations** rather than the
 shared 500: at 500, `dsj1000` regularly exceeded the 300-second meta benchmark budget, while
-250 keeps it comfortably inside and still reaches the published optimum on berlin52,
-kroA100 and a280. For a tighter wall-clock budget, lower `pop_size` and
+250 keeps the default inside it. The epoch cap mainly bounds the larger instances; the
+smaller ones converge on the stagnation rule well before either limit. For a tighter
+wall-clock budget, lower `pop_size` and
 `children_per_pair` first — both scale the per-epoch cost linearly, while
 `strategy = "single_ab"` reduces the crossover work further.
 

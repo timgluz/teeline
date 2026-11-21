@@ -33,4 +33,10 @@ describe('defaultSolveOptions', () => {
     expect(opts.epochs).toBeGreaterThan(0)
     expect(Number.isInteger(opts.epochs)).toBe(true)
   })
+
+  it('uses the EAX-specific epoch default only for eax', () => {
+    expect(defaultSolveOptions('eax').epochs).toBe(250)
+    expect(defaultSolveOptions('sa').epochs).toBe(500)
+    expect(defaultSolveOptions().epochs).toBe(500)
+  })
 })

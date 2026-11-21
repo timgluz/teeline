@@ -31,12 +31,7 @@ export function initSolverConfig(
 
   function selectSolver(id: string): void {
     selectedId = id
-    currentOptions = defaultSolveOptions()
-    // EAX's solver-specific default (250) is lower than the shared 500: at 500, dsj1000
-    // runs regularly exceeded the 300-second meta benchmark budget.
-    if (id === 'eax') {
-      currentOptions.epochs = 250
-    }
+    currentOptions = defaultSolveOptions(id)
     renderConfigPanel(id)
     highlightActivePill(id)
     solverSelect.value = id
