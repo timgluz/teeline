@@ -19,11 +19,16 @@ pub fn solve(
     let distances = &problem.distances;
     let mut rng = rand::rng();
     let mut path: Vec<usize> = cities.iter().map(|c| c.id).collect();
-    for i in (1..path.len()).rev() {
-        let j = rng.random_range(0..=i);
-        path.swap(i, j);
-    }
+    shuffle_slice(&mut path, &mut rng);
     Solution::from_parts(&path, distances.as_ref())
+}
+
+/// Fisher-Yates shuffle over any slice, shared with solvers that seed a population.
+pub(crate) fn shuffle_slice<T>(items: &mut [T], rng: &mut impl RngExt) {
+    for i in (1..items.len()).rev() {
+        let j = rng.random_range(0..=i);
+        items.swap(i, j);
+    }
 }
 
 #[cfg(test)]

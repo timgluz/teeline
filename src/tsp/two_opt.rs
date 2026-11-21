@@ -4,6 +4,7 @@ use super::DistanceSource;
 use super::candidate_list::{self, CandidateList};
 use super::progress::ProgressMessage;
 use super::route::Route;
+use super::two_opt_move;
 use super::{HeuristicOptions, Solution, TspProblem, kdtree::KDPoint};
 
 pub fn solve(
@@ -94,7 +95,7 @@ fn best_improvement_passes(
     while improved {
         improved = false;
         let route_positions = candidates.route_positions(path);
-        let mut best: Option<(f32, usize, usize)> = None;
+        let mut best: Option<(f64, usize, usize)> = None;
 
         for i in 0..(n_indices - 2) {
             if let Some(tx) = progress_tx {
@@ -144,21 +145,12 @@ fn first_improvement_passes(
             }
 
             for j in (i + 2)..n_indices {
-                let current_distance = distances
-                    .distance_between(path[i], path[i + 1])
-                    .expect("two_opt: invalid city pair")
-                    + distances
-                        .distance_between(path[j], path[j + 1])
-                        .expect("two_opt: invalid city pair");
-
-                let new_distance = distances
-                    .distance_between(path[i], path[j])
-                    .expect("two_opt: invalid city pair")
-                    + distances
-                        .distance_between(path[i + 1], path[j + 1])
-                        .expect("two_opt: invalid city pair");
-
-                if new_distance < current_distance {
+                let delta = two_opt_move::delta(path, i, j, |a, b| {
+                    distances
+                        .distance_between(a, b)
+                        .expect("two_opt: invalid city pair")
+                });
+                if delta < -1e-6 {
                     swap_2opt(path, i + 1, j);
                     improved = true;
                     report_improvement(path, distances, i, j, progress_tx);
@@ -190,23 +182,13 @@ fn consider_move(
     distances: &dyn DistanceSource,
     i: usize,
     j: usize,
-    best: &mut Option<(f32, usize, usize)>,
+    best: &mut Option<(f64, usize, usize)>,
 ) {
-    let current_distance = distances
-        .distance_between(path[i], path[i + 1])
-        .expect("two_opt: invalid city pair")
-        + distances
-            .distance_between(path[j], path[j + 1])
-            .expect("two_opt: invalid city pair");
-
-    let new_distance = distances
-        .distance_between(path[i], path[j])
-        .expect("two_opt: invalid city pair")
-        + distances
-            .distance_between(path[i + 1], path[j + 1])
-            .expect("two_opt: invalid city pair");
-
-    let delta = new_distance - current_distance;
+    let delta = two_opt_move::delta(path, i, j, |a, b| {
+        distances
+            .distance_between(a, b)
+            .expect("two_opt: invalid city pair")
+    });
     if delta >= -1e-6 {
         return;
     }
@@ -224,10 +206,7 @@ fn consider_move(
 }
 
 fn swap_2opt(path: &mut [usize], from: usize, to: usize) {
-    if from >= to {
-        return;
-    }
-    path[from..=to].reverse();
+    two_opt_move::reverse_segment(path, from, to);
 }
 
 #[cfg(test)]
