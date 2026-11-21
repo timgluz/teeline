@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::sync::mpsc;
 use std::time::Instant;
 
-use qtbridge::{QObjectHolder, invoke_method, qobject_impl};
+use qtbridge::{QmlObject, qobject};
 use serde_json::json;
 use teeline::tsp::{
     self, AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, GAOptions,
@@ -62,61 +62,65 @@ fn build_solvers_json() -> String {
     serde_json::to_string(&arr).unwrap_or_else(|_| "[]".to_string())
 }
 
-#[qobject_impl(Singleton)]
+#[qobject(Singleton, ConvertToCamelCase)]
 impl SolverEngine {
     qproperty!(
         "selectedSolver",
         Member = selected_solver,
         Write = set_selected_solver,
-        Notify = "selectedSolverChanged"
+        Notify = selected_solver_changed
     );
     qproperty!(
         "running",
         Member = running,
         Write = set_running,
-        Notify = "runningChanged"
+        Notify = running_changed
     );
     qproperty!(
         "bestCost",
-        Member = best_cost,
+        Read = get_best_cost,
         Write = set_best_cost,
-        Notify = "bestCostChanged"
+        Notify = best_cost_changed
     );
+
+    fn get_best_cost(&self) -> f32 {
+        self.best_cost
+    }
     qproperty!(
         "iteration",
         Member = iteration,
         Write = set_iteration,
-        Notify = "iterationChanged"
+        Notify = iteration_changed
     );
     qproperty!(
         "elapsedMs",
         Member = elapsed_ms,
         Write = set_elapsed_ms,
-        Notify = "elapsedMsChanged"
+        Notify = elapsed_ms_changed
     );
     qproperty!(
         "tourJson",
         Member = tour_json,
         Write = set_tour_json,
-        Notify = "tourJsonChanged"
+        Notify = tour_json_changed
     );
     qproperty!(
         "solversJson",
         Member = solvers_json,
         Write = set_solvers_json,
-        Notify = "solversJsonChanged"
+        Notify = solvers_json_changed
     );
     qproperty!(
         "optTourRouteJson",
         Member = opt_tour_route_json,
         Write = set_opt_tour_route_json,
-        Notify = "optTourRouteJsonChanged"
+        Notify = opt_tour_route_json_changed
     );
     qproperty!(
         "comparisonJson",
         Member = comparison_json,
         Write = set_comparison_json,
-        Notify = "comparisonJsonChanged"
+        Notify = comparison_json_changed
     );
 
     fn set_selected_solver(&mut self, v: String) {
@@ -157,23 +161,23 @@ impl SolverEngine {
     }
 
     #[qsignal]
-    fn selected_solver_changed(&self);
+    fn selected_solver_changed(&mut self);
     #[qsignal]
-    fn running_changed(&self);
+    fn running_changed(&mut self);
     #[qsignal]
-    fn best_cost_changed(&self);
+    fn best_cost_changed(&mut self);
     #[qsignal]
-    fn iteration_changed(&self);
+    fn iteration_changed(&mut self);
     #[qsignal]
-    fn elapsed_ms_changed(&self);
+    fn elapsed_ms_changed(&mut self);
     #[qsignal]
-    fn tour_json_changed(&self);
+    fn tour_json_changed(&mut self);
     #[qsignal]
-    fn solvers_json_changed(&self);
+    fn solvers_json_changed(&mut self);
     #[qsignal]
-    fn opt_tour_route_json_changed(&self);
+    fn opt_tour_route_json_changed(&mut self);
     #[qsignal]
-    fn comparison_json_changed(&self);
+    fn comparison_json_changed(&mut self);
 
     #[qslot]
     fn select_solver(&mut self, alias: String) {
@@ -240,9 +244,9 @@ impl SolverEngine {
         self.set_tour_json("[]".to_string());
         self.set_comparison_json(String::new());
 
-        let inv_progress = self.get_qml_method_invoker();
-        let inv_done = self.get_qml_method_invoker();
-        let inv_cmp = self.get_qml_method_invoker();
+        let progress_handle = self.get_thread_handle();
+        let done_handle = self.get_thread_handle();
+        let cmp_handle = self.get_thread_handle();
         let opt_json = self.opt_tour_route_json.clone();
 
         std::thread::spawn(move || {
@@ -252,21 +256,18 @@ impl SolverEngine {
             let data = match tsplib::read_from_file(Path::new(&file_path)) {
                 Ok(d) => d,
                 Err(e) => {
-                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done("[]".to_string(), 0.0, 0, e)
+                    });
                     return;
                 }
             };
             let problem = match data.to_problem(DistanceBackend::Auto) {
                 Ok(problem) => problem,
                 Err(e) => {
-                    invoke_method!(
-                        inv_done,
-                        "onSolveDone",
-                        "[]".to_string(),
-                        0.0_f32,
-                        0i32,
-                        e
-                    );
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done("[]".to_string(), 0.0, 0, e)
+                    });
                     return;
                 }
             };
@@ -274,7 +275,6 @@ impl SolverEngine {
 
             // Build pipeline stages — each gets the same problem + its own progress channel.
             let (tx, rx) = mpsc::channel::<ProgressMessage>();
-            let inv2 = inv_progress;
             std::thread::spawn(move || {
                 let mut epoch = 0i32;
                 while let Ok(msg) = rx.recv() {
@@ -283,7 +283,9 @@ impl SolverEngine {
                             epoch += 1;
                             let tour = route_to_json(route.route());
                             let ms = start.elapsed().as_millis() as i32;
-                            invoke_method!(inv2, "onProgressUpdate", tour, cost, epoch, ms);
+                            progress_handle.invoke_mut(move |engine| {
+                                engine.on_progress_update(tour, cost, epoch, ms);
+                            });
                         }
                         ProgressMessage::EpochUpdate(n) => {
                             epoch = n as i32;
@@ -314,37 +316,35 @@ impl SolverEngine {
                 .collect();
 
             if stages.is_empty() {
-                invoke_method!(
-                    inv_done,
-                    "onSolveDone",
-                    "[]".to_string(),
-                    0.0_f32,
-                    0i32,
-                    "No valid stages in pipeline".to_string()
-                );
+                done_handle.invoke_mut(move |engine| {
+                    engine.on_solve_done(
+                        "[]".to_string(),
+                        0.0,
+                        0,
+                        "No valid stages in pipeline".to_string(),
+                    )
+                });
                 return;
             }
 
             match run_pipeline(&stages) {
                 Ok(solution) => {
                     let tour = route_to_json(solution.route());
-                    let ms = start.elapsed().as_millis() as i32;
-                    invoke_method!(
-                        inv_done,
-                        "onSolveDone",
-                        tour,
-                        solution.total,
-                        ms,
-                        String::new()
-                    );
+                    let total = solution.total;
                     let comp_json =
                         make_comparison_json(&opt_json, solution.route(), &problem.cities);
+                    let ms = start.elapsed().as_millis() as i32;
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done(tour, total, ms, String::new());
+                    });
                     if !comp_json.is_empty() {
-                        invoke_method!(inv_cmp, "onComparisonReady", comp_json);
+                        cmp_handle.invoke_mut(move |engine| engine.on_comparison_ready(comp_json));
                     }
                 }
                 Err(e) => {
-                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done("[]".to_string(), 0.0, 0, e)
+                    });
                 }
             }
         });
@@ -360,9 +360,9 @@ impl SolverEngine {
         self.set_tour_json("[]".to_string());
         self.set_comparison_json(String::new());
 
-        let inv_progress = self.get_qml_method_invoker();
-        let inv_done = self.get_qml_method_invoker();
-        let inv_cmp = self.get_qml_method_invoker();
+        let progress_handle = self.get_thread_handle();
+        let done_handle = self.get_thread_handle();
+        let cmp_handle = self.get_thread_handle();
         let alias = self.selected_solver.clone();
         let opt_json = self.opt_tour_route_json.clone();
 
@@ -370,14 +370,14 @@ impl SolverEngine {
             let solver = match Solvers::from_str(&alias) {
                 Ok(s) => s,
                 Err(_) => {
-                    invoke_method!(
-                        inv_done,
-                        "onSolveDone",
-                        "[]".to_string(),
-                        0.0_f32,
-                        0i32,
-                        format!("Unknown solver: {alias}")
-                    );
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done(
+                            "[]".to_string(),
+                            0.0,
+                            0,
+                            format!("Unknown solver: {alias}"),
+                        )
+                    });
                     return;
                 }
             };
@@ -385,7 +385,9 @@ impl SolverEngine {
             let data = match tsplib::read_from_file(Path::new(&file_path)) {
                 Ok(d) => d,
                 Err(e) => {
-                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done("[]".to_string(), 0.0, 0, e)
+                    });
                     return;
                 }
             };
@@ -393,14 +395,9 @@ impl SolverEngine {
             let problem = match data.to_problem(DistanceBackend::Auto) {
                 Ok(problem) => problem,
                 Err(e) => {
-                    invoke_method!(
-                        inv_done,
-                        "onSolveDone",
-                        "[]".to_string(),
-                        0.0_f32,
-                        0i32,
-                        e
-                    );
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done("[]".to_string(), 0.0, 0, e)
+                    });
                     return;
                 }
             };
@@ -416,7 +413,9 @@ impl SolverEngine {
                             epoch += 1;
                             let tour = route_to_json(route.route());
                             let ms = start.elapsed().as_millis() as i32;
-                            invoke_method!(inv_progress, "onProgressUpdate", tour, cost, epoch, ms);
+                            progress_handle.invoke_mut(move |engine| {
+                                engine.on_progress_update(tour, cost, epoch, ms);
+                            });
                         }
                         ProgressMessage::EpochUpdate(n) => {
                             epoch = n as i32;
@@ -430,23 +429,21 @@ impl SolverEngine {
             match tsp::solve_with_context(solver, &problem, &opts, Some(tx), None) {
                 Ok(solution) => {
                     let tour = route_to_json(solution.route());
-                    let ms = start.elapsed().as_millis() as i32;
-                    invoke_method!(
-                        inv_done,
-                        "onSolveDone",
-                        tour,
-                        solution.total,
-                        ms,
-                        String::new()
-                    );
+                    let total = solution.total;
                     let comp_json =
                         make_comparison_json(&opt_json, solution.route(), &problem.cities);
+                    let ms = start.elapsed().as_millis() as i32;
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done(tour, total, ms, String::new());
+                    });
                     if !comp_json.is_empty() {
-                        invoke_method!(inv_cmp, "onComparisonReady", comp_json);
+                        cmp_handle.invoke_mut(move |engine| engine.on_comparison_ready(comp_json));
                     }
                 }
                 Err(e) => {
-                    invoke_method!(inv_done, "onSolveDone", "[]".to_string(), 0.0_f32, 0i32, e);
+                    done_handle.invoke_mut(move |engine| {
+                        engine.on_solve_done("[]".to_string(), 0.0, 0, e)
+                    });
                 }
             }
         });
