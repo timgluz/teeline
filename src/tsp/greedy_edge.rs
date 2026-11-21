@@ -53,7 +53,10 @@ pub fn solve(
 
     // Step 3: walk the single resulting cycle into an ordered path.
     let pos_path = hamiltonian_cycle_to_path(n, &selected);
-    let path: Vec<usize> = pos_path.iter().map(|&pos| cities[pos].id).collect();
+    let path: Vec<usize> = pos_path
+        .iter()
+        .map(|pos| cities[pos.into_inner()].id)
+        .collect();
 
     if let Some(tx) = progress_tx {
         let total = distances.tour_length(&path);

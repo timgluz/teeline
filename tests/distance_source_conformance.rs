@@ -9,8 +9,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use teeline::tsp::{
-    AppOptions, DistanceSource, DistanceType, LKOptions, Solvers, TspProblem, distance_matrix,
-    kdtree::KDPoint, lin_kernighan, on_the_fly::OnTheFly, solve_problem, tsplib,
+    AppOptions, DistanceSource, DistanceType, LKOptions, Position, Solvers, TspProblem,
+    distance_matrix, kdtree::KDPoint, lin_kernighan, on_the_fly::OnTheFly, solve_problem, tsplib,
 };
 
 /// One fixture per coordinate metric. CEIL_2D has no tracked file, so `berlin52` coordinates
@@ -71,15 +71,19 @@ fn every_backend_agrees_on_every_pair() {
         for a in 0..n {
             for b in 0..n {
                 assert_eq!(
-                    matrix.distance_by_pos(a, b).unwrap(),
-                    onfly.distance_by_pos(a, b).unwrap(),
+                    matrix
+                        .distance_by_pos(Position::new(a), Position::new(b))
+                        .unwrap(),
+                    onfly
+                        .distance_by_pos(Position::new(a), Position::new(b))
+                        .unwrap(),
                     "{fixture} ({dt:?}) position pair ({a}, {b})"
                 );
             }
         }
 
         // Nearest-neighbour results must agree too, not just raw distances.
-        let target = matrix.point_at(0).unwrap();
+        let target = matrix.point_at(Position::new(0)).unwrap();
         let matrix_near = matrix
             .nearest(&target, 3)
             .nearest()
@@ -104,30 +108,45 @@ fn every_backend_obeys_the_conformance_contract() {
             assert!(source.is_coordinate_metric(), "{fixture}/{name}");
             assert_eq!(source.tour_length(&[]), 0.0);
 
-            let first_id = source.pos2city_id(0).expect("position 0 exists");
-            let second_id = source.pos2city_id(1).expect("position 1 exists");
+            let first_id = source
+                .pos2city_id(Position::new(0))
+                .expect("position 0 exists");
+            let second_id = source
+                .pos2city_id(Position::new(1))
+                .expect("position 1 exists");
             assert_eq!(source.tour_length(&[first_id]), 0.0);
-            assert_eq!(source.city_id2pos(first_id), Some(0));
-            assert_eq!(source.point_at(0).unwrap().id, first_id);
+            assert_eq!(source.city_id2pos(first_id), Some(Position::new(0)));
+            assert_eq!(source.point_at(Position::new(0)).unwrap().id, first_id);
             assert_eq!(source.distance_between(first_id, first_id).unwrap(), 0.0);
-            assert_eq!(source.distance_by_pos(0, 0).unwrap(), 0.0);
+            assert_eq!(
+                source
+                    .distance_by_pos(Position::new(0), Position::new(0))
+                    .unwrap(),
+                0.0
+            );
 
             let row = source.distances_from(first_id);
             assert_eq!(row.len(), n);
             for (pos, &distance) in row.iter().enumerate() {
                 assert_eq!(
                     distance,
-                    source.distance_by_pos(0, pos).unwrap(),
+                    source
+                        .distance_by_pos(Position::new(0), Position::new(pos))
+                        .unwrap(),
                     "{fixture}/{name}: distances_from disagrees at position {pos}"
                 );
             }
 
             assert!(
-                source.distance_by_pos(n, 0).is_err(),
+                source
+                    .distance_by_pos(Position::new(n), Position::new(0))
+                    .is_err(),
                 "{fixture}/{name}: first position == n must be out of range"
             );
             assert!(
-                source.distance_by_pos(0, n).is_err(),
+                source
+                    .distance_by_pos(Position::new(0), Position::new(n))
+                    .is_err(),
                 "{fixture}/{name}: second position == n must be out of range"
             );
             assert!(
@@ -154,7 +173,7 @@ fn every_backend_obeys_the_conformance_contract() {
                 "{fixture}/{name}: unknown id at the end must not make a tour"
             );
 
-            let target = source.point_at(0).unwrap();
+            let target = source.point_at(Position::new(0)).unwrap();
             assert_eq!(source.nearest(&target, 1).nearest().len(), 1);
             assert!(
                 source
@@ -252,10 +271,10 @@ fn non_contiguous_city_ids_map_correctly() {
         ("matrix", &matrix as &dyn DistanceSource),
         ("on-the-fly", &onfly as &dyn DistanceSource),
     ] {
-        assert_eq!(source.pos2city_id(0), Some(10), "{name}");
-        assert_eq!(source.pos2city_id(1), Some(20), "{name}");
-        assert_eq!(source.pos2city_id(2), Some(30), "{name}");
-        assert_eq!(source.city_id2pos(20), Some(1), "{name}");
+        assert_eq!(source.pos2city_id(Position::new(0)), Some(10), "{name}");
+        assert_eq!(source.pos2city_id(Position::new(1)), Some(20), "{name}");
+        assert_eq!(source.pos2city_id(Position::new(2)), Some(30), "{name}");
+        assert_eq!(source.city_id2pos(20), Some(Position::new(1)), "{name}");
         assert_eq!(source.distance_between(10, 20).unwrap(), 5.0, "{name}");
         // EUC_2D rounds each edge: sqrt(3^2 + 3^2) = 4.24.. -> 4.
         assert_eq!(source.distance_between(20, 30).unwrap(), 4.0, "{name}");

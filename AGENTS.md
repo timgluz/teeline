@@ -54,7 +54,8 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - `AppOptions` — pure config container; one optional option struct per solver plus shared `HeuristicOptions`
 - `TspProblem` — cities plus `Arc<dyn DistanceSource>`; `new` wraps a concrete source, `from_source` shares one. `cities` is the 2D layout geometry-based solvers read; `DistanceSource::is_coordinate_metric()` reports whether the distance source is the coordinates rather than an EXPLICIT matrix
 - `Solution` — tour route and total distance computed from the problem's distance source
-- `DistanceSource` — the distance-query trait (`src/tsp/distance_source.rs`); positions are dense indices into the city list, city IDs are external, and the shared defaults keep backends byte-identical
+- `DistanceSource` — the distance-query trait (`src/tsp/distance_source.rs`); `Position` is a dense `0..n` city index, city IDs stay external `usize`, and the shared defaults keep backends byte-identical
+- `Position` — `#[repr(transparent)]` newtype over `usize` for dense `0..n` city positions (`src/tsp/position.rs`); a position cannot be passed where a city ID is expected
 - `NearestResult` / `NearestResultItem` — returned by both KD-tree and distance-source nearest-neighbor lookups
 
 **Spatial data structures:**

@@ -1,23 +1,24 @@
 //! The distance-query boundary.
 //!
-//! Positions are dense `0..n` indices into the problem's city list; city IDs are external
-//! identifiers (TSPLIB 1-based, API-supplied, possibly non-contiguous). `distance_by_pos`,
-//! `point_at`, `pos2city_id`, and `city_id2pos` are the conversion boundary;
+//! Positions are dense `0..n` indices (typed as [`Position`]) into the problem's city list;
+//! city IDs are external identifiers (TSPLIB 1-based, API-supplied, possibly non-contiguous).
+//! `distance_by_pos`, `point_at`, `pos2city_id`, and `city_id2pos` are the conversion boundary;
 //! `distance_between`/`tour_length` accept IDs.
 //!
 //! Every backend implements only the five primitives. The method defaults below are shared, so
 //! two backends cannot drift in summation order, id handling, or tie-breaking — the property the
 //! byte-identical guarantee rests on.
 
+use super::Position;
 use super::kdtree::KDPoint;
 use super::{NearestResult, NearestResultItem};
 
 pub trait DistanceSource: Send + Sync {
     fn num_cities(&self) -> usize;
-    fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str>;
-    fn pos2city_id(&self, pos: usize) -> Option<usize>;
-    fn city_id2pos(&self, city_id: usize) -> Option<usize>;
-    fn point_at(&self, pos: usize) -> Option<KDPoint>;
+    fn distance_by_pos(&self, pos1: Position, pos2: Position) -> Result<f32, &'static str>;
+    fn pos2city_id(&self, pos: Position) -> Option<usize>;
+    fn city_id2pos(&self, city_id: usize) -> Option<Position>;
+    fn point_at(&self, pos: Position) -> Option<KDPoint>;
 
     fn is_coordinate_metric(&self) -> bool {
         true
@@ -45,7 +46,7 @@ pub trait DistanceSource: Send + Sync {
         let mut distances = Vec::with_capacity(n);
         for i in 0..n {
             distances.push(
-                self.distance_by_pos(pos, i)
+                self.distance_by_pos(pos, Position::new(i))
                     .expect("valid position in distances_from"),
             );
         }
@@ -79,7 +80,7 @@ pub trait DistanceSource: Send + Sync {
     }
 
     /// Position-based tour length — no id lookup per edge.
-    fn tour_length_by_pos(&self, path: &[usize]) -> f32 {
+    fn tour_length_by_pos(&self, path: &[Position]) -> f32 {
         if path.len() < 2 {
             return 0.0;
         }
@@ -99,7 +100,8 @@ pub trait DistanceSource: Send + Sync {
             None => return search_result,
         };
 
-        for pos in 0..self.num_cities() {
+        for i in 0..self.num_cities() {
+            let pos = Position::new(i);
             if pos == city_pos {
                 continue;
             }
@@ -123,7 +125,8 @@ pub trait DistanceSource: Send + Sync {
         let city_pos = self.city_id2pos(target.id)?;
 
         let mut best: Option<NearestResultItem> = None;
-        for pos in 0..self.num_cities() {
+        for i in 0..self.num_cities() {
+            let pos = Position::new(i);
             if pos == city_pos {
                 continue;
             }
@@ -166,10 +169,14 @@ mod tests {
         assert!(source.is_coordinate_metric());
         assert_eq!(source.distance_between(0, 0).unwrap(), 0.0);
         assert_eq!(source.distances_from(0).len(), n);
-        let tour: Vec<usize> = (0..n).collect();
-        assert!(source.tour_length(&tour) > 0.0);
-        assert_eq!(source.tour_length_by_pos(&tour), source.tour_length(&tour));
-        let target = source.point_at(0).unwrap();
+        let id_tour: Vec<usize> = (0..n).collect();
+        let pos_tour: Vec<Position> = (0..n).map(Position::new).collect();
+        assert!(source.tour_length(&id_tour) > 0.0);
+        assert_eq!(
+            source.tour_length_by_pos(&pos_tour),
+            source.tour_length(&id_tour)
+        );
+        let target = source.point_at(Position::new(0)).unwrap();
         assert_eq!(source.nearest(&target, 1).nearest().len(), 1);
         assert!(
             source

@@ -28,6 +28,8 @@ pub mod opt_tour;
 pub mod or_opt;
 pub mod particle_swarm;
 pub mod pipeline;
+pub mod position;
+pub use position::Position;
 pub mod probability;
 pub mod progress;
 pub mod random_shuffle;
@@ -2094,7 +2096,7 @@ impl TspProblem {
         }
         let mut seen = std::collections::HashSet::with_capacity(cities.len());
         for (pos, city) in cities.iter().enumerate() {
-            if distances.pos2city_id(pos) != Some(city.id) {
+            if distances.pos2city_id(Position::new(pos)) != Some(city.id) {
                 return Err(format!(
                     "distance source position {pos} does not map to city id {}",
                     city.id
