@@ -27,6 +27,10 @@ use std::sync::mpsc;
 /// Cost improvement below this is treated as zero; without it a float-noise swap would loop.
 const EPS: f32 = 1e-6;
 
+/// Merge candidates are capped below the local-search list: patching only needs a few
+/// boundary neighbours, and the smaller scan is a large win at n = 1,000.
+const PATCH_CANDIDATE_K: usize = 15;
+
 // ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
@@ -379,7 +383,7 @@ struct Scratch {
     in_queue: Vec<bool>,
     added: Vec<(usize, usize)>,
     comp_of: Vec<usize>,
-    comp_sizes: Vec<usize>,
+    comp_vertices: Vec<Vec<usize>>,
     pos: Vec<usize>,
 }
 
@@ -390,28 +394,28 @@ impl Scratch {
             in_queue: vec![false; n],
             added: Vec::new(),
             comp_of: vec![usize::MAX; n],
-            comp_sizes: Vec::new(),
+            comp_vertices: Vec::new(),
             pos: vec![0; n],
         }
     }
 }
 
-/// Fills `comp_of` with a component id per city and `sizes` with each component's vertex count.
-fn component_map(graph: &TourGraph, comp_of: &mut [usize], sizes: &mut Vec<usize>) {
+/// Fills `comp_of` with a component id per city and `vertices` with each component's cities.
+fn component_map(graph: &TourGraph, comp_of: &mut [usize], vertices: &mut Vec<Vec<usize>>) {
     let n = graph.len();
     comp_of.fill(usize::MAX);
-    sizes.clear();
+    vertices.clear();
     for start in 0..n {
         if comp_of[start] != usize::MAX {
             continue;
         }
-        let id = sizes.len();
-        let mut count = 0usize;
+        let id = vertices.len();
+        let mut component = Vec::new();
         let mut prev = usize::MAX;
         let mut current = start;
         loop {
             comp_of[current] = id;
-            count += 1;
+            component.push(current);
             let [a, b] = graph.neighbours(current);
             let next = if a != prev { a } else { b };
             prev = current;
@@ -420,7 +424,7 @@ fn component_map(graph: &TourGraph, comp_of: &mut [usize], sizes: &mut Vec<usize
                 break;
             }
         }
-        sizes.push(count);
+        vertices.push(component);
     }
 }
 
@@ -430,6 +434,7 @@ fn merge_via_candidates(
     graph: &mut TourGraph,
     comp_of: &[usize],
     small: usize,
+    small_vertices: &[usize],
     candidates: &CandidateList,
     distances: &dyn DistanceSource,
     added: &mut Vec<(usize, usize)>,
@@ -437,12 +442,13 @@ fn merge_via_candidates(
     let n = graph.len();
     let mut best: Option<(f32, usize, usize, usize, usize, bool)> = None;
 
-    for a in 0..n {
-        if comp_of[a] != small {
-            continue;
-        }
+    for &a in small_vertices {
         for b in graph.neighbours(a) {
-            for &cand in candidates.neighbours_by_pos(Position::new(a)) {
+            for &cand in candidates
+                .neighbours_by_pos(Position::new(a))
+                .iter()
+                .take(PATCH_CANDIDATE_K)
+            {
                 let c = cand.into_inner();
                 if c >= n || comp_of[c] == small {
                     continue;
@@ -462,16 +468,13 @@ fn merge_via_full_scan(
     graph: &mut TourGraph,
     comp_of: &[usize],
     small: usize,
+    small_vertices: &[usize],
     distances: &dyn DistanceSource,
     added: &mut Vec<(usize, usize)>,
 ) {
-    let n = graph.len();
     let mut best: Option<(f32, usize, usize, usize, usize, bool)> = None;
 
-    for a in 0..n {
-        if comp_of[a] != small {
-            continue;
-        }
+    for &a in small_vertices {
         for b in graph.neighbours(a) {
             for (c, &component) in comp_of.iter().enumerate() {
                 if component == small {
@@ -549,20 +552,22 @@ fn patch_subtours(
     scratch: &mut Scratch,
 ) -> (usize, usize) {
     scratch.added.clear();
-    component_map(graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
-    let components_before = scratch.comp_sizes.len();
-    while scratch.comp_sizes.len() > 1 {
+    component_map(graph, &mut scratch.comp_of, &mut scratch.comp_vertices);
+    let components_before = scratch.comp_vertices.len();
+    while scratch.comp_vertices.len() > 1 {
         let small = scratch
-            .comp_sizes
+            .comp_vertices
             .iter()
             .enumerate()
-            .min_by_key(|&(_, &size)| size)
+            .min_by_key(|(_, vertices)| vertices.len())
             .map(|(id, _)| id)
             .expect("at least one component");
+        let small_vertices = std::mem::take(&mut scratch.comp_vertices[small]);
         if !merge_via_candidates(
             graph,
             &scratch.comp_of,
             small,
+            &small_vertices,
             candidates,
             distances,
             &mut scratch.added,
@@ -571,11 +576,12 @@ fn patch_subtours(
                 graph,
                 &scratch.comp_of,
                 small,
+                &small_vertices,
                 distances,
                 &mut scratch.added,
             );
         }
-        component_map(graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
+        component_map(graph, &mut scratch.comp_of, &mut scratch.comp_vertices);
     }
     (components_before, scratch.added.len())
 }
@@ -1264,12 +1270,14 @@ mod tests {
         let distances = distance_matrix::from_cities_unrounded(&cities);
         let candidates = CandidateList::build(&cities, 5).unwrap();
         let mut scratch = Scratch::new(6);
-        component_map(&graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
-        assert_eq!(scratch.comp_sizes.len(), 2);
+        component_map(&graph, &mut scratch.comp_of, &mut scratch.comp_vertices);
+        assert_eq!(scratch.comp_vertices.len(), 2);
+        let small_vertices = scratch.comp_vertices[0].clone();
         merge_via_candidates(
             &mut graph,
             &scratch.comp_of,
             0,
+            &small_vertices,
             &candidates,
             &distances,
             &mut scratch.added,
@@ -1629,13 +1637,15 @@ mod tests {
         let mut graph =
             TourGraph::from_neighbours(vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]]);
         let mut scratch = Scratch::new(6);
-        component_map(&graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
-        assert_eq!(scratch.comp_sizes.len(), 2);
+        component_map(&graph, &mut scratch.comp_of, &mut scratch.comp_vertices);
+        assert_eq!(scratch.comp_vertices.len(), 2);
+        let small_vertices = scratch.comp_vertices[0].clone();
         assert!(
             !merge_via_candidates(
                 &mut graph,
                 &scratch.comp_of,
                 0,
+                &small_vertices,
                 &candidates,
                 &distances,
                 &mut scratch.added,
@@ -1646,6 +1656,7 @@ mod tests {
             &mut graph,
             &scratch.comp_of,
             0,
+            &small_vertices,
             &distances,
             &mut scratch.added,
         );
