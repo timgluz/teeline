@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use crate::tsp::{
     AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, FourierOptions, GAOptions,
-    HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
+    HeuristicOptions, LKOptions, MemeticEaxOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -53,6 +53,12 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                     let t = value.as_table().ok_or("config: `lk` must be a table")?;
                     base.lk = Some(LKOptions::from_toml(t)?);
                 }
+                "memetic_eax" => {
+                    let t = value
+                        .as_table()
+                        .ok_or("config: `memetic_eax` must be a table")?;
+                    base.memetic_eax = Some(MemeticEaxOptions::from_toml(t)?);
+                }
                 "som" => {
                     let t = value.as_table().ok_or("config: `som` must be a table")?;
                     base.som = Some(SOMOptions::from_toml(t)?);
@@ -69,7 +75,7 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, sfc, lk, som, aco, heuristic"
+                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, sfc, lk, memetic_eax, som, aco, heuristic"
                     ));
                 }
             }
@@ -153,6 +159,7 @@ pub fn load_pipeline_config_with_backend(
             ("fourier", matches!(solver, Solvers::Fourier)),
             ("sfc", matches!(solver, Solvers::SpaceFillingCurve)),
             ("lk", matches!(solver, Solvers::LinKernighan)),
+            ("memetic_eax", matches!(solver, Solvers::MemeticEax)),
             ("som", matches!(solver, Solvers::KohonenSom)),
             ("aco", matches!(solver, Solvers::AntColony)),
             (
@@ -166,6 +173,7 @@ pub fn load_pipeline_config_with_backend(
                         | Solvers::Fourier
                         | Solvers::SpaceFillingCurve
                         | Solvers::LinKernighan
+                        | Solvers::MemeticEax
                         | Solvers::KohonenSom
                         | Solvers::AntColony
                 ),
@@ -590,6 +598,43 @@ mod tests {
         let aco = opts.aco.unwrap();
         assert_eq!(aco.num_ants, 10);
         assert!((aco.beta - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_toml_provider_memetic_eax_sub_table_works() {
+        let table: toml::Table = toml::from_str(
+            "solver = \"memetic_eax\"\n[memetic_eax]\npop_size = 30\nstrategy = \"rand\"\nseed = 5",
+        )
+        .unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        let eax = opts.memetic_eax.unwrap();
+        assert_eq!(eax.pop_size, 30);
+        assert_eq!(eax.strategy, crate::tsp::EaxStrategy::Rand);
+        assert_eq!(eax.seed, Some(5));
+    }
+
+    #[test]
+    fn test_load_pipeline_config_memetic_eax_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.memetic_eax]\npop_size = 30\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("memetic_eax"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_eax_errors() {
+        // EAX reads only opts.memetic_eax at solve time, never opts.heuristic.
+        let toml = "[[stage]]\nsolver = \"eax\"\n\n[stage.memetic_eax]\npop_size = 30\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_memetic_eax_invalid_pop_size_errors() {
+        let toml = "[[stage]]\nsolver = \"memetic_eax\"\n\n[stage.memetic_eax]\npop_size = 1\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("pop_size"), "got: {err}");
     }
 
     #[test]

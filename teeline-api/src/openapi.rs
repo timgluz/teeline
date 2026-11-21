@@ -56,6 +56,7 @@ impl Modify for SecurityAddon {
         request::PsoConfig,
         request::GsaConfig,
         request::LkConfig,
+        request::MemeticEaxConfig,
         request::SaConfig,
         request::GaConfig,
         request::CsConfig,

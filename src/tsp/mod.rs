@@ -72,6 +72,7 @@ pub enum Solvers {
     FlowerPollination,
     Fourier,
     LinKernighan,
+    MemeticEax,
     NearestNeighbor,
     GeneticAlgorithm,
     GravitationalSearch,
@@ -110,6 +111,9 @@ impl Solvers {
             "lin_kernighan",
             "nearest_neighbor",
             "nn",
+            "memetic_eax",
+            "memetic",
+            "eax",
             "genetic_algorithm",
             "ga",
             "gravitational_search",
@@ -511,6 +515,11 @@ impl Solvers {
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
+                name: "memetic_eax",
+                alias: Some("eax"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
                 name: "or_opt",
                 alias: Some("or-opt"),
                 kind: SolverKind::Heuristic,
@@ -548,7 +557,7 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 23] = [
+static SOLVER_LIST: [SolverInfo; 24] = [
     SolverInfo {
         name: "Ant Colony",
         alias: "aco",
@@ -752,6 +761,17 @@ static SOLVER_LIST: [SolverInfo; 23] = [
         exact: false,
     },
     SolverInfo {
+        name: "Memetic EAX",
+        alias: "eax",
+        category: "Metaheuristic",
+        desc: "Memetic Edge Assembly Crossover: maintains a population of locally optimized \
+               tours, recombines them through alternating A/B edge cycles, patches subtours, \
+               and polishes offspring.",
+        complexity: "O(epochs \u{00b7} pop \u{00b7} children\u{00b7}n\u{00b2})",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
         name: "Random Shuffle",
         alias: "shuffle",
         category: "Utility",
@@ -780,6 +800,7 @@ impl FromStr for Solvers {
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
             "fourier" => Ok(Solvers::Fourier),
             "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
+            "eax" | "memetic" | "memetic_eax" => Ok(Solvers::MemeticEax),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "gsa" | "gravitational_search" => Ok(Solvers::GravitationalSearch),
@@ -1904,6 +1925,7 @@ pub struct AppOptions {
     pub cs: Option<CSOptions>,
     pub fpa: Option<FPAOptions>,
     pub lk: Option<LKOptions>,
+    pub memetic_eax: Option<MemeticEaxOptions>,
     pub fourier: Option<FourierOptions>,
     pub sfc: Option<SfcOptions>,
     pub som: Option<SOMOptions>,
@@ -1926,7 +1948,7 @@ fn parse_f32(v: &toml::Value, name: &str) -> Result<f32, String> {
 /// the raw signed `i64` with no range enforcement, so a bare `as usize` cast on a negative
 /// value would silently wrap into a huge positive number (e.g. `-5i64 as usize` is over
 /// 1.8*10^19) instead of erroring — `usize::try_from` rejects negatives cleanly instead.
-fn parse_nonneg_usize(v: &toml::Value, name: &str) -> Result<usize, String> {
+pub(crate) fn parse_nonneg_usize(v: &toml::Value, name: &str) -> Result<usize, String> {
     let n = v
         .as_integer()
         .ok_or_else(|| format!("config: `{name}` must be an integer, got {v}"))?;
@@ -2008,6 +2030,11 @@ pub fn solve_with_context(
             let lk = opts.lk.as_ref().cloned().unwrap_or_default();
             lk.validate()?;
             lin_kernighan::solve(problem, &lk, tx, init_tour)
+        }
+        Solvers::MemeticEax => {
+            let eax = opts.memetic_eax.as_ref().cloned().unwrap_or_default();
+            eax.validate()?;
+            memetic_eax::solve(problem, &eax, tx, init_tour)
         }
         Solvers::NearestNeighbor => nearest_neighbor::solve(problem, &h, tx, init_tour),
         Solvers::GeneticAlgorithm => {
@@ -2298,6 +2325,7 @@ mod tests {
             cs: None,
             fpa: None,
             lk: None,
+            memetic_eax: None,
             fourier: None,
             sfc: None,
             som: None,
@@ -2679,6 +2707,7 @@ mod tests {
         assert!(!Solvers::FlowerPollination.auto_expand_with_nn());
         assert!(!Solvers::NearestNeighbor.auto_expand_with_nn());
         assert!(!Solvers::BellmanKarp.auto_expand_with_nn());
+        assert!(!Solvers::MemeticEax.auto_expand_with_nn());
         assert!(!Solvers::Unspecified.auto_expand_with_nn());
     }
 
@@ -2712,6 +2741,7 @@ mod tests {
         assert!(!Solvers::NearestNeighbor.auto_expand_with_shuffle());
         assert!(!Solvers::BellmanKarp.auto_expand_with_shuffle());
         assert!(!Solvers::RandomShuffle.auto_expand_with_shuffle());
+        assert!(!Solvers::MemeticEax.auto_expand_with_shuffle());
     }
 
     #[test]

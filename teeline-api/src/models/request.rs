@@ -76,6 +76,27 @@ pub struct LkConfig {
     pub max_depth: Option<usize>,
 }
 
+/// Memetic EAX. Mirrors `MemeticEaxOptions`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct MemeticEaxConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epochs: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pop_size: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children_per_pair: Option<usize>,
+    /// `single_ab`, `rand`, or `hybrid`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "hybrid")]
+    pub strategy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stall_epochs: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidate_k: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+}
+
 /// Simulated Annealing. Mirrors `SAOptions`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct SaConfig {
@@ -220,6 +241,8 @@ pub struct SolverConfigs {
     pub gsa: Option<GsaConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lk: Option<LkConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memetic_eax: Option<MemeticEaxConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sa: Option<SaConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -371,6 +394,28 @@ mod tests {
         let back: SolverConfigs = serde_json::from_str(&json).unwrap();
         assert_eq!(back.sa.as_ref().unwrap().cooling_rate, Some(0.0005));
         assert_eq!(back.sa.as_ref().unwrap().min_temperature, None);
+    }
+
+    #[test]
+    fn solver_configs_memetic_eax_round_trip() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(MemeticEaxConfig {
+                epochs: Some(42),
+                pop_size: Some(20),
+                children_per_pair: Some(5),
+                strategy: Some("rand".to_string()),
+                stall_epochs: Some(9),
+                candidate_k: Some(11),
+                seed: Some(7),
+            }),
+            ..SolverConfigs::default()
+        };
+        let json = serde_json::to_string(&configs).unwrap();
+        let back: SolverConfigs = serde_json::from_str(&json).unwrap();
+        let eax = back.memetic_eax.unwrap();
+        assert_eq!(eax.epochs, Some(42));
+        assert_eq!(eax.strategy.as_deref(), Some("rand"));
+        assert_eq!(eax.seed, Some(7));
     }
 
     #[test]

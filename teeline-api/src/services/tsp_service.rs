@@ -6,8 +6,9 @@ use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings}
 use teeline::tsp::tsplib;
 use teeline::tsp::{
     AcoOptions, AppOptions, AspectScaling, CSOptions, DistanceBackend, DistanceType, FPAOptions,
-    FourierOptions, GAOptions, HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcCurveType,
-    SfcOptions, Solvers, TieBreaker, TspProblem, find_solver, solve_problem,
+    FourierOptions, GAOptions, HeuristicOptions, LKOptions, MemeticEaxOptions, SAOptions,
+    SOMOptions, SfcCurveType, SfcOptions, Solvers, TieBreaker, TspProblem, find_solver,
+    solve_problem,
 };
 
 use super::TspSolverService;
@@ -242,12 +243,34 @@ fn make_app_options(
         None => None,
     };
 
+    let memetic_eax = match cfg.memetic_eax.as_ref() {
+        Some(c) => {
+            let d = MemeticEaxOptions::default();
+            let options = MemeticEaxOptions {
+                epochs: c.epochs.unwrap_or(d.epochs),
+                pop_size: c.pop_size.unwrap_or(d.pop_size),
+                children_per_pair: c.children_per_pair.unwrap_or(d.children_per_pair),
+                strategy: match c.strategy.as_deref() {
+                    Some(v) => v.parse()?,
+                    None => d.strategy,
+                },
+                stall_epochs: c.stall_epochs.unwrap_or(d.stall_epochs),
+                candidate_k: c.candidate_k.unwrap_or(d.candidate_k),
+                seed: c.seed,
+            };
+            options.validate()?;
+            Some(options)
+        }
+        None => None,
+    };
+
     Ok(AppOptions {
         sa,
         ga,
         cs,
         fpa,
         lk,
+        memetic_eax,
         fourier,
         sfc,
         som,
@@ -870,6 +893,44 @@ EOF
         assert!(sfc.mirror);
         assert_eq!(sfc.multi_orientation, 4);
         assert_eq!(sfc.tie_breaker, TieBreaker::NearestPrev);
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_maps_config() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                epochs: Some(12),
+                pop_size: Some(20),
+                children_per_pair: Some(5),
+                strategy: Some("rand".into()),
+                stall_epochs: Some(9),
+                candidate_k: Some(11),
+                seed: Some(7),
+            }),
+            ..SolverConfigs::default()
+        };
+        let opts = make_app_options("memetic_eax", Some(&configs)).unwrap();
+        let eax = opts.memetic_eax.unwrap();
+        assert_eq!(eax.epochs, 12);
+        assert_eq!(eax.pop_size, 20);
+        assert_eq!(eax.children_per_pair, 5);
+        assert_eq!(eax.strategy, teeline::tsp::EaxStrategy::Rand);
+        assert_eq!(eax.stall_epochs, 9);
+        assert_eq!(eax.candidate_k, 11);
+        assert_eq!(eax.seed, Some(7));
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_rejects_invalid_strategy() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                strategy: Some("turbo".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("memetic_eax", Some(&configs)).unwrap_err();
+        assert!(err.contains("turbo"), "got: {err}");
     }
 
     #[test]

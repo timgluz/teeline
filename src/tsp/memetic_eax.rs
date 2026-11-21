@@ -118,6 +118,87 @@ impl MemeticEaxOptions {
         }
         Ok(())
     }
+
+    pub fn from_toml(table: &toml::Table) -> Result<Self, String> {
+        let mut eax = MemeticEaxOptions::default();
+        for (key, value) in table.iter() {
+            match key.as_str() {
+                "epochs" => eax.epochs = super::parse_nonneg_usize(value, "epochs")?,
+                "pop_size" => eax.pop_size = super::parse_nonneg_usize(value, "pop_size")?,
+                "children_per_pair" => {
+                    eax.children_per_pair = super::parse_nonneg_usize(value, "children_per_pair")?;
+                }
+                "strategy" => {
+                    let raw = value.as_str().ok_or_else(|| {
+                        format!("config: `strategy` must be a string, got {value}")
+                    })?;
+                    eax.strategy = raw.parse()?;
+                }
+                "stall_epochs" => {
+                    eax.stall_epochs = super::parse_nonneg_usize(value, "stall_epochs")?;
+                }
+                "candidate_k" => {
+                    eax.candidate_k = super::parse_nonneg_usize(value, "candidate_k")?;
+                }
+                "seed" => {
+                    let raw = value
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `seed` must be an integer, got {value}"))?;
+                    eax.seed =
+                        Some(u64::try_from(raw).map_err(|_| {
+                            format!("config: `seed` must be non-negative, got {raw}")
+                        })?);
+                }
+                other => {
+                    return Err(format!(
+                        "config: unknown field `{other}` in [memetic_eax] — valid: epochs, pop_size, children_per_pair, strategy, stall_epochs, candidate_k, seed"
+                    ));
+                }
+            }
+        }
+        eax.validate()?;
+        Ok(eax)
+    }
+
+    pub fn from_cli(args: &clap::ArgMatches) -> Result<Self, String> {
+        let mut eax = MemeticEaxOptions::default();
+        if let Some(v) = args.get_one::<String>("epochs") {
+            eax.epochs = v
+                .parse()
+                .map_err(|_| format!("--epochs: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("pop_size") {
+            eax.pop_size = v
+                .parse()
+                .map_err(|_| format!("--pop-size: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("children_per_pair") {
+            eax.children_per_pair = v
+                .parse()
+                .map_err(|_| format!("--children-per-pair: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("strategy") {
+            eax.strategy = v.parse()?;
+        }
+        if let Some(v) = args.get_one::<String>("stall_epochs") {
+            eax.stall_epochs = v
+                .parse()
+                .map_err(|_| format!("--stall-epochs: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("candidate_k") {
+            eax.candidate_k = v
+                .parse()
+                .map_err(|_| format!("--candidate-k: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("seed") {
+            eax.seed = Some(
+                v.parse()
+                    .map_err(|_| format!("--seed: invalid integer `{v}`"))?,
+            );
+        }
+        eax.validate()?;
+        Ok(eax)
+    }
 }
 
 fn is_permutation(positions: &[usize], n: usize) -> bool {
@@ -1640,6 +1721,96 @@ mod tests {
             let _ = solve(&problem, &opts, None, None);
         });
         assert!(count.load(Ordering::SeqCst) > 0, "no tracing event emitted");
+    }
+
+    #[test]
+    fn options_validate_requires_two_parents() {
+        let mut opts = MemeticEaxOptions::default();
+        assert!(opts.validate().is_ok());
+        opts.pop_size = 1;
+        assert!(opts.validate().is_err());
+        opts.pop_size = 2;
+        assert!(opts.validate().is_ok());
+    }
+
+    #[test]
+    fn options_from_toml_parses_every_field() {
+        let table: toml::Table = toml::from_str(
+            "epochs = 42\npop_size = 12\nchildren_per_pair = 4\nstrategy = \"rand\"\nstall_epochs = 7\ncandidate_k = 9\nseed = 99",
+        )
+        .unwrap();
+        let opts = MemeticEaxOptions::from_toml(&table).unwrap();
+        assert_eq!(opts.epochs, 42);
+        assert_eq!(opts.pop_size, 12);
+        assert_eq!(opts.children_per_pair, 4);
+        assert_eq!(opts.strategy, EaxStrategy::Rand);
+        assert_eq!(opts.stall_epochs, 7);
+        assert_eq!(opts.candidate_k, 9);
+        assert_eq!(opts.seed, Some(99));
+    }
+
+    #[test]
+    fn options_from_toml_rejects_unknown_field_and_bad_strategy() {
+        let unknown: toml::Table = toml::from_str("bogus = 1").unwrap();
+        assert!(MemeticEaxOptions::from_toml(&unknown).is_err());
+        let bad: toml::Table = toml::from_str("strategy = \"turbo\"").unwrap();
+        assert!(MemeticEaxOptions::from_toml(&bad).is_err());
+    }
+
+    fn cli_command() -> clap::Command {
+        use clap::{Arg, ArgAction, Command};
+        Command::new("test").args([
+            Arg::new("epochs").long("epochs").action(ArgAction::Set),
+            Arg::new("pop_size").long("pop-size").action(ArgAction::Set),
+            Arg::new("children_per_pair")
+                .long("children-per-pair")
+                .action(ArgAction::Set),
+            Arg::new("strategy").long("strategy").action(ArgAction::Set),
+            Arg::new("stall_epochs")
+                .long("stall-epochs")
+                .action(ArgAction::Set),
+            Arg::new("candidate_k")
+                .long("candidate-k")
+                .action(ArgAction::Set),
+            Arg::new("seed").long("seed").action(ArgAction::Set),
+        ])
+    }
+
+    #[test]
+    fn options_from_cli_parses_every_field() {
+        let args = cli_command().get_matches_from([
+            "test",
+            "--epochs",
+            "42",
+            "--pop-size",
+            "12",
+            "--children-per-pair",
+            "4",
+            "--strategy",
+            "single_ab",
+            "--stall-epochs",
+            "7",
+            "--candidate-k",
+            "9",
+            "--seed",
+            "99",
+        ]);
+        let opts = MemeticEaxOptions::from_cli(&args).unwrap();
+        assert_eq!(opts.epochs, 42);
+        assert_eq!(opts.pop_size, 12);
+        assert_eq!(opts.children_per_pair, 4);
+        assert_eq!(opts.strategy, EaxStrategy::SingleAb);
+        assert_eq!(opts.stall_epochs, 7);
+        assert_eq!(opts.candidate_k, 9);
+        assert_eq!(opts.seed, Some(99));
+    }
+
+    #[test]
+    fn options_from_cli_rejects_invalid_values() {
+        let args = cli_command().get_matches_from(["test", "--pop-size", "zero"]);
+        assert!(MemeticEaxOptions::from_cli(&args).is_err());
+        let args = cli_command().get_matches_from(["test", "--strategy", "turbo"]);
+        assert!(MemeticEaxOptions::from_cli(&args).is_err());
     }
 
     #[test]

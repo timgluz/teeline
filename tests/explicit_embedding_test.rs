@@ -7,9 +7,9 @@
 use std::path::Path;
 use teeline::tsp::{
     AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, FourierOptions, GAOptions,
-    HeuristicOptions, LKOptions, SAOptions, SOMOptions, SfcOptions, Solvers, TspProblem,
-    branch_bound, fourier, kdtree::KDPoint, lin_kernighan, nearest_neighbor, solve_problem, som,
-    space_filling_curve, tsplib,
+    HeuristicOptions, LKOptions, MemeticEaxOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
+    TspProblem, branch_bound, fourier, kdtree::KDPoint, lin_kernighan, nearest_neighbor,
+    solve_problem, som, space_filling_curve, tsplib,
 };
 
 fn load(name: &str) -> tsplib::TspLibData {
@@ -213,6 +213,14 @@ fn every_registered_solver_returns_a_valid_tour_on_gr17() {
         aco: Some(AcoOptions {
             heuristic: heuristic.clone(),
             num_ants: 4,
+            ..Default::default()
+        }),
+        memetic_eax: Some(MemeticEaxOptions {
+            epochs: 3,
+            pop_size: 4,
+            children_per_pair: 2,
+            stall_epochs: 2,
+            seed: Some(1),
             ..Default::default()
         }),
         heuristic: Some(heuristic),

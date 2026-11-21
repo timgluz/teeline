@@ -37,7 +37,7 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         use teeline::tsp::{
             AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-            LKOptions, SAOptions, SfcOptions,
+            LKOptions, MemeticEaxOptions, SAOptions, SfcOptions,
         };
         match self.solver {
             Solvers::AntColony => {
@@ -66,6 +66,9 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
             }
             Solvers::SpaceFillingCurve => {
                 base.sfc = Some(SfcOptions::from_cli(self.args)?);
+            }
+            Solvers::MemeticEax => {
+                base.memetic_eax = Some(MemeticEaxOptions::from_cli(self.args)?);
             }
             _ => {
                 base.heuristic = Some(HeuristicOptions::from_cli(self.args)?);
@@ -252,6 +255,40 @@ fn tuning_args() -> Vec<Arg> {
             .long("n_nearest")
             .help("nearest neighbours to look for")
             .required(false),
+        Arg::new("pop_size")
+            .long("pop-size")
+            .value_name("N")
+            .help("Memetic EAX: population size (default 100, minimum 2)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("children_per_pair")
+            .long("children-per-pair")
+            .value_name("N")
+            .help("Memetic EAX: offspring considered per parent (default 15)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("strategy")
+            .long("strategy")
+            .value_name("NAME")
+            .help("Memetic EAX: E-set strategy: single_ab, rand, or hybrid (default hybrid)")
+            .value_parser(["single_ab", "rand", "hybrid"])
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("stall_epochs")
+            .long("stall-epochs")
+            .value_name("N")
+            .help(
+                "Memetic EAX: stagnant generations before hybrid switches to single_ab; \
+                 the solver stops at twice this count (default 50)",
+            )
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("candidate_k")
+            .long("candidate-k")
+            .value_name("N")
+            .help("Memetic EAX: nearest-neighbour list size for patching and local search (default 20)")
+            .action(ArgAction::Set)
+            .required(false),
         Arg::new("n_elite")
             .long("n_elite")
             .help("strongest individuals to pass directly to next generation")
@@ -306,7 +343,7 @@ fn tuning_args() -> Vec<Arg> {
             .required(false),
         Arg::new("seed")
             .long("seed")
-            .help("LK: fixed RNG seed for reproducible runs (default: system entropy)")
+            .help("LK / Memetic EAX: fixed RNG seed for reproducible runs (default: system entropy)")
             .value_name("N")
             .action(ArgAction::Set)
             .required(false),
@@ -941,6 +978,37 @@ mod tests {
         let args = options_cmd().get_matches_from(["test", "fourier", "--k-max", "32"]);
         let opts = solver_options_from_args(&args, Solvers::Fourier);
         assert_eq!(opts.fourier.unwrap().k_max, 32);
+    }
+
+    #[test]
+    fn test_solver_options_eax_flags_parsed() {
+        let args = options_cmd().get_matches_from([
+            "test",
+            "eax",
+            "--epochs",
+            "12",
+            "--pop-size",
+            "20",
+            "--children-per-pair",
+            "5",
+            "--strategy",
+            "rand",
+            "--stall-epochs",
+            "9",
+            "--candidate-k",
+            "11",
+            "--seed",
+            "77",
+        ]);
+        let opts = solver_options_from_args(&args, Solvers::MemeticEax);
+        let eax = opts.memetic_eax.unwrap();
+        assert_eq!(eax.epochs, 12);
+        assert_eq!(eax.pop_size, 20);
+        assert_eq!(eax.children_per_pair, 5);
+        assert_eq!(eax.strategy, teeline::tsp::EaxStrategy::Rand);
+        assert_eq!(eax.stall_epochs, 9);
+        assert_eq!(eax.candidate_k, 11);
+        assert_eq!(eax.seed, Some(77));
     }
 
     #[test]
