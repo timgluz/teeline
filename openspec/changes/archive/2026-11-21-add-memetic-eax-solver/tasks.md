@@ -100,9 +100,16 @@ inside the 300 s budget). The small-instance time targets (berlin52 <0.2 s, kroA
 a280 <2.0 s) are not met at the default `pop_size = 100` × `children_per_pair = 15`; the
 quality targets are met, and a tuned benchmark config can cover the time targets separately.
 
-One `dsj1000` run reported a tour 10 cost units below the published optimum. The benchmark
-validates the permutation; the discrepancy points at the recorded optimum or the metric for
-this file and deserves a separate check rather than a solver change.
+Provenance: AMD Ryzen 7 PRO 4750U (16 threads), 32 GB RAM, Linux; release build, Rust
+1.100.0. The Tier A harness does not pass `--seed`, so the five runs use system entropy
+(independent stochastic runs, not fixed seeds). "Median time" is the harness's per-run process
+wall time (`wall_s`), including CLI startup.
+
+One `dsj1000` run reported 18,660,178 while an independent CEIL_2D recomputation of the same
+route gives 18,660,188 (the published optimum). The route is a valid permutation; the 10-unit
+difference is **f32 accumulation in `DistanceSource::tour_length`**, not a solver route
+difference. The route's exact cost is the optimum. Follow-up: accumulate tour lengths in f64
+so reported costs and gaps are exact at large-instance scale.
 
 ## 16. Integration gate
 

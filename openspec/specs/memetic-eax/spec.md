@@ -262,3 +262,10 @@ The system SHALL produce high-quality tours on TSPLIB instances with fewer than 
 
 - **WHEN** a strict target is not met on the measuring machine
 - **THEN** the measured result is reported rather than the target being weakened silently
+
+> **Measured at `eab6b34` (default options).** 60 runs, 0 timeouts: every instance except
+> `dsj1000` reached its published optimum; `dsj1000` was 0.028% median with a 32.4 s median.
+> The small-instance time targets above are tuned-configuration targets; at the default
+> `pop_size = 100` × `children_per_pair = 15` they take 2.9 s / 3.5 s / 5.4 s. The `dsj1000`
+> cost is reported 10 units below the exact CEIL_2D sum because `tour_length` accumulates f32;
+> the route's exact cost is the optimum.
