@@ -26,30 +26,35 @@ pub fn tour_cost(route: &[usize], cities: &[KDPoint]) -> f32 {
 pub fn tour_cost_unrounded(route: &[usize], cities: &[KDPoint]) -> f32 {
     let idx: HashMap<usize, &KDPoint> = cities.iter().map(|c| (c.id, c)).collect();
     let n = route.len();
-    (0..n)
-        .map(|i| idx[&route[i]].distance(idx[&route[(i + 1) % n]]))
-        .sum()
+    let mut total = 0.0f64;
+    for i in 0..n {
+        total += f64::from(idx[&route[i]].distance(idx[&route[(i + 1) % n]]));
+    }
+    total as f32
 }
 
 /// Sum of distances along the tour using the given distance type.
 pub fn tour_cost_with_type(route: &[usize], cities: &[KDPoint], dt: DistanceType) -> f32 {
     let idx: HashMap<usize, &KDPoint> = cities.iter().map(|c| (c.id, c)).collect();
     let n = route.len();
-    (0..n)
-        .map(|i| {
-            let a = idx[&route[i]];
-            let b = idx[&route[(i + 1) % n]];
-            match dt {
-                DistanceType::Euc2D => distance_matrix::euc_2d_distance(a, b),
-                DistanceType::Geo => distance_matrix::geo_distance(a, b),
-                DistanceType::Att => distance_matrix::att_distance(a, b),
-                DistanceType::Ceil2D => distance_matrix::ceil_2d_distance(a, b),
-                DistanceType::Explicit => {
-                    panic!("tour_cost_with_type requires DistanceMatrix for EXPLICIT; use tour_cost_from_matrix instead")
-                }
+    let mut total = 0.0f64;
+    for i in 0..n {
+        let a = idx[&route[i]];
+        let b = idx[&route[(i + 1) % n]];
+        let distance = match dt {
+            DistanceType::Euc2D => distance_matrix::euc_2d_distance(a, b),
+            DistanceType::Geo => distance_matrix::geo_distance(a, b),
+            DistanceType::Att => distance_matrix::att_distance(a, b),
+            DistanceType::Ceil2D => distance_matrix::ceil_2d_distance(a, b),
+            DistanceType::Explicit => {
+                panic!(
+                    "tour_cost_with_type requires DistanceMatrix for EXPLICIT; use tour_cost_from_matrix instead"
+                )
             }
-        })
-        .sum()
+        };
+        total += f64::from(distance);
+    }
+    total as f32
 }
 
 /// Sum of distances along the tour using a pre-computed distance matrix.
