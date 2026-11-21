@@ -101,6 +101,9 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - Integration tests in `tests/` use the public library crate
 - Test helpers (approximate float comparison, etc.) in `src/test/helpers.rs`
 - EXPLICIT fixtures: `gr17.tsp` and `ring6_explicit.tsp` have no coordinates; `bays29.tsp` has a `DISPLAY_DATA_SECTION`
+- **Fixtures must live in `tests/fixtures/`.** The `data/` tree is git-ignored, so a test that
+  reads `data/tsplib/<instance>.tsp` passes locally and fails in CI. Copy the instance into
+  `tests/fixtures/` and reference it from there (e.g. `tests/fixtures/kroA100.tsp`).
 
 ## Important Notes
 
