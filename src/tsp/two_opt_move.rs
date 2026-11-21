@@ -32,23 +32,45 @@ pub(crate) fn reverse_segment(tour: &mut [usize], from: usize, to: usize) {
 }
 
 /// Reverses `tour[from..=to]` and keeps `pos` consistent with the new ranks.
+///
+/// On a cyclic tour, reversing the complement `to+1 ..= from-1` yields the same tour, so the
+/// shorter side is reversed. The average move cost therefore halves, and the worst case stays
+/// at `n / 2` instead of `n`.
 pub(crate) fn reverse_segment_with_pos(
     tour: &mut [usize],
     pos: &mut [usize],
     from: usize,
     to: usize,
 ) {
-    let mut left = from;
-    let mut right = to;
+    let n = tour.len();
+    if n < 2 || from >= to {
+        return;
+    }
+    let inside = to - from + 1;
+    if inside <= n / 2 {
+        reverse_cyclic(tour, pos, from, inside);
+    } else {
+        reverse_cyclic(tour, pos, (to + 1) % n, n - inside);
+    }
+}
+
+/// Reverses `len` consecutive tour positions starting at `start`, wrapping at `n`.
+fn reverse_cyclic(tour: &mut [usize], pos: &mut [usize], start: usize, len: usize) {
+    let n = tour.len();
+    let mut left = 0usize;
+    let mut right = len.saturating_sub(1);
     while left < right {
-        tour.swap(left, right);
-        pos[tour[left]] = left;
-        pos[tour[right]] = right;
+        let a = (start + left) % n;
+        let b = (start + right) % n;
+        tour.swap(a, b);
+        pos[tour[a]] = a;
+        pos[tour[b]] = b;
         left += 1;
         right -= 1;
     }
     if left == right {
-        pos[tour[left]] = left;
+        let a = (start + left) % n;
+        pos[tour[a]] = a;
     }
 }
 

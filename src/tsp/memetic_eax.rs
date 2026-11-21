@@ -25,7 +25,7 @@ use std::collections::HashSet;
 use std::sync::mpsc;
 
 /// Cost improvement below this is treated as zero; without it a float-noise swap would loop.
-const EPS: f32 = 1e-6;
+const EPS: f64 = 1e-9;
 
 /// Merge candidates are capped below the local-search list: patching only needs a few
 /// boundary neighbours, and the smaller scan is a large win at n = 1,000.
@@ -686,7 +686,7 @@ fn best_2opt_move(
                     continue;
                 }
                 let delta = two_opt_move::delta(tour, i, j, |a, b| distance(distances, a, b));
-                if delta < -f64::from(EPS)
+                if delta < -EPS
                     && best
                         .as_ref()
                         .is_none_or(|&(best_delta, ..)| delta < best_delta)
@@ -714,7 +714,7 @@ struct ChildStats {
 #[derive(Clone, Debug)]
 struct Member {
     graph: TourGraph,
-    cost: f32,
+    cost: f64,
 }
 
 impl Member {
@@ -763,9 +763,11 @@ fn add_member(
     members: &mut Vec<Member>,
     allow_duplicate: bool,
 ) -> bool {
-    let key = canonical_tour(&graph.to_tour(0));
-    if !allow_duplicate && !seen.insert(key) {
-        return false;
+    if !allow_duplicate {
+        let key = canonical_tour(&graph.to_tour(0));
+        if !seen.insert(key) {
+            return false;
+        }
     }
     members.push(Member::new(graph, distances));
     true
@@ -875,7 +877,6 @@ fn select_e_set<'a>(
 
 fn perturb(
     member: &Member,
-    n: usize,
     candidates: &CandidateList,
     distances: &dyn DistanceSource,
     rng: &mut impl RngExt,
@@ -883,15 +884,35 @@ fn perturb(
 ) -> Member {
     let tour = member.graph.to_tour(0);
     let mut kicked = double_bridge(&tour, rng);
-    let all: Vec<usize> = (0..n).collect();
-    polish(&mut kicked, &all, candidates, distances, scratch);
+    let dirty = changed_edge_endpoints(&tour, &kicked);
+    polish(&mut kicked, &dirty, candidates, distances, scratch);
     Member::new(TourGraph::from_tour(&kicked), distances)
+}
+
+/// Vertices whose incident edges differ between two tours. A double bridge changes only four
+/// edges, so this gives the eight endpoints a full-tour polish would otherwise rediscover.
+fn changed_edge_endpoints(old: &[usize], new: &[usize]) -> Vec<usize> {
+    let n = old.len();
+    let key = |a: usize, b: usize| if a < b { (a, b) } else { (b, a) };
+    let old_edges: HashSet<(usize, usize)> =
+        (0..n).map(|i| key(old[i], old[(i + 1) % n])).collect();
+    let mut dirty = Vec::new();
+    for i in 0..n {
+        let edge = key(new[i], new[(i + 1) % n]);
+        if !old_edges.contains(&edge) {
+            dirty.push(new[i]);
+            dirty.push(new[(i + 1) % n]);
+        }
+    }
+    dirty.sort_unstable();
+    dirty.dedup();
+    dirty
 }
 
 #[allow(clippy::too_many_arguments)]
 fn make_child(
     parent_a: &Member,
-    parent_b: &Member,
+    cycles: &[AbCycle],
     opts: &MemeticEaxOptions,
     hybrid_as_single_ab: bool,
     candidates: &CandidateList,
@@ -899,22 +920,14 @@ fn make_child(
     rng: &mut impl RngExt,
     scratch: &mut Scratch,
 ) -> Option<(Member, ChildStats)> {
-    let n = parent_a.graph.len();
-    let cycles = match ab_cycles(&parent_a.graph, &parent_b.graph) {
-        Ok(cycles) => cycles,
-        Err(error) => {
-            tracing::debug!(error, "memetic_eax: AB-cycle decomposition failed");
-            return None;
-        }
-    };
     if cycles.is_empty() {
         return Some((
-            perturb(parent_a, n, candidates, distances, rng, scratch),
+            perturb(parent_a, candidates, distances, rng, scratch),
             ChildStats::default(),
         ));
     }
 
-    let selected = select_e_set(&cycles, opts.strategy, hybrid_as_single_ab, rng);
+    let selected = select_e_set(cycles, opts.strategy, hybrid_as_single_ab, rng);
     let mut child = parent_a.graph.clone();
     for cycle in &selected {
         apply_cycle(&mut child, &cycle.vertices);
@@ -961,7 +974,7 @@ fn pair_order(population_len: usize, rng: &mut impl RngExt) -> Vec<(usize, usize
         .collect()
 }
 
-fn should_replace(parent_cost: f32, child_cost: f32) -> bool {
+fn should_replace(parent_cost: f64, child_cost: f64) -> bool {
     child_cost < parent_cost - EPS
 }
 
@@ -1089,7 +1102,12 @@ pub fn solve(
     let mut stagnant = 0usize;
     let mut hybrid_as_single_ab = false;
 
-    send_progress(progress_tx, &best.graph.to_tour(0), distances, best_cost);
+    send_progress(
+        progress_tx,
+        &best.graph.to_tour(0),
+        distances,
+        best_cost as f32,
+    );
 
     let mut epoch = 0usize;
     while !should_stop(epoch, opts, stagnant) {
@@ -1098,11 +1116,20 @@ pub fn solve(
         let mut generation_components = 0usize;
         let mut generation_bridges = 0usize;
         for (a_idx, b_idx) in pairs {
+            // The AB decomposition depends only on the two parents, which are fixed for the
+            // whole child loop. Rebuilding it per child was 15x redundant.
+            let cycles = match ab_cycles(&population[a_idx].graph, &population[b_idx].graph) {
+                Ok(cycles) => cycles,
+                Err(error) => {
+                    tracing::debug!(error, "memetic_eax: AB-cycle decomposition failed");
+                    continue;
+                }
+            };
             let mut best_child: Option<Member> = None;
             for _ in 0..opts.children_per_pair {
                 if let Some((child, stats)) = make_child(
                     &population[a_idx],
-                    &population[b_idx],
+                    &cycles,
                     opts,
                     hybrid_as_single_ab,
                     &candidates,
@@ -1136,7 +1163,12 @@ pub fn solve(
             best = current_best.clone();
             best_cost = best.cost;
             stagnant = 0;
-            send_progress(progress_tx, &best.graph.to_tour(0), distances, best_cost);
+            send_progress(
+                progress_tx,
+                &best.graph.to_tour(0),
+                distances,
+                best_cost as f32,
+            );
         } else {
             stagnant += 1;
         }
@@ -1337,7 +1369,7 @@ mod tests {
         let mut scratch = Scratch::new(12);
         let all: Vec<usize> = (0..12).collect();
         polish(&mut tour, &all, &candidates, &distances, &mut scratch);
-        assert!(tour_cost(&tour, &distances) <= before + EPS);
+        assert!(tour_cost(&tour, &distances) <= before + 1e-6);
         assert!(
             TourGraph::from_tour(&tour).is_single_cycle(),
             "polish must keep one cycle"
@@ -1429,7 +1461,7 @@ mod tests {
         let mut ids = solution.route().to_vec();
         ids.sort_unstable();
         assert_eq!(ids, (0..14).collect::<Vec<_>>());
-        assert!((solution.total - problem.distances.tour_length(solution.route())).abs() < EPS);
+        assert!((solution.total - problem.distances.tour_length(solution.route())).abs() < 1e-6);
     }
 
     #[test]
@@ -1449,7 +1481,7 @@ mod tests {
         let first = solve(&problem, &opts, None, None);
         let second = solve(&problem, &opts, None, None);
         assert_eq!(first.route(), second.route());
-        assert!((first.total - second.total).abs() < EPS);
+        assert!((first.total - second.total).abs() < 1e-6);
     }
 
     #[test]
@@ -1485,10 +1517,11 @@ mod tests {
             TourGraph::from_tour(&[0usize, 2, 4, 6, 8, 1, 3, 5, 7, 9]),
             distances,
         );
+        let cycles = ab_cycles(&a.graph, &b.graph).unwrap();
         let mut scratch = Scratch::new(10);
         let child = make_child(
             &a,
-            &b,
+            &cycles,
             &options(),
             false,
             &candidates,
@@ -1541,10 +1574,11 @@ mod tests {
             distances,
         );
         let b = a.clone();
+        let cycles = ab_cycles(&a.graph, &b.graph).unwrap();
         let mut scratch = Scratch::new(10);
         let (child, stats) = make_child(
             &a,
-            &b,
+            &cycles,
             &options(),
             false,
             &candidates,
@@ -1570,10 +1604,11 @@ mod tests {
         let b = Member::new(TourGraph::from_tour(&b_tour), distances);
         let mut opts = options();
         opts.strategy = EaxStrategy::SingleAb;
+        let cycles = ab_cycles(&a.graph, &b.graph).unwrap();
         let mut scratch = Scratch::new(10);
         let (child, stats) = make_child(
             &a,
-            &b,
+            &cycles,
             &opts,
             false,
             &candidates,
