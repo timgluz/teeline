@@ -50,7 +50,15 @@ A fixed synthetic layout plus two pinned tours are committed as constants in
   even length and at least four.
 
 A Vitest test asserts every invariant, so a future edit cannot silently turn the lesson into
-an accident. No runtime search or random layout.
+an accident. No runtime search or random layout. If a deterministic search over a fixed set of
+layouts and starts cannot produce the pair, hand-craft the two tours and keep the same
+invariants; the two-cycle and ≥60%-shared properties are non-negotiable for the lesson.
+
+**Two cycles, not three.** The two-cycle fixture makes the EAX identity visible: selecting
+*every* AB-cycle is exactly `E_A Δ (E_A Δ E_B) = E_B`, i.e. Parent B. The explainer names that
+identity rather than presenting it as a patched child. A three-cycle fixture was considered so
+`Rand`/multi-select could still show patching, but it complicates the legend and still has the
+same all-cycles identity; the default `1-AB` already demonstrates the patch path.
 
 ### 2. Pure-TypeScript simulation, no WASM
 
@@ -79,6 +87,12 @@ Frame outline:
 | 5 Apply E-set | remove A-edges in the E-set, add B-edges, reveal components |
 | 6 Patch Subtours | one frame per bridge (smallest component, cheapest pair), optional 2-opt, final child |
 
+Stage 5 is two frames (remove the A-edges, then add the B-edges and reveal components); stage 6
+adds a frame per bridge and a "no patching needed" frame when the E-set already forms one tour.
+`Run` uses the current selection and does not block at stage 4; changing a cycle or strategy
+pauses and rebuilds the frames after the selection. A cycle click on a later stage returns to
+stage 4.
+
 ### 4. SVG, not canvas
 
 Twenty-four cities and at most ~48 union edges fit comfortably in SVG, which keeps hit targets,
@@ -95,6 +109,9 @@ visually hidden summary and a cycle/subtour table carry the text alternative.
   The last active cycle cannot be deselected: an empty E-set would make the child identical to
   Parent A, which is not a crossover worth presenting as one.
 - A stage or strategy change pauses playback and resets to that stage's first frame.
+- Selecting every cycle has its own frame: the result is Parent B exactly, so the copy says
+  "all AB-cycles selected: A becomes B, nothing to patch" instead of pretending a crossover
+  happened.
 
 ### 6. Exhaustive patching for the 24-city fixture
 
@@ -102,12 +119,17 @@ The bridge search iterates every edge of the smallest component against every ed
 components and keeps the cheapest reconnection (the Rust uses candidate lists for n = 1000; the
 explainer does not need them). Each accepted bridge removes one edge from each component and adds
 two, so degree two is preserved and the component count drops by one. The exact delta is shown.
+Each edge pair admits two rewirings; both are scored, and exact ties break on the canonical
+vertex tuple `(min_u, max_v, min_x, max_y)` so Node/Vitest and browser runs never diverge.
 
 ### 7. One-move 2-opt preview
 
 After patching, compute the best single 2-opt move over all edge pairs (small fixture), draw the
 removed and added edges, and report the exact old/new lengths. A toggle enables it; the default
-final state is the unpolished child so the EAX result is never confused with the polish.
+final state is the unpolished child so the EAX result is never confused with the polish. If no
+improving move exists, the preview says the child is already 2-opt-local and draws no
+replacement edges. The preview never applies a worsening or zero-delta swap; the toggle either
+disables or reports "already 2-opt-local (Δ = 0)".
 
 ### 8. Teaching statistics are the quality-preservation lesson
 
@@ -123,8 +145,19 @@ which is why a child is rarely much worse and often better than its parents.
   muted text colour; removed/dissolving uses the site `--color-negative` (`#f87171`); the final
   child uses the site `--color-accent` (`#6366f1`). No new global tokens are introduced; red and
   indigo are existing site tokens used in a new role.
+- **Keep cycle identity and component identity on separate visual channels.** AB-cycles are
+  identified by badges and legend rows (not by recolouring edges); connected components in
+  Stages 5–6 are shown with tinted city halos/rings keyed to `component_id`, while edges keep
+  their A/B/removed/bridge provenance. This prevents `Cycle #1` and `Subtour #1` from reading as
+  the same thing.
+- **Stage 1 overlap:** draw Parent A and Parent B with a ±1.5 px perpendicular offset; on shared
+  edges use an alternating blue/amber dashed stroke so both tours remain visibly complete before
+  Stage 2 fades the shared backbone.
 - Cycle badges use four categorical tints and a legend; selected cycles pulse once (functional
-  state, not decorative motion).
+  state, not decorative motion). Cycle toggles are native buttons with `aria-pressed`, mirrored
+  by legend rows; released keys and focus rings use the explainer's existing styles.
+- The cycle/subtour summary is a real table with a caption and column headers. Stage changes are
+  announced with `aria-live="polite"`, and a stage jump moves focus to the stage heading.
 - Numeric values use the monospace stack; the surrounding copy uses the explainer's existing
   body stack.
 - `prefers-reduced-motion`: Run jumps to the next stage/frame instead of animating; the pulse is
@@ -146,8 +179,9 @@ derive from `EXPLAINER_META`, so they need no per-solver edit. `nav-data.test.ts
   detection, smallest-first patching, exact bridge delta, one-tour result, 2-opt preview, and
   statistics.
 - **Playwright**: initial parents, six stage jumps, Step/Back, Run/Pause/Reset, strategy and
-  cycle toggles, seeded Rand reload, subtour labels, bridge stepping, 2-opt preview, keyboard
-  reachability, narrow viewport, docs/index links.
+  cycle toggles, the empty-selection guard, seeded Rand reload, subtour labels, bridge stepping,
+  2-opt preview and its no-improvement state, live-region/focus behavior, keyboard reachability,
+  narrow viewport, docs/index links.
 - **Registration guards**: the existing `nav-data`/`solver-index` cross-checks plus the explainer
   route build.
 

@@ -30,6 +30,11 @@ The explainer SHALL present one crossover event in six ordered stages: Compare P
 - **WHEN** the explainer first loads
 - **THEN** it shows Parent A and Parent B, their tour lengths, and their shared-edge count
 
+#### Scenario: Shared edges stay distinguishable
+
+- **WHEN** the two parents share an edge
+- **THEN** both tours remain visible on that edge (offset or alternating stroke) before the union graph fades it
+
 #### Scenario: Stepping forward follows the storyboard
 
 - **WHEN** the visitor steps forward
@@ -44,6 +49,11 @@ The explainer SHALL present one crossover event in six ordered stages: Compare P
 
 - **WHEN** the visitor selects a stage button
 - **THEN** the explainer jumps to that stage's first frame and pauses playback
+
+#### Scenario: Selection changes rebuild later frames
+
+- **WHEN** the visitor changes a cycle or the strategy while paused
+- **THEN** the frames after the selection are rebuilt from the new E-set
 
 ### Requirement: Union graph and AB-cycle decomposition
 
@@ -100,7 +110,12 @@ The explainer SHALL apply the selected E-set to Parent A as a symmetric differen
 #### Scenario: Subtours are colour-coded
 
 - **WHEN** the symmetric difference produces more than one component
-- **THEN** each component is labelled and colour-coded as a distinct subtour
+- **THEN** each component is labelled and visually distinguished as a distinct subtour without reusing the AB-cycle badge palette
+
+#### Scenario: Selecting every cycle reproduces Parent B
+
+- **WHEN** the E-set contains every AB-cycle
+- **THEN** the result is exactly Parent B, the explainer says no patching is needed, and the child is not presented as a patched crossover
 
 #### Scenario: One component needs no patching
 
@@ -140,6 +155,11 @@ The explainer SHALL offer an optional one-move 2-opt preview on the patched chil
 - **WHEN** the preview is shown
 - **THEN** every length and delta is computed from the fixture coordinates
 
+#### Scenario: No improving move
+
+- **WHEN** the child has no improving 2-opt move
+- **THEN** the preview reports that the child is already 2-opt-local and draws no replacement edges
+
 ### Requirement: Teaching statistics explain quality preservation
 
 The explainer SHALL display statistics that make edge inheritance legible: shared edges and ratio, AB-cycle count and lengths, E-set size, subtour count, bridges added, child versus parent costs, and the child's edge inheritance (A, B, or new).
@@ -167,6 +187,11 @@ The explainer SHALL be operable by keyboard, expose a text alternative for the v
 
 - **WHEN** a screen reader encounters the visualization
 - **THEN** it receives the current stage, parent tours, AB-cycle summary, selected E-set, subtours, patches, and final statistics
+
+#### Scenario: Cycle toggles expose their state
+
+- **WHEN** a screen reader reads the cycle legend
+- **THEN** each cycle toggle is a button whose selected state is exposed
 
 #### Scenario: Narrow viewport
 
