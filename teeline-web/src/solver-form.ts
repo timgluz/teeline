@@ -31,7 +31,7 @@ export function initSolverConfig(
 
   function selectSolver(id: string): void {
     selectedId = id
-    currentOptions = defaultSolveOptions()
+    currentOptions = defaultSolveOptions(id)
     renderConfigPanel(id)
     highlightActivePill(id)
     solverSelect.value = id

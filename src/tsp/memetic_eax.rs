@@ -91,7 +91,9 @@ pub struct MemeticEaxOptions {
 impl Default for MemeticEaxOptions {
     fn default() -> Self {
         MemeticEaxOptions {
-            epochs: 500,
+            // Lower than the shared 500: at 500, dsj1000 runs regularly exceeded the
+            // 300-second meta benchmark budget; 250 keeps the default inside it.
+            epochs: 250,
             pop_size: 100,
             children_per_pair: 15,
             strategy: EaxStrategy::Hybrid,

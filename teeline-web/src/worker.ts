@@ -233,7 +233,7 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
     if (data.type === 'webmcp-solve') {
       const req = data as WebMCPSolveRequest
       try {
-        const opts = { ...defaultSolveOptions(), ...req.options }
+        const opts = { ...defaultSolveOptions(req.solver), ...req.options }
         const raw = parseAndSolve(req.solver, req.input, opts)
         return {
           type: 'webmcp-result',
@@ -265,7 +265,7 @@ export function handleMessage(data: WorkerRequest): WorkerResponse {
       }
     }
     const mergedOptions: SolveOptions = {
-      ...defaultSolveOptions(),
+      ...defaultSolveOptions(data.solver),
       ...data.options,
     }
     let solution: ReturnType<typeof solve>

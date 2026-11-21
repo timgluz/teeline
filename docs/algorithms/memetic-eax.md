@@ -57,7 +57,7 @@ procedure MemeticEAX(cities, epochs, pop_size, children_per_pair):
 
 | Field | CLI flag | Default | Range | Description |
 | ------- | ------- | --------- | ------- | ------------- |
-| `epochs` | `--epochs` | 500 | ≥ 0 | Maximum generations; `0` means no epoch cap |
+| `epochs` | `--epochs` | 250 | ≥ 0 | Maximum generations; `0` means no epoch cap |
 | `pop_size` | `--pop-size` | 100 | ≥ 2 | Population size |
 | `children_per_pair` | `--children-per-pair` | 15 | ≥ 1 | Offspring considered per parent |
 | `strategy` | `--strategy` | `hybrid` | `single_ab`, `rand`, `hybrid` | E-set selection |
@@ -100,9 +100,12 @@ teeline pipeline --config eax.toml -i data/tsplib/berlin52.tsp
 ## Notes
 
 EAX is heavier per epoch than Lin-Kernighan or 2-opt: each child runs a crossover, a
-patching pass, and a local 2-opt polish. On berlin52 and kroA100 the default budget reaches
-the published optimum; a280 and dsj1000 approach it. For a tighter wall-clock budget, lower
-`pop_size` and `children_per_pair` first — both scale the per-epoch cost linearly, while
+patching pass, and a local 2-opt polish. The default is **250 generations** rather than the
+shared 500: at 500, `dsj1000` regularly exceeded the 300-second meta benchmark budget, while
+250 keeps the default inside it. The epoch cap mainly bounds the larger instances; the
+smaller ones converge on the stagnation rule well before either limit. For a tighter
+wall-clock budget, lower `pop_size` and
+`children_per_pair` first — both scale the per-epoch cost linearly, while
 `strategy = "single_ab"` reduces the crossover work further.
 
 The published scores for this algorithm are indexed under `eax` in
