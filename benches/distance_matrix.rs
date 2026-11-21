@@ -69,6 +69,8 @@ fn bench_lookup(c: &mut Criterion) {
     let cities = load_cities("att532");
     let dm = DistanceMatrix::build(&cities, DistanceType::Euc2D).unwrap();
     let last = dm.num_cities();
+    // Kept unchanged so `--baseline pre` keeps comparing the lookup that existed before the
+    // refactor. `lookup/distance_between_dense` below is its grouped pair for the sparse bench.
     c.bench_function("distance_between_last_pair", |b| {
         b.iter(|| {
             black_box(

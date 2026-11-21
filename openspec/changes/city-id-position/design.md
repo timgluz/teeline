@@ -100,6 +100,7 @@ Rows are indexed by position and currently store neighbour **IDs**; store neighb
 - `Solution { total: f32, route: Vec<usize> }`; delete `cities`, `cities_idx`, `cities()`, and `get_by_city_id()` (no callers in the repo). `Solution::new`/`from_parts` stop copying the city list and building the map.
 - `DistanceMatrix { n, items, cities: Vec<KDPoint>, city_idx: IdIndex, is_coordinate_metric }`; `point_at` indexes the `Vec`, `city_id2pos` delegates to `IdIndex`.
 - Delete the unused, ID-keyed `city_table_from_vec` (`mod.rs:2100`) and remove `CityTable` from `DistanceMatrix`; keep the alias only if another module still needs it.
+- Delete the now-dead `DistanceMatrix::city_index()` accessor, whose field type changed to `IdIndex` (no callers).
 
 ## Performance & Memory Budget
 
@@ -114,6 +115,12 @@ Correctness wins over performance, but these are merge gates:
 - **Allocation gate**: a test-only counting allocator asserts zero allocations in `distance_between`, `position_of`, and `tour_length` loops.
 - **Expected wins**: a dense `IdIndex` replaces SipHash `HashMap` lookups in `DistanceMatrix` (likely faster for 2-opt/or-opt/3-opt/LK/SA/tabu); LK scratch memory drops from O(max_id) to O(n). Measure and report both.
 - **Where memory could rise**: a second index (avoided by D2), a redundant `ids` Vec (not in this plan), or `Option<CityId>` (not in this plan). None apply.
+
+### Measured (PR 3, att532)
+
+- Matrix `distance_between` with dense IDs: 33.6 ns (SipHash `HashMap`) → 5.33 ns (`IdIndex::Dense`), −84% (p < 0.001, criterion against the `pre` baseline).
+- Matrix `distance_between` with sparse IDs: 33.8 ns (`IdIndex::Sparse`); `tour_length`: 2.81 µs dense / 10.86 µs sparse.
+- Deterministic output is byte-identical to the pre-change baseline on 98 solver/fixture pairs; `3opt` on att532 drops from 546.9 s to 96.7 s.
 
 ## Risks / Trade-offs
 

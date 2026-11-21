@@ -1035,6 +1035,10 @@ mod tests {
             KDPoint::new_with_id(30, &[0.0, 1.0]),
         ];
         let dm = DistanceMatrix::from_cities_unrounded(&cities).unwrap();
+        assert!(
+            matches!(dm.city_idx, IdIndex::Sparse(_)),
+            "the test must exercise the sparse branch, not the dense fallback"
+        );
 
         assert_eq!(dm.point_at(0).map(|c| c.id), Some(10));
         assert_eq!(dm.pos2city_id(1), Some(20));

@@ -223,8 +223,9 @@ impl TspLibData {
 
 /// Validate an EXPLICIT city list before the matrix packs its weights.
 ///
-/// `DistanceMatrix::new` rejects a mismatched weight count or duplicate IDs; a malformed
-/// TSPLIB file (or a hand-built `TspLibData`) should return an error instead of panicking.
+/// `DistanceMatrix::new` already returns `Err`; this adds the file-level context
+/// (`EXPLICIT input:` and the expected weight count) and rejects a bad file before the
+/// O(n²) pack instead of after it.
 fn validate_explicit_cities(cities: &[KDPoint], weight_count: usize) -> Result<usize, String> {
     let n = cities.len();
     if n < 2 {
