@@ -20,12 +20,6 @@ impl Position {
     }
 }
 
-impl From<usize> for Position {
-    fn from(index: usize) -> Self {
-        Self(index)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -46,7 +40,7 @@ mod tests {
     fn position_round_trips() {
         let pos = Position::new(7);
         assert_eq!(pos.into_inner(), 7);
-        assert_eq!(Position::from(7), pos);
+        assert_eq!(Position::new(7), pos);
         assert!(Position::new(1) < Position::new(2));
     }
 }

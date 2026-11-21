@@ -365,7 +365,8 @@ mod tests {
             assert_eq!(
                 count[pos.into_inner()],
                 1,
-                "position {pos:?} must be matched exactly once"
+                "position {} must be matched exactly once",
+                pos.into_inner()
             );
         }
     }

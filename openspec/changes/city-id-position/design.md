@@ -112,7 +112,7 @@ Correctness wins over performance, but these are merge gates:
 - **Micro-bench gate**: no regression > +3% with p < 0.05 on two reruns; `nearest_k5` blocks at +2%.
 - **Wall-clock gate**: median of 10 runs > +5%, only for deterministic cells with a median ≥ 200 ms (2opt, or_opt, 3opt, nn, sfc, bhk, seeded LK). Report shorter cells; do not gate on them.
 - **Memory gate**: on-the-fly peak RSS > +2% or +1 MiB. `Position` must be memory-neutral where the underlying storage is `usize`; `graph.rs`'s `u32` list must not grow.
-- **Allocation gate**: a test-only counting allocator asserts zero allocations in `distance_between`, `position_of`, and `tour_length` loops.
+- **Allocation gate**: a test-only counting allocator asserts zero allocations in `distance_between`, `city_id2pos`/`pos2city_id`, and `tour_length` loops.
 - **Expected wins**: a dense `IdIndex` replaces SipHash `HashMap` lookups in `DistanceMatrix` (likely faster for 2-opt/or-opt/3-opt/LK/SA/tabu); LK scratch memory drops from O(max_id) to O(n). Measure and report both.
 - **Where memory could rise**: a second index (avoided by D2), a redundant `ids` Vec (not in this plan), or `Option<CityId>` (not in this plan). None apply.
 

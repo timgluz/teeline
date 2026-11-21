@@ -3,14 +3,19 @@
 //! Positions are what solvers touch per candidate move, so a hidden allocation in
 //! `distance_by_pos`, `pos2city_id`/`city_id2pos`, or `tour_length` would show up as
 //! allocator traffic in every local-search pass. This binary installs a counting global
-//! allocator and asserts those loops stay allocation-free on both `IdIndex` branches.
+//! allocator and asserts those loops stay allocation-free on both `IdIndex` branches and
+//! both backends.
+//!
+//! **Keep exactly one `#[test]` in this file.** The counting switch is process-wide, so a
+//! second test running in parallel could allocate inside the measured window.
 
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::hint::black_box;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
-use teeline::tsp::{DistanceSource, DistanceType, Position};
+use teeline::tsp::{DistanceSource, DistanceType, OnTheFly, Position};
 
 /// Counting allocator used only by this test binary.
 ///
@@ -52,15 +57,13 @@ unsafe impl GlobalAlloc for CountingAllocator {
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
-fn source(ids: impl Iterator<Item = usize>) -> DistanceMatrix {
-    let cities: Vec<KDPoint> = ids
-        .enumerate()
+fn cities(ids: impl Iterator<Item = usize>) -> Vec<KDPoint> {
+    ids.enumerate()
         .map(|(i, id)| KDPoint::new_with_id(id, &[i as f32, 0.0]))
-        .collect();
-    DistanceMatrix::build(&cities, DistanceType::Euc2D).expect("unique city ids")
+        .collect()
 }
 
-fn assert_hot_loops_allocate_nothing(source: &DistanceMatrix, label: &str) {
+fn assert_hot_loops_allocate_nothing(source: &dyn DistanceSource, label: &str) {
     let n = source.num_cities();
     let tour_ids: Vec<usize> = (0..n)
         .map(|pos| source.pos2city_id(Position::new(pos)).unwrap())
@@ -80,18 +83,20 @@ fn assert_hot_loops_allocate_nothing(source: &DistanceMatrix, label: &str) {
         let a = Position::new(i % n);
         let b = Position::new((i + 1) % n);
 
-        checksum += source.distance_by_pos(a, b).unwrap();
-        checksum += source
-            .distance_between(tour_ids[i % n], tour_ids[(i + 1) % n])
-            .unwrap();
+        checksum += black_box(source.distance_by_pos(a, b).unwrap());
+        checksum += black_box(
+            source
+                .distance_between(tour_ids[i % n], tour_ids[(i + 1) % n])
+                .unwrap(),
+        );
 
-        let id = source.pos2city_id(a).unwrap();
-        let pos = source.city_id2pos(id).unwrap();
+        let id = black_box(source.pos2city_id(a).unwrap());
+        let pos = black_box(source.city_id2pos(id).unwrap());
         checksum += pos.into_inner() as f32;
     }
     for _ in 0..1_000 {
-        checksum += source.tour_length(&tour_ids);
-        checksum += source.tour_length_by_pos(&tour_positions);
+        checksum += black_box(source.tour_length(&tour_ids));
+        checksum += black_box(source.tour_length_by_pos(&tour_positions));
     }
 
     COUNTING.store(false, Ordering::SeqCst);
@@ -107,7 +112,16 @@ fn assert_hot_loops_allocate_nothing(source: &DistanceMatrix, label: &str) {
 #[test]
 fn distance_source_hot_loops_do_not_allocate() {
     // Dense `IdIndex` branch (TSPLIB-style 1-based ids).
-    assert_hot_loops_allocate_nothing(&source(1..=64), "dense ids");
+    let dense_cities = cities(1..=64);
+    let dense_matrix = DistanceMatrix::build(&dense_cities, DistanceType::Euc2D).unwrap();
+    assert_hot_loops_allocate_nothing(&dense_matrix, "matrix/dense ids");
+    let dense_on_the_fly = OnTheFly::new(&dense_cities, DistanceType::Euc2D).unwrap();
+    assert_hot_loops_allocate_nothing(&dense_on_the_fly, "on-the-fly/dense ids");
+
     // Sparse `IdIndex` branch (max id far above 4 * n).
-    assert_hot_loops_allocate_nothing(&source((1..=64).map(|i| i * 1_000)), "sparse ids");
+    let sparse_cities = cities((1..=64).map(|i| i * 1_000));
+    let sparse_matrix = DistanceMatrix::build(&sparse_cities, DistanceType::Euc2D).unwrap();
+    assert_hot_loops_allocate_nothing(&sparse_matrix, "matrix/sparse ids");
+    let sparse_on_the_fly = OnTheFly::new(&sparse_cities, DistanceType::Euc2D).unwrap();
+    assert_hot_loops_allocate_nothing(&sparse_on_the_fly, "on-the-fly/sparse ids");
 }

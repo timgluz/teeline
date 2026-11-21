@@ -38,7 +38,7 @@
 - [x] 5.3 Type `CandidateList`'s rows and API with `Position`; type only the `usize` boundary of `graph.rs` (`select_edges`/`hamiltonian_cycle_to_path`) and keep its packed `(f32, u32, u32)` edge list unchanged.
 - [x] 5.4 Adopt `Position` in `bellman_karp`, `ant_colony`, `christofides`, `savings`, and `greedy_edge`; verify each tour is unchanged.
 - [x] 5.5 Update the remaining `src` and `tests` call sites; verify no CLI/API/WASM/Qt output type changes.
-- [x] 5.6 Add the allocation test and verify no new allocation on `id_at`/`position_of`, `distance_by_pos`, and `tour_length` hot loops.
+- [x] 5.6 Add the allocation test and verify no new allocation on `pos2city_id`/`city_id2pos`, `distance_by_pos`, and `tour_length` hot loops.
 
 ## 6. Verification
 
