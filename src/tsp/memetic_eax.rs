@@ -252,111 +252,105 @@ struct AbCycle {
     vertices: Vec<usize>,
 }
 
-fn other_origin(origin: bool) -> bool {
-    !origin
-}
-
-/// Marks `edge` visited in the adjacency set of origin `origin` (`true` = A, `false` = B).
-fn mark_edge(
-    origin_is_a: bool,
-    a_only: &[Vec<usize>],
-    b_only: &[Vec<usize>],
-    used_a: &mut [[bool; 2]],
-    used_b: &mut [[bool; 2]],
-    a: usize,
-    b: usize,
-) {
-    let (adj, used) = if origin_is_a {
-        (a_only, used_a)
-    } else {
-        (b_only, used_b)
-    };
-    if let Some(slot) = adj[a].iter().position(|&x| x == b) {
-        used[a][slot] = true;
-    }
-    if let Some(slot) = adj[b].iter().position(|&x| x == a) {
-        used[b][slot] = true;
-    }
-}
-
-fn unvisited_neighbour(adj: &[Vec<usize>], used: &[[bool; 2]], city: usize) -> Option<usize> {
-    adj[city]
-        .iter()
-        .enumerate()
-        .find(|(slot, _)| !used[city][*slot])
-        .map(|(_, &neighbour)| neighbour)
-}
-
 /// Decomposes the symmetric difference of two tours into alternating AB cycles.
 ///
-/// Shared edges are absent from the difference graph, so they can never appear in a cycle.
+/// Each city pairs its A-only edges with its B-only edges, which turns the difference graph
+/// into disjoint even cycles. Shared edges never enter the difference graph.
 fn ab_cycles(a: &TourGraph, b: &TourGraph) -> Result<Vec<AbCycle>, &'static str> {
     let n = a.len();
     if b.len() != n {
         return Err("parent graphs differ in size");
     }
 
-    let mut a_only: Vec<Vec<usize>> = vec![Vec::new(); n];
-    let mut b_only: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut a_edges: Vec<(usize, usize)> = Vec::new();
+    let mut b_edges: Vec<(usize, usize)> = Vec::new();
+    let mut incident_a: Vec<Vec<usize>> = vec![Vec::new(); n];
+    let mut incident_b: Vec<Vec<usize>> = vec![Vec::new(); n];
+
     for city in 0..n {
-        for &nbr in &a.nbr[city] {
-            if !b.has_edge(city, nbr) {
-                a_only[city].push(nbr);
+        for &neighbour in &a.nbr[city] {
+            if city < neighbour && !b.has_edge(city, neighbour) {
+                let edge = a_edges.len();
+                a_edges.push((city, neighbour));
+                incident_a[city].push(edge);
+                incident_a[neighbour].push(edge);
             }
         }
-        for &nbr in &b.nbr[city] {
-            if !a.has_edge(city, nbr) {
-                b_only[city].push(nbr);
+        for &neighbour in &b.nbr[city] {
+            if city < neighbour && !a.has_edge(city, neighbour) {
+                let edge = b_edges.len();
+                b_edges.push((city, neighbour));
+                incident_b[city].push(edge);
+                incident_b[neighbour].push(edge);
             }
         }
-        if a_only[city].len() != b_only[city].len() {
+    }
+
+    for city in 0..n {
+        if incident_a[city].len() != incident_b[city].len() {
             return Err("parent tours disagree on edge parity");
         }
     }
 
-    let mut used_a = vec![[false; 2]; n];
-    let mut used_b = vec![[false; 2]; n];
+    let mut a_partner: Vec<[Option<usize>; 2]> = vec![[None, None]; a_edges.len()];
+    let mut b_partner: Vec<[Option<usize>; 2]> = vec![[None, None]; b_edges.len()];
+    for city in 0..n {
+        for index in 0..incident_a[city].len() {
+            let a_edge = incident_a[city][index];
+            let b_edge = incident_b[city][index];
+            let a_slot = usize::from(a_edges[a_edge].0 != city);
+            let b_slot = usize::from(b_edges[b_edge].0 != city);
+            a_partner[a_edge][a_slot] = Some(b_edge);
+            b_partner[b_edge][b_slot] = Some(a_edge);
+        }
+    }
+
+    let mut used_a = vec![false; a_edges.len()];
+    let mut used_b = vec![false; b_edges.len()];
     let mut cycles = Vec::new();
 
-    for start in 0..n {
-        while let Some(first) = unvisited_neighbour(&a_only, &used_a, start) {
-            let mut vertices = vec![start];
-            let mut current = start;
-            let mut next = first;
-            let mut origin_is_a = true; // start on an A edge
-
-            loop {
-                mark_edge(
-                    origin_is_a,
-                    &a_only,
-                    &b_only,
-                    &mut used_a,
-                    &mut used_b,
-                    current,
-                    next,
-                );
-                if next == start {
-                    break;
-                }
-                vertices.push(next);
-                origin_is_a = other_origin(origin_is_a);
-                let (adj, used) = if origin_is_a {
-                    (&a_only, &used_a)
-                } else {
-                    (&b_only, &used_b)
-                };
-                let Some(following) = unvisited_neighbour(adj, used, next) else {
-                    return Err("AB traversal reached a dead end");
-                };
-                current = next;
-                next = following;
-            }
-
-            if vertices.len() < 4 || vertices.len() % 2 != 0 {
-                return Err("AB cycle must be even and at least length 4");
-            }
-            cycles.push(AbCycle { vertices });
+    for start in 0..a_edges.len() {
+        if used_a[start] {
+            continue;
         }
+        let entry_start = a_edges[start].0;
+        let mut vertices = vec![entry_start];
+        let mut entry = entry_start;
+        let mut a_edge = start;
+
+        loop {
+            if used_a[a_edge] {
+                return Err("AB traversal revisited an edge before closing");
+            }
+            used_a[a_edge] = true;
+
+            let (u, v) = a_edges[a_edge];
+            let exit = if entry == u { v } else { u };
+            vertices.push(exit);
+            let a_slot = usize::from(a_edges[a_edge].0 != exit);
+            let b_edge = a_partner[a_edge][a_slot].ok_or("unpaired A endpoint")?;
+
+            if used_b[b_edge] {
+                return Err("AB traversal revisited a B edge before closing");
+            }
+            used_b[b_edge] = true;
+            let (bu, bv) = b_edges[b_edge];
+            let b_exit = if exit == bu { bv } else { bu };
+            let b_slot = usize::from(b_edges[b_edge].0 != b_exit);
+            let next_a = b_partner[b_edge][b_slot].ok_or("unpaired B endpoint")?;
+
+            if next_a == start && b_exit == entry_start {
+                break;
+            }
+            vertices.push(b_exit);
+            entry = b_exit;
+            a_edge = next_a;
+        }
+
+        if vertices.len() < 4 || !vertices.len().is_multiple_of(2) {
+            return Err("AB cycle must be even and at least length 4");
+        }
+        cycles.push(AbCycle { vertices });
     }
 
     Ok(cycles)
@@ -396,8 +390,7 @@ struct Scratch {
     added: Vec<(usize, usize)>,
     comp_of: Vec<usize>,
     comp_sizes: Vec<usize>,
-    next: Vec<usize>,
-    prev: Vec<usize>,
+    pos: Vec<usize>,
 }
 
 impl Scratch {
@@ -408,8 +401,7 @@ impl Scratch {
             added: Vec::new(),
             comp_of: vec![usize::MAX; n],
             comp_sizes: Vec::new(),
-            next: vec![usize::MAX; n],
-            prev: vec![usize::MAX; n],
+            pos: vec![0; n],
         }
     }
 }
@@ -550,12 +542,11 @@ fn patch_subtours(
     candidates: &CandidateList,
     distances: &dyn DistanceSource,
     scratch: &mut Scratch,
-) {
-    loop {
-        component_map(graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
-        if scratch.comp_sizes.len() <= 1 {
-            break;
-        }
+) -> (usize, usize) {
+    scratch.added.clear();
+    component_map(graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
+    let components_before = scratch.comp_sizes.len();
+    while scratch.comp_sizes.len() > 1 {
         let small = scratch
             .comp_sizes
             .iter()
@@ -563,7 +554,6 @@ fn patch_subtours(
             .min_by_key(|&(_, &size)| size)
             .map(|(id, _)| id)
             .expect("at least one component");
-        scratch.added.clear();
         if !merge_via_candidates(
             graph,
             &scratch.comp_of,
@@ -580,55 +570,32 @@ fn patch_subtours(
                 &mut scratch.added,
             );
         }
-        debug_assert!(
-            !scratch.added.is_empty(),
-            "every patch round must add at least one bridge"
-        );
+        component_map(graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
     }
+    (components_before, scratch.added.len())
 }
 
 // ---------------------------------------------------------------------------
 // Dirty-edge 2-opt
 // ---------------------------------------------------------------------------
 
-/// Fills `next`/`prev` with one orientation of the tour, starting at position 0.
-fn orient(graph: &TourGraph, next: &mut [usize], prev: &mut [usize]) {
-    let n = graph.len();
-    if n == 0 {
-        return;
-    }
-    next.fill(usize::MAX);
-    prev.fill(usize::MAX);
-    let mut previous = usize::MAX;
-    let mut current = 0usize;
-    for _ in 0..n {
-        let [a, b] = graph.nbr[current];
-        let following = if a != previous { a } else { b };
-        next[current] = following;
-        prev[following] = current;
-        previous = current;
-        current = following;
-    }
-    debug_assert_eq!(current, 0, "orientation must close the cycle");
-    debug_assert!(
-        next.iter().all(|&x| x != usize::MAX),
-        "orientation must cover every city"
-    );
-}
-
-/// Candidate-restricted 2-opt, seeded from `dirty` vertices and propagated from accepted swaps.
+/// Candidate-restricted 2-opt on the flat tour, seeded by `dirty` cities and propagated from
+/// accepted swaps. Reversing the affected segment keeps a move O(segment); the earlier version
+/// re-derived the whole cycle orientation after every move, which made polish O(n · moves).
 fn polish(
-    graph: &mut TourGraph,
+    tour: &mut [usize],
     dirty: &[usize],
     candidates: &CandidateList,
     distances: &dyn DistanceSource,
     scratch: &mut Scratch,
 ) -> bool {
-    let n = graph.len();
+    let n = tour.len();
     if n < 4 {
         return false;
     }
-    orient(graph, &mut scratch.next, &mut scratch.prev);
+    for (rank, &city) in tour.iter().enumerate() {
+        scratch.pos[city] = rank;
+    }
     scratch.queue.clear();
     scratch.in_queue.iter_mut().for_each(|flag| *flag = false);
     for &city in dirty {
@@ -645,14 +612,16 @@ fn polish(
         head += 1;
         scratch.in_queue[u] = false;
 
-        let Some((a, b, c, d)) = best_2opt_move(graph, u, &scratch.next, candidates, distances)
-        else {
+        let Some((i, j)) = best_2opt_move(tour, &scratch.pos, u, candidates, distances) else {
             continue;
         };
-        apply_2opt(graph, a, b, c, d);
-        orient(graph, &mut scratch.next, &mut scratch.prev);
+        let a = tour[i];
+        let b = tour[(i + 1) % n];
+        let c = tour[j];
+        let d = tour[(j + 1) % n];
+        apply_2opt(tour, &mut scratch.pos, i, j);
         improved = true;
-        for &city in &[a, b, c, d] {
+        for city in [a, b, c, d] {
             if !scratch.in_queue[city] {
                 scratch.in_queue[city] = true;
                 scratch.queue.push(city);
@@ -662,83 +631,78 @@ fn polish(
     improved
 }
 
-/// Returns `(u, a, v, c)` for the best improving reconnection: the removed edges are
-/// `(u, a)` and `(v, c)`, and the added edges are `(u, v)` and `(a, c)`.
-///
-/// The orientation check is what keeps the move on one cycle: reconnecting endpoints that
-/// lie on the same side of the two cut edges would split the tour into two subtours.
-#[allow(clippy::type_complexity)]
+/// Returns the best improving `(i, j)` for an edge adjacent to `u`, where `i < j` and the edges
+/// `(i, i+1)` and `(j, j+1)` are replaced by `(i, j)` and `(i+1, j+1)`.
 fn best_2opt_move(
-    graph: &TourGraph,
+    tour: &[usize],
+    pos: &[usize],
     u: usize,
-    next: &[usize],
     candidates: &CandidateList,
     distances: &dyn DistanceSource,
-) -> Option<(usize, usize, usize, usize)> {
-    let [u0, u1] = graph.nbr[u];
-    let mut best: Option<(f32, usize, usize, usize, usize)> = None;
+) -> Option<(usize, usize)> {
+    let n = tour.len();
+    let p = pos[u];
+    let u_edges = [p, (p + n - 1) % n];
+    let mut best: Option<(f32, usize, usize)> = None;
 
-    for &a in &[u0, u1] {
-        let u_other = if a == u0 { u1 } else { u0 };
-        let u_is_forward = next[u] == a;
+    for &u_edge in &u_edges {
         for &cand in candidates.neighbours_by_pos(Position::new(u)) {
             let v = cand.into_inner();
-            if v == a || v == u_other {
-                continue;
-            }
-            for &c in &graph.nbr[v] {
-                if c == u || c == a {
+            let q = pos[v];
+            for &v_edge in &[q, (q + n - 1) % n] {
+                let (i, j) = if u_edge < v_edge {
+                    (u_edge, v_edge)
+                } else {
+                    (v_edge, u_edge)
+                };
+                if j <= i + 1 || (i == 0 && j == n - 1) {
                     continue;
                 }
-                let v_is_forward = next[v] == c;
-                if u_is_forward == v_is_forward {
-                    // Same direction: (u,v) and (a,c).
-                    if graph.has_edge(u, v) || graph.has_edge(a, c) {
-                        continue;
-                    }
-                    let delta = distance(distances, u, v) + distance(distances, a, c)
-                        - distance(distances, u, a)
-                        - distance(distances, v, c);
-                    if delta < -EPS
-                        && best
-                            .as_ref()
-                            .is_none_or(|&(best_delta, ..)| delta < best_delta)
-                    {
-                        best = Some((delta, u, a, v, c));
-                    }
-                } else {
-                    // Opposite directions: (u,c) and (a,v).
-                    if graph.has_edge(u, c) || graph.has_edge(a, v) {
-                        continue;
-                    }
-                    let delta = distance(distances, u, c) + distance(distances, a, v)
-                        - distance(distances, u, a)
-                        - distance(distances, v, c);
-                    if delta < -EPS
-                        && best
-                            .as_ref()
-                            .is_none_or(|&(best_delta, ..)| delta < best_delta)
-                    {
-                        best = Some((delta, u, a, c, v));
-                    }
+                let i_next = (i + 1) % n;
+                let j_next = (j + 1) % n;
+                let delta = distance(distances, tour[i], tour[j])
+                    + distance(distances, tour[i_next], tour[j_next])
+                    - distance(distances, tour[i], tour[i_next])
+                    - distance(distances, tour[j], tour[j_next]);
+                if delta < -EPS
+                    && best
+                        .as_ref()
+                        .is_none_or(|&(best_delta, ..)| delta < best_delta)
+                {
+                    best = Some((delta, i, j));
                 }
             }
         }
     }
 
-    best.map(|(_, a, b, c, d)| (a, b, c, d))
+    best.map(|(_, i, j)| (i, j))
 }
 
-fn apply_2opt(graph: &mut TourGraph, u: usize, a: usize, v: usize, c: usize) {
-    graph.replace_neighbour(u, a, v);
-    graph.replace_neighbour(a, u, c);
-    graph.replace_neighbour(v, c, u);
-    graph.replace_neighbour(c, v, a);
+fn apply_2opt(tour: &mut [usize], pos: &mut [usize], i: usize, j: usize) {
+    let mut left = i + 1;
+    let mut right = j;
+    while left < right {
+        tour.swap(left, right);
+        pos[tour[left]] = left;
+        pos[tour[right]] = right;
+        left += 1;
+        right -= 1;
+    }
+    if left == right {
+        pos[tour[left]] = left;
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Population
 // ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ChildStats {
+    cycles: usize,
+    components: usize,
+    bridges: usize,
+}
 
 #[derive(Clone, Debug)]
 struct Member {
@@ -873,9 +837,15 @@ fn initial_population(
             &mut members,
             false,
         );
-        let mut polished = TourGraph::from_tour(seed);
+        let mut polished = seed.to_vec();
         polish(&mut polished, &all, candidates, distances, scratch);
-        add_member(polished, distances, &mut seen, &mut members, false);
+        add_member(
+            TourGraph::from_tour(&polished),
+            distances,
+            &mut seen,
+            &mut members,
+            false,
+        );
     }
 
     let mut attempts = 0usize;
@@ -888,19 +858,30 @@ fn initial_population(
             let start = rng.random_range(0..n);
             randomized_nn(n, candidates, distances, rng, start)
         };
-        let mut graph = TourGraph::from_tour(&tour);
-        polish(&mut graph, &all, candidates, distances, scratch);
-        add_member(graph, distances, &mut seen, &mut members, false);
+        let mut tour = tour;
+        polish(&mut tour, &all, candidates, distances, scratch);
+        add_member(
+            TourGraph::from_tour(&tour),
+            distances,
+            &mut seen,
+            &mut members,
+            false,
+        );
     }
 
     // Instances with fewer distinct local optima than `pop_size` fall back to perturbed copies.
     while members.len() < target {
         let base = rng.random_range(0..members.len());
         let tour = members[base].graph.to_tour(0);
-        let kicked = double_bridge(&tour, rng);
-        let mut graph = TourGraph::from_tour(&kicked);
-        polish(&mut graph, &all, candidates, distances, scratch);
-        add_member(graph, distances, &mut seen, &mut members, true);
+        let mut kicked = double_bridge(&tour, rng);
+        polish(&mut kicked, &all, candidates, distances, scratch);
+        add_member(
+            TourGraph::from_tour(&kicked),
+            distances,
+            &mut seen,
+            &mut members,
+            true,
+        );
     }
 
     members
@@ -941,11 +922,10 @@ fn perturb(
     scratch: &mut Scratch,
 ) -> Member {
     let tour = member.graph.to_tour(0);
-    let kicked = double_bridge(&tour, rng);
-    let mut graph = TourGraph::from_tour(&kicked);
+    let mut kicked = double_bridge(&tour, rng);
     let all: Vec<usize> = (0..n).collect();
-    polish(&mut graph, &all, candidates, distances, scratch);
-    Member::new(graph, distances)
+    polish(&mut kicked, &all, candidates, distances, scratch);
+    Member::new(TourGraph::from_tour(&kicked), distances)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -958,14 +938,20 @@ fn make_child(
     distances: &dyn DistanceSource,
     rng: &mut impl RngExt,
     scratch: &mut Scratch,
-) -> Option<Member> {
+) -> Option<(Member, ChildStats)> {
     let n = parent_a.graph.len();
     let cycles = match ab_cycles(&parent_a.graph, &parent_b.graph) {
         Ok(cycles) => cycles,
-        Err(_) => return None,
+        Err(error) => {
+            tracing::debug!(error, "memetic_eax: AB-cycle decomposition failed");
+            return None;
+        }
     };
     if cycles.is_empty() {
-        return Some(perturb(parent_a, n, candidates, distances, rng, scratch));
+        return Some((
+            perturb(parent_a, n, candidates, distances, rng, scratch),
+            ChildStats::default(),
+        ));
     }
 
     let selected = select_e_set(&cycles, opts.strategy, hybrid_as_single_ab, rng);
@@ -973,20 +959,31 @@ fn make_child(
     for cycle in &selected {
         apply_cycle(&mut child, &cycle.vertices);
     }
-    patch_subtours(&mut child, candidates, distances, scratch);
+    let (components, bridges) = patch_subtours(&mut child, candidates, distances, scratch);
 
-    // The bridge endpoints are the only vertices the crossover disturbed; propagating from
-    // them avoids rescanning the parents' already locally optimal regions.
-    let dirty: Vec<usize> = scratch.added.iter().flat_map(|&(a, b)| [a, b]).collect();
-    if dirty.is_empty() {
-        return None;
-    }
-    polish(&mut child, &dirty, candidates, distances, scratch);
+    // Every vertex of an applied AB cycle got a new neighbour; patching disturbs the bridge
+    // endpoints again. Seed polish from both: with `single_ab` the crossover often already
+    // yields one tour and therefore no bridge edges.
+    let mut dirty: Vec<usize> = selected
+        .iter()
+        .flat_map(|cycle| cycle.vertices.iter().copied())
+        .collect();
+    dirty.extend(scratch.added.iter().flat_map(|&(a, b)| [a, b]));
+    let mut tour = child.to_tour(0);
+    polish(&mut tour, &dirty, candidates, distances, scratch);
+    let child = TourGraph::from_tour(&tour);
     debug_assert!(
         child.is_single_cycle(),
         "an offspring must stay one Hamiltonian cycle"
     );
-    Some(Member::new(child, distances))
+    Some((
+        Member::new(child, distances),
+        ChildStats {
+            cycles: selected.len(),
+            components,
+            bridges,
+        },
+    ))
 }
 
 /// Pairs a shuffled permutation of the population and reports each distinct pair once.
@@ -1000,6 +997,10 @@ fn pair_order(population_len: usize, rng: &mut impl RngExt) -> Vec<(usize, usize
         index += 2;
     }
     pairs
+}
+
+fn should_replace(parent_cost: f32, child_cost: f32) -> bool {
+    child_cost < parent_cost - EPS
 }
 
 fn should_stop(epochs_done: usize, opts: &MemeticEaxOptions, stagnant: usize) -> bool {
@@ -1042,10 +1043,35 @@ pub fn solve(
     let distances = problem.distances.as_ref();
     let n = distances.num_cities();
 
+    // `solve` is public and the option fields are public, so a direct caller can bypass
+    // `solve_with_context`'s validation. Clamp instead of silently turning the run into a
+    // no-op: `stall_epochs = 0` would stop immediately and `children_per_pair = 0` would
+    // produce no offspring.
+    let mut sanitized = opts.clone();
+    if sanitized.pop_size == 0 {
+        tracing::warn!("memetic_eax: pop_size 0 clamped to 1");
+        sanitized.pop_size = 1;
+    }
+    if sanitized.children_per_pair == 0 {
+        tracing::warn!("memetic_eax: children_per_pair 0 clamped to 1");
+        sanitized.children_per_pair = 1;
+    }
+    if sanitized.candidate_k == 0 {
+        tracing::warn!("memetic_eax: candidate_k 0 clamped to 1");
+        sanitized.candidate_k = 1;
+    }
+    if sanitized.stall_epochs == 0 {
+        tracing::warn!("memetic_eax: stall_epochs 0 clamped to 1");
+        sanitized.stall_epochs = 1;
+    }
+    let opts = &sanitized;
+
     let init_positions: Option<Vec<usize>> = init_tour.and_then(|tour| {
-        tour.iter()
+        let positions: Option<Vec<usize>> = tour
+            .iter()
             .map(|&id| distances.city_id2pos(id).map(Position::into_inner))
-            .collect()
+            .collect();
+        positions.filter(|positions| is_permutation(positions, n))
     });
 
     if n < 4 {
@@ -1067,6 +1093,9 @@ pub fn solve(
             );
             let positions = init_positions.unwrap_or_else(|| (0..n).collect());
             let ids = positions_to_ids(&positions, distances);
+            if let Some(tx) = progress_tx {
+                let _ = tx.send(ProgressMessage::Done);
+            }
             return Solution::from_parts(&ids, distances);
         }
     };
@@ -1102,10 +1131,13 @@ pub fn solve(
     let mut epoch = 0usize;
     while !should_stop(epoch, opts, stagnant) {
         let pairs = pair_order(population.len(), &mut rng);
+        let mut generation_cycles = 0usize;
+        let mut generation_components = 0usize;
+        let mut generation_bridges = 0usize;
         for (a_idx, b_idx) in pairs {
             let mut best_child: Option<Member> = None;
             for _ in 0..opts.children_per_pair {
-                if let Some(child) = make_child(
+                if let Some((child, stats)) = make_child(
                     &population[a_idx],
                     &population[b_idx],
                     opts,
@@ -1114,15 +1146,20 @@ pub fn solve(
                     distances,
                     &mut rng,
                     &mut scratch,
-                ) && best_child
-                    .as_ref()
-                    .is_none_or(|current| child.cost < current.cost)
-                {
-                    best_child = Some(child);
+                ) {
+                    generation_cycles += stats.cycles;
+                    generation_components = generation_components.max(stats.components);
+                    generation_bridges += stats.bridges;
+                    if best_child
+                        .as_ref()
+                        .is_none_or(|current| child.cost < current.cost)
+                    {
+                        best_child = Some(child);
+                    }
                 }
             }
             if let Some(child) = best_child
-                && child.cost < population[a_idx].cost - EPS
+                && should_replace(population[a_idx].cost, child.cost)
             {
                 population[a_idx] = child;
             }
@@ -1132,7 +1169,7 @@ pub fn solve(
             .iter()
             .min_by(|a, b| a.cost.total_cmp(&b.cost))
             .expect("population is never empty");
-        if current_best.cost < best_cost - EPS {
+        if should_replace(best_cost, current_best.cost) {
             best = current_best.clone();
             best_cost = best.cost;
             stagnant = 0;
@@ -1149,7 +1186,15 @@ pub fn solve(
             tracing::debug!(epoch, "memetic_eax: hybrid switched to single_ab");
         }
 
-        tracing::debug!(epoch, best = best_cost, stagnant, "memetic_eax: generation");
+        tracing::debug!(
+            epoch,
+            best = best_cost,
+            stagnant,
+            cycles = generation_cycles,
+            components = generation_components,
+            bridges = generation_bridges,
+            "memetic_eax: generation"
+        );
         epoch += 1;
     }
 
@@ -1187,6 +1232,13 @@ mod tests {
     fn problem(cities: Vec<KDPoint>) -> TspProblem {
         let distances = distance_matrix::from_cities_unrounded(&cities);
         TspProblem::new(cities, distances)
+    }
+
+    fn tour_cost(tour: &[usize], distances: &dyn DistanceSource) -> f32 {
+        let n = tour.len();
+        (0..n)
+            .map(|i| distance(distances, tour[i], tour[(i + 1) % n]))
+            .sum()
     }
 
     fn options() -> MemeticEaxOptions {
@@ -1324,14 +1376,14 @@ mod tests {
         ]);
         let distances = distance_matrix::from_cities_unrounded(&cities);
         let candidates = CandidateList::build(&cities, 3).unwrap();
-        let mut graph = TourGraph::from_tour(&[0usize, 1, 3, 2]);
-        let before = graph.edge_sum(&distances);
+        let mut tour = vec![0usize, 1, 3, 2];
+        let before = tour_cost(&tour, &distances);
         let mut scratch = Scratch::new(4);
         let all: Vec<usize> = (0..4).collect();
-        polish(&mut graph, &all, &candidates, &distances, &mut scratch);
-        let after = graph.edge_sum(&distances);
+        polish(&mut tour, &all, &candidates, &distances, &mut scratch);
+        let after = tour_cost(&tour, &distances);
         assert!(after < before, "polish must remove the crossing");
-        assert!(graph.is_single_cycle());
+        assert!(TourGraph::from_tour(&tour).is_single_cycle());
     }
 
     #[test]
@@ -1339,13 +1391,16 @@ mod tests {
         let cities = points(12);
         let distances = distance_matrix::from_cities_unrounded(&cities);
         let candidates = CandidateList::build(&cities, 4).unwrap();
-        let mut graph = TourGraph::from_tour(&(0..12).collect::<Vec<_>>());
-        let before = graph.edge_sum(&distances);
+        let mut tour: Vec<usize> = (0..12).collect();
+        let before = tour_cost(&tour, &distances);
         let mut scratch = Scratch::new(12);
         let all: Vec<usize> = (0..12).collect();
-        polish(&mut graph, &all, &candidates, &distances, &mut scratch);
-        assert!(graph.edge_sum(&distances) <= before + EPS);
-        assert!(graph.is_single_cycle(), "polish must keep one cycle");
+        polish(&mut tour, &all, &candidates, &distances, &mut scratch);
+        assert!(tour_cost(&tour, &distances) <= before + EPS);
+        assert!(
+            TourGraph::from_tour(&tour).is_single_cycle(),
+            "polish must keep one cycle"
+        );
     }
 
     #[test]
@@ -1486,9 +1541,300 @@ mod tests {
             &mut rng,
             &mut scratch,
         );
-        if let Some(child) = child {
+        if let Some((child, _)) = child {
             assert!(child.graph.is_single_cycle());
         }
+    }
+
+    #[test]
+    fn ab_cycles_random_parent_pairs_are_even_and_alternating() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(11);
+        for n in 6..=12 {
+            for _ in 0..20 {
+                let mut a: Vec<usize> = (0..n).collect();
+                a.shuffle(&mut rng);
+                let mut b: Vec<usize> = (0..n).collect();
+                b.shuffle(&mut rng);
+                let ga = TourGraph::from_tour(&a);
+                let gb = TourGraph::from_tour(&b);
+                let cycles = ab_cycles(&ga, &gb).expect("random parents must decompose");
+                for cycle in &cycles {
+                    assert!(cycle.vertices.len() >= 4);
+                    assert!(cycle.vertices.len().is_multiple_of(2));
+                    for i in 0..cycle.vertices.len() {
+                        let from = cycle.vertices[i];
+                        let to = cycle.vertices[(i + 1) % cycle.vertices.len()];
+                        assert_ne!(
+                            ga.has_edge(from, to),
+                            gb.has_edge(from, to),
+                            "cycle edge must be A-only or B-only, never shared"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn make_child_with_identical_parents_returns_some() {
+        let problem = problem(points(10));
+        let distances = problem.distances.as_ref();
+        let candidates = CandidateList::build(&problem.cities, 4).unwrap();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(5);
+        let a = Member::new(
+            TourGraph::from_tour(&(0..10).collect::<Vec<_>>()),
+            distances,
+        );
+        let b = a.clone();
+        let mut scratch = Scratch::new(10);
+        let (child, stats) = make_child(
+            &a,
+            &b,
+            &options(),
+            false,
+            &candidates,
+            distances,
+            &mut rng,
+            &mut scratch,
+        )
+        .expect("identical parents must perturb, not skip");
+        assert_eq!(stats.cycles, 0);
+        assert!(child.graph.is_single_cycle());
+    }
+
+    #[test]
+    fn make_child_single_ab_returns_some_and_single_cycle() {
+        let problem = problem(points(10));
+        let distances = problem.distances.as_ref();
+        let candidates = CandidateList::build(&problem.cities, 5).unwrap();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(6);
+        let a_tour: Vec<usize> = (0..10).collect();
+        let mut b_tour = a_tour.clone();
+        b_tour[1..=4].reverse(); // one 2-opt move: a single AB cycle
+        let a = Member::new(TourGraph::from_tour(&a_tour), distances);
+        let b = Member::new(TourGraph::from_tour(&b_tour), distances);
+        let mut opts = options();
+        opts.strategy = EaxStrategy::SingleAb;
+        let mut scratch = Scratch::new(10);
+        let (child, stats) = make_child(
+            &a,
+            &b,
+            &opts,
+            false,
+            &candidates,
+            distances,
+            &mut rng,
+            &mut scratch,
+        )
+        .expect("a single AB cycle must produce a child, not None");
+        assert_eq!(stats.cycles, 1);
+        assert!(child.graph.is_single_cycle());
+    }
+
+    #[test]
+    fn population_fills_when_fewer_optima_than_pop_size() {
+        let problem = problem(points(4));
+        let distances = problem.distances.as_ref();
+        let candidates = CandidateList::build(&problem.cities, 3).unwrap();
+        let mut opts = options();
+        opts.pop_size = 20;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let members = initial_population(
+            4,
+            &opts,
+            &candidates,
+            distances,
+            None,
+            &mut Scratch::new(4),
+            &mut rng,
+        );
+        assert_eq!(members.len(), 20);
+        for member in &members {
+            assert!(member.graph.is_single_cycle());
+        }
+    }
+
+    #[test]
+    fn initial_population_clamps_zero_and_one() {
+        let problem = problem(points(6));
+        let distances = problem.distances.as_ref();
+        let candidates = CandidateList::build(&problem.cities, 3).unwrap();
+        for pop_size in [0usize, 1] {
+            let mut opts = options();
+            opts.pop_size = pop_size;
+            let mut rng = rand::rngs::StdRng::seed_from_u64(8);
+            let members = initial_population(
+                6,
+                &opts,
+                &candidates,
+                distances,
+                None,
+                &mut Scratch::new(6),
+                &mut rng,
+            );
+            assert_eq!(members.len(), 1);
+        }
+    }
+
+    #[test]
+    fn candidate_list_clamps_to_n_minus_one() {
+        let cities = points(6);
+        let distances = distance_matrix::from_cities_unrounded(&cities);
+        let candidates = build_candidates(&distances, &cities, 100).unwrap();
+        for city in 0..6 {
+            assert!(
+                candidates.neighbours_by_pos(Position::new(city)).len() <= 5,
+                "candidate row must be capped at n - 1"
+            );
+        }
+    }
+
+    #[test]
+    fn full_scan_fallback_merges_components_when_candidates_do_not_cross() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![0.0, 1.0],
+            vec![100.0, 100.0],
+            vec![101.0, 100.0],
+            vec![100.0, 101.0],
+        ]);
+        let distances = distance_matrix::from_cities_unrounded(&cities);
+        let candidates = CandidateList::build(&cities, 1).unwrap();
+        let mut graph = TourGraph {
+            nbr: vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]],
+        };
+        let mut scratch = Scratch::new(6);
+        component_map(&graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
+        assert_eq!(scratch.comp_sizes.len(), 2);
+        assert!(
+            !merge_via_candidates(
+                &mut graph,
+                &scratch.comp_of,
+                0,
+                &candidates,
+                &distances,
+                &mut scratch.added,
+            ),
+            "each city's only candidate is inside its own component"
+        );
+        merge_via_full_scan(
+            &mut graph,
+            &scratch.comp_of,
+            0,
+            &distances,
+            &mut scratch.added,
+        );
+        assert!(graph.is_single_cycle());
+    }
+
+    #[test]
+    fn is_single_cycle_rejects_disconnected_graph() {
+        let graph = TourGraph {
+            nbr: vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]],
+        };
+        assert!(!graph.is_single_cycle());
+    }
+
+    #[test]
+    #[should_panic(expected = "one cycle")]
+    fn to_tour_panics_when_components_do_not_close() {
+        // A triangle plus a square: walking the triangle does not close the 7-step tour.
+        let graph = TourGraph {
+            nbr: vec![[1, 2], [0, 2], [0, 1], [4, 6], [3, 5], [4, 6], [3, 5]],
+        };
+        let _ = graph.to_tour(0);
+    }
+
+    #[test]
+    fn polish_improves_from_dirty_vertices_only() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![1.0, 1.0],
+            vec![0.0, 1.0],
+        ]);
+        let distances = distance_matrix::from_cities_unrounded(&cities);
+        let candidates = CandidateList::build(&cities, 3).unwrap();
+        let mut tour = vec![0usize, 1, 3, 2];
+        let before = tour_cost(&tour, &distances);
+        let mut scratch = Scratch::new(4);
+        let improved = polish(&mut tour, &[0, 3], &candidates, &distances, &mut scratch);
+        assert!(improved, "dirty vertices must be enough to find the move");
+        assert!(tour_cost(&tour, &distances) < before);
+        assert!(TourGraph::from_tour(&tour).is_single_cycle());
+    }
+
+    #[test]
+    fn should_replace_is_strict() {
+        assert!(should_replace(10.0, 9.0));
+        assert!(!should_replace(10.0, 10.0));
+        assert!(!should_replace(10.0, 10.0 - EPS / 2.0));
+    }
+
+    #[test]
+    fn solve_clamps_zero_options() {
+        let problem = problem(points(8));
+        let opts = MemeticEaxOptions {
+            epochs: 2,
+            pop_size: 0,
+            children_per_pair: 0,
+            strategy: EaxStrategy::Hybrid,
+            stall_epochs: 0,
+            candidate_k: 0,
+            seed: Some(12),
+        };
+        let solution = solve(&problem, &opts, None, None);
+        let mut ids = solution.route().to_vec();
+        ids.sort_unstable();
+        assert_eq!(ids, (0..8).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn solve_filters_invalid_tiny_seed() {
+        let problem = problem(points(3));
+        let invalid = vec![0usize, 0, 1]; // duplicate 0, missing 2
+        let solution = solve(&problem, &options(), None, Some(&invalid));
+        assert_eq!(solution.route(), &[0, 1, 2]);
+    }
+
+    #[test]
+    fn generation_events_are_emitted() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tracing::span::Id;
+
+        struct Counter(Arc<AtomicUsize>);
+        impl tracing::Subscriber for Counter {
+            fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+                true
+            }
+            fn new_span(&self, _: &tracing::span::Attributes<'_>) -> Id {
+                Id::from_u64(1)
+            }
+            fn record(&self, _: &Id, _: &tracing::span::Record<'_>) {}
+            fn record_follows_from(&self, _: &Id, _: &Id) {}
+            fn event(&self, _: &tracing::Event<'_>) {
+                self.0.fetch_add(1, Ordering::SeqCst);
+            }
+            fn enter(&self, _: &Id) {}
+            fn exit(&self, _: &Id) {}
+        }
+
+        let count = Arc::new(AtomicUsize::new(0));
+        tracing::subscriber::with_default(Counter(count.clone()), || {
+            let problem = problem(points(8));
+            let opts = MemeticEaxOptions {
+                epochs: 2,
+                pop_size: 4,
+                children_per_pair: 2,
+                stall_epochs: 1,
+                seed: Some(1),
+                ..MemeticEaxOptions::default()
+            };
+            let _ = solve(&problem, &opts, None, None);
+        });
+        assert!(count.load(Ordering::SeqCst) > 0, "no tracing event emitted");
     }
 
     #[test]
