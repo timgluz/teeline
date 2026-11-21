@@ -8,8 +8,8 @@ import {
 import { EXPLAINER_IDS } from './explainers/registry'
 
 describe('SOLVER_META', () => {
-  it('contains exactly 22 solvers', () => {
-    expect(Object.keys(SOLVER_META)).toHaveLength(22)
+  it('contains exactly 23 solvers', () => {
+    expect(Object.keys(SOLVER_META)).toHaveLength(23)
   })
 
   it('every entry has id and name', () => {

@@ -94,6 +94,11 @@ export const SOLVER_META: Record<string, SolverMeta> = {
     name: 'Ant Colony Optimization',
     complexity: 'O(epochs · ants · n²)',
   },
+  eax: {
+    id: 'eax',
+    name: 'Memetic EAX',
+    complexity: 'O(epochs · pop · children · n²)',
+  },
   savings: {
     id: 'savings',
     name: 'Savings',
@@ -126,7 +131,7 @@ export const SOLVER_GROUPS: SolverGroup[] = [
   },
   {
     label: 'Metaheuristic',
-    ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa', 'aco'],
+    ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa', 'aco', 'eax'],
   },
 ]
 

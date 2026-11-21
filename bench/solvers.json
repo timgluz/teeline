@@ -275,6 +275,19 @@
       ]
     },
     {
+      "id": "eax",
+      "cli": "memetic_eax",
+      "name": "Memetic EAX",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "memetic-eax",
+      "notes": "Memetic Edge Assembly Crossover: population crossover + candidate-list 2-opt polish. Stochastic; heavier per epoch than lk or 2opt. Tune pop-size/children-per-pair for the wall-clock budget.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
       "id": "pso",
       "cli": "particle_swarm",
       "name": "Particle Swarm",

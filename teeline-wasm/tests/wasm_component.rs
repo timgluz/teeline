@@ -131,6 +131,11 @@ fn default_options() -> crate::teeline::solver::types::SolveOptions {
         sfc_rotation: 0,
         sfc_mirror: 0,
         sfc_multi_orientation: 8,
+        eax_pop_size: 100,
+        eax_children_per_pair: 15,
+        eax_strategy: 2,
+        eax_stall_epochs: 50,
+        eax_candidate_k: 20,
     }
 }
 
@@ -339,6 +344,11 @@ fn test_fourier() {
 #[test]
 fn test_space_filling_curve() {
     run_solver("sfc")
+}
+
+#[test]
+fn test_solve_memetic_eax_returns_a_valid_tour() {
+    run_solver("eax")
 }
 
 #[test]
@@ -887,6 +897,11 @@ const VALID_SOLVE_OPTIONS_KEYS: &[&str] = &[
     "sfcRotation",
     "sfcMirror",
     "sfcMultiOrientation",
+    "eaxPopSize",
+    "eaxChildrenPerPair",
+    "eaxStrategy",
+    "eaxStallEpochs",
+    "eaxCandidateK",
 ];
 
 #[test]
@@ -979,6 +994,32 @@ fn test_list_algorithms_sfc_kind_and_params() {
         sfc.recommendation.len() > 20,
         "sfc recommendation must be a real description; got: '{}'",
         sfc.recommendation
+    );
+}
+
+#[test]
+fn test_list_algorithms_memetic_eax_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let eax = algorithms
+        .iter()
+        .find(|a| a.id == "eax")
+        .expect("eax missing");
+    assert_eq!(eax.kind, "metaheuristic");
+    let keys: Vec<&str> = eax.params.iter().map(|p| p.key.as_str()).collect();
+    for expected in [
+        "epochs",
+        "eaxPopSize",
+        "eaxChildrenPerPair",
+        "eaxStrategy",
+        "eaxStallEpochs",
+        "eaxCandidateK",
+    ] {
+        assert!(keys.contains(&expected), "eax must have {expected}");
+    }
+    assert!(
+        eax.recommendation.len() > 20,
+        "eax recommendation must be a real description; got: '{}'",
+        eax.recommendation
     );
 }
 

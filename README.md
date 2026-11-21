@@ -258,6 +258,7 @@ done
 | Simulated Annealing | `sa` | heuristic — local search | [→](docs/algorithms/simulated-annealing.md) |
 | Tabu Search | `tabu_search`, `tabu` | heuristic — local search | [→](docs/algorithms/tabu-search.md) |
 | Genetic Algorithm | `ga` | heuristic — evolutionary | [→](docs/algorithms/genetic-algorithm.md) |
+| Memetic EAX | `memetic_eax`, `memetic`, `eax` | heuristic — evolutionary | [→](docs/algorithms/memetic-eax.md) |
 | Particle Swarm | `pso` | heuristic — swarm | [→](docs/algorithms/particle-swarm.md) |
 | Gravitational Search | `gsa` | heuristic — swarm / physics | [→](docs/algorithms/gravitational-search.md) |
 | Cuckoo Search | `cs` | heuristic — nature-inspired | [→](docs/algorithms/cuckoo-search.md) |
@@ -285,6 +286,7 @@ Auto-expansion strategy depends on the solver type:
 | **Deterministic local search** (2opt, 3opt, tabu, or_opt, lk, branch_bound) | `pipeline(nn, solver)` | Monotone hill-climbers (and B&B's upper bound) benefit from a good start |
 | **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa, gsa, fourier, aco) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
 | **Constructive** (nn, christofides, greedy_edge, sfc, bhk) | no expansion | They build a tour from scratch |
+| **Self-seeding population** (eax) | no expansion | It builds its own diverse population; a single seed would reduce diversity |
 
 ```bash
 # sa auto-expands to pipeline(shuffle, sa)

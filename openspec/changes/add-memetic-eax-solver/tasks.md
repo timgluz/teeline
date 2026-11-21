@@ -57,26 +57,26 @@
 
 ## 12. WASM bridge
 
-- [ ] 12.1 Add the solver to `build_opts`, `kind_for` (metaheuristic), `params_for_solver`, and `recommendation_for`, and update the WIT export if the option shape changes. Verify: `cargo test --manifest-path teeline-wasm/Cargo.toml` passes with list/params/solve assertions.
-- [ ] 12.2 Regenerate JS bindings if the WIT changed. Verify: `task build:wasm` succeeds and `task web:build` reports no missing export.
+- [x] 12.1 Add the solver to `build_opts`, `kind_for` (metaheuristic), `params_for_solver`, and `recommendation_for`, and update the WIT export if the option shape changes. Verify: `cargo test --manifest-path teeline-wasm/Cargo.toml` passes with list/params/solve assertions.
+- [x] 12.2 Regenerate JS bindings if the WIT changed. Verify: `task build:wasm` succeeds and `task web:build` reports no missing export.
 
 ## 13. Web
 
-- [ ] 13.1 Add `docs/algorithms/memetic-eax.md` with `id: "memetic_eax"` and a Complexity row matching `SOLVER_META`; add `SOLVER_META`, the Metaheuristic `SOLVER_GROUPS` entry, bump the solver count 22 → 23, and update `teeline-wasm.d.ts` and `solver-options.ts`. Verify: `npx --prefix teeline-web tsc --noEmit --project teeline-web/tsconfig.json` and `task web:test` pass, including the solver-index/nav-data cross-checks.
+- [x] 13.1 Add `docs/algorithms/memetic-eax.md` with `id: "memetic_eax"` and a Complexity row matching `SOLVER_META`; add `SOLVER_META`, the Metaheuristic `SOLVER_GROUPS` entry, bump the solver count 22 → 23, and update `teeline-wasm.d.ts` and `solver-options.ts`. Verify: `npx --prefix teeline-web tsc --noEmit --project teeline-web/tsconfig.json` and `task web:test` pass, including the solver-index/nav-data cross-checks.
 
 ## 14. Documentation and benchmark registration
 
-- [ ] 14.1 Add the solver to the `README.md` and `AGENTS.md` solver tables. Verify: `markdownlint README.md AGENTS.md` passes and both tables list `memetic_eax`.
-- [ ] 14.2 Register in `bench/solvers.json` (`family: "meta"`, `deterministic: false`, `doc: "memetic-eax"`), add the missing `kroA100` optimum to `bench/optima.json`, and reconcile the EUC_2D metric note on `berlin52`/`a280` with the current rounding behavior. Verify: `task web:test` stays green and a dry-run publish produces a non-null kroA100 gap.
+- [x] 14.1 Add the solver to the `README.md` and `AGENTS.md` solver tables. Verify: `markdownlint README.md AGENTS.md` passes and both tables list `memetic_eax`.
+- [x] 14.2 Register in `bench/solvers.json` (`family: "meta"`, `deterministic: false`, `doc: "memetic-eax"`), add the missing `kroA100` optimum to `bench/optima.json`, and reconcile the EUC_2D metric note on `berlin52`/`a280` with the current rounding behavior. Verify: `task web:test` stays green and a dry-run publish produces a non-null kroA100 gap.
 
 ## 15. Benchmarks and integration quality
 
-- [ ] 15.1 Add integration tests for aliases, CLI/TOML options, pipeline use, and ATSP rejection through the public API. Verify: `cargo test --test memetic_eax` passes.
+- [x] 15.1 Add integration tests for aliases, CLI/TOML options, pipeline use, and ATSP rejection through the public API. Verify: `cargo test --test memetic_eax` passes.
 - [ ] 15.2 Run five-seed benchmarks on `berlin52`, `kroA100`, `a280`, and `dsj1000` within the 300-second meta budget and record machine, build mode, seeds, and elapsed time. Verify: `task bench:tierA -- --only memetic_eax` completes and the report states the measured gaps against the targets.
 
 ## 16. Integration gate
 
-- [ ] 16.1 Run the full gate: `cargo fmt -- --check`, `cargo clippy -- -D warnings`, `cargo test`, `task build:wasm`, `cargo test --manifest-path teeline-wasm/Cargo.toml`, `npx --prefix teeline-web tsc --noEmit --project teeline-web/tsconfig.json`, and `task web:test`. Verify: every command exits 0.
+- [x] 16.1 Run the full gate: `cargo fmt -- --check`, `cargo clippy -- -D warnings`, `cargo test`, `task build:wasm`, `cargo test --manifest-path teeline-wasm/Cargo.toml`, `npx --prefix teeline-web tsc --noEmit --project teeline-web/tsconfig.json`, and `task web:test`. Verify: every command exits 0.
 
 ## Workflow follow-up
 

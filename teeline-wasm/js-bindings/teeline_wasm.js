@@ -6499,6 +6499,7 @@ const _trampoline21 = function(arg0) {
 }
 _trampoline21.fnName = 'wasi:filesystem/preopens@0.2.3#getDirectories';
 let exports3;
+let exports4;
 let realloc1;
 let realloc1Async;
 let postReturn0;
@@ -6524,7 +6525,7 @@ let postReturn9Async;
 let exports1Solve;
 
 function solve(arg0, arg1, arg2) {
-  var ptr0 = realloc1(0, 0, 4, 80);
+  var ptr0 = realloc1(0, 0, 4, 100);
   
   var encodeRes = _utf8AllocateAndEncode(arg0, realloc1, memory0);
   var ptr1= encodeRes.ptr;
@@ -6544,7 +6545,7 @@ function solve(arg0, arg1, arg2) {
   }
   dataView(memory0).setUint32(ptr0 + 12, len3, true);
   dataView(memory0).setUint32(ptr0 + 8, result3, true);
-  var {epochs: v4_0, platooEpochs: v4_1, coolingRate: v4_2, maxTemperature: v4_3, minTemperature: v4_4, mutationProbability: v4_5, nElite: v4_6, nNearest: v4_7, alpha: v4_8, beta: v4_9, evaporationRate: v4_10, numAnts: v4_11, sfcOrder: v4_12, sfcRotation: v4_13, sfcMirror: v4_14, sfcMultiOrientation: v4_15 } = arg2;
+  var {epochs: v4_0, platooEpochs: v4_1, coolingRate: v4_2, maxTemperature: v4_3, minTemperature: v4_4, mutationProbability: v4_5, nElite: v4_6, nNearest: v4_7, alpha: v4_8, beta: v4_9, evaporationRate: v4_10, numAnts: v4_11, sfcOrder: v4_12, sfcRotation: v4_13, sfcMirror: v4_14, sfcMultiOrientation: v4_15, eaxPopSize: v4_16, eaxChildrenPerPair: v4_17, eaxStrategy: v4_18, eaxStallEpochs: v4_19, eaxCandidateK: v4_20 } = arg2;
   dataView(memory0).setInt32(ptr0 + 16, toUint32(v4_0), true);
   dataView(memory0).setInt32(ptr0 + 20, toUint32(v4_1), true);
   dataView(memory0).setFloat32(ptr0 + 24, +v4_2, true);
@@ -6561,6 +6562,11 @@ function solve(arg0, arg1, arg2) {
   dataView(memory0).setInt32(ptr0 + 68, toUint32(v4_13), true);
   dataView(memory0).setInt32(ptr0 + 72, toUint32(v4_14), true);
   dataView(memory0).setInt32(ptr0 + 76, toUint32(v4_15), true);
+  dataView(memory0).setInt32(ptr0 + 80, toUint32(v4_16), true);
+  dataView(memory0).setInt32(ptr0 + 84, toUint32(v4_17), true);
+  dataView(memory0).setInt32(ptr0 + 88, toUint32(v4_18), true);
+  dataView(memory0).setInt32(ptr0 + 92, toUint32(v4_19), true);
+  dataView(memory0).setInt32(ptr0 + 96, toUint32(v4_20), true);
   _debugLog('[iface="solve", function="solve"][Instruction::CallWasm] enter', {
     funcName: 'solve',
     paramCount: 1,
@@ -6661,7 +6667,7 @@ function solve(arg0, arg1, arg2) {
 let exports1ParseAndSolve;
 
 function parseAndSolve(arg0, arg1, arg2) {
-  var ptr0 = realloc1(0, 0, 4, 80);
+  var ptr0 = realloc1(0, 0, 4, 100);
   
   var encodeRes = _utf8AllocateAndEncode(arg0, realloc1, memory0);
   var ptr1= encodeRes.ptr;
@@ -6676,7 +6682,7 @@ function parseAndSolve(arg0, arg1, arg2) {
   
   dataView(memory0).setUint32(ptr0 + 12, len2, true);
   dataView(memory0).setUint32(ptr0 + 8, ptr2, true);
-  var {epochs: v3_0, platooEpochs: v3_1, coolingRate: v3_2, maxTemperature: v3_3, minTemperature: v3_4, mutationProbability: v3_5, nElite: v3_6, nNearest: v3_7, alpha: v3_8, beta: v3_9, evaporationRate: v3_10, numAnts: v3_11, sfcOrder: v3_12, sfcRotation: v3_13, sfcMirror: v3_14, sfcMultiOrientation: v3_15 } = arg2;
+  var {epochs: v3_0, platooEpochs: v3_1, coolingRate: v3_2, maxTemperature: v3_3, minTemperature: v3_4, mutationProbability: v3_5, nElite: v3_6, nNearest: v3_7, alpha: v3_8, beta: v3_9, evaporationRate: v3_10, numAnts: v3_11, sfcOrder: v3_12, sfcRotation: v3_13, sfcMirror: v3_14, sfcMultiOrientation: v3_15, eaxPopSize: v3_16, eaxChildrenPerPair: v3_17, eaxStrategy: v3_18, eaxStallEpochs: v3_19, eaxCandidateK: v3_20 } = arg2;
   dataView(memory0).setInt32(ptr0 + 16, toUint32(v3_0), true);
   dataView(memory0).setInt32(ptr0 + 20, toUint32(v3_1), true);
   dataView(memory0).setFloat32(ptr0 + 24, +v3_2, true);
@@ -6693,6 +6699,11 @@ function parseAndSolve(arg0, arg1, arg2) {
   dataView(memory0).setInt32(ptr0 + 68, toUint32(v3_13), true);
   dataView(memory0).setInt32(ptr0 + 72, toUint32(v3_14), true);
   dataView(memory0).setInt32(ptr0 + 76, toUint32(v3_15), true);
+  dataView(memory0).setInt32(ptr0 + 80, toUint32(v3_16), true);
+  dataView(memory0).setInt32(ptr0 + 84, toUint32(v3_17), true);
+  dataView(memory0).setInt32(ptr0 + 88, toUint32(v3_18), true);
+  dataView(memory0).setInt32(ptr0 + 92, toUint32(v3_19), true);
+  dataView(memory0).setInt32(ptr0 + 96, toUint32(v3_20), true);
   _debugLog('[iface="parse-and-solve", function="parse-and-solve"][Instruction::CallWasm] enter', {
     funcName: 'parse-and-solve',
     paramCount: 1,
@@ -7145,7 +7156,7 @@ function getVersion() {
 let exports1Compare;
 
 function compare(arg0, arg1, arg2) {
-  var ptr0 = realloc1(0, 0, 4, 80);
+  var ptr0 = realloc1(0, 0, 4, 100);
   var vec2 = arg0;
   var len2 = vec2.length;
   var result2 = realloc1(0, 0, 4, len2 * 8);
@@ -7168,7 +7179,7 @@ function compare(arg0, arg1, arg2) {
   
   dataView(memory0).setUint32(ptr0 + 12, len3, true);
   dataView(memory0).setUint32(ptr0 + 8, ptr3, true);
-  var {epochs: v4_0, platooEpochs: v4_1, coolingRate: v4_2, maxTemperature: v4_3, minTemperature: v4_4, mutationProbability: v4_5, nElite: v4_6, nNearest: v4_7, alpha: v4_8, beta: v4_9, evaporationRate: v4_10, numAnts: v4_11, sfcOrder: v4_12, sfcRotation: v4_13, sfcMirror: v4_14, sfcMultiOrientation: v4_15 } = arg2;
+  var {epochs: v4_0, platooEpochs: v4_1, coolingRate: v4_2, maxTemperature: v4_3, minTemperature: v4_4, mutationProbability: v4_5, nElite: v4_6, nNearest: v4_7, alpha: v4_8, beta: v4_9, evaporationRate: v4_10, numAnts: v4_11, sfcOrder: v4_12, sfcRotation: v4_13, sfcMirror: v4_14, sfcMultiOrientation: v4_15, eaxPopSize: v4_16, eaxChildrenPerPair: v4_17, eaxStrategy: v4_18, eaxStallEpochs: v4_19, eaxCandidateK: v4_20 } = arg2;
   dataView(memory0).setInt32(ptr0 + 16, toUint32(v4_0), true);
   dataView(memory0).setInt32(ptr0 + 20, toUint32(v4_1), true);
   dataView(memory0).setFloat32(ptr0 + 24, +v4_2, true);
@@ -7185,6 +7196,11 @@ function compare(arg0, arg1, arg2) {
   dataView(memory0).setInt32(ptr0 + 68, toUint32(v4_13), true);
   dataView(memory0).setInt32(ptr0 + 72, toUint32(v4_14), true);
   dataView(memory0).setInt32(ptr0 + 76, toUint32(v4_15), true);
+  dataView(memory0).setInt32(ptr0 + 80, toUint32(v4_16), true);
+  dataView(memory0).setInt32(ptr0 + 84, toUint32(v4_17), true);
+  dataView(memory0).setInt32(ptr0 + 88, toUint32(v4_18), true);
+  dataView(memory0).setInt32(ptr0 + 92, toUint32(v4_19), true);
+  dataView(memory0).setInt32(ptr0 + 96, toUint32(v4_20), true);
   _debugLog('[iface="compare", function="compare"][Instruction::CallWasm] enter', {
     funcName: 'compare',
     paramCount: 1,
@@ -9094,6 +9110,7 @@ const $init = (() => {
     const module1 = fetchCompile(new URL('./teeline_wasm.core2.wasm', import.meta.url));
     const module2 = base64Compile('AGFzbQEAAAABOQpgAn9/AX9gA39+fwF/YAR/f39/AX9gAX8AYAABf2ABfwBgAn9/AGADf35/AGAEf39/fwBgAn5/AAMVFAAAAAECAwQFBQYHBgYGBggGCAkFBAUBcAEUFAdmFQEwAAABMQABATIAAgEzAAMBNAAEATUABQE2AAYBNwAHATgACAE5AAkCMTAACgIxMQALAjEyAAwCMTMADQIxNAAOAjE1AA8CMTYAEAIxNwARAjE4ABICMTkAEwgkaW1wb3J0cwEACvUBFAsAIAAgAUEAEQAACwsAIAAgAUEBEQAACwsAIAAgAUECEQAACw0AIAAgASACQQMRAQALDwAgACABIAIgA0EEEQIACwkAIABBBREDAAsHAEEGEQQACwkAIABBBxEFAAsJACAAQQgRBQALCwAgACABQQkRBgALDQAgACABIAJBChEHAAsLACAAIAFBCxEGAAsLACAAIAFBDBEGAAsLACAAIAFBDREGAAsLACAAIAFBDhEGAAsPACAAIAEgAiADQQ8RCAALCwAgACABQRARBgALDwAgACABIAIgA0EREQgACwsAIAAgAUESEQkACwkAIABBExEFAAsALwlwcm9kdWNlcnMBDHByb2Nlc3NlZC1ieQENd2l0LWNvbXBvbmVudAcwLjIyNy4xAPcIBG5hbWUAExJ3aXQtY29tcG9uZW50OnNoaW0B2ggUACdhZGFwdC13YXNpX3NuYXBzaG90X3ByZXZpZXcxLXJhbmRvbV9nZXQBKGFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtZW52aXJvbl9nZXQCLmFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtZW52aXJvbl9zaXplc19nZXQDK2FkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtY2xvY2tfdGltZV9nZXQEJWFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtZmRfd3JpdGUFJmFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtcHJvY19leGl0BihhZGFwdC13YXNpX3NuYXBzaG90X3ByZXZpZXcxLXNjaGVkX3lpZWxkBzNpbmRpcmVjdC13YXNpOmNsaS9lbnZpcm9ubWVudEAwLjIuMy1nZXQtZW52aXJvbm1lbnQIKWluZGlyZWN0LXdhc2k6Y2xvY2tzL3dhbGwtY2xvY2tAMC4yLjMtbm93CTppbmRpcmVjdC13YXNpOmZpbGVzeXN0ZW0vdHlwZXNAMC4yLjMtZmlsZXN5c3RlbS1lcnJvci1jb2RlCkhpbmRpcmVjdC13YXNpOmZpbGVzeXN0ZW0vdHlwZXNAMC4yLjMtW21ldGhvZF1kZXNjcmlwdG9yLndyaXRlLXZpYS1zdHJlYW0LSWluZGlyZWN0LXdhc2k6ZmlsZXN5c3RlbS90eXBlc0AwLjIuMy1bbWV0aG9kXWRlc2NyaXB0b3IuYXBwZW5kLXZpYS1zdHJlYW0MQGluZGlyZWN0LXdhc2k6ZmlsZXN5c3RlbS90eXBlc0AwLjIuMy1bbWV0aG9kXWRlc2NyaXB0b3IuZ2V0LXR5cGUNPGluZGlyZWN0LXdhc2k6ZmlsZXN5c3RlbS90eXBlc0AwLjIuMy1bbWV0aG9kXWRlc2NyaXB0b3Iuc3RhdA5AaW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS5jaGVjay13cml0ZQ86aW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS53cml0ZRBDaW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS5ibG9ja2luZy1mbHVzaBFNaW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS5ibG9ja2luZy13cml0ZS1hbmQtZmx1c2gSMmluZGlyZWN0LXdhc2k6cmFuZG9tL3JhbmRvbUAwLjIuMy1nZXQtcmFuZG9tLWJ5dGVzEzdpbmRpcmVjdC13YXNpOmZpbGVzeXN0ZW0vcHJlb3BlbnNAMC4yLjItZ2V0LWRpcmVjdG9yaWVz');
     const module3 = base64Compile('AGFzbQEAAAABOQpgAn9/AX9gA39+fwF/YAR/f39/AX9gAX8AYAABf2ABfwBgAn9/AGADf35/AGAEf39/fwBgAn5/AAJ+FQABMAAAAAExAAAAATIAAAABMwABAAE0AAIAATUAAwABNgAEAAE3AAUAATgABQABOQAGAAIxMAAHAAIxMQAGAAIxMgAGAAIxMwAGAAIxNAAGAAIxNQAIAAIxNgAGAAIxNwAIAAIxOAAJAAIxOQAFAAgkaW1wb3J0cwFwARQUCRoBAEEACxQAAQIDBAUGBwgJCgsMDQ4PEBESEwAvCXByb2R1Y2VycwEMcHJvY2Vzc2VkLWJ5AQ13aXQtY29tcG9uZW50BzAuMjI3LjEAHARuYW1lABUUd2l0LWNvbXBvbmVudDpmaXh1cHM');
+    const module4 = base64Compile('AGFzbQEAAAABBAFgAAACBQEAAAAACAEA');
     ({ exports: exports0 } = yield instantiateCore(yield module2));
     ({ exports: exports1 } = yield instantiateCore(yield module0, {
       wasi_snapshot_preview1: {
@@ -9192,6 +9209,11 @@ const $init = (() => {
         '7': trampoline9,
         '8': trampoline10,
         '9': trampoline11,
+      },
+    }));
+    ({ exports: exports4 } = yield instantiateCore(yield module4, {
+      '': {
+        '': exports1._initialize,
       },
     }));
     realloc1 = exports1.cabi_realloc;

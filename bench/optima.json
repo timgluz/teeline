@@ -10,8 +10,7 @@
     "a280": {
       "cost": 2579,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "ali535": {
       "cost": 202339,
@@ -36,8 +35,7 @@
     "berlin52": {
       "cost": 7542,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "bier127": {
       "cost": 118282,
@@ -181,6 +179,11 @@
       "cost": 3323,
       "method": "exact",
       "evidence": "teeline's bellman_karp (Held-Karp over the full 14-city state space), which is exhaustive and so proves the optimum. GEO is one of the definitions teeline reproduces exactly, so this is also the optimum of the objective the solver is measured against. Reproduce: teeline solve bhk -i data/tsplib/burma14.tsp"
+    },
+    "kroA100": {
+      "cost": 21282,
+      "method": "published",
+      "source": "tsplib-published"
     }
   }
 }
