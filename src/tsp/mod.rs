@@ -1929,6 +1929,7 @@ fn parse_nonneg_usize(v: &toml::Value, name: &str) -> Result<usize, String> {
     usize::try_from(n).map_err(|_| format!("config: `{name}` must be >= 0, got {n}"))
 }
 
+/// Validates that `tour` is a permutation of the city IDs in `cities`.
 pub fn validate_tour(tour: &[usize], cities: &[KDPoint]) -> Result<(), String> {
     if tour.len() != cities.len() {
         return Err(format!(
@@ -2154,6 +2155,7 @@ impl Solution {
         self.route.is_empty()
     }
 
+    /// Route of city IDs in visit order (never dense positions).
     pub fn route(&self) -> &[usize] {
         self.route[..].as_ref()
     }

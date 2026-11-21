@@ -23,6 +23,7 @@ impl Route {
         Route { route }
     }
 
+    /// Returns the city ID at route rank `pos` (not a dense city position).
     pub fn get(&self, pos: usize) -> Option<usize> {
         self.route.get(pos).copied()
     }
@@ -99,6 +100,7 @@ fn random_pair(n_items: usize) -> (usize, usize) {
     }
 }
 
+/// Reverses the route segment between two route ranks (a 2-opt move).
 fn swap_cities(route: &mut [usize], from: usize, to: usize) {
     if to >= route.len() {
         panic!("to can not be same or bigger than route size");
@@ -114,9 +116,16 @@ fn swap_cities(route: &mut [usize], from: usize, to: usize) {
 
 /// Greedy swap sequence that transforms `from` into `to`.
 /// Returns `Vec<(pos_i, pos_j)>` of swaps to apply in order.
-/// Both slices must be permutations of the same elements.
+///
+/// Both inputs are **routes** (sequences of city IDs), not position lists; the returned
+/// pairs are route ranks.
 pub fn swap_sequence(from: &[usize], to: &[usize]) -> Vec<(usize, usize)> {
     let n = from.len();
+    assert_eq!(
+        n,
+        to.len(),
+        "swap_sequence: routes must have the same length"
+    );
     let mut tmp = from.to_vec();
     let mut seq: Vec<(usize, usize)> = Vec::new();
     for i in 0..n.saturating_sub(1) {
@@ -133,9 +142,9 @@ pub fn swap_sequence(from: &[usize], to: &[usize]) -> Vec<(usize, usize)> {
     seq
 }
 
-/// Apply an ordered list of `(i, j)` swaps to `position`, returning the result.
-pub fn apply_swaps(position: &[usize], swaps: &[(usize, usize)]) -> Vec<usize> {
-    let mut pos = position.to_vec();
+/// Apply an ordered list of route-rank swaps to a route of city IDs, returning the result.
+pub fn apply_swaps(route: &[usize], swaps: &[(usize, usize)]) -> Vec<usize> {
+    let mut pos = route.to_vec();
     for &(i, j) in swaps {
         pos.swap(i, j);
     }

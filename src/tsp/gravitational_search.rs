@@ -37,7 +37,9 @@ pub fn solve(
     let mut rng = rand::rng();
     let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
-    let mut positions: Vec<Vec<usize>> = (0..n_agents)
+    // An agent's candidate solution is a tour (a permutation of city IDs). `Position` is
+    // reserved for dense `0..n` indices, so this module never calls a tour a "position".
+    let mut tours: Vec<Vec<usize>> = (0..n_agents)
         .map(|idx| {
             if idx == 0 {
                 init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
@@ -60,14 +62,14 @@ pub fn solve(
         .collect();
 
     let mut velocities: Vec<Velocity> = vec![Vec::new(); n_agents];
-    let mut costs: Vec<f32> = positions.iter().map(|p| distances.tour_length(p)).collect();
+    let mut costs: Vec<f32> = tours.iter().map(|p| distances.tour_length(p)).collect();
 
     let (best_idx, _) = costs
         .iter()
         .enumerate()
         .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
         .unwrap();
-    let mut gbest: Vec<usize> = positions[best_idx].clone();
+    let mut gbest: Vec<usize> = tours[best_idx].clone();
     let mut gbest_cost: f32 = costs[best_idx];
 
     if let Some(tx) = progress_tx {
@@ -131,17 +133,17 @@ pub fn solve(
                 if n_swaps == 0 {
                     continue;
                 }
-                let pull = swap_sequence(&positions[i], &positions[j]);
+                let pull = swap_sequence(&tours[i], &tours[j]);
                 new_vel.extend(trim_velocity(&pull, n_swaps));
             }
 
             new_vel.truncate(v_max);
-            positions[i] = apply_swaps(&positions[i], &new_vel);
+            tours[i] = apply_swaps(&tours[i], &new_vel);
             velocities[i] = new_vel;
 
-            costs[i] = distances.tour_length(&positions[i]);
+            costs[i] = distances.tour_length(&tours[i]);
             if costs[i] < gbest_cost {
-                gbest = positions[i].clone();
+                gbest = tours[i].clone();
                 gbest_cost = costs[i];
                 if let Some(tx) = progress_tx {
                     let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
@@ -249,7 +251,7 @@ mod tests {
         // Solver must not panic or produce NaN.
         let (cities, problem) = five_city_problem();
         // Force all agents to share the same tour (same cost) by providing init_tour
-        // and running 0 epochs so positions never diverge.
+        // and running 0 epochs so tours never diverge.
         let tour: Vec<usize> = cities.iter().map(|c| c.id).collect();
         // Run a few epochs; all agents start from the same init_tour so sum_fitness
         // is 0 on the first epoch, exercising the uniform-mass fallback.
