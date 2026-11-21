@@ -1,6 +1,7 @@
 /// Integration tests for the memetic EAX solver.
 use std::path::Path;
 use std::str::FromStr;
+use teeline::config::load_pipeline_config;
 use teeline::tsp::{
     AppOptions, EaxStrategy, MemeticEaxOptions, Solvers, TspProblem, pipeline, solve_problem,
     tsplib,
@@ -130,4 +131,19 @@ fn atsp_input_is_rejected_before_any_solver_runs() {
     let input = "NAME: atsp\nTYPE: ATSP\nDIMENSION: 3\nEDGE_WEIGHT_TYPE: EXPLICIT\nEDGE_WEIGHT_FORMAT: FULL_MATRIX\nEDGE_WEIGHT_SECTION\n0 1 2\n3 0 4\n5 6 0\nEOF\n";
     let err = tsplib::read_from_str(input).unwrap_err();
     assert!(err.contains("ATSP"), "expected ATSP rejection, got: {err}");
+}
+
+#[test]
+fn toml_stage_configures_memetic_eax() {
+    let toml = "[[stage]]\nsolver = \"memetic_eax\"\n\n[stage.memetic_eax]\npop_size = 30\nchildren_per_pair = 4\nstrategy = \"rand\"\nstall_epochs = 7\ncandidate_k = 9\nseed = 5\n";
+    let stages = load_pipeline_config(toml, AppOptions::default()).unwrap();
+    assert_eq!(stages.len(), 1);
+    assert_eq!(stages[0].0, Solvers::MemeticEax);
+    let eax = stages[0].1.memetic_eax.as_ref().unwrap();
+    assert_eq!(eax.pop_size, 30);
+    assert_eq!(eax.children_per_pair, 4);
+    assert_eq!(eax.strategy, EaxStrategy::Rand);
+    assert_eq!(eax.stall_epochs, 7);
+    assert_eq!(eax.candidate_k, 9);
+    assert_eq!(eax.seed, Some(5));
 }

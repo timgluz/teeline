@@ -17,7 +17,9 @@ export interface SolveOptions {
   sfcRotation: number
   sfcMirror: number
   sfcMultiOrientation: number
-  // Memetic EAX tunables (ignored by non-EAX solvers).
+  // Memetic EAX tunables (ignored by non-EAX solvers). These are required fields in
+  // the WIT `solve-options` record; outside JS callers that omit them get 0, which the
+  // WASM bridge clamps to the smallest valid configuration.
   eaxPopSize: number
   eaxChildrenPerPair: number
   eaxStrategy: number
