@@ -58,7 +58,7 @@ Hard constraints every change must preserve:
 - **Solver registration** happens in `src/tsp/mod.rs` in four coordinated places: the
   `Solvers` enum, the `FromStr` impl, the `solve_with_context` dispatch arm, and
   `Solvers::all_meta()`. Updating fewer than all four is a defect.
-- **`Solution` is the single tour representation** (`route`, `cities`, `total`). `total` is
+- **`Solution` is the single tour representation** (`route`, `total`). `total` is
   computed from the problem's distance source when the solution is constructed; build a new
   `Solution` when the route changes rather than mutating one in place.
 - **Spatial queries** go through the shared `nearest(&pt, n)` interface — `KDTree`
