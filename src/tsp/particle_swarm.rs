@@ -36,7 +36,9 @@ pub fn solve(
     let mut rng = rand::rng();
     let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
-    let mut positions: Vec<Vec<usize>> = (0..n_particles)
+    // A particle's candidate solution is a tour (a permutation of city IDs). `Position` is
+    // reserved for dense `0..n` indices, so this module never calls a tour a "position".
+    let mut tours: Vec<Vec<usize>> = (0..n_particles)
         .map(|idx| {
             if idx == 0 {
                 init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
@@ -59,7 +61,7 @@ pub fn solve(
         .collect();
 
     let mut velocities: Vec<Velocity> = vec![Vec::new(); n_particles];
-    let mut pbest: Vec<Vec<usize>> = positions.clone();
+    let mut pbest: Vec<Vec<usize>> = tours.clone();
     let mut pbest_cost: Vec<f32> = pbest.iter().map(|p| distances.tour_length(p)).collect();
 
     let (best_idx, _) = pbest_cost
@@ -102,11 +104,11 @@ pub fn solve(
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let inertia_keep = (w * velocities[i].len() as f64).round() as usize;
 
-            let cog_diff = swap_sequence(&positions[i], &pbest[i]);
+            let cog_diff = swap_sequence(&tours[i], &pbest[i]);
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let cog_keep = (C1 * r1 * cog_diff.len() as f64).round() as usize;
 
-            let soc_diff = swap_sequence(&positions[i], &gbest);
+            let soc_diff = swap_sequence(&tours[i], &gbest);
             #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let soc_keep = (C2 * r2 * soc_diff.len() as f64).round() as usize;
 
@@ -115,18 +117,18 @@ pub fn solve(
             new_vel.extend(trim_velocity(&soc_diff, soc_keep));
             new_vel.truncate(v_max);
 
-            let new_pos = apply_swaps(&positions[i], &new_vel);
-            positions[i] = new_pos;
+            let new_tour = apply_swaps(&tours[i], &new_vel);
+            tours[i] = new_tour;
             velocities[i] = new_vel;
 
-            let cost = distances.tour_length(&positions[i]);
+            let cost = distances.tour_length(&tours[i]);
 
             if cost < pbest_cost[i] {
-                pbest[i] = positions[i].clone();
+                pbest[i] = tours[i].clone();
                 pbest_cost[i] = cost;
             }
             if cost < gbest_cost {
-                gbest = positions[i].clone();
+                gbest = tours[i].clone();
                 gbest_cost = cost;
                 if let Some(tx) = progress_tx {
                     let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
