@@ -117,7 +117,7 @@ fn berlin52_is_within_a_sane_quality_bound() {
 
 #[test]
 fn kroa100_is_within_a_sane_quality_bound() {
-    let problem = load_problem("data/tsplib/kroA100.tsp");
+    let problem = load_problem("tests/fixtures/kroA100.tsp");
     let solution = solve_problem(Solvers::MemeticEax, &problem, &options()).unwrap();
     assert!(
         solution.total < 1.10 * KROA100_OPT,
