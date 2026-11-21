@@ -10,8 +10,7 @@
     "a280": {
       "cost": 2579,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "ali535": {
       "cost": 202339,
@@ -36,14 +35,12 @@
     "berlin52": {
       "cost": 7542,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "bier127": {
       "cost": 118282,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "brazil58": {
       "cost": 25395,
@@ -53,8 +50,7 @@
     "brd14051": {
       "cost": 469385,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "brg180": {
       "cost": 1950,
@@ -64,50 +60,42 @@
     "d1291": {
       "cost": 50801,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "d15112": {
       "cost": 1573084,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "d1655": {
       "cost": 62128,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "d18512": {
       "cost": 645238,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "d198": {
       "cost": 15780,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "d2103": {
       "cost": 80450,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "d493": {
       "cost": 35002,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "d657": {
       "cost": 48912,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "dantzig42": {
       "cost": 699,
@@ -122,20 +110,17 @@
     "fl1577": {
       "cost": 22249,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "fl3795": {
       "cost": 28772,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "linhp318": {
       "cost": 41345,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "pla33810": {
       "cost": 66048945,
@@ -150,37 +135,37 @@
     "rl11849": {
       "cost": 923288,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "rl5915": {
       "cost": 565530,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "rl5934": {
       "cost": 556045,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "tsp225": {
       "cost": 3916,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "usa13509": {
       "cost": 19982859,
       "method": "published",
-      "source": "tsplib-published",
-      "metric_note": "TSPLIB rounds EUC_2D with nint(); teeline does not. This is the rounded optimum, so teeline cannot score it until the metric is fixed."
+      "source": "tsplib-published"
     },
     "burma14": {
       "cost": 3323,
       "method": "exact",
       "evidence": "teeline's bellman_karp (Held-Karp over the full 14-city state space), which is exhaustive and so proves the optimum. GEO is one of the definitions teeline reproduces exactly, so this is also the optimum of the objective the solver is measured against. Reproduce: teeline solve bhk -i data/tsplib/burma14.tsp"
+    },
+    "kroA100": {
+      "cost": 21282,
+      "method": "published",
+      "source": "tsplib-published"
     }
   }
 }

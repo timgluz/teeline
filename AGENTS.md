@@ -83,6 +83,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | `cuckoo_search.rs`        | Cuckoo Search via Lévy flights (k random 2-opt reversals, Bernoulli nest abandonment)                                                                                            | `cs`           |
 | `flower_pollination.rs`   | Flower Pollination Algorithm (global Lévy-flight toward gbest; local ε-scaled cross-pollination)                                                                                 | `fpa`          |
 | `lin_kernighan.rs`        | Lin-Kernighan style ILS: candidate-list 2-opt + double-bridge kicks                                                                                                              | `lk`           |
+| `memetic_eax.rs`          | Memetic Edge Assembly Crossover: population of locally optimised tours, AB-cycle recombination, subtour patching, dirty-edge 2-opt polish                                        | `eax`          |
 | `or_opt.rs`               | Or-opt local search: relocates segments of 1–3 cities (best-improvement)                                                                                                         | `or_opt`       |
 | `christofides.rs`         | Christofides ≤1.5× approximation: MST + greedy matching + Eulerian shortcut                                                                                                      | `christofides` |
 | `gravitational_search.rs` | Gravitational Search Algorithm (Rashedi 2009): mass-weighted swap-velocity swarm (educational)                                                                                   | `gsa`          |
@@ -100,6 +101,9 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 - Integration tests in `tests/` use the public library crate
 - Test helpers (approximate float comparison, etc.) in `src/test/helpers.rs`
 - EXPLICIT fixtures: `gr17.tsp` and `ring6_explicit.tsp` have no coordinates; `bays29.tsp` has a `DISPLAY_DATA_SECTION`
+- **Fixtures must live in `tests/fixtures/`.** The `data/` tree is git-ignored, so a test that
+  reads `data/tsplib/<instance>.tsp` passes locally and fails in CI. Copy the instance into
+  `tests/fixtures/` and reference it from there (e.g. `tests/fixtures/kroA100.tsp`).
 
 ## Important Notes
 

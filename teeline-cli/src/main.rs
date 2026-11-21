@@ -280,7 +280,7 @@ fn tuning_args() -> Vec<Arg> {
             .help(
                 "Memetic EAX: stagnant generations before hybrid switches to single_ab; \
                  the solver stops at twice this count (default 50; falls back to \
-                 --stagnation_epochs when omitted)",
+                 --stagnation_epochs when omitted, where 0 keeps the default)",
             )
             .action(ArgAction::Set)
             .required(false),

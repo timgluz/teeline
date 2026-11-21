@@ -258,6 +258,27 @@ fn make_app_options(
                 candidate_k: c.candidate_k.unwrap_or(d.candidate_k),
                 seed: c.seed,
             };
+            // Client-supplied, and the API has no solve timeout: bound the cost here.
+            const MAX_EPOCHS: usize = 100_000;
+            const MAX_POP: usize = 1_000;
+            const MAX_CHILDREN: usize = 100;
+            const MAX_STALL: usize = 10_000;
+            const MAX_K: usize = 100;
+            if options.epochs == 0 || options.epochs > MAX_EPOCHS {
+                return Err(format!(
+                    "memetic_eax.epochs must be in 1..={MAX_EPOCHS} (got {})",
+                    options.epochs
+                ));
+            }
+            if options.pop_size > MAX_POP
+                || options.children_per_pair > MAX_CHILDREN
+                || options.stall_epochs > MAX_STALL
+                || options.candidate_k > MAX_K
+            {
+                return Err(format!(
+                    "memetic_eax: pop_size <= {MAX_POP}, children_per_pair <= {MAX_CHILDREN},                      stall_epochs <= {MAX_STALL}, candidate_k <= {MAX_K}"
+                ));
+            }
             options.validate()?;
             Some(options)
         }
@@ -918,6 +939,32 @@ EOF
         assert_eq!(eax.stall_epochs, 9);
         assert_eq!(eax.candidate_k, 11);
         assert_eq!(eax.seed, Some(7));
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_rejects_zero_epochs() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                epochs: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("memetic_eax", Some(&configs)).unwrap_err();
+        assert!(err.contains("epochs"), "got: {err}");
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_rejects_oversized_population() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                pop_size: Some(100_000),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("memetic_eax", Some(&configs)).unwrap_err();
+        assert!(err.contains("pop_size"), "got: {err}");
     }
 
     #[test]

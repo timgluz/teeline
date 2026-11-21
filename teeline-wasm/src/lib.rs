@@ -1,20 +1,21 @@
 #[allow(warnings)]
 mod bindings;
 
+use bindings::Guest;
 use bindings::teeline::solver::types::{
     AlgorithmInfo, City, CompareResult, ComparisonStats, ParamSpec, ParsedProblem, Solution,
     SolveOptions,
 };
-use bindings::Guest;
 use teeline::tsp::comparison;
 use teeline::tsp::{
-    kdtree::KDPoint, AcoOptions, AppOptions, CSOptions, DistanceBackend, DistanceType, FPAOptions,
-    FourierOptions, GAOptions, HeuristicOptions, SAOptions, SfcOptions, Solvers, TspProblem,
+    AcoOptions, AppOptions, CSOptions, DistanceBackend, DistanceType, EaxStrategy, FPAOptions,
+    FourierOptions, GAOptions, HeuristicOptions, MemeticEaxOptions, SAOptions, SfcOptions, Solvers,
+    TspProblem, kdtree::KDPoint,
 };
 
 struct Component;
 
-fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
+fn build_opts(solver: Solvers, o: &SolveOptions) -> Result<AppOptions, String> {
     let heuristic = HeuristicOptions {
         epochs: o.epochs as usize,
         // Not exposed through the WASM interface yet; 0 keeps the plateau stop off, matching the
@@ -24,7 +25,17 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
         n_nearest: o.n_nearest as usize,
         verbose: false,
     };
-    match solver {
+    let eax_strategy = match (solver, o.eax_strategy) {
+        (Solvers::MemeticEax, 0) => EaxStrategy::SingleAb,
+        (Solvers::MemeticEax, 1) => EaxStrategy::Rand,
+        (Solvers::MemeticEax, 2) => EaxStrategy::Hybrid,
+        (Solvers::MemeticEax, other) => {
+            return Err(format!("eaxStrategy must be 0, 1, or 2 (got {other})"));
+        }
+        _ => EaxStrategy::Hybrid,
+    };
+
+    Ok(match solver {
         Solvers::SimulatedAnnealing => AppOptions {
             sa: Some(SAOptions {
                 heuristic,
@@ -92,11 +103,24 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::MemeticEax => AppOptions {
+            memetic_eax: Some(MemeticEaxOptions {
+                epochs: heuristic.epochs,
+                pop_size: o.eax_pop_size as usize,
+                children_per_pair: o.eax_children_per_pair as usize,
+                strategy: eax_strategy,
+                stall_epochs: o.eax_stall_epochs as usize,
+                candidate_k: o.eax_candidate_k as usize,
+                // Browsers use system entropy; the CLI/API expose `seed` for benchmarks.
+                seed: None,
+            }),
+            ..AppOptions::default()
+        },
         _ => AppOptions {
             heuristic: Some(heuristic),
             ..AppOptions::default()
         },
-    }
+    })
 }
 
 fn kd_to_city(c: &KDPoint) -> City {
@@ -140,6 +164,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "som"             => "Topology-preserving constructive solver; best piped: pipeline(som,2opt) or pipeline(som,sa)",
         "gec"             => "Deterministic edge-by-edge construction; usually beats nn as a warm-start: pipeline(greedy_edge,2opt) or pipeline(greedy_edge,lk)",
         "sav"             => "Savings-based construction; strong warm-start: pipeline(savings,2opt) or pipeline(savings,lk)",
+        "eax"             => "Memetic EAX: population crossover + local search; strong quality on small/medium instances, heavier per epoch than lk or 2opt",
         "aco"             => "Pheromone-trail metaheuristic; tune beta (heuristic weight) and evaporation-rate. Slow per epoch — lower epochs on large datasets",
         _                 => info.category,
     }
@@ -273,6 +298,21 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         | Solvers::ParticleSwarmOptimization
         | Solvers::TabuSearch
         | Solvers::StochasticHill => shared_heuristic_params(),
+        Solvers::MemeticEax => {
+            let mut v = vec![pi("epochs", "Epochs", 1.0)];
+            v.push(pi("eaxPopSize", "Population size", 2.0));
+            v.push(pi("eaxChildrenPerPair", "Children per pair", 1.0));
+            v.push(pi_step(
+                "eaxStrategy",
+                "E-strategy (0 single_ab, 1 rand, 2 hybrid)",
+                0.0,
+                2.0,
+                1.0,
+            ));
+            v.push(pi("eaxStallEpochs", "Stall epochs", 1.0));
+            v.push(pi("eaxCandidateK", "Candidate K", 1.0));
+            v
+        }
         Solvers::Fourier => vec![pi("epochs", "Gradient steps per stage", 1.0)],
         Solvers::KohonenSom => vec![pi("epochs", "Training iterations", 1.0)],
         Solvers::SpaceFillingCurve => vec![
@@ -306,7 +346,7 @@ fn solve_with_cities(
         return Err("need at least 2 cities".into());
     }
     let problem = TspProblem::from_points(kd_cities, DistanceType::Euc2D, DistanceBackend::Auto)?;
-    let opts = build_opts(solver_id, options);
+    let opts = build_opts(solver_id, options)?;
     let start = std::time::Instant::now();
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         teeline::tsp::solve_problem(solver_id, &problem, &opts)
@@ -380,7 +420,7 @@ impl Guest for Component {
     ) -> Result<Solution, String> {
         let problem = parse_to_tsp_problem(&input)?;
         let solver_id = teeline::tsp::find_solver(&solver)?;
-        let opts = build_opts(solver_id, &options);
+        let opts = build_opts(solver_id, &options)?;
         let start = std::time::Instant::now();
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             teeline::tsp::solve_problem(solver_id, &problem, &opts)
@@ -423,7 +463,15 @@ impl Guest for Component {
                         };
                     }
                 };
-                let opts = build_opts(solver_id, &options);
+                let opts = match build_opts(solver_id, &options) {
+                    Ok(opts) => opts,
+                    Err(e) => {
+                        return CompareResult {
+                            algorithm: algo,
+                            solution: Err(e),
+                        };
+                    }
+                };
                 let start = std::time::Instant::now();
                 let sol = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     teeline::tsp::solve_problem(solver_id, &problem, &opts)
