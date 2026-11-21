@@ -100,8 +100,8 @@ impl Default for MemeticEaxOptions {
 
 impl MemeticEaxOptions {
     pub fn validate(&self) -> Result<(), String> {
-        if self.pop_size == 0 {
-            return Err("pop_size must be >= 1".to_string());
+        if self.pop_size < 2 {
+            return Err("pop_size must be >= 2".to_string());
         }
         if self.children_per_pair == 0 {
             return Err("children_per_pair must be >= 1".to_string());
@@ -445,7 +445,7 @@ fn merge_via_candidates(
     added: &mut Vec<(usize, usize)>,
 ) -> bool {
     let n = graph.len();
-    let mut best: Option<(f32, usize, usize, usize, usize)> = None;
+    let mut best: Option<(f32, usize, usize, usize, usize, bool)> = None;
 
     for a in 0..n {
         if comp_of[a] != small {
@@ -476,7 +476,7 @@ fn merge_via_full_scan(
     added: &mut Vec<(usize, usize)>,
 ) {
     let n = graph.len();
-    let mut best: Option<(f32, usize, usize, usize, usize)> = None;
+    let mut best: Option<(f32, usize, usize, usize, usize, bool)> = None;
 
     for a in 0..n {
         if comp_of[a] != small {
@@ -504,36 +504,51 @@ fn consider_bridge(
     b: usize,
     c: usize,
     d: usize,
-    best: &mut Option<(f32, usize, usize, usize, usize)>,
+    best: &mut Option<(f32, usize, usize, usize, usize, bool)>,
 ) {
     if a == c || a == d || b == c || b == d {
         return;
     }
-    let delta = distance(distances, a, c) + distance(distances, b, d)
-        - distance(distances, a, b)
-        - distance(distances, c, d);
-    let better = match best {
-        None => true,
-        Some((best_delta, _, _, _, _)) => delta < *best_delta,
-    };
-    if better {
-        *best = Some((delta, a, b, c, d));
+    let removed = distance(distances, a, b) + distance(distances, c, d);
+    // The two ways to reconnect two removed edges; either merges the components.
+    let cross = distance(distances, a, c) + distance(distances, b, d) - removed;
+    if best
+        .as_ref()
+        .is_none_or(|&(best_delta, ..)| cross < best_delta)
+    {
+        *best = Some((cross, a, b, c, d, false));
+    }
+    let parallel = distance(distances, a, d) + distance(distances, b, c) - removed;
+    if best
+        .as_ref()
+        .is_none_or(|&(best_delta, ..)| parallel < best_delta)
+    {
+        *best = Some((parallel, a, b, c, d, true));
     }
 }
 
 /// Applies `(a,b)` + `(c,d)` → `(a,c)` + `(b,d)`, merging the two cycles.
 fn apply_best_bridge(
     graph: &mut TourGraph,
-    best: Option<(f32, usize, usize, usize, usize)>,
+    best: Option<(f32, usize, usize, usize, usize, bool)>,
     added: &mut Vec<(usize, usize)>,
 ) -> Option<f32> {
-    let (delta, a, b, c, d) = best?;
-    graph.replace_neighbour(a, b, c);
-    graph.replace_neighbour(b, a, d);
-    graph.replace_neighbour(c, d, a);
-    graph.replace_neighbour(d, c, b);
-    added.push((a, c));
-    added.push((b, d));
+    let (delta, a, b, c, d, parallel) = best?;
+    if parallel {
+        graph.replace_neighbour(a, b, d);
+        graph.replace_neighbour(b, a, c);
+        graph.replace_neighbour(c, d, b);
+        graph.replace_neighbour(d, c, a);
+        added.push((a, d));
+        added.push((b, c));
+    } else {
+        graph.replace_neighbour(a, b, c);
+        graph.replace_neighbour(b, a, d);
+        graph.replace_neighbour(c, d, a);
+        graph.replace_neighbour(d, c, b);
+        added.push((a, c));
+        added.push((b, d));
+    }
     Some(delta)
 }
 
@@ -643,7 +658,7 @@ fn best_2opt_move(
     let n = tour.len();
     let p = pos[u];
     let u_edges = [p, (p + n - 1) % n];
-    let mut best: Option<(f32, usize, usize)> = None;
+    let mut best: Option<(f64, usize, usize)> = None;
 
     for &u_edge in &u_edges {
         for &cand in candidates.neighbours_by_pos(Position::new(u)) {
@@ -660,11 +675,14 @@ fn best_2opt_move(
                 }
                 let i_next = (i + 1) % n;
                 let j_next = (j + 1) % n;
-                let delta = distance(distances, tour[i], tour[j])
-                    + distance(distances, tour[i_next], tour[j_next])
-                    - distance(distances, tour[i], tour[i_next])
-                    - distance(distances, tour[j], tour[j_next]);
-                if delta < -EPS
+                // f64 keeps the four-term sum far below a move's real cost even at dsj1000
+                // scale, where an f32 ulp (~0.01) dwarfs the absolute EPS and a move and
+                // its reverse could otherwise both look improving.
+                let delta = distance(distances, tour[i], tour[j]) as f64
+                    + distance(distances, tour[i_next], tour[j_next]) as f64
+                    - distance(distances, tour[i], tour[i_next]) as f64
+                    - distance(distances, tour[j], tour[j_next]) as f64;
+                if delta < -f64::from(EPS)
                     && best
                         .as_ref()
                         .is_none_or(|&(best_delta, ..)| delta < best_delta)
@@ -822,7 +840,7 @@ fn initial_population(
     scratch: &mut Scratch,
     rng: &mut impl RngExt,
 ) -> Vec<Member> {
-    let target = opts.pop_size.max(1);
+    let target = opts.pop_size.max(2);
     let mut members: Vec<Member> = Vec::with_capacity(target);
     let mut seen: HashSet<Vec<usize>> = HashSet::new();
     let all: Vec<usize> = (0..n).collect();
@@ -964,11 +982,12 @@ fn make_child(
     // Every vertex of an applied AB cycle got a new neighbour; patching disturbs the bridge
     // endpoints again. Seed polish from both: with `single_ab` the crossover often already
     // yields one tour and therefore no bridge edges.
-    let mut dirty: Vec<usize> = selected
-        .iter()
-        .flat_map(|cycle| cycle.vertices.iter().copied())
-        .collect();
-    dirty.extend(scratch.added.iter().flat_map(|&(a, b)| [a, b]));
+    let mut dirty: Vec<usize> = scratch.added.iter().flat_map(|&(a, b)| [a, b]).collect();
+    dirty.extend(
+        selected
+            .iter()
+            .flat_map(|cycle| cycle.vertices.iter().copied()),
+    );
     let mut tour = child.to_tour(0);
     polish(&mut tour, &dirty, candidates, distances, scratch);
     let child = TourGraph::from_tour(&tour);
@@ -988,15 +1007,16 @@ fn make_child(
 
 /// Pairs a shuffled permutation of the population and reports each distinct pair once.
 fn pair_order(population_len: usize, rng: &mut impl RngExt) -> Vec<(usize, usize)> {
+    if population_len < 2 {
+        return Vec::new();
+    }
     let mut order: Vec<usize> = (0..population_len).collect();
     order.shuffle(rng);
-    let mut pairs = Vec::with_capacity(order.len() / 2);
-    let mut index = 0;
-    while index + 1 < order.len() {
-        pairs.push((order[index], order[index + 1]));
-        index += 2;
-    }
-    pairs
+    // A ring over the shuffled order: every member is parent A exactly once, and the last
+    // member is paired with the first, so no member is left out.
+    (0..population_len)
+        .map(|i| (order[i], order[(i + 1) % population_len]))
+        .collect()
 }
 
 fn should_replace(parent_cost: f32, child_cost: f32) -> bool {
@@ -1043,14 +1063,14 @@ pub fn solve(
     let distances = problem.distances.as_ref();
     let n = distances.num_cities();
 
-    // `solve` is public and the option fields are public, so a direct caller can bypass
-    // `solve_with_context`'s validation. Clamp instead of silently turning the run into a
-    // no-op: `stall_epochs = 0` would stop immediately and `children_per_pair = 0` would
-    // produce no offspring.
+    // `solve` is public and the option fields are public, so a direct caller can bypass the
+    // `validate()` that the dispatch path applies. Clamp instead of silently turning the run
+    // into a no-op: `stall_epochs = 0` would stop immediately, `children_per_pair = 0` would
+    // produce no offspring, and `pop_size = 1` would leave nothing to pair.
     let mut sanitized = opts.clone();
-    if sanitized.pop_size == 0 {
-        tracing::warn!("memetic_eax: pop_size 0 clamped to 1");
-        sanitized.pop_size = 1;
+    if sanitized.pop_size < 2 {
+        tracing::warn!("memetic_eax: pop_size below 2 clamped to 2");
+        sanitized.pop_size = 2;
     }
     if sanitized.children_per_pair == 0 {
         tracing::warn!("memetic_eax: children_per_pair 0 clamped to 1");
@@ -1425,9 +1445,20 @@ mod tests {
     fn pairing_never_pairs_a_member_with_itself() {
         for n in 0..6 {
             let mut rng = rand::rngs::StdRng::seed_from_u64(n as u64);
-            for (a, b) in pair_order(n, &mut rng) {
+            let pairs = pair_order(n, &mut rng);
+            assert_eq!(pairs.len(), if n < 2 { 0 } else { n });
+            for &(a, b) in &pairs {
                 assert_ne!(a, b, "self-pair in population of {n}");
                 assert!(a < n && b < n);
+            }
+            if n >= 2 {
+                let mut parents: Vec<usize> = pairs.iter().map(|&(a, _)| a).collect();
+                parents.sort_unstable();
+                assert_eq!(
+                    parents,
+                    (0..n).collect::<Vec<_>>(),
+                    "every member must be parent A exactly once in a population of {n}"
+                );
             }
         }
     }
@@ -1672,7 +1703,7 @@ mod tests {
                 &mut Scratch::new(6),
                 &mut rng,
             );
-            assert_eq!(members.len(), 1);
+            assert_eq!(members.len(), 2);
         }
     }
 
