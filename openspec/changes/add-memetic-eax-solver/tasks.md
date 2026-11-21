@@ -39,21 +39,21 @@
 
 ## 8. Options and core registration
 
-- [ ] 8.1 Add `MemeticEaxOptions` (`Default`, `validate`, `from_toml`, `from_cli`) and `AppOptions.memetic_eax`. Verify: unit tests cover defaults, each validation error, and a TOML round-trip.
-- [ ] 8.2 Register `Solvers::MemeticEax` in the enum, `variants()`, `FromStr`, `SolverMeta`, `SOLVER_LIST` (23 → 24), `AppOptions`, dispatch, and confirm absence from both `auto_expand_*` lists. Verify: alias round-trip tests and `cargo test -p teeline` pass.
+- [x] 8.1 Add `MemeticEaxOptions` (`Default`, `validate`, `from_toml`, `from_cli`) and `AppOptions.memetic_eax`. Verify: unit tests cover defaults, each validation error, and a TOML round-trip.
+- [x] 8.2 Register `Solvers::MemeticEax` in the enum, `variants()`, `FromStr`, `SolverMeta`, `SOLVER_LIST` (23 → 24), `AppOptions`, dispatch, and confirm absence from both `auto_expand_*` lists. Verify: alias round-trip tests and `cargo test -p teeline` pass.
 
 ## 9. TOML and CLI
 
-- [ ] 9.1 Wire the `[memetic_eax]` stage table in `src/config.rs`, including valid-field lists and the per-solver belongs check. Verify: config tests accept a valid table and reject it on a different solver.
-- [ ] 9.2 Add CLI flags (`--epochs`, `--pop-size`, `--children-per-pair`, `--strategy`, `--stall-epochs`, `--candidate-k`, `--seed`) and the `solver_options_from_args` arm. Verify: a CLI test exercises every flag and `teeline solve memetic_eax --help` lists them.
+- [x] 9.1 Wire the `[memetic_eax]` stage table in `src/config.rs`, including valid-field lists and the per-solver belongs check. Verify: config tests accept a valid table and reject it on a different solver.
+- [x] 9.2 Add CLI flags (`--epochs`, `--pop-size`, `--children-per-pair`, `--strategy`, `--stall-epochs`, `--candidate-k`, `--seed`) and the `solver_options_from_args` arm. Verify: a CLI test exercises every flag and `teeline solve memetic_eax --help` lists them.
 
 ## 10. Pipeline
 
-- [ ] 10.1 Consume `init_tour` as a seeded population member; confirm the solver is absent from `auto_expand_with_nn`, `auto_expand_with_shuffle`, and `stage_warnings`. Verify: a pipeline test asserts `pipeline(nn, memetic_eax)` is no worse than `nn`, and the auto-expand tests assert no prefix.
+- [x] 10.1 Consume `init_tour` as a seeded population member; confirm the solver is absent from `auto_expand_with_nn`, `auto_expand_with_shuffle`, and `stage_warnings`. Verify: a pipeline test asserts `pipeline(nn, memetic_eax)` is no worse than `nn`, and the auto-expand tests assert no prefix.
 
 ## 11. HTTP API
 
-- [ ] 11.1 Add `MemeticEaxConfig` to `models/request.rs`, the `SolverConfigs` field, the `make_app_options` mapping, and the `openapi.rs` export. Verify: `cargo test -p teeline-api` passes and a request carrying `memetic_eax` config maps to non-default options.
+- [x] 11.1 Add `MemeticEaxConfig` to `models/request.rs`, the `SolverConfigs` field, the `make_app_options` mapping, and the `openapi.rs` export. Verify: `cargo test -p teeline-api` passes and a request carrying `memetic_eax` config maps to non-default options.
 
 ## 12. WASM bridge
 

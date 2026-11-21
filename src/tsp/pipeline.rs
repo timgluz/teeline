@@ -243,6 +243,45 @@ mod tests {
     }
 
     #[test]
+    fn test_pipeline_nn_then_memetic_eax_is_no_worse_than_nn() {
+        let cities = small_cities();
+        let dm = distance_matrix::from_cities(&cities);
+        let problem = TspProblem::new(cities.clone(), dm);
+
+        let nn_result = make_stage(Solvers::NearestNeighbor, problem.clone())
+            .solve(None)
+            .unwrap();
+        let eax_options = AppOptions {
+            memetic_eax: Some(crate::tsp::MemeticEaxOptions {
+                epochs: 3,
+                pop_size: 4,
+                children_per_pair: 2,
+                stall_epochs: 2,
+                seed: Some(1),
+                ..crate::tsp::MemeticEaxOptions::default()
+            }),
+            ..AppOptions::default()
+        };
+        let stages = [
+            make_stage(Solvers::NearestNeighbor, problem.clone()),
+            PipelineStage::new(Solvers::MemeticEax, eax_options, problem, None),
+        ];
+        let result = run_pipeline(&stages).unwrap();
+
+        assert!(
+            result.total <= nn_result.total * 1.001,
+            "memetic EAX must keep the warm-start seed: nn={} eax={}",
+            nn_result.total,
+            result.total
+        );
+    }
+
+    #[test]
+    fn test_stage_warnings_does_not_flag_memetic_eax() {
+        assert!(stage_warnings(&[Solvers::NearestNeighbor, Solvers::MemeticEax]).is_empty());
+    }
+
+    #[test]
     fn test_stage_warnings_flags_nn_mid_pipeline() {
         let warnings =
             stage_warnings(&[Solvers::TwoOpt, Solvers::NearestNeighbor, Solvers::TwoOpt]);
