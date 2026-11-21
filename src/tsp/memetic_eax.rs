@@ -14,6 +14,8 @@ use super::lin_kernighan::double_bridge;
 use super::probability::bernoulli;
 use super::progress::ProgressMessage;
 use super::route::Route;
+use super::tour_graph::{TourGraph, distance};
+use super::two_opt_move;
 use super::{Solution, TspProblem, kdtree::KDPoint};
 use rand::seq::SliceRandom;
 use rand::{RngExt, SeedableRng};
@@ -116,117 +118,6 @@ impl MemeticEaxOptions {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tour graph
-// ---------------------------------------------------------------------------
-
-/// A fixed-degree undirected tour: `nbr[city]` holds exactly two neighbours.
-#[derive(Clone, Debug)]
-struct TourGraph {
-    nbr: Vec<[usize; 2]>,
-}
-
-impl TourGraph {
-    fn from_tour(tour: &[usize]) -> Self {
-        let n = tour.len();
-        let mut nbr = vec![[usize::MAX; 2]; n];
-        for i in 0..n {
-            let a = tour[i];
-            let b = tour[(i + 1) % n];
-            Self::push_neighbour(&mut nbr[a], b);
-            Self::push_neighbour(&mut nbr[b], a);
-        }
-        debug_assert!(
-            nbr.iter().all(|s| s[0] != usize::MAX && s[1] != usize::MAX),
-            "every city must have two neighbours"
-        );
-        TourGraph { nbr }
-    }
-
-    fn push_neighbour(slots: &mut [usize; 2], value: usize) {
-        if slots[0] == usize::MAX {
-            slots[0] = value;
-        } else {
-            debug_assert_eq!(slots[1], usize::MAX, "degree must stay at two");
-            slots[1] = value;
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.nbr.len()
-    }
-
-    fn has_edge(&self, a: usize, b: usize) -> bool {
-        self.nbr[a][0] == b || self.nbr[a][1] == b
-    }
-
-    /// Replaces the neighbour `old` of `city` with `new`.
-    fn replace_neighbour(&mut self, city: usize, old: usize, new: usize) {
-        let slots = &mut self.nbr[city];
-        if slots[0] == old {
-            slots[0] = new;
-        } else if slots[1] == old {
-            slots[1] = new;
-        } else {
-            panic!("replace_neighbour: {old} is not a neighbour of {city}");
-        }
-    }
-
-    fn to_tour(&self, start: usize) -> Vec<usize> {
-        let n = self.nbr.len();
-        let mut tour = Vec::with_capacity(n);
-        let mut prev = usize::MAX;
-        let mut current = start;
-        for _ in 0..n {
-            tour.push(current);
-            let [a, b] = self.nbr[current];
-            let next = if a != prev { a } else { b };
-            prev = current;
-            current = next;
-        }
-        debug_assert_eq!(current, start, "tour graph must be one cycle");
-        tour
-    }
-
-    fn is_single_cycle(&self) -> bool {
-        let n = self.nbr.len();
-        if n == 0 {
-            return true;
-        }
-        let mut seen = vec![false; n];
-        let mut prev = usize::MAX;
-        let mut current = 0;
-        for _ in 0..n {
-            if seen[current] {
-                return false;
-            }
-            seen[current] = true;
-            let [a, b] = self.nbr[current];
-            let next = if a != prev { a } else { b };
-            prev = current;
-            current = next;
-        }
-        current == 0 && seen.into_iter().all(|s| s)
-    }
-
-    fn edge_sum(&self, distances: &dyn DistanceSource) -> f32 {
-        let n = self.nbr.len();
-        if n < 2 {
-            return 0.0;
-        }
-        let tour = self.to_tour(0);
-        (0..n)
-            .map(|i| distance(distances, tour[i], tour[(i + 1) % n]))
-            .sum()
-    }
-}
-
-fn distance(distances: &dyn DistanceSource, a: usize, b: usize) -> f32 {
-    distances
-        .distance_by_pos(Position::new(a), Position::new(b))
-        .unwrap_or(f32::MAX)
-}
-
 fn is_permutation(positions: &[usize], n: usize) -> bool {
     if positions.len() != n {
         return false;
@@ -268,7 +159,7 @@ fn ab_cycles(a: &TourGraph, b: &TourGraph) -> Result<Vec<AbCycle>, &'static str>
     let mut incident_b: Vec<Vec<usize>> = vec![Vec::new(); n];
 
     for city in 0..n {
-        for &neighbour in &a.nbr[city] {
+        for neighbour in a.neighbours(city) {
             if city < neighbour && !b.has_edge(city, neighbour) {
                 let edge = a_edges.len();
                 a_edges.push((city, neighbour));
@@ -276,7 +167,7 @@ fn ab_cycles(a: &TourGraph, b: &TourGraph) -> Result<Vec<AbCycle>, &'static str>
                 incident_a[neighbour].push(edge);
             }
         }
-        for &neighbour in &b.nbr[city] {
+        for neighbour in b.neighbours(city) {
             if city < neighbour && !a.has_edge(city, neighbour) {
                 let edge = b_edges.len();
                 b_edges.push((city, neighbour));
@@ -422,7 +313,7 @@ fn component_map(graph: &TourGraph, comp_of: &mut [usize], sizes: &mut Vec<usize
         loop {
             comp_of[current] = id;
             count += 1;
-            let [a, b] = graph.nbr[current];
+            let [a, b] = graph.neighbours(current);
             let next = if a != prev { a } else { b };
             prev = current;
             current = next;
@@ -451,13 +342,13 @@ fn merge_via_candidates(
         if comp_of[a] != small {
             continue;
         }
-        for &b in &graph.nbr[a] {
+        for b in graph.neighbours(a) {
             for &cand in candidates.neighbours_by_pos(Position::new(a)) {
                 let c = cand.into_inner();
                 if c >= n || comp_of[c] == small {
                     continue;
                 }
-                for &d in &graph.nbr[c] {
+                for d in graph.neighbours(c) {
                     consider_bridge(distances, a, b, c, d, &mut best);
                 }
             }
@@ -482,12 +373,12 @@ fn merge_via_full_scan(
         if comp_of[a] != small {
             continue;
         }
-        for &b in &graph.nbr[a] {
-            for c in 0..n {
-                if comp_of[c] == small {
+        for b in graph.neighbours(a) {
+            for (c, &component) in comp_of.iter().enumerate() {
+                if component == small {
                     continue;
                 }
-                for &d in &graph.nbr[c] {
+                for d in graph.neighbours(c) {
                     consider_bridge(distances, a, b, c, d, &mut best);
                 }
             }
@@ -634,7 +525,7 @@ fn polish(
         let b = tour[(i + 1) % n];
         let c = tour[j];
         let d = tour[(j + 1) % n];
-        apply_2opt(tour, &mut scratch.pos, i, j);
+        two_opt_move::reverse_segment_with_pos(tour, &mut scratch.pos, i + 1, j);
         improved = true;
         for city in [a, b, c, d] {
             if !scratch.in_queue[city] {
@@ -673,15 +564,7 @@ fn best_2opt_move(
                 if j <= i + 1 || (i == 0 && j == n - 1) {
                     continue;
                 }
-                let i_next = (i + 1) % n;
-                let j_next = (j + 1) % n;
-                // f64 keeps the four-term sum far below a move's real cost even at dsj1000
-                // scale, where an f32 ulp (~0.01) dwarfs the absolute EPS and a move and
-                // its reverse could otherwise both look improving.
-                let delta = distance(distances, tour[i], tour[j]) as f64
-                    + distance(distances, tour[i_next], tour[j_next]) as f64
-                    - distance(distances, tour[i], tour[i_next]) as f64
-                    - distance(distances, tour[j], tour[j_next]) as f64;
+                let delta = two_opt_move::delta(tour, i, j, |a, b| distance(distances, a, b));
                 if delta < -f64::from(EPS)
                     && best
                         .as_ref()
@@ -694,21 +577,6 @@ fn best_2opt_move(
     }
 
     best.map(|(_, i, j)| (i, j))
-}
-
-fn apply_2opt(tour: &mut [usize], pos: &mut [usize], i: usize, j: usize) {
-    let mut left = i + 1;
-    let mut right = j;
-    while left < right {
-        tour.swap(left, right);
-        pos[tour[left]] = left;
-        pos[tour[right]] = right;
-        left += 1;
-        right -= 1;
-    }
-    if left == right {
-        pos[tour[left]] = left;
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1274,36 +1142,6 @@ mod tests {
     }
 
     #[test]
-    fn graph_round_trips_edges() {
-        let tour = vec![3usize, 1, 4, 0, 2];
-        let graph = TourGraph::from_tour(&tour);
-        let rebuilt = graph.to_tour(3);
-        for i in 0..tour.len() {
-            assert!(graph.has_edge(tour[i], tour[(i + 1) % tour.len()]));
-        }
-        assert_eq!(rebuilt, tour);
-    }
-
-    #[test]
-    fn graph_has_degree_two_for_every_city() {
-        let tour = vec![0usize, 1, 2, 3, 4, 5];
-        let graph = TourGraph::from_tour(&tour);
-        for slots in &graph.nbr {
-            assert_ne!(slots[0], usize::MAX);
-            assert_ne!(slots[1], usize::MAX);
-            assert_ne!(slots[0], slots[1]);
-        }
-    }
-
-    #[test]
-    fn replace_neighbour_swaps_the_edge() {
-        let mut graph = TourGraph::from_tour(&[0usize, 1, 2, 3]);
-        graph.replace_neighbour(0, 1, 2);
-        assert!(graph.has_edge(0, 2));
-        assert!(!graph.has_edge(0, 1));
-    }
-
-    #[test]
     fn shared_edges_do_not_appear_in_ab_cycles() {
         let a = TourGraph::from_tour(&[0usize, 1, 2, 3]);
         let b = TourGraph::from_tour(&[0usize, 2, 1, 3]);
@@ -1352,7 +1190,8 @@ mod tests {
         let cycles = ab_cycles(&a, &b).unwrap();
         let mut child = a.clone();
         apply_cycle(&mut child, &cycles[0].vertices);
-        for slots in &child.nbr {
+        for city in 0..child.len() {
+            let slots = child.neighbours(city);
             assert_ne!(slots[0], usize::MAX);
             assert_ne!(slots[1], usize::MAX);
         }
@@ -1365,9 +1204,8 @@ mod tests {
     #[test]
     fn patching_merges_two_components() {
         // Two disjoint triangles in one graph.
-        let mut graph = TourGraph {
-            nbr: vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]],
-        };
+        let mut graph =
+            TourGraph::from_neighbours(vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]]);
         assert!(!graph.is_single_cycle());
         let cities = points(6);
         let distances = distance_matrix::from_cities_unrounded(&cities);
@@ -1732,9 +1570,8 @@ mod tests {
         ]);
         let distances = distance_matrix::from_cities_unrounded(&cities);
         let candidates = CandidateList::build(&cities, 1).unwrap();
-        let mut graph = TourGraph {
-            nbr: vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]],
-        };
+        let mut graph =
+            TourGraph::from_neighbours(vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]]);
         let mut scratch = Scratch::new(6);
         component_map(&graph, &mut scratch.comp_of, &mut scratch.comp_sizes);
         assert_eq!(scratch.comp_sizes.len(), 2);
@@ -1757,24 +1594,6 @@ mod tests {
             &mut scratch.added,
         );
         assert!(graph.is_single_cycle());
-    }
-
-    #[test]
-    fn is_single_cycle_rejects_disconnected_graph() {
-        let graph = TourGraph {
-            nbr: vec![[1, 2], [0, 2], [0, 1], [4, 5], [3, 5], [3, 4]],
-        };
-        assert!(!graph.is_single_cycle());
-    }
-
-    #[test]
-    #[should_panic(expected = "one cycle")]
-    fn to_tour_panics_when_components_do_not_close() {
-        // A triangle plus a square: walking the triangle does not close the 7-step tour.
-        let graph = TourGraph {
-            nbr: vec![[1, 2], [0, 2], [0, 1], [4, 6], [3, 5], [4, 6], [3, 5]],
-        };
-        let _ = graph.to_tour(0);
     }
 
     #[test]

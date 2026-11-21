@@ -24,6 +24,8 @@ pub mod lin_kernighan;
 pub mod memetic_eax;
 pub mod nearest_neighbor;
 pub mod on_the_fly;
+pub(crate) mod tour_graph;
+pub(crate) mod two_opt_move;
 pub use on_the_fly::OnTheFly;
 pub mod opt_tour;
 pub mod or_opt;
