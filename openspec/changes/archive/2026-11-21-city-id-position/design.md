@@ -122,6 +122,17 @@ Correctness wins over performance, but these are merge gates:
 - Matrix `distance_between` with sparse IDs: 33.8 ns (`IdIndex::Sparse`); `tour_length`: 2.81 µs dense / 10.86 µs sparse.
 - Deterministic output is byte-identical to the pre-change baseline on 98 solver/fixture pairs; `3opt` on att532 drops from 546.9 s to 96.7 s.
 
+### Final verification (2026-11-21, master `fbb845ee`)
+
+- **Deterministic parity**: 188 solver/fixture runs (both backends, seeded LK, exact solvers) are byte-identical by sha256 to the pre-change `476b3724` binary.
+- **Stochastic**: 140 runs across ACO/CS/FPA/GA/GSA/PSO/shuffle on berlin52 and a280 were all valid permutations; medians stayed within ±5.4% of the pre-change binary.
+- **Micro-bench**: dense matrix lookups improved 84% and the matrix build benches improved 2–21%. The kdtree deltas (`nearest_k5` +2.45%) are address layout only: the benchmark functions' instruction streams are identical between the two binaries.
+- **Wall clock** (median of 10, matrix): `or_opt` att532 −66.9%, `3opt` a280 −81.6%, `lk` att532 −1.8%, `lk` a280 +1.4%; `3opt` att532 546.9 s → 100.1 s.
+- **Memory**: on-the-fly peak RSS at 10k/25k/50k = −2.5%/−7.3%/−15.1% vs the baseline; `graph.rs` still stores `(f32, u32, u32)`; the huge-ID LK test passes.
+- **Allocation**: the hot-loop test reports zero allocations on both backends and both `IdIndex` branches.
+- **WASM**: the component builds; WIT and `teeline-wasm.d.ts` are unchanged; the duplicate-ID tests pass.
+- **Qt**: builds and starts headless; the QML event loop runs.
+
 ## Risks / Trade-offs
 
 - **LK remap correctness** — the tour, tie-breaks, and chain reconstruction must be preserved. Gate with the existing LK tests, seeded quality runs, and a sparse/huge-ID test.

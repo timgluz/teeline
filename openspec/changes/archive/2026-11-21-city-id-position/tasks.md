@@ -3,7 +3,7 @@
 ## 1. Foundation
 
 - [x] 1.1 Write ADR 013 recording the `Position`-only boundary, distance-source index ownership, and fallible source construction; add it to the `docs/adr/` index and verify the index links it.
-- [ ] 1.2 Capture the pre-change baseline: build a `master` worktree in release, run `cargo bench --bench kdtree` and `cargo bench --bench distance_matrix` with `--save-baseline pre`, run `scripts/bench-distance-scaling.sh` for memory, and store the deterministic-solver fixture outputs.
+- [x] 1.2 Capture the pre-change baseline: build a `master` worktree in release, run `cargo bench --bench kdtree` and `cargo bench --bench distance_matrix` with `--save-baseline pre`, run `scripts/bench-distance-scaling.sh` for memory, and store the deterministic-solver fixture outputs.
 
 ## 2. PR 1 — Lin-Kernighan remap and position-storing candidate rows
 
@@ -42,27 +42,27 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `cargo test --workspace`; verify it is green.
-- [ ] 6.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
-- [ ] 6.3 Run `cargo fmt --check`; verify no diffs.
-- [ ] 6.4 Compare deterministic solvers (2opt, or_opt, 3opt, nn, sfc, bhk, seeded LK) by sha256 on the fixture corpus; verify byte-identical output.
-- [ ] 6.5 Verify stochastic solvers (ACO, CS, FPA, GA, GSA, PSO, random shuffle) return a valid permutation of the original IDs and stay within the quality budget across runs.
-- [ ] 6.6 Run the micro-bench gate: no regression > +3% (p < 0.05, two reruns); `nearest_k5` blocks at +2%.
-- [ ] 6.7 Run the wall-clock gate: median of 10 runs, no regression > +5% on deterministic cells with a median ≥ 200 ms.
-- [ ] 6.8 Run the memory gate: on-the-fly peak RSS no more than +2% or +1 MiB; verify `graph.rs`'s `u32` edge storage is unchanged and LK scales with `n`, not `max_id`.
-- [ ] 6.9 Run the allocation gate and verify zero allocations in the hot-loop test.
-- [ ] 6.10 Build the WASM target and verify the ambient `teeline-wasm.d.ts` matches any changed export; verify duplicate IDs return an error.
-- [ ] 6.11 Build and smoke-test `teeline-qt`; verify a solve still renders progress.
-- [ ] 6.12 Run `graphify update .`; verify the graph is current.
+- [x] 6.1 Run `cargo test --workspace`; verify it is green.
+- [x] 6.2 Run `cargo clippy --workspace -- -D warnings`; verify no warnings.
+- [x] 6.3 Run `cargo fmt --check`; verify no diffs.
+- [x] 6.4 Compare deterministic solvers (2opt, or_opt, 3opt, nn, sfc, bhk, seeded LK) by sha256 on the fixture corpus; verify byte-identical output.
+- [x] 6.5 Verify stochastic solvers (ACO, CS, FPA, GA, GSA, PSO, random shuffle) return a valid permutation of the original IDs and stay within the quality budget across runs.
+- [x] 6.6 Run the micro-bench gate: no regression > +3% (p < 0.05, two reruns); `nearest_k5` blocks at +2%.
+- [x] 6.7 Run the wall-clock gate: median of 10 runs, no regression > +5% on deterministic cells with a median ≥ 200 ms.
+- [x] 6.8 Run the memory gate: on-the-fly peak RSS no more than +2% or +1 MiB; verify `graph.rs`'s `u32` edge storage is unchanged and LK scales with `n`, not `max_id`.
+- [x] 6.9 Run the allocation gate and verify zero allocations in the hot-loop test.
+- [x] 6.10 Build the WASM target and verify the ambient `teeline-wasm.d.ts` matches any changed export; verify duplicate IDs return an error.
+- [x] 6.11 Build and smoke-test `teeline-qt`; verify a solve still renders progress.
+- [x] 6.12 Run `graphify update .`; verify the graph is current.
 
 ## 7. Stacked PR delivery
 
-- [ ] 7.1 Open PR 1 (`fix/lk-position-remap`) against `master` for group 2, including ADR 013; verify the huge/unordered-ID tests.
-- [ ] 7.2 Open PR 2 (`fix/duplicate-city-ids`) against PR 1 for group 3; verify the API 400 and WASM error paths.
-- [ ] 7.3 Open PR 3 (`refactor/index-consolidation`) against PR 2 for group 4; verify the dead-code removal and matrix outputs.
-- [ ] 7.4 Open PR 4 (`refactor/position-newtype`) against PR 3 for group 5; verify the full conformance suite and the performance gates.
-- [ ] 7.5 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope.
-- [ ] 7.6 Archive after the stack merges and the deterministic fixture outputs are verified byte-identical.
+- [x] 7.1 Open PR 1 (`fix/lk-position-remap`) against `master` for group 2, including ADR 013; verify the huge/unordered-ID tests.
+- [x] 7.2 Open PR 2 (`fix/duplicate-city-ids`) against PR 1 for group 3; verify the API 400 and WASM error paths.
+- [x] 7.3 Open PR 3 (`refactor/index-consolidation`) against PR 2 for group 4; verify the dead-code removal and matrix outputs.
+- [x] 7.4 Open PR 4 (`refactor/position-newtype`) against PR 3 for group 5; verify the full conformance suite and the performance gates.
+- [x] 7.5 After each merge, retarget the next PR to the new base and verify its diff contains only its own scope.
+- [x] 7.6 Archive after the stack merges and the deterministic fixture outputs are verified byte-identical.
 
 ## Out of scope
 
