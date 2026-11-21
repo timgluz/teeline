@@ -4,8 +4,11 @@ Qt 6 / QML desktop GUI for the Teeline TSP solver. Provides live visualization o
 
 ## Requirements
 
-- Qt 6.7 or later
+- Qt 6.10 or later (`qtbridge` 0.4). The Qt SDK from download.qt.io ships the QtQml
+  private headers the bridge needs; with a distribution Qt on Debian/Ubuntu, install
+  `qt6-declarative-private-dev`.
 - Rust toolchain (the solver engine is compiled into the binary via `qtbridge`)
+- A C++ toolchain and `qmake` on `PATH` (qtbridge generates and compiles the C++ bridge)
 
 ## Build
 

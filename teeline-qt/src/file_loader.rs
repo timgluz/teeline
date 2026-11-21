@@ -1,4 +1,4 @@
-use qtbridge::qobject_impl;
+use qtbridge::qobject;
 use std::path::Path;
 use teeline::tsp::{kdtree::KDPoint, opt_tour, tour_cost, tsplib};
 
@@ -40,79 +40,83 @@ impl Default for FileLoader {
     }
 }
 
-#[qobject_impl(Singleton)]
+#[qobject(Singleton, ConvertToCamelCase)]
 impl FileLoader {
     qproperty!(
         "cityCount",
         Member = city_count,
         Write = set_city_count,
-        Notify = "cityCountChanged"
+        Notify = city_count_changed
     );
     qproperty!(
         "problemName",
         Member = problem_name,
         Write = set_problem_name,
-        Notify = "problemNameChanged"
+        Notify = problem_name_changed
     );
     qproperty!(
         "edgeWeightType",
         Member = edge_weight_type,
         Write = set_edge_weight_type,
-        Notify = "edgeWeightTypeChanged"
+        Notify = edge_weight_type_changed
     );
     qproperty!(
         "isLoaded",
         Member = is_loaded,
         Write = set_is_loaded,
-        Notify = "isLoadedChanged"
+        Notify = is_loaded_changed
     );
     qproperty!(
         "errorMessage",
         Member = error_message,
         Write = set_error_message,
-        Notify = "errorMessageChanged"
+        Notify = error_message_changed
     );
     qproperty!(
         "citiesJson",
         Member = cities_json,
         Write = set_cities_json,
-        Notify = "citiesJsonChanged"
+        Notify = cities_json_changed
     );
     qproperty!(
         "recentFilesJson",
         Member = recent_files_json,
         Write = set_recent_files_json,
-        Notify = "recentFilesJsonChanged"
+        Notify = recent_files_json_changed
     );
     qproperty!(
         "filePath",
         Member = file_path,
         Write = set_file_path,
-        Notify = "filePathChanged"
+        Notify = file_path_changed
     );
     qproperty!(
         "hasOptTour",
         Member = has_opt_tour,
         Write = set_has_opt_tour,
-        Notify = "hasOptTourChanged"
+        Notify = has_opt_tour_changed
     );
     qproperty!(
         "optTourRouteJson",
         Member = opt_tour_route_json,
         Write = set_opt_tour_route_json,
-        Notify = "optTourRouteJsonChanged"
+        Notify = opt_tour_route_json_changed
     );
     qproperty!(
         "optTourCost",
-        Member = opt_tour_cost,
+        Read = get_opt_tour_cost,
         Write = set_opt_tour_cost,
-        Notify = "optTourCostChanged"
+        Notify = opt_tour_cost_changed
     );
+
+    fn get_opt_tour_cost(&self) -> f32 {
+        self.opt_tour_cost
+    }
     qproperty!(
         "optTourFilePath",
         Member = opt_tour_file_path,
         Write = set_opt_tour_file_path,
-        Notify = "optTourFilePathChanged"
+        Notify = opt_tour_file_path_changed
     );
 
     fn set_city_count(&mut self, v: i32) {
@@ -165,29 +169,29 @@ impl FileLoader {
     }
 
     #[qsignal]
-    fn city_count_changed(&self);
+    fn city_count_changed(&mut self);
     #[qsignal]
-    fn problem_name_changed(&self);
+    fn problem_name_changed(&mut self);
     #[qsignal]
-    fn edge_weight_type_changed(&self);
+    fn edge_weight_type_changed(&mut self);
     #[qsignal]
-    fn is_loaded_changed(&self);
+    fn is_loaded_changed(&mut self);
     #[qsignal]
-    fn error_message_changed(&self);
+    fn error_message_changed(&mut self);
     #[qsignal]
-    fn cities_json_changed(&self);
+    fn cities_json_changed(&mut self);
     #[qsignal]
-    fn recent_files_json_changed(&self);
+    fn recent_files_json_changed(&mut self);
     #[qsignal]
-    fn file_path_changed(&self);
+    fn file_path_changed(&mut self);
     #[qsignal]
-    fn has_opt_tour_changed(&self);
+    fn has_opt_tour_changed(&mut self);
     #[qsignal]
-    fn opt_tour_route_json_changed(&self);
+    fn opt_tour_route_json_changed(&mut self);
     #[qsignal]
-    fn opt_tour_cost_changed(&self);
+    fn opt_tour_cost_changed(&mut self);
     #[qsignal]
-    fn opt_tour_file_path_changed(&self);
+    fn opt_tour_file_path_changed(&mut self);
 
     /// Load a TSPLIB file. `path` may be a filesystem path or a file:// URL.
     #[qslot]

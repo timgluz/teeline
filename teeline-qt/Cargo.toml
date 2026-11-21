@@ -17,10 +17,6 @@ path = "src/main.rs"
 dist = false # requires Qt runtime; not a standalone distributable binary
 
 [dependencies]
-# Pinned to a backport of upstream 88105239b2: mutable dispatch used &mut
-# proxy receivers, so a signal emitted from a mutable slot re-entered the same
-# proxy through shared references and could abort on "Failed to borrow for
-# read_property()". Switch back to upstream once the 0.3+ API migration is done.
-qtbridge = { git = "https://github.com/timgluz/qtbridge-rust", rev = "8c844588cdf40e2ef3c8f621f40de1f65dc88cef" }
+qtbridge = "0.4"
 teeline = { path = ".." }
 serde_json = "1"
