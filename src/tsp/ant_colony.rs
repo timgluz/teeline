@@ -112,7 +112,7 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, distances.as_ref());
+        return Solution::from_parts(&path, distances.as_ref());
     }
 
     let mut rng = rand::rng();
@@ -264,7 +264,7 @@ pub fn solve(
     }
 
     let best_ids: Vec<usize> = best.iter().map(|&p| to_id(p)).collect();
-    Solution::from_parts(&best_ids, cities, distances.as_ref())
+    Solution::from_parts(&best_ids, distances.as_ref())
 }
 
 #[cfg(test)]

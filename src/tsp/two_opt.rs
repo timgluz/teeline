@@ -28,7 +28,7 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, distances.as_ref());
+        return Solution::from_parts(&path, distances.as_ref());
     }
 
     // A candidate list is a pruning heuristic: every move is still scored with the exact
@@ -53,7 +53,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&path, cities, distances.as_ref())
+    Solution::from_parts(&path, distances.as_ref())
 }
 
 /// A candidate list is a pruning heuristic: every move is still scored with the exact distance
@@ -311,19 +311,13 @@ mod tests {
 
     #[test]
     fn explicit_input_skips_the_candidate_list() {
-        use crate::tsp::CityTable;
-
         let n = 6;
         let cities: Vec<kdtree::KDPoint> = (0..n)
             .map(|i| kdtree::KDPoint::new_with_id(i + 1, &[i as f32, 0.0]))
             .collect();
-        let table: CityTable = cities
-            .iter()
-            .enumerate()
-            .map(|(position, city)| (position, *city))
-            .collect();
         let matrix =
-            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], table).unwrap();
+            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], cities.clone())
+                .unwrap();
 
         assert!(candidates_for(&matrix, &cities, 2).is_none());
     }

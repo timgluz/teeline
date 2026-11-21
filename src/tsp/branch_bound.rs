@@ -88,7 +88,7 @@ pub fn solve(
     } else {
         best_path
     };
-    Solution::from_parts(&result_path, cities, distances.as_ref())
+    Solution::from_parts(&result_path, distances.as_ref())
 }
 
 fn build_evaluator(distances: &Arc<dyn DistanceSource>) -> PathEvaluator {

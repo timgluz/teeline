@@ -492,7 +492,7 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, problem.distances.as_ref());
+        return Solution::from_parts(&path, problem.distances.as_ref());
     }
 
     let base_grid = normalize_coords(cities, opts.order, opts.aspect_scaling);
@@ -531,7 +531,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::from_parts(&path, cities, problem.distances.as_ref())
+    Solution::from_parts(&path, problem.distances.as_ref())
 }
 
 #[cfg(test)]
