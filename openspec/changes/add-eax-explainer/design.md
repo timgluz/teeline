@@ -92,6 +92,8 @@ visually hidden summary and a cycle/subtour table carry the text alternative.
 - `Rand` uses a small seeded PRNG (mulberry32) with a visible seed and a `Reshuffle` button.
   The same seed always selects the same cycles; no unseeded `Math.random`.
 - Clicking a cycle or legend row toggles it and switches the strategy to a manual selection.
+  The last active cycle cannot be deselected: an empty E-set would make the child identical to
+  Parent A, which is not a crossover worth presenting as one.
 - A stage or strategy change pauses playback and resets to that stage's first frame.
 
 ### 6. Exhaustive patching for the 24-city fixture
@@ -116,10 +118,11 @@ which is why a child is rarely much worse and often better than its parents.
 
 ### 9. Visual language
 
-- Parent A: blue (`#3b82f6`); Parent B: amber (`#d97706`); shared edges: muted slate
-  (`--muted`); removed/dissolving: red (`#f87171`); bridge/polished: green (`#16a34a`); final
-  child: indigo (`#6366f1`). These reuse the GA explainer's scoped palette rather than
-  introducing new site tokens.
+- Parent A: blue (`#3b82f6`); Parent B: amber (`#d97706`); bridge/polished: green
+  (`#16a34a`) — the GA explainer's existing scoped palette. Shared edges use the explainer's
+  muted text colour; removed/dissolving uses the site `--color-negative` (`#f87171`); the final
+  child uses the site `--color-accent` (`#6366f1`). No new global tokens are introduced; red and
+  indigo are existing site tokens used in a new role.
 - Cycle badges use four categorical tints and a legend; selected cycles pulse once (functional
   state, not decorative motion).
 - Numeric values use the monospace stack; the surrounding copy uses the explainer's existing

@@ -66,7 +66,7 @@ The explainer SHALL render the union multigraph of both parents, fade shared edg
 
 ### Requirement: Interactive E-set selection
 
-The explainer SHALL let the visitor select the crossover E-set with `1-AB`, `Rand`, or by clicking a cycle, SHALL keep selected cycles visually distinct from unselected ones, and SHALL make `Rand` reproducible for a given seed.
+The explainer SHALL let the visitor select the crossover E-set with `1-AB`, `Rand`, or by clicking a cycle, SHALL keep at least one cycle selected, SHALL keep selected cycles visually distinct from unselected ones, and SHALL make `Rand` reproducible for a given seed.
 
 #### Scenario: One-AB selects one cycle
 
@@ -82,6 +82,11 @@ The explainer SHALL let the visitor select the crossover E-set with `1-AB`, `Ran
 
 - **WHEN** the visitor clicks a cycle badge or legend row
 - **THEN** that cycle joins or leaves the E-set and the visualization updates
+
+#### Scenario: The last cycle cannot be deselected
+
+- **WHEN** the visitor tries to deselect the only active cycle
+- **THEN** it stays selected and the explainer explains that at least one cycle is required for a crossover
 
 ### Requirement: Symmetric difference and subtours
 
