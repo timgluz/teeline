@@ -23,7 +23,7 @@ pub fn solve(
         let j = rng.random_range(0..=i);
         path.swap(i, j);
     }
-    Solution::from_parts(&path, cities, distances.as_ref())
+    Solution::from_parts(&path, distances.as_ref())
 }
 
 #[cfg(test)]

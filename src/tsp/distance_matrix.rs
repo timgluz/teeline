@@ -52,12 +52,11 @@
 */
 
 use std::borrow::Cow;
-use std::collections::HashMap;
 
+use super::DistanceType;
 use super::distance_source::DistanceSource;
-use super::id_index::unique_city_ids;
+use super::id_index::{IdIndex, unique_city_ids};
 use super::kdtree::KDPoint;
-use super::{CityTable, DistanceType};
 
 pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     // Full-precision PI, deliberately, not TSPLIB's truncated `PI = 3.141592` from the
@@ -234,8 +233,8 @@ impl PackedDistances {
 pub struct DistanceMatrix {
     n: usize, // how many cities
     items: PackedDistances,
-    cities: CityTable,
-    city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
+    cities: Vec<KDPoint>, // position-indexed, same order as the matrix rows
+    city_idx: IdIndex,    // translates city_id to matrix position
     is_coordinate_metric: bool,
 }
 
@@ -244,7 +243,7 @@ impl DistanceMatrix {
     ///
     /// Values that fit in `u16` are stored at two bytes each; everything else stays `f32`.
     /// Both representations preserve every value exactly.
-    pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Result<Self, &'static str> {
+    pub fn new(n: usize, distances: Vec<f32>, cities: Vec<KDPoint>) -> Result<Self, &'static str> {
         Self::from_parts(n, PackedDistances::from_explicit(distances), cities, false)
     }
 
@@ -253,7 +252,7 @@ impl DistanceMatrix {
     pub fn from_explicit_slice(
         n: usize,
         distances: &[f32],
-        cities: CityTable,
+        cities: Vec<KDPoint>,
     ) -> Result<Self, &'static str> {
         Self::from_parts(
             n,
@@ -266,17 +265,14 @@ impl DistanceMatrix {
     fn from_parts(
         n: usize,
         items: PackedDistances,
-        cities: CityTable,
+        cities: Vec<KDPoint>,
         is_coordinate_metric: bool,
     ) -> Result<Self, &'static str> {
         if cities.len() != n {
-            return Err("city table length does not match n");
+            return Err("city count does not match n");
         }
-        let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
+        let city_idx = IdIndex::build(&cities)?;
 
-        if city_idx.len() != n {
-            return Err("city ids must be unique");
-        }
         let expected = n
             .checked_sub(1)
             .and_then(|previous| n.checked_mul(previous))
@@ -297,7 +293,7 @@ impl DistanceMatrix {
     fn new_with_coordinates(
         n: usize,
         distances: Vec<f32>,
-        cities: CityTable,
+        cities: Vec<KDPoint>,
         is_coordinate_metric: bool,
     ) -> Result<Self, &'static str> {
         Self::from_parts(
@@ -355,12 +351,8 @@ impl DistanceMatrix {
 
         let size = n * (n - 1) / 2; // how many items on distance vec
 
-        let mut city_table = CityTable::new();
-
         let mut distances = Vec::with_capacity(size);
         for (i, pt1) in cities.iter().enumerate() {
-            city_table.insert(i, *pt1);
-
             for pt2 in cities.iter().take(i) {
                 distances.push(distance(pt1, pt2));
             }
@@ -368,7 +360,7 @@ impl DistanceMatrix {
 
         distances.shrink_to_fit();
 
-        DistanceMatrix::new_with_coordinates(n, distances, city_table, true)
+        DistanceMatrix::new_with_coordinates(n, distances, cities.to_vec(), true)
     }
 
     pub fn len(&self) -> usize {
@@ -406,10 +398,6 @@ impl DistanceMatrix {
     pub fn storage_kind(&self) -> &'static str {
         self.items.kind()
     }
-
-    pub fn city_index(&self) -> &HashMap<usize, usize> {
-        &self.city_idx
-    }
 }
 
 impl DistanceSource for DistanceMatrix {
@@ -432,35 +420,27 @@ impl DistanceSource for DistanceMatrix {
 
     /// Hot-path override: the default would dispatch `city_id2pos` twice and
     /// `distance_by_pos` once through the vtable for every lookup. This one resolves the
-    /// map directly and calls the primitive statically. The conformance suite proves it
+    /// index directly and calls the primitive statically. The conformance suite proves it
     /// returns the same values as the default.
     fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
         if city_id1 == city_id2 {
             return Ok(0.0);
         }
-        let pos1 = self
-            .city_idx
-            .get(&city_id1)
-            .copied()
-            .ok_or("city_id1 not in index")?;
-        let pos2 = self
-            .city_idx
-            .get(&city_id2)
-            .copied()
-            .ok_or("city_id2 not in index")?;
+        let pos1 = self.city_idx.get(city_id1).ok_or("city_id1 not in index")?;
+        let pos2 = self.city_idx.get(city_id2).ok_or("city_id2 not in index")?;
         self.distance_by_pos(pos1, pos2)
     }
 
     fn pos2city_id(&self, pos: usize) -> Option<usize> {
-        self.cities.get(&pos).map(|c| c.id)
+        self.cities.get(pos).map(|c| c.id)
     }
 
     fn city_id2pos(&self, city_id: usize) -> Option<usize> {
-        self.city_idx.get(&city_id).copied()
+        self.city_idx.get(city_id)
     }
 
     fn point_at(&self, pos: usize) -> Option<KDPoint> {
-        self.cities.get(&pos).copied()
+        self.cities.get(pos).copied()
     }
 
     fn is_coordinate_metric(&self) -> bool {
@@ -479,9 +459,7 @@ mod tests {
         // Hand-built matrix: distance(0,1) = NaN, distance(0,2) = 5, distance(1,2) = 1.
         // Packed lower triangle is [d(1,0), d(2,0), d(2,1)].
         let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
-        let table: crate::tsp::CityTable =
-            cities.iter().enumerate().map(|(i, c)| (i, *c)).collect();
-        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], table).unwrap();
+        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], cities.clone()).unwrap();
 
         // City 1 must be skipped despite being "closest" only in the sense that NaN loses
         // every ordinary comparison — a NaN in `best` would otherwise stick forever.
@@ -748,9 +726,9 @@ mod tests {
         assert_eq!(dm.storage_kind(), "f32");
     }
 
-    fn explicit_cities(n: usize) -> CityTable {
+    fn explicit_cities(n: usize) -> Vec<KDPoint> {
         (0..n)
-            .map(|i| (i, KDPoint::new_with_id(i + 1, &[i as f32, 0.0])))
+            .map(|i| KDPoint::new_with_id(i + 1, &[i as f32, 0.0]))
             .collect()
     }
 
@@ -1045,6 +1023,29 @@ mod tests {
             3,
             "nearest to city 1 should be city 3, not city 2"
         );
+    }
+
+    #[test]
+    fn sparse_ids_resolve_through_the_sparse_index() {
+        // max_id (30) exceeds 4 * n (12), so `IdIndex` must take the sparse branch; the
+        // matrix still has to answer every position/id query exactly.
+        let cities = vec![
+            KDPoint::new_with_id(10, &[0.0, 0.0]),
+            KDPoint::new_with_id(20, &[3.0, 4.0]),
+            KDPoint::new_with_id(30, &[0.0, 1.0]),
+        ];
+        let dm = DistanceMatrix::from_cities_unrounded(&cities).unwrap();
+
+        assert_eq!(dm.point_at(0).map(|c| c.id), Some(10));
+        assert_eq!(dm.pos2city_id(1), Some(20));
+        assert_eq!(dm.pos2city_id(3), None);
+        assert_eq!(dm.city_id2pos(30), Some(2));
+        assert_eq!(dm.city_id2pos(99), None);
+        assert_approx(5.0, dm.distance_between(10, 20).unwrap());
+        assert!(dm.distance_between(10, 99).is_err());
+
+        let d20_30 = 18.0_f32.sqrt();
+        assert_approx(1.0 + 5.0 + d20_30, dm.tour_length(&[10, 20, 30]));
     }
 
     #[test]

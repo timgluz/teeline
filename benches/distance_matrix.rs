@@ -78,6 +78,44 @@ fn bench_lookup(c: &mut Criterion) {
             )
         });
     });
+
+    // `IdIndex` switches to a hash map once the largest id outgrows `4 * n`, so multiplying
+    // the TSPLIB ids by 1000 exercises the sparse path on the same geometry.
+    let sparse_cities: Vec<KDPoint> = cities
+        .iter()
+        .map(|city| KDPoint::new_with_id(city.id * 1_000, &[city.x(), city.y()]))
+        .collect();
+    let sparse = DistanceMatrix::build(&sparse_cities, DistanceType::Euc2D).unwrap();
+
+    let dense_tour: Vec<usize> = cities.iter().map(|city| city.id).collect();
+    let sparse_tour: Vec<usize> = sparse_cities.iter().map(|city| city.id).collect();
+
+    let mut group = c.benchmark_group("lookup");
+    group.bench_function("distance_between_dense", |b| {
+        b.iter(|| {
+            black_box(
+                black_box(&dm)
+                    .distance_between(black_box(1), black_box(last))
+                    .unwrap(),
+            )
+        });
+    });
+    group.bench_function("distance_between_sparse", |b| {
+        b.iter(|| {
+            black_box(
+                black_box(&sparse)
+                    .distance_between(black_box(1_000), black_box(last * 1_000))
+                    .unwrap(),
+            )
+        });
+    });
+    group.bench_function("tour_length_dense", |b| {
+        b.iter(|| black_box(black_box(&dm).tour_length(black_box(&dense_tour))));
+    });
+    group.bench_function("tour_length_sparse", |b| {
+        b.iter(|| black_box(black_box(&sparse).tour_length(black_box(&sparse_tour))));
+    });
+    group.finish();
 }
 
 criterion_group!(

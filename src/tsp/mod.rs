@@ -47,7 +47,6 @@ pub mod two_opt;
 use crate::tsp::distance_matrix::DistanceMatrix;
 use crate::tsp::kdtree::KDPoint;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::mpsc;
 
@@ -2123,47 +2122,25 @@ impl TspProblem {
 // Solution
 // ---------------------------------------------------------------------------
 
-pub type CityTable = HashMap<usize, KDPoint>;
-
-pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
-    cities.iter().map(|c| (c.id, *c)).collect()
-}
-
 pub struct Solution {
     pub total: f32,
     route: Vec<usize>,
-    cities: Vec<KDPoint>,
-    cities_idx: HashMap<usize, usize>,
 }
 
 impl Solution {
     pub fn new(route: &[usize], problem: &TspProblem) -> Self {
-        let cities = &problem.cities;
-        let distances = &problem.distances;
-        let cities_idx = cities.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
-
         Solution {
-            total: distances.tour_length(route),
+            total: problem.distances.tour_length(route),
             route: route.to_vec(),
-            cities: cities.to_vec(),
-            cities_idx,
         }
     }
 
-    /// Convenience constructor for solver functions that already hold separate `cities`
-    /// and `distances` slices and do not need to construct a full [`TspProblem`].
-    pub(crate) fn from_parts(
-        route: &[usize],
-        cities: &[kdtree::KDPoint],
-        distances: &dyn DistanceSource,
-    ) -> Self {
-        let cities_idx = cities.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
-
+    /// Convenience constructor for solver functions that already hold a distance source and
+    /// do not need to construct a full [`TspProblem`].
+    pub(crate) fn from_parts(route: &[usize], distances: &dyn DistanceSource) -> Self {
         Solution {
             total: distances.tour_length(route),
             route: route.to_vec(),
-            cities: cities.to_vec(),
-            cities_idx,
         }
     }
 
@@ -2177,18 +2154,6 @@ impl Solution {
 
     pub fn route(&self) -> &[usize] {
         self.route[..].as_ref()
-    }
-
-    pub fn cities(&self) -> &[kdtree::KDPoint] {
-        &self.cities[..]
-    }
-
-    pub fn get_by_city_id(&self, city_id: usize) -> Option<&KDPoint> {
-        if let Some(vec_pos) = self.cities_idx.get(&city_id) {
-            self.cities.get(*vec_pos)
-        } else {
-            None
-        }
     }
 }
 

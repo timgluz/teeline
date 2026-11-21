@@ -10,7 +10,7 @@ use regex::Regex;
 
 use super::distance_matrix::DistanceMatrix;
 use super::kdtree::KDPoint;
-use super::{CityTable, DistanceBackend, DistanceType, TspProblem, embedding};
+use super::{DistanceBackend, DistanceType, TspProblem, embedding};
 
 const COORD_SECTION_KEY: &str = "NODE_COORD_SECTION";
 const DISPLAY_DATA_SECTION_KEY: &str = "DISPLAY_DATA_SECTION";
@@ -108,10 +108,11 @@ impl TspLibData {
     pub fn distance_matrix(&self) -> Result<DistanceMatrix, String> {
         match &self.raw_distances {
             Some(dists) => {
-                let (n, city_table) = explicit_city_table(&self.cities, dists.len())?;
+                let n = validate_explicit_cities(&self.cities, dists.len())?;
                 // Packs straight from the parsed weights; `DistanceMatrix::new` would require
                 // an O(n^2) clone first.
-                DistanceMatrix::from_explicit_slice(n, dists, city_table).map_err(|e| e.to_string())
+                DistanceMatrix::from_explicit_slice(n, dists, self.cities.clone())
+                    .map_err(|e| e.to_string())
             }
             None => {
                 DistanceMatrix::build(&self.cities, self.distance_type).map_err(|e| e.to_string())
@@ -170,8 +171,9 @@ impl TspLibData {
                         .to_string(),
                 );
             }
-            let (n, city_table) = explicit_city_table(&cities, distances.len())?;
-            let dm = DistanceMatrix::new(n, distances, city_table).map_err(|e| e.to_string())?;
+            let n = validate_explicit_cities(&cities, distances.len())?;
+            let dm =
+                DistanceMatrix::new(n, distances, cities.clone()).map_err(|e| e.to_string())?;
             return TspProblem::try_new(cities, dm);
         }
 
@@ -219,14 +221,11 @@ impl TspLibData {
     }
 }
 
-/// Validate an EXPLICIT city list and build its position-indexed city table.
+/// Validate an EXPLICIT city list before the matrix packs its weights.
 ///
-/// `DistanceMatrix::new` asserts on a mismatched weight count or duplicate IDs; a malformed
+/// `DistanceMatrix::new` rejects a mismatched weight count or duplicate IDs; a malformed
 /// TSPLIB file (or a hand-built `TspLibData`) should return an error instead of panicking.
-fn explicit_city_table(
-    cities: &[KDPoint],
-    weight_count: usize,
-) -> Result<(usize, CityTable), String> {
+fn validate_explicit_cities(cities: &[KDPoint], weight_count: usize) -> Result<usize, String> {
     let n = cities.len();
     if n < 2 {
         return Err(format!(
@@ -246,12 +245,7 @@ fn explicit_city_table(
 
     super::id_index::unique_city_ids(cities).map_err(|e| format!("EXPLICIT input: {e}"))?;
 
-    let table = cities
-        .iter()
-        .enumerate()
-        .map(|(position, city)| (position, *city))
-        .collect();
-    Ok((n, table))
+    Ok(n)
 }
 
 pub fn read_from_file(path: &Path) -> Result<TspLibData, String> {

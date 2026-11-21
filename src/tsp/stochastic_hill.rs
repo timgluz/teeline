@@ -93,7 +93,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(best_route.route(), cities, distances.as_ref())
+    Solution::from_parts(best_route.route(), distances.as_ref())
 }
 
 #[cfg(test)]
