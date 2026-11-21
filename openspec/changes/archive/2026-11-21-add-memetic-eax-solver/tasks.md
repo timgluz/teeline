@@ -72,7 +72,44 @@
 ## 15. Benchmarks and integration quality
 
 - [x] 15.1 Add integration tests for aliases, CLI/TOML options, pipeline use, and ATSP rejection through the public API. Verify: `cargo test --test memetic_eax` passes.
-- [ ] 15.2 Run five-seed benchmarks on `berlin52`, `kroA100`, `a280`, and `dsj1000` within the 300-second meta budget and record machine, build mode, seeds, and elapsed time. Verify: `task bench:tierA -- --only memetic_eax` completes and the report states the measured gaps against the targets.
+- [x] 15.2 Run five-seed benchmarks on `berlin52`, `kroA100`, `a280`, and `dsj1000` within the 300-second meta budget and record machine, build mode, seeds, and elapsed time. Verify: `task bench:tierA -- --solver eax` completes and the report states the measured gaps against the targets.
+
+### Benchmark results
+
+Release build, Rust 1.100.0, Tier A default config (`runs = 5`, `meta` budget 300 s),
+measured at commit `eab6b34`:
+
+| Instance | OK | Timeouts | Median gap | Best | Worst | Median time |
+|---|---:|---:|---:|---:|---:|---:|
+| burma14 | 5 | 0 | 0.000% | 0.000% | 0.000% | 1.2 s |
+| gr17 | 5 | 0 | 0.000% | 0.000% | 0.000% | 1.8 s |
+| ulysses16 | 5 | 0 | 0.000% | 0.000% | 0.000% | 1.7 s |
+| ulysses22 | 5 | 0 | 0.000% | 0.000% | 0.000% | 2.1 s |
+| att48 | 5 | 0 | 0.000% | 0.000% | 0.000% | 2.8 s |
+| berlin52 | 5 | 0 | 0.000% | 0.000% | 0.000% | 2.9 s |
+| eil76 | 5 | 0 | 0.000% | 0.000% | 0.000% | 3.0 s |
+| kroA100 | 5 | 0 | 0.000% | 0.000% | 0.000% | 3.5 s |
+| gr120 | 5 | 0 | 0.000% | 0.000% | 0.000% | 4.5 s |
+| ch150 | 5 | 0 | 0.000% | 0.000% | 0.000% | 3.4 s |
+| a280 | 5 | 0 | 0.000% | 0.000% | 0.000% | 5.4 s |
+| dsj1000 | 5 | 0 | 0.028% | 0.000% | 0.076% | 32.4 s |
+
+Result: **60 ok, 0 timeout, 0 error**. Every instance reaches its published optimum in every
+run except `dsj1000`, which is 0.028% median (target ≤0.50%) and finishes in ~32 s (well
+inside the 300 s budget). The small-instance time targets (berlin52 <0.2 s, kroA100 <0.5 s,
+a280 <2.0 s) are not met at the default `pop_size = 100` × `children_per_pair = 15`; the
+quality targets are met, and a tuned benchmark config can cover the time targets separately.
+
+Provenance: AMD Ryzen 7 PRO 4750U (16 threads), 32 GB RAM, Linux; release build, Rust
+1.100.0. The Tier A harness does not pass `--seed`, so the five runs use system entropy
+(independent stochastic runs, not fixed seeds). "Median time" is the harness's per-run process
+wall time (`wall_s`), including CLI startup.
+
+One `dsj1000` run reported 18,660,178 while an independent CEIL_2D recomputation of the same
+route gives 18,660,188 (the published optimum). The route is a valid permutation; the 10-unit
+difference is **f32 accumulation in `DistanceSource::tour_length`**, not a solver route
+difference. The route's exact cost is the optimum. Follow-up: accumulate tour lengths in f64
+so reported costs and gaps are exact at large-instance scale.
 
 ## 16. Integration gate
 
