@@ -15,7 +15,7 @@ use teeline::tsp::{
 
 struct Component;
 
-fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
+fn build_opts(solver: Solvers, o: &SolveOptions) -> Result<AppOptions, String> {
     let heuristic = HeuristicOptions {
         epochs: o.epochs as usize,
         // Not exposed through the WASM interface yet; 0 keeps the plateau stop off, matching the
@@ -25,7 +25,17 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
         n_nearest: o.n_nearest as usize,
         verbose: false,
     };
-    match solver {
+    let eax_strategy = match (solver, o.eax_strategy) {
+        (Solvers::MemeticEax, 0) => EaxStrategy::SingleAb,
+        (Solvers::MemeticEax, 1) => EaxStrategy::Rand,
+        (Solvers::MemeticEax, 2) => EaxStrategy::Hybrid,
+        (Solvers::MemeticEax, other) => {
+            return Err(format!("eaxStrategy must be 0, 1, or 2 (got {other})"));
+        }
+        _ => EaxStrategy::Hybrid,
+    };
+
+    Ok(match solver {
         Solvers::SimulatedAnnealing => AppOptions {
             sa: Some(SAOptions {
                 heuristic,
@@ -96,15 +106,11 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
         Solvers::MemeticEax => AppOptions {
             memetic_eax: Some(MemeticEaxOptions {
                 epochs: heuristic.epochs,
-                pop_size: (o.eax_pop_size as usize).max(2),
-                children_per_pair: (o.eax_children_per_pair as usize).max(1),
-                strategy: match o.eax_strategy {
-                    0 => EaxStrategy::SingleAb,
-                    1 => EaxStrategy::Rand,
-                    _ => EaxStrategy::Hybrid,
-                },
-                stall_epochs: (o.eax_stall_epochs as usize).max(1),
-                candidate_k: (o.eax_candidate_k as usize).max(1),
+                pop_size: o.eax_pop_size as usize,
+                children_per_pair: o.eax_children_per_pair as usize,
+                strategy: eax_strategy,
+                stall_epochs: o.eax_stall_epochs as usize,
+                candidate_k: o.eax_candidate_k as usize,
                 // Browsers use system entropy; the CLI/API expose `seed` for benchmarks.
                 seed: None,
             }),
@@ -114,7 +120,7 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             heuristic: Some(heuristic),
             ..AppOptions::default()
         },
-    }
+    })
 }
 
 fn kd_to_city(c: &KDPoint) -> City {
@@ -340,7 +346,7 @@ fn solve_with_cities(
         return Err("need at least 2 cities".into());
     }
     let problem = TspProblem::from_points(kd_cities, DistanceType::Euc2D, DistanceBackend::Auto)?;
-    let opts = build_opts(solver_id, options);
+    let opts = build_opts(solver_id, options)?;
     let start = std::time::Instant::now();
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         teeline::tsp::solve_problem(solver_id, &problem, &opts)
@@ -414,7 +420,7 @@ impl Guest for Component {
     ) -> Result<Solution, String> {
         let problem = parse_to_tsp_problem(&input)?;
         let solver_id = teeline::tsp::find_solver(&solver)?;
-        let opts = build_opts(solver_id, &options);
+        let opts = build_opts(solver_id, &options)?;
         let start = std::time::Instant::now();
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             teeline::tsp::solve_problem(solver_id, &problem, &opts)
@@ -457,7 +463,15 @@ impl Guest for Component {
                         };
                     }
                 };
-                let opts = build_opts(solver_id, &options);
+                let opts = match build_opts(solver_id, &options) {
+                    Ok(opts) => opts,
+                    Err(e) => {
+                        return CompareResult {
+                            algorithm: algo,
+                            solution: Err(e),
+                        };
+                    }
+                };
                 let start = std::time::Instant::now();
                 let sol = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     teeline::tsp::solve_problem(solver_id, &problem, &opts)

@@ -998,6 +998,20 @@ fn test_list_algorithms_sfc_kind_and_params() {
 }
 
 #[test]
+fn test_solve_rejects_an_invalid_eax_strategy() {
+    let (mut store, instance) = make_instance();
+    let mut opts = default_options();
+    opts.eax_strategy = 3;
+    let result = instance
+        .call_solve(&mut store, "eax", &five_cities(), opts)
+        .unwrap();
+    assert!(
+        result.is_err(),
+        "eaxStrategy 3 must be rejected, not silently clamped"
+    );
+}
+
+#[test]
 fn test_list_algorithms_memetic_eax_kind_and_params() {
     let algorithms = run_list_algorithms();
     let eax = algorithms

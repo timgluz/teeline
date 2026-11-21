@@ -185,9 +185,15 @@ impl MemeticEaxOptions {
                 .parse()
                 .map_err(|_| format!("--stall-epochs: invalid integer `{v}`"))?;
         } else if let Some(v) = args.get_one::<String>("stagnation_epochs") {
-            eax.stall_epochs = v
+            let n: usize = v
                 .parse()
                 .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
+            // The shared flag counts the stop directly, while EAX stops at twice
+            // `stall_epochs`; halving keeps the same effective run length. 0 means
+            // "no override" here, so the default still bounds the run.
+            if n > 0 {
+                eax.stall_epochs = (n / 2).max(1);
+            }
         }
         if let Some(v) = args.get_one::<String>("candidate_k") {
             eax.candidate_k = v
@@ -1804,8 +1810,22 @@ mod tests {
             "7",
         ]);
         let opts = MemeticEaxOptions::from_cli(&args).unwrap();
-        assert_eq!(opts.stall_epochs, 20);
+        assert_eq!(
+            opts.stall_epochs, 10,
+            "20 shared epochs map to EAX's 2× stop"
+        );
         assert_eq!(opts.candidate_k, 7);
+    }
+
+    #[test]
+    fn options_from_cli_zero_stagnation_keeps_the_default() {
+        let args = cli_command().get_matches_from(["test", "--stagnation_epochs", "0"]);
+        let opts = MemeticEaxOptions::from_cli(&args).unwrap();
+        assert_eq!(
+            opts.stall_epochs,
+            MemeticEaxOptions::default().stall_epochs,
+            "0 means no override for EAX"
+        );
     }
 
     #[test]
