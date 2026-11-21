@@ -1,8 +1,14 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::mpsc;
 
+use rand::RngExt;
+
+use super::DistanceSource;
+use super::Position;
+use super::candidate_list::CandidateList;
 use super::progress::ProgressMessage;
 use super::route::Route;
+use super::tour_graph::distance;
 use super::{HeuristicOptions, Solution, TspProblem};
 
 pub fn solve(
@@ -66,10 +72,61 @@ pub fn solve(
     Solution::from_parts(&path, distances.as_ref())
 }
 
+/// Greedy nearest-neighbour tour over dense positions, choosing uniformly among the
+/// `relaxation` nearest unvisited candidates.
+///
+/// `relaxation = 1` is the deterministic nearest-neighbour rule; larger values diversify the
+/// constructive starts a population-based solver (such as memetic EAX) builds on.
+pub(crate) fn randomized_tour(
+    distances: &dyn DistanceSource,
+    candidates: &CandidateList,
+    start: usize,
+    relaxation: usize,
+    rng: &mut impl RngExt,
+) -> Vec<usize> {
+    let n = distances.num_cities();
+    debug_assert!(start < n, "start position must be inside the problem");
+    let relaxation = relaxation.max(1);
+    let mut visited = vec![false; n];
+    let mut tour = Vec::with_capacity(n);
+    let mut current = start;
+    visited[current] = true;
+    tour.push(current);
+
+    let mut choices: Vec<usize> = Vec::with_capacity(relaxation);
+    for _ in 1..n {
+        choices.clear();
+        for &candidate in candidates.neighbours_by_pos(Position::new(current)) {
+            let city = candidate.into_inner();
+            if !visited[city] {
+                choices.push(city);
+                if choices.len() == relaxation {
+                    break;
+                }
+            }
+        }
+        current = if choices.is_empty() {
+            // Candidate list exhausted (k < n - 1): fall back to the nearest unvisited city.
+            (0..n)
+                .filter(|&city| !visited[city])
+                .min_by(|&a, &b| {
+                    distance(distances, current, a).total_cmp(&distance(distances, current, b))
+                })
+                .expect("at least one unvisited city remains")
+        } else {
+            choices[rng.random_range(0..choices.len())]
+        };
+        visited[current] = true;
+        tour.push(current);
+    }
+    tour
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
+    use rand::SeedableRng;
 
     fn tsp5_problem() -> TspProblem {
         let cities = kdtree::build_points(&[
@@ -121,6 +178,36 @@ mod tests {
         let mut visited: Vec<usize> = tour.route().to_vec();
         visited.sort();
         assert_eq!(visited, vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    fn randomized_tour_with_relaxation_one_is_deterministic_nearest_neighbour() {
+        let problem = tsp5_problem();
+        let cities = &problem.cities;
+        let candidates = CandidateList::build(cities, 4).unwrap();
+        let distances = problem.distances.as_ref();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let first = randomized_tour(distances, &candidates, 0, 1, &mut rng);
+        let second = randomized_tour(distances, &candidates, 0, 1, &mut rng);
+        assert_eq!(first, second);
+        let mut visited = first.clone();
+        visited.sort_unstable();
+        assert_eq!(visited, (0..cities.len()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn randomized_tour_is_a_valid_permutation_for_any_relaxation() {
+        let problem = tsp5_problem();
+        let cities = &problem.cities;
+        let candidates = CandidateList::build(cities, 4).unwrap();
+        let distances = problem.distances.as_ref();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(2);
+        for relaxation in [1usize, 3] {
+            let tour = randomized_tour(distances, &candidates, 1, relaxation, &mut rng);
+            let mut visited = tour.clone();
+            visited.sort_unstable();
+            assert_eq!(visited, (0..cities.len()).collect::<Vec<_>>());
+        }
     }
 
     #[test]

@@ -11,8 +11,10 @@ use super::DistanceSource;
 use super::Position;
 use super::candidate_list::CandidateList;
 use super::lin_kernighan::double_bridge;
+use super::nearest_neighbor;
 use super::probability::bernoulli;
 use super::progress::ProgressMessage;
+use super::random_shuffle;
 use super::route::Route;
 use super::tour_graph::{TourGraph, distance};
 use super::two_opt_move;
@@ -635,55 +637,6 @@ fn build_candidates(
     }
 }
 
-fn randomized_nn(
-    n: usize,
-    candidates: &CandidateList,
-    distances: &dyn DistanceSource,
-    rng: &mut impl RngExt,
-    start: usize,
-) -> Vec<usize> {
-    let mut visited = vec![false; n];
-    let mut tour = Vec::with_capacity(n);
-    let mut current = start;
-    visited[current] = true;
-    tour.push(current);
-
-    for _ in 1..n {
-        let mut choices = [usize::MAX; 3];
-        let mut count = 0usize;
-        for &cand in candidates.neighbours_by_pos(Position::new(current)) {
-            let c = cand.into_inner();
-            if !visited[c] {
-                choices[count] = c;
-                count += 1;
-                if count == 3 {
-                    break;
-                }
-            }
-        }
-        current = if count == 0 {
-            // Candidate list exhausted (k < n - 1); fall back to the nearest unvisited city.
-            (0..n)
-                .filter(|&city| !visited[city])
-                .min_by(|&a, &b| {
-                    distance(distances, current, a).total_cmp(&distance(distances, current, b))
-                })
-                .expect("at least one unvisited city remains")
-        } else {
-            choices[rng.random_range(0..count)]
-        };
-        visited[current] = true;
-        tour.push(current);
-    }
-    tour
-}
-
-fn shuffled_tour(n: usize, rng: &mut impl RngExt) -> Vec<usize> {
-    let mut tour: Vec<usize> = (0..n).collect();
-    tour.shuffle(rng);
-    tour
-}
-
 fn add_member(
     graph: TourGraph,
     distances: &dyn DistanceSource,
@@ -739,10 +692,12 @@ fn initial_population(
     while members.len() < target && attempts < max_attempts {
         attempts += 1;
         let tour = if attempts.is_multiple_of(3) {
-            shuffled_tour(n, rng)
+            let mut tour: Vec<usize> = (0..n).collect();
+            random_shuffle::shuffle_slice(&mut tour, rng);
+            tour
         } else {
             let start = rng.random_range(0..n);
-            randomized_nn(n, candidates, distances, rng, start)
+            nearest_neighbor::randomized_tour(distances, candidates, start, 3, rng)
         };
         let mut tour = tour;
         polish(&mut tour, &all, candidates, distances, scratch);
