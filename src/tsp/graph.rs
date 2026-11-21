@@ -5,6 +5,7 @@
 //! reuse `UnionFind`/`sorted_edges` without duplicating them.
 
 use super::DistanceSource;
+use super::Position;
 
 /// Disjoint-set over position indices `0..n`, with path compression and union by rank.
 pub(crate) struct UnionFind {
@@ -61,7 +62,7 @@ pub(crate) fn sorted_edges(n: usize, distances: &dyn DistanceSource) -> Vec<(f32
     for i in 0..n {
         for j in (i + 1)..n {
             let d = distances
-                .distance_by_pos(i, j)
+                .distance_by_pos(Position::new(i), Position::new(j))
                 .expect("i, j are within 0..n by construction");
             edges.push((d, i as u32, j as u32));
         }
@@ -95,10 +96,10 @@ pub(crate) fn sorted_edges(n: usize, distances: &dyn DistanceSource) -> Vec<(f32
 /// would have been accepted when scanned). That means exactly one path fragment
 /// survives before the closing edge, which is why `accepted.len() == n - 1` is
 /// the correct — and only — point at which a same-component edge may be accepted.
-pub(crate) fn select_edges(n: usize, edges: &[(f32, u32, u32)]) -> Vec<(usize, usize)> {
+pub(crate) fn select_edges(n: usize, edges: &[(f32, u32, u32)]) -> Vec<(Position, Position)> {
     let mut uf = UnionFind::new(n);
     let mut degree = vec![0u8; n];
-    let mut accepted: Vec<(usize, usize)> = Vec::with_capacity(n);
+    let mut accepted: Vec<(Position, Position)> = Vec::with_capacity(n);
 
     for &(_, uu, vv) in edges {
         if accepted.len() == n {
@@ -115,7 +116,7 @@ pub(crate) fn select_edges(n: usize, edges: &[(f32, u32, u32)]) -> Vec<(usize, u
         uf.union(u, v);
         degree[u] += 1;
         degree[v] += 1;
-        accepted.push((u, v));
+        accepted.push((Position::new(u), Position::new(v)));
     }
 
     assert_eq!(
@@ -137,7 +138,7 @@ pub(crate) fn select_edges(n: usize, edges: &[(f32, u32, u32)]) -> Vec<(usize, u
 /// (not several disjoint cycles). This is guaranteed by `greedy_edge::select_edges`'s
 /// construction, not re-derived here — violating it panics rather than silently
 /// returning a corrupt/duplicated path.
-pub(crate) fn hamiltonian_cycle_to_path(n: usize, edges: &[(usize, usize)]) -> Vec<usize> {
+pub(crate) fn hamiltonian_cycle_to_path(n: usize, edges: &[(Position, Position)]) -> Vec<Position> {
     assert_eq!(
         edges.len(),
         n,
@@ -147,6 +148,7 @@ pub(crate) fn hamiltonian_cycle_to_path(n: usize, edges: &[(usize, usize)]) -> V
 
     let mut adj: Vec<Vec<usize>> = vec![Vec::with_capacity(2); n];
     for &(u, v) in edges {
+        let (u, v) = (u.into_inner(), v.into_inner());
         adj[u].push(v);
         adj[v].push(u);
     }
@@ -172,7 +174,7 @@ pub(crate) fn hamiltonian_cycle_to_path(n: usize, edges: &[(usize, usize)]) -> V
              several disjoint cycles"
         );
         seen[cur] = true;
-        path.push(cur);
+        path.push(Position::new(cur));
         let next = adj[cur]
             .iter()
             .copied()
@@ -334,8 +336,8 @@ mod tests {
 
         let mut degree = vec![0u8; n];
         for &(u, v) in &selected {
-            degree[u] += 1;
-            degree[v] += 1;
+            degree[u.into_inner()] += 1;
+            degree[v.into_inner()] += 1;
         }
         for (pos, &d) in degree.iter().enumerate() {
             assert_eq!(d, 2, "position {pos} must have degree exactly 2, got {d}");
@@ -364,7 +366,7 @@ mod tests {
         let path = hamiltonian_cycle_to_path(n, &selected);
         let mut sorted = path.clone();
         sorted.sort_unstable();
-        assert_eq!(sorted, (0..n).collect::<Vec<_>>());
+        assert_eq!(sorted, (0..n).map(Position::new).collect::<Vec<_>>());
     }
 
     #[test]
@@ -380,8 +382,8 @@ mod tests {
 
         let mut degree = vec![0u8; n];
         for &(u, v) in &selected {
-            degree[u] += 1;
-            degree[v] += 1;
+            degree[u.into_inner()] += 1;
+            degree[v.into_inner()] += 1;
         }
         assert!(degree.iter().all(|&d| d == 2));
     }
@@ -405,8 +407,8 @@ mod tests {
             assert_eq!(selected.len(), n, "n={n}: must select exactly n edges");
             let mut degree = vec![0u8; n];
             for &(u, v) in &selected {
-                degree[u] += 1;
-                degree[v] += 1;
+                degree[u.into_inner()] += 1;
+                degree[v.into_inner()] += 1;
             }
             assert!(
                 degree.iter().all(|&d| d == 2),
@@ -418,7 +420,7 @@ mod tests {
             sorted.sort_unstable();
             assert_eq!(
                 sorted,
-                (0..n).collect::<Vec<_>>(),
+                (0..n).map(Position::new).collect::<Vec<_>>(),
                 "n={n}: must visit all positions"
             );
         }
@@ -428,26 +430,37 @@ mod tests {
     // hamiltonian_cycle_to_path
     // -----------------------------------------------------------------
 
+    fn pos_edges(pairs: &[(usize, usize)]) -> Vec<(Position, Position)> {
+        pairs
+            .iter()
+            .map(|&(u, v)| (Position::new(u), Position::new(v)))
+            .collect()
+    }
+
+    fn positions(indices: &[usize]) -> Vec<Position> {
+        indices.iter().copied().map(Position::new).collect()
+    }
+
     #[test]
     fn hamiltonian_cycle_to_path_hand_built_4_cycle() {
-        let edges = vec![(0, 1), (1, 2), (2, 3), (3, 0)];
+        let edges = pos_edges(&[(0, 1), (1, 2), (2, 3), (3, 0)]);
         let path = hamiltonian_cycle_to_path(4, &edges);
-        assert_eq!(path, vec![0, 1, 2, 3]);
+        assert_eq!(path, positions(&[0, 1, 2, 3]));
     }
 
     #[test]
     fn hamiltonian_cycle_to_path_is_a_permutation() {
-        let edges = vec![(0, 2), (2, 4), (4, 1), (1, 3), (3, 0)];
+        let edges = pos_edges(&[(0, 2), (2, 4), (4, 1), (1, 3), (3, 0)]);
         let mut path = hamiltonian_cycle_to_path(5, &edges);
         path.sort_unstable();
-        assert_eq!(path, vec![0, 1, 2, 3, 4]);
+        assert_eq!(path, positions(&[0, 1, 2, 3, 4]));
     }
 
     #[test]
     #[should_panic(expected = "degree exactly 2")]
     fn hamiltonian_cycle_to_path_panics_on_wrong_degree() {
         // Exactly n=4 edges, but position 0 has degree 3 and position 3 has degree 1.
-        let edges = vec![(0, 1), (0, 2), (0, 3), (1, 2)];
+        let edges = pos_edges(&[(0, 1), (0, 2), (0, 3), (1, 2)]);
         hamiltonian_cycle_to_path(4, &edges);
     }
 
@@ -456,7 +469,7 @@ mod tests {
     fn hamiltonian_cycle_to_path_panics_on_disjoint_cycles() {
         // Two disjoint triangles: {0,1,2} and {3,4,5}. Every position has degree 2,
         // and there are exactly n=6 edges, but they do not form one Hamiltonian cycle.
-        let edges = vec![(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3)];
+        let edges = pos_edges(&[(0, 1), (1, 2), (2, 0), (3, 4), (4, 5), (5, 3)]);
         hamiltonian_cycle_to_path(6, &edges);
     }
 }

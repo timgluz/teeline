@@ -1,6 +1,7 @@
 use super::DistanceSource;
 use std::sync::mpsc;
 
+use super::Position;
 use super::graph::{hamiltonian_cycle_to_path, select_edges};
 use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
@@ -70,7 +71,10 @@ pub fn solve(
 
     // Step 4: walk the single resulting cycle into an ordered path.
     let pos_path = hamiltonian_cycle_to_path(n, &selected);
-    let path: Vec<usize> = pos_path.iter().map(|&pos| cities[pos].id).collect();
+    let path: Vec<usize> = pos_path
+        .iter()
+        .map(|pos| cities[pos.into_inner()].id)
+        .collect();
 
     if let Some(tx) = progress_tx {
         let total = distances.tour_length(&path);
@@ -91,7 +95,7 @@ pub fn solve(
 /// under the monotone sqrt, so skipping it avoids n square roots). A single O(n)
 /// pass — cheaper than building a KD-tree for one query, and `TspProblem` carries
 /// no pre-built tree to reuse.
-fn hub_position(cities: &[KDPoint]) -> usize {
+fn hub_position(cities: &[KDPoint]) -> Position {
     let n = cities.len();
     let mut cx = 0.0f32;
     let mut cy = 0.0f32;
@@ -102,7 +106,7 @@ fn hub_position(cities: &[KDPoint]) -> usize {
     cx /= n as f32;
     cy /= n as f32;
 
-    let mut best = 0usize;
+    let mut best = Position::new(0);
     let mut best_d2 = f32::MAX;
     for (i, c) in cities.iter().enumerate() {
         let dx = c.coords[0] - cx;
@@ -110,7 +114,7 @@ fn hub_position(cities: &[KDPoint]) -> usize {
         let d2 = dx * dx + dy * dy;
         if d2 < best_d2 {
             best_d2 = d2;
-            best = i;
+            best = Position::new(i);
         }
     }
     best
@@ -135,20 +139,20 @@ fn hub_position(cities: &[KDPoint]) -> usize {
 /// position.
 fn sorted_edges_by_savings(
     n: usize,
-    hub: usize,
+    hub: Position,
     distances: &dyn DistanceSource,
 ) -> Vec<(f32, u32, u32)> {
     let mut edges = Vec::with_capacity(n * (n.saturating_sub(1)) / 2);
     for i in 0..n {
         for j in (i + 1)..n {
             let d_hub_i = distances
-                .distance_by_pos(hub, i)
+                .distance_by_pos(hub, Position::new(i))
                 .expect("hub, i are within 0..n by construction");
             let d_hub_j = distances
-                .distance_by_pos(hub, j)
+                .distance_by_pos(hub, Position::new(j))
                 .expect("hub, j are within 0..n by construction");
             let d_ij = distances
-                .distance_by_pos(i, j)
+                .distance_by_pos(Position::new(i), Position::new(j))
                 .expect("i, j are within 0..n by construction");
             // s(i,j) = d(hub,i) + d(hub,j) - d(i,j); 0 when either endpoint is the hub.
             let savings = d_hub_i + d_hub_j - d_ij;
@@ -184,14 +188,14 @@ mod tests {
         // Centroid is (0,0); the city at the origin is the nearest to it.
         let problem = make_problem(&[[0., 0.], [10., 0.], [0., 10.], [10., 10.]]);
         let hub = hub_position(&problem.cities);
-        assert_eq!(hub, 0);
+        assert_eq!(hub, Position::new(0));
     }
 
     #[test]
     fn hub_position_is_within_bounds() {
         let problem = make_problem(&[[1., 2.], [3., 4.], [5., 6.], [7., 8.]]);
         let hub = hub_position(&problem.cities);
-        assert!(hub < problem.cities.len());
+        assert!(hub.into_inner() < problem.cities.len());
     }
 
     // ------------------------------------------------------------------
@@ -202,14 +206,14 @@ mod tests {
     fn savings_list_has_n_choose_2_entries() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.]]);
         let n = problem.cities.len();
-        let edges = sorted_edges_by_savings(n, 0, problem.distances.as_ref());
+        let edges = sorted_edges_by_savings(n, Position::new(0), problem.distances.as_ref());
         assert_eq!(edges.len(), n * (n - 1) / 2);
     }
 
     #[test]
     fn savings_list_is_sorted_descending() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.]]);
-        let edges = sorted_edges_by_savings(4, 0, problem.distances.as_ref());
+        let edges = sorted_edges_by_savings(4, Position::new(0), problem.distances.as_ref());
         for pair in edges.windows(2) {
             assert!(
                 pair[0].0 >= pair[1].0,
@@ -224,7 +228,7 @@ mod tests {
     fn savings_for_hub_pair_is_zero() {
         // Any pair involving the hub has savings 0.
         let problem = make_problem(&[[0., 0.], [5., 0.], [10., 0.]]);
-        let edges = sorted_edges_by_savings(3, 0, problem.distances.as_ref());
+        let edges = sorted_edges_by_savings(3, Position::new(0), problem.distances.as_ref());
         for &(_s, i, j) in &edges {
             if i as usize == 0 || j as usize == 0 {
                 // hub-involving pair

@@ -2,7 +2,7 @@ use super::DistanceSource;
 use super::candidate_list::CandidateList;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
-    HeuristicOptions, LKOptions, Solution, TspProblem, kdtree::KDPoint, nearest_neighbor,
+    HeuristicOptions, LKOptions, Position, Solution, TspProblem, kdtree::KDPoint, nearest_neighbor,
     route::Route,
 };
 use rand::{RngExt, SeedableRng};
@@ -37,7 +37,11 @@ pub fn solve(
     let k = opts.heuristic.n_nearest;
     let n = dm.num_cities();
     let mut best_positions: Vec<usize> = match init_tour {
-        Some(t) => match t.iter().map(|&id| dm.city_id2pos(id)).collect() {
+        Some(t) => match t
+            .iter()
+            .map(|&id| dm.city_id2pos(id).map(Position::into_inner))
+            .collect()
+        {
             Some(positions) => positions,
             None => return Solution::new(t, problem),
         },
@@ -114,21 +118,29 @@ fn nearest_neighbor_positions(problem: &TspProblem, dm: &dyn DistanceSource) -> 
     nearest_neighbor::solve(problem, &nn_opts, None, None)
         .route()
         .iter()
-        .map(|&id| dm.city_id2pos(id).expect("NN tour city is in the index"))
+        .map(|&id| {
+            dm.city_id2pos(id)
+                .expect("NN tour city is in the index")
+                .into_inner()
+        })
         .collect()
 }
 
 fn positions_to_ids(positions: &[usize], dm: &dyn DistanceSource) -> Vec<usize> {
     positions
         .iter()
-        .map(|&pos| dm.pos2city_id(pos).expect("position came from the index"))
+        .map(|&pos| {
+            dm.pos2city_id(Position::new(pos))
+                .expect("position came from the index")
+        })
         .collect()
 }
 
 // ── Distance shorthand ────────────────────────────────────────────────────────
 
 fn d(dm: &dyn DistanceSource, a: usize, b: usize) -> f32 {
-    dm.distance_by_pos(a, b).unwrap_or(f32::MAX)
+    dm.distance_by_pos(Position::new(a), Position::new(b))
+        .unwrap_or(f32::MAX)
 }
 
 // ── Flat-tour helpers (kept for solve() and tests) ────────────────────────────
@@ -329,7 +341,8 @@ fn find_lk_chain(
         return false;
     }
 
-    for &t_next in candidates.neighbours_by_pos(t_open) {
+    for &t_next in candidates.neighbours_by_pos(Position::new(t_open)) {
+        let t_next = t_next.into_inner();
         // LK positive-gain bound: candidates sorted by distance, so break (not continue).
         let g1 = gain - d(dm, t_open, t_next);
         if g1 <= EPS {
@@ -562,9 +575,12 @@ mod tests {
         let cands = build_candidates(&pts, 3).expect("unique city ids");
         assert_eq!(cands.num_cities(), 6);
         for i in 0..cands.num_cities() {
-            let row = cands.neighbours_by_pos(i);
+            let row = cands.neighbours_by_pos(Position::new(i));
             assert_eq!(row.len(), 3, "city {i} must have 3 candidates");
-            assert!(!row.contains(&i), "city {i} must not be its own candidate");
+            assert!(
+                !row.contains(&Position::new(i)),
+                "city {i} must not be its own candidate"
+            );
         }
     }
 
@@ -574,10 +590,10 @@ mod tests {
         let dm = distance_matrix::from_cities(&pts);
         let cands = build_candidates(&pts, 4).expect("unique city ids");
         for i in 0..cands.num_cities() {
-            let row = cands.neighbours_by_pos(i);
+            let row = cands.neighbours_by_pos(Position::new(i));
             let dists: Vec<f32> = row
                 .iter()
-                .map(|&j| dm.distance_by_pos(i, j).unwrap_or(f32::MAX))
+                .map(|&j| dm.distance_by_pos(Position::new(i), j).unwrap_or(f32::MAX))
                 .collect();
             let mut sorted = dists.clone();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -590,7 +606,7 @@ mod tests {
         let pts = build_points(4);
         let cands = build_candidates(&pts, 10).expect("unique city ids");
         for i in 0..cands.num_cities() {
-            assert!(cands.neighbours_by_pos(i).len() <= 3);
+            assert!(cands.neighbours_by_pos(Position::new(i)).len() <= 3);
         }
     }
 

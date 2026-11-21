@@ -3,6 +3,7 @@ use std::sync::mpsc;
 use rand::RngExt;
 use rand::seq::SliceRandom;
 
+use super::Position;
 use super::budget::Budget;
 use super::probability::roulette_select;
 use super::progress::ProgressMessage;
@@ -34,14 +35,14 @@ fn evaporate_and_floor(pheromone: &mut [f32], rate: f32, tau_min: f32) {
 
 /// Deposits `amount` symmetrically on edge (u, v). Teeline only solves symmetric TSP, so
 /// pheromone mirrors that symmetry (both `pheromone[u*n+v]` and `pheromone[v*n+u]` are written).
-fn deposit_edge(pheromone: &mut [f32], n: usize, u: usize, v: usize, amount: f32) {
-    pheromone[u * n + v] += amount;
-    pheromone[v * n + u] += amount;
+fn deposit_edge(pheromone: &mut [f32], n: usize, u: Position, v: Position, amount: f32) {
+    pheromone[u.into_inner() * n + v.into_inner()] += amount;
+    pheromone[v.into_inner() * n + u.into_inner()] += amount;
 }
 
 /// Deposits `1 / cost` along every edge of a closed tour given in position-space
 /// (wraps last -> first). No-op for degenerate tours/costs.
-fn deposit_tour(pheromone: &mut [f32], n: usize, tour_pos: &[usize], cost: f32) {
+fn deposit_tour(pheromone: &mut [f32], n: usize, tour_pos: &[Position], cost: f32) {
     if tour_pos.len() < 2 || cost <= 0.0 {
         return;
     }
@@ -63,7 +64,12 @@ fn deposit_tour(pheromone: &mut [f32], n: usize, tour_pos: &[usize], cost: f32) 
 /// the first fallback candidate as a last resort so callers never panic or stall.
 /// `r1`/`r2` are independent uniform samples in `[0, 1)` for the primary/fallback rolls,
 /// passed in rather than an RNG so this function stays pure and unit-testable.
-fn select_next(primary: &[(usize, f32)], fallback: &[(usize, f32)], r1: f32, r2: f32) -> usize {
+fn select_next(
+    primary: &[(Position, f32)],
+    fallback: &[(Position, f32)],
+    r1: f32,
+    r2: f32,
+) -> Position {
     let primary_sum: f32 = primary.iter().map(|&(_, w)| w).sum();
     if primary_sum > 0.0 && primary_sum.is_finite() {
         return roulette_select(primary, primary_sum, r1);
@@ -81,7 +87,7 @@ fn select_next(primary: &[(usize, f32)], fallback: &[(usize, f32)], r1: f32, r2:
 /// A single ant's constructed tour (position-space) and its cost, grouped together rather
 /// than tracked as parallel `Vec<Vec<usize>>`/`Vec<f32>` arrays matched by index.
 struct Ant {
-    tour: Vec<usize>,
+    tour: Vec<Position>,
     cost: f32,
 }
 
@@ -117,27 +123,27 @@ pub fn solve(
 
     let mut rng = rand::rng();
 
-    let to_pos = |id: usize| -> usize {
+    let to_pos = |id: usize| -> Position {
         distances
             .city_id2pos(id)
             .expect("init_tour city id must exist in this problem")
     };
-    let to_id = |pos: usize| -> usize {
+    let to_id = |pos: Position| -> usize {
         distances
             .pos2city_id(pos)
             .expect("position must map to a known city id")
     };
 
-    let best_pos_seed: Vec<usize> = match init_tour {
+    let best_pos_seed: Vec<Position> = match init_tour {
         Some(t) => t.iter().map(|&id| to_pos(id)).collect(),
         None => {
-            let mut positions: Vec<usize> = (0..n).collect();
+            let mut positions: Vec<Position> = (0..n).map(Position::new).collect();
             positions.shuffle(&mut rng);
             positions
         }
     };
     let mut best_cost = distances.tour_length_by_pos(&best_pos_seed);
-    let mut best: Vec<usize> = best_pos_seed.clone();
+    let mut best: Vec<Position> = best_pos_seed.clone();
 
     if let Some(tx) = progress_tx {
         let best_ids: Vec<usize> = best.iter().map(|&p| to_id(p)).collect();
@@ -167,7 +173,10 @@ pub fn solve(
             if u == v {
                 continue;
             }
-            let dist = distances.distance_by_pos(u, v).unwrap_or(0.0).max(MIN_DIST);
+            let dist = distances
+                .distance_by_pos(Position::new(u), Position::new(v))
+                .unwrap_or(0.0)
+                .max(MIN_DIST);
             eta_beta[u * n + v] = (1.0 / dist).powf(opts.beta);
         }
     }
@@ -194,14 +203,14 @@ pub fn solve(
             let mut visited = vec![false; n];
             visited[start] = true;
             let mut tour = Vec::with_capacity(n);
-            tour.push(start);
-            let mut current = start;
+            tour.push(Position::new(start));
+            let mut current = Position::new(start);
 
             // Reused across every step of this ant's tour construction (cleared and
             // refilled each step) instead of freshly allocating both Vecs on every
             // iteration — up to n-1 allocation pairs per ant, per epoch, otherwise.
-            let mut primary: Vec<(usize, f32)> = Vec::with_capacity(n);
-            let mut fallback: Vec<(usize, f32)> = Vec::with_capacity(n);
+            let mut primary: Vec<(Position, f32)> = Vec::with_capacity(n);
+            let mut fallback: Vec<(Position, f32)> = Vec::with_capacity(n);
 
             for _ in 1..n {
                 primary.clear();
@@ -210,16 +219,19 @@ pub fn solve(
                     if visited[v] {
                         continue;
                     }
-                    let eta = eta_beta[current * n + v];
-                    primary.push((v, tau_alpha[current * n + v] * eta));
-                    fallback.push((v, eta));
+                    let eta = eta_beta[current.into_inner() * n + v];
+                    primary.push((
+                        Position::new(v),
+                        tau_alpha[current.into_inner() * n + v] * eta,
+                    ));
+                    fallback.push((Position::new(v), eta));
                 }
 
                 let r1: f32 = rng.random();
                 let r2: f32 = rng.random();
                 let next = select_next(&primary, &fallback, r1, r2);
 
-                visited[next] = true;
+                visited[next.into_inner()] = true;
                 tour.push(next);
                 current = next;
             }
@@ -276,6 +288,10 @@ mod tests {
     use crate::tsp::progress::ProgressMessage;
     use crate::tsp::{AcoOptions, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
+    fn positions(indices: &[usize]) -> Vec<Position> {
+        indices.iter().copied().map(Position::new).collect()
+    }
+
     #[test]
     fn test_evaporate_and_floor_decays_above_floor() {
         let mut pheromone = vec![1.0, 1.0];
@@ -298,7 +314,7 @@ mod tests {
     fn test_deposit_edge_writes_both_directions() {
         let n = 3;
         let mut pheromone = vec![0.0; n * n];
-        deposit_edge(&mut pheromone, n, 0, 2, 0.5);
+        deposit_edge(&mut pheromone, n, Position::new(0), Position::new(2), 0.5);
         // u=0, so `u*n+v`/`v*n+u` reduce to `v`/`v*n` — written pre-reduced (rather than
         // `0 * n + 2` / `2 * n + 0`) since clippy's `erasing_op`/`identity_op` lints (deny
         // and warn by default respectively) flag the literal `0 * n` form as almost
@@ -321,7 +337,7 @@ mod tests {
         let n = 4;
         let mut pheromone = vec![0.0; n * n];
         let cost = 10.0;
-        deposit_tour(&mut pheromone, n, &[0, 1, 2], cost);
+        deposit_tour(&mut pheromone, n, &positions(&[0, 1, 2]), cost);
         let amount = 1.0 / cost;
         for &(u, v) in &[(0usize, 1usize), (1, 2), (2, 0)] {
             assert!(
@@ -349,29 +365,29 @@ mod tests {
     fn test_deposit_tour_noop_on_degenerate_cost() {
         let n = 3;
         let mut pheromone = vec![0.0; n * n];
-        deposit_tour(&mut pheromone, n, &[0, 1, 2], 0.0);
+        deposit_tour(&mut pheromone, n, &positions(&[0, 1, 2]), 0.0);
         assert!(pheromone.iter().all(|&t| t == 0.0));
     }
 
     #[test]
     fn test_select_next_uses_primary_when_healthy() {
-        let primary = [(0usize, 1.0f32), (1usize, 3.0f32)];
-        let fallback = [(0usize, 1.0f32), (1usize, 1.0f32)];
-        assert_eq!(select_next(&primary, &fallback, 0.5, 0.5), 1);
+        let primary = [(Position::new(0), 1.0f32), (Position::new(1), 3.0f32)];
+        let fallback = [(Position::new(0), 1.0f32), (Position::new(1), 1.0f32)];
+        assert_eq!(select_next(&primary, &fallback, 0.5, 0.5), Position::new(1));
     }
 
     #[test]
     fn test_select_next_falls_back_to_eta_when_primary_degenerate() {
-        let primary = [(0usize, 0.0f32), (1usize, 0.0f32)];
-        let fallback = [(0usize, 1.0f32), (1usize, 3.0f32)];
-        assert_eq!(select_next(&primary, &fallback, 0.5, 0.5), 1);
+        let primary = [(Position::new(0), 0.0f32), (Position::new(1), 0.0f32)];
+        let fallback = [(Position::new(0), 1.0f32), (Position::new(1), 3.0f32)];
+        assert_eq!(select_next(&primary, &fallback, 0.5, 0.5), Position::new(1));
     }
 
     #[test]
     fn test_select_next_falls_back_to_first_when_fully_degenerate() {
-        let primary = [(0usize, 0.0f32), (1usize, f32::NAN)];
-        let fallback = [(0usize, 0.0f32), (1usize, 0.0f32)];
-        assert_eq!(select_next(&primary, &fallback, 0.5, 0.5), 0);
+        let primary = [(Position::new(0), 0.0f32), (Position::new(1), f32::NAN)];
+        let fallback = [(Position::new(0), 0.0f32), (Position::new(1), 0.0f32)];
+        assert_eq!(select_next(&primary, &fallback, 0.5, 0.5), Position::new(0));
     }
 
     #[test]

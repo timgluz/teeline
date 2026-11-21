@@ -54,6 +54,7 @@
 use std::borrow::Cow;
 
 use super::DistanceType;
+use super::Position;
 use super::distance_source::DistanceSource;
 use super::id_index::{IdIndex, unique_city_ids};
 use super::kdtree::KDPoint;
@@ -405,10 +406,12 @@ impl DistanceSource for DistanceMatrix {
         self.n
     }
 
-    fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
+    fn distance_by_pos(&self, pos1: Position, pos2: Position) -> Result<f32, &'static str> {
         if pos1 == pos2 {
             return Ok(0.0);
         }
+        let pos1 = pos1.into_inner();
+        let pos2 = pos2.into_inner();
         if pos1 >= self.n || pos2 >= self.n {
             return Err("position out of range");
         }
@@ -426,21 +429,29 @@ impl DistanceSource for DistanceMatrix {
         if city_id1 == city_id2 {
             return Ok(0.0);
         }
-        let pos1 = self.city_idx.get(city_id1).ok_or("city_id1 not in index")?;
-        let pos2 = self.city_idx.get(city_id2).ok_or("city_id2 not in index")?;
+        let pos1 = self
+            .city_idx
+            .get(city_id1)
+            .map(Position::new)
+            .ok_or("city_id1 not in index")?;
+        let pos2 = self
+            .city_idx
+            .get(city_id2)
+            .map(Position::new)
+            .ok_or("city_id2 not in index")?;
         self.distance_by_pos(pos1, pos2)
     }
 
-    fn pos2city_id(&self, pos: usize) -> Option<usize> {
-        self.cities.get(pos).map(|c| c.id)
+    fn pos2city_id(&self, pos: Position) -> Option<usize> {
+        self.cities.get(pos.into_inner()).map(|c| c.id)
     }
 
-    fn city_id2pos(&self, city_id: usize) -> Option<usize> {
-        self.city_idx.get(city_id)
+    fn city_id2pos(&self, city_id: usize) -> Option<Position> {
+        self.city_idx.get(city_id).map(Position::new)
     }
 
-    fn point_at(&self, pos: usize) -> Option<KDPoint> {
-        self.cities.get(pos).copied()
+    fn point_at(&self, pos: Position) -> Option<KDPoint> {
+        self.cities.get(pos.into_inner()).copied()
     }
 
     fn is_coordinate_metric(&self) -> bool {
@@ -740,8 +751,18 @@ mod tests {
         let narrow = DistanceMatrix::new(3, packed.clone(), cities.clone()).unwrap();
         assert_eq!(narrow.storage_kind(), "u16");
         assert_eq!(narrow.stored_bytes(), packed.len() * 2);
-        assert_eq!(narrow.distance_by_pos(2, 0).unwrap(), 65_535.0);
-        assert_eq!(narrow.distance_by_pos(2, 1).unwrap(), 1.0);
+        assert_eq!(
+            narrow
+                .distance_by_pos(Position::new(2), Position::new(0))
+                .unwrap(),
+            65_535.0
+        );
+        assert_eq!(
+            narrow
+                .distance_by_pos(Position::new(2), Position::new(1))
+                .unwrap(),
+            1.0
+        );
 
         for (packed, expected_kind) in [
             (vec![1.0, 65_536.0, 2.0], "f32"), // does not fit u16
@@ -796,8 +817,12 @@ mod tests {
         for a in 0..n {
             for b in 0..n {
                 assert_eq!(
-                    compact.distance_by_pos(a, b).unwrap(),
-                    reference.distance_by_pos(a, b).unwrap(),
+                    compact
+                        .distance_by_pos(Position::new(a), Position::new(b))
+                        .unwrap(),
+                    reference
+                        .distance_by_pos(Position::new(a), Position::new(b))
+                        .unwrap(),
                     "pair ({a}, {b})"
                 );
             }
@@ -1040,10 +1065,10 @@ mod tests {
             "the test must exercise the sparse branch, not the dense fallback"
         );
 
-        assert_eq!(dm.point_at(0).map(|c| c.id), Some(10));
-        assert_eq!(dm.pos2city_id(1), Some(20));
-        assert_eq!(dm.pos2city_id(3), None);
-        assert_eq!(dm.city_id2pos(30), Some(2));
+        assert_eq!(dm.point_at(Position::new(0)).map(|c| c.id), Some(10));
+        assert_eq!(dm.pos2city_id(Position::new(1)), Some(20));
+        assert_eq!(dm.pos2city_id(Position::new(3)), None);
+        assert_eq!(dm.city_id2pos(30), Some(Position::new(2)));
         assert_eq!(dm.city_id2pos(99), None);
         assert_approx(5.0, dm.distance_between(10, 20).unwrap());
         assert!(dm.distance_between(10, 99).is_err());

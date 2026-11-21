@@ -4,6 +4,7 @@
 //! the TSPLIB primitive. Every lookup computes the distance, so the source needs O(n) memory
 //! instead of the matrix's O(n²). It is the backend that makes 100k-city instances possible.
 
+use super::Position;
 use super::distance_matrix::{att_distance, ceil_2d_distance, euc_2d_distance, geo_distance};
 use super::id_index::IdIndex;
 use super::kdtree::KDPoint;
@@ -47,12 +48,18 @@ impl DistanceSource for OnTheFly {
         self.cities.len()
     }
 
-    fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
+    fn distance_by_pos(&self, pos1: Position, pos2: Position) -> Result<f32, &'static str> {
         if pos1 == pos2 {
             return Ok(0.0);
         }
-        let a = self.cities.get(pos1).ok_or("position out of range")?;
-        let b = self.cities.get(pos2).ok_or("position out of range")?;
+        let a = self
+            .cities
+            .get(pos1.into_inner())
+            .ok_or("position out of range")?;
+        let b = self
+            .cities
+            .get(pos2.into_inner())
+            .ok_or("position out of range")?;
         Ok((self.distance)(a, b))
     }
 
@@ -62,21 +69,29 @@ impl DistanceSource for OnTheFly {
         if city_id1 == city_id2 {
             return Ok(0.0);
         }
-        let pos1 = self.city_idx.get(city_id1).ok_or("city_id1 not in index")?;
-        let pos2 = self.city_idx.get(city_id2).ok_or("city_id2 not in index")?;
+        let pos1 = self
+            .city_idx
+            .get(city_id1)
+            .map(Position::new)
+            .ok_or("city_id1 not in index")?;
+        let pos2 = self
+            .city_idx
+            .get(city_id2)
+            .map(Position::new)
+            .ok_or("city_id2 not in index")?;
         self.distance_by_pos(pos1, pos2)
     }
 
-    fn pos2city_id(&self, pos: usize) -> Option<usize> {
-        self.cities.get(pos).map(|city| city.id)
+    fn pos2city_id(&self, pos: Position) -> Option<usize> {
+        self.cities.get(pos.into_inner()).map(|city| city.id)
     }
 
-    fn city_id2pos(&self, city_id: usize) -> Option<usize> {
-        self.city_idx.get(city_id)
+    fn city_id2pos(&self, city_id: usize) -> Option<Position> {
+        self.city_idx.get(city_id).map(Position::new)
     }
 
-    fn point_at(&self, pos: usize) -> Option<KDPoint> {
-        self.cities.get(pos).copied()
+    fn point_at(&self, pos: Position) -> Option<KDPoint> {
+        self.cities.get(pos.into_inner()).copied()
     }
 }
 
@@ -119,13 +134,23 @@ mod tests {
     #[test]
     fn self_distance_is_zero_and_positions_round_trip() {
         let source = OnTheFly::new(&cities(), DistanceType::Euc2D).unwrap();
-        assert_eq!(source.distance_by_pos(1, 1).unwrap(), 0.0);
-        for pos in 0..source.num_cities() {
+        assert_eq!(
+            source
+                .distance_by_pos(Position::new(1), Position::new(1))
+                .unwrap(),
+            0.0
+        );
+        for i in 0..source.num_cities() {
+            let pos = Position::new(i);
             let id = source.pos2city_id(pos).unwrap();
             assert_eq!(source.city_id2pos(id), Some(pos));
             assert_eq!(source.point_at(pos).unwrap().id, id);
         }
-        assert!(source.distance_by_pos(0, 99).is_err());
+        assert!(
+            source
+                .distance_by_pos(Position::new(0), Position::new(99))
+                .is_err()
+        );
     }
 
     #[test]
@@ -136,7 +161,7 @@ mod tests {
             KDPoint::new_with_id(30, &[0.0, 1.0]),
         ];
         let source = OnTheFly::new(&cities, DistanceType::Euc2D).unwrap();
-        assert_eq!(source.city_id2pos(20), Some(1));
+        assert_eq!(source.city_id2pos(20), Some(Position::new(1)));
         assert_eq!(source.distance_between(10, 20).unwrap(), 5.0);
         assert!(source.distance_between(10, 99).is_err());
     }
@@ -144,7 +169,17 @@ mod tests {
     #[test]
     fn computes_the_declared_metric() {
         let source = OnTheFly::new(&cities(), DistanceType::Euc2D).unwrap();
-        assert_eq!(source.distance_by_pos(0, 1).unwrap(), 5.0); // 3-4-5
-        assert_eq!(source.distance_by_pos(0, 1).unwrap(), 5.0);
+        assert_eq!(
+            source
+                .distance_by_pos(Position::new(0), Position::new(1))
+                .unwrap(),
+            5.0
+        ); // 3-4-5
+        assert_eq!(
+            source
+                .distance_by_pos(Position::new(0), Position::new(1))
+                .unwrap(),
+            5.0
+        );
     }
 }

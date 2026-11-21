@@ -607,6 +607,7 @@ fn coords_from_text<S: AsRef<str>>(line_no: usize, txt: S) -> Result<KDPoint, St
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::Position;
     use crate::tsp::distance_source::DistanceSource;
 
     // ── existing tests ────────────────────────────────────────────────────────
@@ -1099,7 +1100,10 @@ mod tests {
         let problem = TspProblem::new(cities.clone(), matrix);
         for (pos, city) in cities.iter().enumerate() {
             assert_eq!(&problem.cities[pos], city);
-            assert_eq!(problem.distances.point_at(pos).unwrap(), *city);
+            assert_eq!(
+                problem.distances.point_at(Position::new(pos)).unwrap(),
+                *city
+            );
         }
     }
 
