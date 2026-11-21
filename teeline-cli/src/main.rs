@@ -279,14 +279,15 @@ fn tuning_args() -> Vec<Arg> {
             .value_name("N")
             .help(
                 "Memetic EAX: stagnant generations before hybrid switches to single_ab; \
-                 the solver stops at twice this count (default 50)",
+                 the solver stops at twice this count (default 50; falls back to \
+                 --stagnation_epochs when omitted)",
             )
             .action(ArgAction::Set)
             .required(false),
         Arg::new("candidate_k")
             .long("candidate-k")
             .value_name("N")
-            .help("Memetic EAX: nearest-neighbour list size for patching and local search (default 20)")
+            .help("Memetic EAX: nearest-neighbour list size for patching and local search (default 20; falls back to --n_nearest when omitted)")
             .action(ArgAction::Set)
             .required(false),
         Arg::new("n_elite")

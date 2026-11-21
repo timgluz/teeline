@@ -75,7 +75,7 @@ impl std::str::FromStr for EaxStrategy {
 /// the stop), and `pop_size`/`children_per_pair` have no shared home.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MemeticEaxOptions {
-    /// Maximum generations; `0` returns the best polished initial member.
+    /// Maximum generations; `0` means no epoch cap (the stagnation stop still applies).
     pub epochs: usize,
     pub pop_size: usize,
     pub children_per_pair: usize,
@@ -184,11 +184,19 @@ impl MemeticEaxOptions {
             eax.stall_epochs = v
                 .parse()
                 .map_err(|_| format!("--stall-epochs: invalid integer `{v}`"))?;
+        } else if let Some(v) = args.get_one::<String>("stagnation_epochs") {
+            eax.stall_epochs = v
+                .parse()
+                .map_err(|_| format!("--stagnation_epochs: invalid integer `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("candidate_k") {
             eax.candidate_k = v
                 .parse()
                 .map_err(|_| format!("--candidate-k: invalid integer `{v}`"))?;
+        } else if let Some(v) = args.get_one::<String>("n_nearest") {
+            eax.candidate_k = v
+                .parse()
+                .map_err(|_| format!("--n_nearest: invalid integer `{v}`"))?;
         }
         if let Some(v) = args.get_one::<String>("seed") {
             eax.seed = Some(
@@ -928,7 +936,8 @@ fn should_replace(parent_cost: f32, child_cost: f32) -> bool {
 }
 
 fn should_stop(epochs_done: usize, opts: &MemeticEaxOptions, stagnant: usize) -> bool {
-    epochs_done >= opts.epochs || stagnant >= opts.stall_epochs.saturating_mul(2)
+    (opts.epochs > 0 && epochs_done >= opts.epochs)
+        || stagnant >= opts.stall_epochs.saturating_mul(2)
 }
 
 fn positions_to_ids(positions: &[usize], distances: &dyn DistanceSource) -> Vec<usize> {
@@ -1346,6 +1355,9 @@ mod tests {
         assert!(should_stop(100, &opts, 0));
         assert!(!should_stop(0, &opts, 5));
         assert!(should_stop(0, &opts, 6));
+        opts.epochs = 0;
+        assert!(!should_stop(1_000_000, &opts, 5));
+        assert!(should_stop(1_000_000, &opts, 6));
     }
 
     #[test]
@@ -1773,7 +1785,45 @@ mod tests {
                 .long("candidate-k")
                 .action(ArgAction::Set),
             Arg::new("seed").long("seed").action(ArgAction::Set),
+            Arg::new("stagnation_epochs")
+                .long("stagnation_epochs")
+                .action(ArgAction::Set),
+            Arg::new("n_nearest")
+                .long("n_nearest")
+                .action(ArgAction::Set),
         ])
+    }
+
+    #[test]
+    fn options_from_cli_falls_back_to_the_shared_flags() {
+        let args = cli_command().get_matches_from([
+            "test",
+            "--stagnation_epochs",
+            "20",
+            "--n_nearest",
+            "7",
+        ]);
+        let opts = MemeticEaxOptions::from_cli(&args).unwrap();
+        assert_eq!(opts.stall_epochs, 20);
+        assert_eq!(opts.candidate_k, 7);
+    }
+
+    #[test]
+    fn options_from_cli_specific_flags_win_over_the_shared_ones() {
+        let args = cli_command().get_matches_from([
+            "test",
+            "--stall-epochs",
+            "9",
+            "--stagnation_epochs",
+            "20",
+            "--candidate-k",
+            "11",
+            "--n_nearest",
+            "7",
+        ]);
+        let opts = MemeticEaxOptions::from_cli(&args).unwrap();
+        assert_eq!(opts.stall_epochs, 9);
+        assert_eq!(opts.candidate_k, 11);
     }
 
     #[test]
