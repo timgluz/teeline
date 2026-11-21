@@ -104,7 +104,7 @@ impl TourGraph {
     ///
     /// Summing `f32` edge lengths in `f32` loses the last bits at large-instance costs (one
     /// ulp is ~2 at dsj1000's 1.9e7), which makes equal-length tours compare differently.
-    /// The f64 sum of f32 values is exact, and this walks the adjacency in place instead of
+    /// f64 accumulation removes that, and this walks the adjacency in place instead of
     /// allocating a tour vector for every member.
     pub(crate) fn edge_sum(&self, distances: &dyn DistanceSource) -> f64 {
         let n = self.nbr.len();

@@ -98,6 +98,40 @@ mod tests {
     }
 
     #[test]
+    fn shorter_side_reversal_matches_an_in_place_reversal() {
+        use std::collections::HashSet;
+
+        let key = |a: usize, b: usize| if a < b { (a, b) } else { (b, a) };
+        for n in 5..=12 {
+            for from in 1..n {
+                for to in (from + 1)..n {
+                    let tour: Vec<usize> = (0..n).collect();
+                    let mut shorter = tour.clone();
+                    let mut pos: Vec<usize> = (0..n).collect();
+                    reverse_segment_with_pos(&mut shorter, &mut pos, from, to);
+
+                    let mut in_place = tour.clone();
+                    in_place[from..=to].reverse();
+
+                    let shorter_edges: HashSet<_> = (0..n)
+                        .map(|i| key(shorter[i], shorter[(i + 1) % n]))
+                        .collect();
+                    let in_place_edges: HashSet<_> = (0..n)
+                        .map(|i| key(in_place[i], in_place[(i + 1) % n]))
+                        .collect();
+                    assert_eq!(
+                        shorter_edges, in_place_edges,
+                        "n={n} from={from} to={to}: reversal must preserve the cyclic edge set"
+                    );
+                    for (rank, &city) in shorter.iter().enumerate() {
+                        assert_eq!(pos[city], rank, "n={n} from={from} to={to}: pos is stale");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
     fn reverse_segment_with_pos_keeps_ranks_consistent() {
         let mut tour = [0usize, 1, 2, 3, 4];
         let mut pos = [0usize; 5];

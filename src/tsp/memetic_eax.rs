@@ -24,8 +24,11 @@ use rand::{RngExt, SeedableRng};
 use std::collections::HashSet;
 use std::sync::mpsc;
 
-/// Cost improvement below this is treated as zero; without it a float-noise swap would loop.
-const EPS: f64 = 1e-9;
+/// Relative tolerance for tour-cost comparisons. An absolute epsilon is meaningless at f32
+/// edge scale (one f32 ulp is ~2 on dsj1000), and even f64 has a ~3.7e-9 ulp at 1.9e7.
+const COST_EPS: f64 = 1e-12;
+/// Minimum 2-opt gain in distance units; below this a float-noise swap would loop.
+const MOVE_EPS: f64 = 1e-9;
 
 /// Merge candidates are capped below the local-search list: patching only needs a few
 /// boundary neighbours, and the smaller scan is a large win at n = 1,000.
@@ -686,7 +689,7 @@ fn best_2opt_move(
                     continue;
                 }
                 let delta = two_opt_move::delta(tour, i, j, |a, b| distance(distances, a, b));
-                if delta < -EPS
+                if delta < -MOVE_EPS
                     && best
                         .as_ref()
                         .is_none_or(|&(best_delta, ..)| delta < best_delta)
@@ -975,7 +978,7 @@ fn pair_order(population_len: usize, rng: &mut impl RngExt) -> Vec<(usize, usize
 }
 
 fn should_replace(parent_cost: f64, child_cost: f64) -> bool {
-    child_cost < parent_cost - EPS
+    child_cost < parent_cost - COST_EPS * parent_cost.abs().max(1.0)
 }
 
 fn should_stop(epochs_done: usize, opts: &MemeticEaxOptions, stagnant: usize) -> bool {
@@ -1749,7 +1752,7 @@ mod tests {
     fn should_replace_is_strict() {
         assert!(should_replace(10.0, 9.0));
         assert!(!should_replace(10.0, 10.0));
-        assert!(!should_replace(10.0, 10.0 - EPS / 2.0));
+        assert!(!should_replace(10.0, 10.0 - COST_EPS * 5.0));
     }
 
     #[test]
