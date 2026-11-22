@@ -3,10 +3,9 @@ use std::collections::HashSet;
 use std::sync::mpsc;
 
 use super::budget::Budget;
-use super::candidate_list::{CandidateList, MIN_CANDIDATE_K};
-use super::nearest_neighbor::randomized_tour;
+use super::nearest_neighbor::seed_population;
 use super::progress::ProgressMessage;
-use super::route::Route;
+use super::route::{Route, move_toward, random_reversal};
 use super::{HeuristicOptions, Solution, TspProblem};
 
 const W_MAX: f64 = 0.9;
@@ -17,68 +16,11 @@ const C1: f64 = 0.5;
 const C2: f64 = 0.5;
 const DEFAULT_N_PARTICLES: usize = 30;
 
-fn random_tour(city_ids: &[usize], rng: &mut impl RngExt) -> Vec<usize> {
-    let mut tour = city_ids.to_vec();
-    for i in (1..tour.len()).rev() {
-        let j = rng.random_range(0..=i);
-        tour.swap(i, j);
-    }
-    tour
-}
-
-/// Order-crossover move toward `target`: copy a random contiguous segment of `target`
-/// (wrapping around the ends) and fill the rest in `cur`'s relative order.
-///
-/// A transposition can break four edges at once and is blind to tour rotation; this move
-/// keeps the target's edges inside the copied segment and breaks only its junctions.
-fn move_toward(
-    cur: &[usize],
-    target: &[usize],
-    fraction: f64,
-    rng: &mut impl RngExt,
-    used: &mut HashSet<usize>,
-) -> Vec<usize> {
-    let n = cur.len();
-    if n < 4 {
-        return target.to_vec();
-    }
-    let seg_len = ((fraction * n as f64).round() as usize).clamp(1, n - 1);
-    let start = rng.random_range(0..n);
-
-    let mut child = vec![usize::MAX; n];
-    used.clear();
-    for k in 0..seg_len {
-        let idx = (start + k) % n;
-        child[idx] = target[idx];
-        used.insert(target[idx]);
-    }
-
-    let mut fill = (start + seg_len) % n;
-    for k in 0..n {
-        let city = cur[(start + seg_len + k) % n];
-        if !used.contains(&city) {
-            child[fill] = city;
-            fill = (fill + 1) % n;
-        }
-    }
-
-    child
-}
-
 /// Explore with one or two random 2-opt reversals; `w` decays from `W_MAX` to `W_MIN`.
 fn perturb(tour: &mut [usize], w: f64, rng: &mut impl RngExt) {
-    let n = tour.len();
-    if n < 3 {
-        return;
-    }
     let moves = if w > 0.6 { 2 } else { 1 };
     for _ in 0..moves {
-        let a = rng.random_range(0..n);
-        let b = rng.random_range(0..n);
-        let (lo, hi) = if a < b { (a, b) } else { (b, a) };
-        if hi - lo > 1 {
-            tour[lo..=hi].reverse();
-        }
+        random_reversal(tour, rng);
     }
 }
 
@@ -94,42 +36,7 @@ pub fn solve(
     let n_particles = opts.n_nearest.max(DEFAULT_N_PARTICLES);
 
     let mut rng = rand::rng();
-    let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
-
-    // One candidate list for all constructive seeds. Coordinate metrics rank by the
-    // KD-tree; EXPLICIT inputs rank by the exact distance source, because their layout is
-    // a display aid (or a derived embedding), not the objective.
-    let candidates = if distances.is_coordinate_metric() {
-        CandidateList::build(cities, MIN_CANDIDATE_K)
-    } else {
-        CandidateList::build_from_distances(distances.as_ref(), cities, MIN_CANDIDATE_K)
-    }
-    .ok();
-
-    let mut tours: Vec<Vec<usize>> = Vec::with_capacity(n_particles);
-    for idx in 0..n_particles {
-        let tour = if idx == 0 {
-            init_tour
-                .map(|t| t.to_vec())
-                .unwrap_or_else(|| random_tour(&city_ids, &mut rng))
-        } else if idx < n_particles / 2 {
-            // Half the swarm starts from diverse nearest-neighbour tours; the rest stays
-            // random so the population does not collapse onto one basin.
-            match &candidates {
-                Some(cands) if n_cities >= 4 => {
-                    let start = rng.random_range(0..n_cities);
-                    randomized_tour(distances.as_ref(), cands, start, 2, &mut rng)
-                        .into_iter()
-                        .map(|pos| cities[pos].id)
-                        .collect()
-                }
-                _ => random_tour(&city_ids, &mut rng),
-            }
-        } else {
-            random_tour(&city_ids, &mut rng)
-        };
-        tours.push(tour);
-    }
+    let mut tours = seed_population(distances.as_ref(), cities, n_particles, init_tour, &mut rng);
 
     let mut pbest: Vec<Vec<usize>> = tours.clone();
     let mut pbest_cost: Vec<f32> = pbest.iter().map(|p| distances.tour_length(p)).collect();
@@ -237,7 +144,6 @@ mod tests {
 
     use crate::tsp::progress::ProgressMessage;
     use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
-    use rand::SeedableRng;
 
     #[test]
     fn test_pso_respects_initial_tour() {
@@ -280,19 +186,6 @@ mod tests {
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
         expected.sort();
         assert_eq!(visited, expected);
-    }
-
-    #[test]
-    fn test_move_toward_returns_a_permutation() {
-        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
-        let cur = vec![0, 1, 2, 3, 4, 5];
-        let target = vec![3, 4, 5, 0, 1, 2];
-        let mut used = HashSet::new();
-        let child = move_toward(&cur, &target, 0.5, &mut rng, &mut used);
-
-        let mut sorted = child.clone();
-        sorted.sort();
-        assert_eq!(sorted, vec![0, 1, 2, 3, 4, 5]);
     }
 
     #[test]
