@@ -17,7 +17,7 @@ const CITY_DRAGGING = '#22d3a5'
  * The dwell for a frame before the loop advances.
  *
  * Endpoints read as a break in the loop rather than another step: the converged tour gets the
- * longest hold, so the eye can see what the solver settled on before the tour unwinds.
+ * longest hold, so the eye can see what the solver settled on before a fresh random tour begins.
  */
 export function frameDwell(frameIdx: number, optimumIndex: number): number {
   if (frameIdx === optimumIndex) return HOLD_AT_OPTIMUM_MS
@@ -37,11 +37,19 @@ export function initHeroCanvas(): void {
   const lengthEl = document.getElementById('hero-tour-length')
   const iterEl = document.getElementById('hero-iterations')
   const bestEl = document.getElementById('hero-best')
-  if (!svg || !lengthEl || !iterEl || !bestEl) return
+  const statusEl = document.getElementById('hero-solve-status')
+  if (!svg || !lengthEl || !iterEl || !bestEl || !statusEl) return
   const root = svg
   const length = lengthEl
   const iterations = iterEl
   const bestNode = bestEl
+  const status = statusEl
+
+  function setStatus(solved: boolean): void {
+    status.textContent = solved ? 'solved' : 'solving'
+    status.classList.toggle('text-positive', solved)
+    status.classList.toggle('text-accent', !solved)
+  }
 
   const NS = 'http://www.w3.org/2000/svg'
   const cities: HeroCity[] = berlin52.map((c) => ({ id: c.id, x: c.x, y: c.y }))
@@ -217,6 +225,7 @@ export function initHeroCanvas(): void {
       'en-US',
     )
     iterations.textContent = String(iterationCount)
+    setStatus(reduceMotion)
   })
 
   function onUp(): void {
@@ -248,6 +257,7 @@ export function initHeroCanvas(): void {
         length.textContent = Math.round(frames[0].cost).toLocaleString('en-US')
         bestNode.textContent = Math.round(best).toLocaleString('en-US')
         iterations.textContent = '0'
+        setStatus(false)
       } else {
         frameIdx += 1
         const f = frames[frameIdx]
@@ -262,6 +272,7 @@ export function initHeroCanvas(): void {
         bestNode.textContent = Math.round(best).toLocaleString('en-US')
         iterations.textContent = String(iterationCount)
         lastFrame = f.cost
+        setStatus(frameIdx === optimumIndex)
       }
       lastAdvance = now
     }
@@ -272,5 +283,6 @@ export function initHeroCanvas(): void {
   length.textContent = Math.round(frames[frameIdx].cost).toLocaleString('en-US')
   bestNode.textContent = Math.round(best).toLocaleString('en-US')
   iterations.textContent = String(iterationCount)
+  setStatus(frameIdx === optimumIndex)
   if (!reduceMotion) requestAnimationFrame(step)
 }
