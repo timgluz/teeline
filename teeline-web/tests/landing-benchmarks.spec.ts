@@ -104,6 +104,66 @@ test.describe('landing benchmark chart', () => {
     // out, so it is counted rather than plotted.
     await expect(section).toContainText('6 solvers · 7 results')
     await expect(section).toContainText('not plotted: 1 did not finish')
+    // Shuffle leaves a gap an order of magnitude larger than the rest, so it is named above
+    // the axis instead of stretching it.
+    await expect(section).toContainText('The axis stops at 15.0%')
+    await expect(section).toContainText('Random shuffle, the sanity check')
+    await expect(section.locator('svg[role="img"] path')).toHaveCount(1)
+  })
+
+  test('filters the chart when a family chip is clicked', async ({ page }) => {
+    await openLanding(page, fixture('problem-synthetic.json'))
+
+    const section = page.locator('#benchmarks')
+    await expect(section).toBeVisible()
+    const circles = section.locator('svg[role="img"] circle')
+    await expect(circles).toHaveCount(6)
+
+    const meta = section.getByRole('button', { name: 'Metaheuristic' })
+    await expect(meta).toHaveAttribute('aria-pressed', 'true')
+    await meta.click()
+
+    await expect(meta).toHaveAttribute('aria-pressed', 'false')
+    await expect(circles).toHaveCount(5)
+    await expect(section).toContainText('1 hidden')
+
+    await section.getByRole('button', { name: 'show all' }).click()
+    await expect(meta).toHaveAttribute('aria-pressed', 'true')
+    await expect(circles).toHaveCount(6)
+    await expect(section).not.toContainText('hidden')
+  })
+
+  test('keeps the last family with results visible', async ({ page }) => {
+    await openLanding(page, fixture('problem-synthetic.json'))
+
+    const section = page.locator('#benchmarks')
+    await expect(section).toBeVisible()
+    for (const name of ['Exact', 'Local search', 'Metaheuristic']) {
+      await section.getByRole('button', { name }).click()
+    }
+
+    // Utility is the last family with a point, so its chip cannot empty the plot.
+    await expect(
+      section.getByRole('button', { name: 'Baseline' }),
+    ).toBeDisabled()
+    // mystery_solver has no family, so it is never filtered away.
+    await expect(section.locator('svg[role="img"] circle')).toHaveCount(1)
+  })
+
+  test('shows the solver, runtime and gap when a point is hovered', async ({
+    page,
+  }) => {
+    await openLanding(page, fixture('problem-berlin52.json'))
+
+    const section = page.locator('#benchmarks')
+    await expect(section).toBeVisible()
+    await section.locator('svg[role="img"] circle').first().hover()
+
+    const tooltip = page.getByRole('tooltip')
+    await expect(tooltip).toBeVisible()
+    await expect(tooltip).toContainText('runtime')
+    await expect(tooltip).toContainText('gap')
+    await expect(tooltip).toContainText('Local search')
   })
 
   test('renders no chart for an instance with no published shard', async ({
