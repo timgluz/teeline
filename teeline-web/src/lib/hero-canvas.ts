@@ -2,9 +2,9 @@ import { berlin52, type HeroCity } from './hero-cities'
 
 /** How long an ordinary 2-opt frame stays on screen. */
 export const FRAME_DWELL_MS = 240
-/** A long break on the converged tour, so the loop settles before it reverses. */
-export const HOLD_AT_OPTIMUM_MS = 1400
-/** A shorter break on the seed before the improvements replay. */
+/** The break on the converged tour before a fresh random run starts. */
+export const HOLD_AT_OPTIMUM_MS = 5000
+/** A shorter look at the random seed before the improvements start. */
 export const HOLD_AT_SEED_MS = 900
 
 const ROUTE_FROM = '#6366f1'
@@ -60,33 +60,26 @@ export function initHeroCanvas(): void {
     return cost
   }
 
-  function nearestNeighborSeed(): number[] {
-    const unvisited = cities.map((_, i) => i)
-    const route = [unvisited.shift()!]
-    let cur = route[0]
-    while (unvisited.length) {
-      let bestIdx = 0
-      let bestD = Infinity
-      unvisited.forEach((c, i) => {
-        const d = dist(cur, c)
-        if (d < bestD) {
-          bestD = d
-          bestIdx = i
-        }
-      })
-      const next = unvisited.splice(bestIdx, 1)[0]
-      route.push(next)
-      cur = next
+  function randomSeed(): number[] {
+    const order = cities.map((_, i) => i)
+    for (let i = order.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const swap = order[i]
+      order[i] = order[j]
+      order[j] = swap
     }
-    return route
+    return order
   }
 
-  function buildFrames(): { frames: Frame[]; optimumIndex: number } {
-    let route = nearestNeighborSeed()
+  function buildFrames(seed: number[]): {
+    frames: Frame[]
+    optimumIndex: number
+  } {
+    const route = seed.slice()
     const frames: Frame[] = []
     frames.push({ route: route.slice(), cost: routeCost(route) })
     let improved = true
-    while (improved && frames.length < 120) {
+    while (improved) {
       improved = false
       for (let i = 0; i < route.length - 1; i++) {
         for (let k = i + 1; k < route.length; k++) {
@@ -98,18 +91,15 @@ export function initHeroCanvas(): void {
             route.splice(i + 1, k - i, ...route.slice(i + 1, k + 1).reverse())
             improved = true
             frames.push({ route: route.slice(), cost: routeCost(route) })
-            if (frames.length >= 120) break
           }
         }
-        if (frames.length >= 120) break
       }
     }
-    const optimumIndex = frames.length - 1
-    const reversed = frames.slice(1, -1).reverse()
-    return { frames: frames.concat(reversed), optimumIndex }
+    return { frames, optimumIndex: frames.length - 1 }
   }
 
-  let built = buildFrames()
+  let currentSeed = randomSeed()
+  let built = buildFrames(currentSeed)
   let frames = built.frames
   let optimumIndex = built.optimumIndex
   let best = Math.min(...frames.map((f) => f.cost))
@@ -211,7 +201,7 @@ export function initHeroCanvas(): void {
     cities[dragging].y = Math.max(0, Math.min(1200, p.y))
     nodeEls[dragging]?.setAttribute('cx', String(cities[dragging].x))
     nodeEls[dragging]?.setAttribute('cy', String(cities[dragging].y))
-    const rebuilt = buildFrames()
+    const rebuilt = buildFrames(currentSeed)
     frames = rebuilt.frames
     optimumIndex = rebuilt.optimumIndex
     best = Math.min(best, ...frames.map((f) => f.cost))
@@ -244,20 +234,35 @@ export function initHeroCanvas(): void {
       dragging === null &&
       now - lastAdvance >= frameDwell(frameIdx, optimumIndex)
     ) {
-      frameIdx = (frameIdx + 1) % frames.length
-      const f = frames[frameIdx]
-      renderRoute(f.route)
-      length.textContent = Math.round(f.cost).toLocaleString('en-US')
-      if (f.cost < lastFrame) {
-        iterationCount++
+      if (frameIdx === optimumIndex) {
+        // The run converged and the break is over: start a fresh random tour.
+        currentSeed = randomSeed()
+        const rebuilt = buildFrames(currentSeed)
+        frames = rebuilt.frames
+        optimumIndex = rebuilt.optimumIndex
+        best = Math.min(best, ...frames.map((f) => f.cost))
+        frameIdx = 0
+        iterationCount = 0
+        lastFrame = frames[0].cost
+        renderRoute(frames[0].route)
+        length.textContent = Math.round(frames[0].cost).toLocaleString('en-US')
+        bestNode.textContent = Math.round(best).toLocaleString('en-US')
+        iterations.textContent = '0'
+      } else {
+        frameIdx += 1
+        const f = frames[frameIdx]
+        renderRoute(f.route)
+        length.textContent = Math.round(f.cost).toLocaleString('en-US')
+        if (f.cost < lastFrame) {
+          iterationCount++
+        }
+        if (f.cost <= best) {
+          best = f.cost
+        }
+        bestNode.textContent = Math.round(best).toLocaleString('en-US')
+        iterations.textContent = String(iterationCount)
+        lastFrame = f.cost
       }
-      if (f.cost <= best) {
-        best = f.cost
-      }
-      bestNode.textContent = Math.round(best).toLocaleString('en-US')
-      iterations.textContent = String(iterationCount)
-      lastFrame = f.cost
-      if (frameIdx === 0) iterationCount = 0
       lastAdvance = now
     }
     requestAnimationFrame(step)
