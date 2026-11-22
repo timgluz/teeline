@@ -8,15 +8,15 @@ draft: false
 
 Ask for the poster child of an impossible problem and you'll get the Traveling Salesman Problem: given a set of cities and the distances between them, find the shortest loop that visits every city exactly once and returns home.
 
-The reason it's famous is arithmetic. With 60 cities on a symmetric map there are 59!/2 possible tours: about 7 × 10⁷⁹, a 7 followed by 79 zeros. That is in the same ballpark as the number of atoms in the observable universe. Check a billion tours per second, starting at the Big Bang, and you would still have seen less than one part in 10⁵² of them. Ten cities is a puzzle; twenty already takes a fast computer years.
+The reason it's famous is arithmetic. With 60 cities on a symmetric map there are 59!/2 possible tours: about 7 × 10⁷⁹, a 7 followed by 79 zeros. That is in the same ballpark as the number of atoms in the observable universe. Check a billion tours per second, starting at the Big Bang, and you would still have seen less than one part in 10⁵² of them. Ten cities is a puzzle; checking every tour for twenty already takes a fast computer years.
 
 That is also why TSP is the most famous face of the P vs NP question. If someone hands you a route and claims it is shorter than 8,000 km, checking the claim is easy: add up the roads. But nobody knows an algorithm guaranteed to find the shortest route quickly — in time that grows like a polynomial in the number of cities — on every possible map. Find one and you have settled P vs NP, along with a Millennium Prize.
 
 The escape hatch is that nobody knows a guaranteed fast algorithm — and that is a statement about the worst case, not about every map. You give up the guarantee and buy speed with cleverness. The resulting methods are called heuristics, and after decades of work they are astonishingly good — often finding tours that later turn out to be optimal, on maps where brute force would never finish.
 
-The algorithm I want to tell you about is a genetic algorithm. That is the surprising part. Genetic algorithms have a bad reputation on TSP, for a good reason I'll get to. In our own benchmark, the classic GA finishes 70% above optimal on a 100-city map. They are also not what you picture when you picture the state of the art.
+The algorithm I want to tell you about is a genetic algorithm. That is the surprising part. Genetic algorithms have a bad reputation on TSP, for a good reason I'll get to. In our own benchmark, a standard order-based GA lands around 8% above optimal on a 52-city map — and 70% above by 100 cities. They are also not what you picture when you picture the state of the art.
 
-Yet in 2006 Yuichi Nagata [reported](https://doi.org/10.1007/11844297_38) that his Edge Assembly Crossover found optimal tours for benchmark instances of up to 24,978 cities within a day, on a single 1.3 GHz processor — slower than the phone in your pocket. Those tours could be called optimal only because exact solvers such as Concorde had already proved the best possible length, after enormous computation. EAX matched the proof without producing one. The [2013 paper](https://doi.org/10.1287/ijoc.1120.0506) with Shigenobu Kobayashi pushed top-tier results to instances of 200,000 cities — without Lin–Kernighan, the local-search engine behind essentially every other state-of-the-art TSP heuristic.
+Yet in 2006 Yuichi Nagata [reported](https://doi.org/10.1007/11844297_38) that his Edge Assembly Crossover found optimal tours for benchmark instances of up to 24,978 cities within a day, on a single 1.3 GHz processor — slower than the phone in your pocket. Those tours could be called optimal only because exact solvers such as Concorde had already proved the best possible length, after enormous computation. EAX matched the proof without producing one.
 
 The version on this site is a compact reimplementation of the same idea, and I'll show you what it does on maps up to 1,000 cities below.
 
@@ -34,27 +34,25 @@ parent 2:  A D | C B E F
 child:     A B C B E F      →   B appears twice, D is gone
 ```
 
-Before that child is even a valid tour, a repair step has to remove the duplicate and fill the hole — and the repair is free to tear out exactly the roads both parents agreed on. The offspring ends up worse than either parent, and the population spends its generations rediscovering what it already had. This is why "just use a GA" so often disappoints on TSP.
+Before that child is even a valid tour, a repair step has to remove the duplicate and fill the hole — and the repair is free to tear out exactly the roads both parents agreed on. Smarter list crossovers avoid the duplicate, yet still slice blindly across the roads both parents share. The offspring often ends up worse than either parent, and the population spends its generations rediscovering what it already had. This is why "just use a GA" so often disappoints on TSP.
 
 EAX asks the opposite question: what if crossover never touched the order at all, and only ever exchanged edges?
 
 ## The move, in three beats
 
-**Overlay the parents.** Put both tours on the same map and keep every road they share. Now start at any city where the tours disagree and walk along a road that only tour A uses, then a road that only tour B uses, then A again, then B, always alternating, until you arrive back where you started. The papers call these loops AB-cycles; think of them as alternating loops. Each one is a place where the two parents genuinely disagree.
-
-**Swap a few loops.** Start from a copy of tour A. For each loop you pick, delete its A-roads and put in its B-roads. Every city the loop touches loses one road and gains one, so each city still has exactly two roads — the tour never loses its shape. What it usually loses is being a single loop: the result is several disconnected mini-loops.
-
-**Stitch and polish.** Patch the mini-loops back into one tour, merging the smallest first and preferring short candidate edges. Here is the real magic of the whole method: the stitch is allowed to use a road that was in neither parent. That is mutation for free, delivered precisely where the crossover broke the tour. A quick 2-opt pass — uncross edges until no simple swap shortens the loop — then cleans up the seams. teeline's version bolts that local search onto every child; a genetic algorithm with local search built in is called memetic, which is where the solver's name comes from.
+**Overlay the parents.** Put both tours on the same map. Every road they share stays locked in, so set those aside and look only at the roads where the tours disagree. Start at any city on a disagreeing road and walk along an A-only road, then a B-only road, alternating until you return to where you started. Because each parent gives every city exactly two roads, the walk always has a matching exit and is guaranteed to close into a loop. The papers call these loops AB-cycles; think of them as alternating loops.
 
 ![The EAX explainer's AB-Cycles stage: two parent tours overlaid on a 16-city map, with one alternating cycle highlighted in purple and the six stage tabs across the top.](/blog/eax-ab-cycles.png)
 
-The [interactive explainer](/algorithms/eax/explainer/) steps through all of this in six stages, with actual tours drawn on the map.
+**Swap a few loops.** Start from a copy of tour A. For each loop you pick, delete its A-roads and put in its B-roads. Every city the loop touches loses one road and gains one, so each city still has exactly two roads — the tour never loses its shape. What it usually loses is being a single loop: the result is several disconnected mini-loops.
+
+**Stitch and polish.** Patch the mini-loops back into one tour, merging the smallest first and preferring short candidate edges. Here is the real magic of the whole method: the stitch is allowed to use a road that was in neither parent. That is mutation for free, delivered precisely where the crossover broke the tour. A quick 2-opt pass — uncross edges until no simple swap shortens the loop — cleans up the seams. Bolting local search onto every child makes it a memetic algorithm, which gives teeline's Memetic EAX its name.
 
 ## Quietly extraordinary — and two catches
 
 The usual currency for a TSP heuristic is gap: how much longer its tour is than the best known one, as a percentage. Zero means it tied the optimum.
 
-On the 12 standard TSPLIB benchmark maps, Memetic EAX's median gap is 0.00% on every single one, over five runs each. The largest map, dsj1000 with 1,000 cities, is the only one where any run missed at all: the worst was 0.04% above optimal, and the median run took about 30 seconds on a desktop CPU. The benchmark allows it 300 seconds.
+On 12 standard TSPLIB benchmark maps, Memetic EAX's median gap is 0.00% on every single one, over five runs each. The largest map, dsj1000 with 1,000 cities, is the only one where any run missed at all: the worst was 0.04% above optimal, and the median run took about 30 seconds on a desktop CPU. The benchmark allows it 300 seconds.
 
 I did not expect that when I added the solver. I expected an interesting algorithm that was too slow to matter. It is slow. It is also, in the median run, matching the known optimum on every map in the benchmark.
 
@@ -69,8 +67,6 @@ The second is the price of all that machinery: speed. In the native benchmark, 2
 The [interactive explainer](/algorithms/eax/explainer/) is the best place to see the move — scrub through it once. The [algorithm page](/algorithms/eax/) has the full description, the options, and the benchmark table, with the references at the bottom.
 
 If you would rather feel the gap close, open [the solver](/solve/?dataset=berlin52). It loads berlin52 and its optimal tour, so the gap column is live. Run Nearest Neighbor and note the gap — about 19% on this map. Then choose Memetic EAX from the "All solvers…" menu and watch it land on 0.00%. Give it a minute or two: the browser build is much slower than the native benchmark.
-
-For a harder test, change `berlin52` in the URL to `a280`. Nearest Neighbor starts around 22% above optimal, and Memetic EAX still reaches it — give it a few minutes.
 
 If you have the CLI installed:
 
