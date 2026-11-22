@@ -1469,7 +1469,7 @@ dependencies = [
 
 [[package]]
 name = "teeline-wasm"
-version = "0.3.0"
+version = "0.3.4"
 dependencies = [
  "teeline",
  "wasmtime",
