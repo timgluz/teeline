@@ -106,7 +106,7 @@ LK chain search (issue #184) is implemented and shipped, not a future improvemen
   quality does not depend on a derived layout.
 - **Candidate-list construction uses a KD-tree**: `build_candidates()` builds the
   per-city `k`-nearest-neighbour list with a `KDTree::nearest` query per city
-  (`src/tsp/kdtree.rs`, same module used by `branch_bound.rs` and `fourier.rs`) instead
+  (`src/tsp/kdtree.rs`, the same module `fourier.rs` uses) instead
   of a brute-force all-pairs distance scan + sort. This changes the construction cost
   from O(n² log n) to O(n log n): a one-time tree build (O(n log n)) followed by `n`
   queries, each an O(log n) tree descent plus O(k) buffer maintenance (the buffer is

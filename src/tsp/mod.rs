@@ -59,6 +59,14 @@ use std::sync::mpsc;
 pub const VERSION: &str = "1.0.1";
 pub const AUTHOR: &str = "Timo Sulg <timo@sulg.dev>";
 
+/// Exact solvers are exponential. Inputs above this bound are rejected at the
+/// dispatcher instead of being allowed to run until the caller gives up.
+///
+/// 24 matches the Tier A `upto24` coverage and the constitution's ~20–30 city
+/// bound; it is deliberately not configurable, because a larger value only
+/// turns a guaranteed hang into a slower guaranteed hang.
+pub const EXACT_MAX_CITIES: usize = 24;
+
 use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1998,6 +2006,15 @@ pub fn solve_with_context(
     progress_tx: Option<mpsc::Sender<progress::ProgressMessage>>,
     init_tour: Option<&[usize]>,
 ) -> Result<Solution, String> {
+    if matches!(solver, Solvers::BellmanKarp | Solvers::BranchBound)
+        && problem.cities.len() > EXACT_MAX_CITIES
+    {
+        return Err(format!(
+            "exact solvers are limited to {EXACT_MAX_CITIES} cities (got {}); \
+             use a heuristic or metaheuristic solver for larger instances",
+            problem.cities.len()
+        ));
+    }
     let tx = progress_tx.as_ref();
     let h = opts.heuristic.as_ref().cloned().unwrap_or_default();
     h.validate()?;

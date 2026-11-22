@@ -1,9 +1,8 @@
 // Pure simulation logic for the Branch & Bound explainer.
 //
 // Rust-faithful model (src/tsp/branch_bound.rs), simplified for teaching:
-//   - depth-first search with full branching (the solver additionally restricts
-//     candidates to the n_nearest geometric neighbours — omitted here so the
-//     tree shows every branch)
+//   - depth-first search with full branching (the solver also branches over
+//     every unvisited city; there is no n_nearest candidate restriction)
 //   - lower bound per node: LB = running_cost + MST({start} ∪ unvisited)
 //     (the solver's bound: the completion must span {start} ∪ unvisited, so its
 //     cost is at least the MST of that set — a valid lower bound)

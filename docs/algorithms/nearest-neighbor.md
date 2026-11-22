@@ -8,6 +8,8 @@ hasExplainer: true
 
 # Nearest Neighbor
 
+<!-- The #benchmarks anchor is rendered by AlgorithmBenchmarks, not by a heading in this file. -->
+<!-- markdownlint-disable MD051 -->
 | | |
 | --- | --- |
 | **Alias** | `nn`, `nearest_neighbor` |
@@ -55,9 +57,9 @@ iteration order.
 evaluates every unvisited city, because "nearest neighbour" means the nearest, full stop.
 
 The option still governs algorithms that use it as a candidate-list limit rather than a
-correctness guarantee — `lin_kernighan` narrows its 2-opt candidate edges with it, and
-`branch_bound` uses it to bound which cities may extend a partial path. For those solvers a small
-value is a deliberate accuracy-versus-speed trade-off, and it is documented on their own pages.
+correctness guarantee — `lin_kernighan` narrows its 2-opt candidate edges with it. For that
+solver a small value is a deliberate accuracy-versus-speed trade-off, and it is documented on its
+own page. `branch_bound` is exact by default and ignores `--n_nearest` entirely.
 
 ## Performance
 
