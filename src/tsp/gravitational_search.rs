@@ -1,24 +1,84 @@
 use rand::RngExt;
+use std::collections::HashSet;
 use std::sync::mpsc;
 
 use super::budget::Budget;
+use super::nearest_neighbor::seed_population;
 use super::progress::ProgressMessage;
-use super::route::{Route, apply_swaps, swap_sequence};
+use super::route::{Route, move_toward, random_reversal};
 use super::{HeuristicOptions, Solution, TspProblem};
-
-type Swap = (usize, usize);
-type Velocity = Vec<Swap>;
 
 const G0: f64 = 20.0;
 const ALPHA: f64 = 1.0;
-// Empirically: inertia (W>0) hurts performance on berlin52 — stale swap indices
-// accumulated across epochs act as noise once G decays. W=0 gives pure gravity.
-const INERTIA_W: f64 = 0.0;
-const V_MAX_FACTOR: f64 = 0.35;
+/// Scale on `g · mass · r` so the OX segment stays useful across the 20 → 7.36
+/// decay of `g` (Rashedi's α is 20, so his `g` reaches zero; ours does not).
+const GRAV_SCALE: f64 = 0.25;
+/// A pull never borrows more than half of the attractor.
+const MAX_FRACTION: f64 = 0.5;
 const DEFAULT_N_AGENTS: usize = 25;
 
-fn trim_velocity(v: &[Swap], keep: usize) -> Velocity {
-    v.iter().take(keep).copied().collect()
+/// Rashedi shrinks Kbest linearly from N to 1; that schedule is the algorithm's
+/// exploration-to-exploitation control, with `g` as the secondary one.
+fn kbest_size(n_agents: usize, epoch: usize, horizon: usize) -> usize {
+    #[allow(clippy::cast_precision_loss)]
+    let progress = (epoch as f64 / horizon.max(1) as f64).min(1.0);
+    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+    let size = (n_agents as f64 - (n_agents as f64 - 1.0) * progress).round() as usize;
+    size.clamp(1, n_agents.max(1))
+}
+
+/// Sample one Kbest attractor weighted by mass, excluding `agent` itself.
+///
+/// Falls back to uniform over the remaining agents when every weight is zero (a
+/// collapsed or tied population), and returns `None` when there is nobody to pull
+/// toward.
+fn sample_attractor(
+    kbest: &[usize],
+    masses: &[f64],
+    agent: usize,
+    rng: &mut impl RngExt,
+) -> Option<usize> {
+    let mut count = 0usize;
+    let mut total = 0.0f64;
+    for &j in kbest {
+        if j == agent {
+            continue;
+        }
+        count += 1;
+        total += masses[j].max(0.0);
+    }
+    if count == 0 {
+        return None;
+    }
+
+    if total <= f64::EPSILON {
+        let pick = rng.random_range(0..count);
+        let mut seen = 0usize;
+        for &j in kbest {
+            if j == agent {
+                continue;
+            }
+            if seen == pick {
+                return Some(j);
+            }
+            seen += 1;
+        }
+        return None;
+    }
+
+    let mut point = rng.random::<f64>() * total;
+    let mut last = None;
+    for &j in kbest {
+        if j == agent || masses[j] <= 0.0 {
+            continue;
+        }
+        last = Some(j);
+        point -= masses[j];
+        if point <= 0.0 {
+            return Some(j);
+        }
+    }
+    last
 }
 
 pub fn solve(
@@ -31,38 +91,13 @@ pub fn solve(
     let distances = &problem.distances;
     let n_cities = cities.len();
     let n_agents = opts.n_nearest.max(DEFAULT_N_AGENTS);
-    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-    let v_max = ((n_cities as f64 * V_MAX_FACTOR).ceil() as usize).max(1);
+
+    tracing::info!(n_agents, epochs = opts.epochs, "GSA starting");
 
     let mut rng = rand::rng();
-    let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
+    let mut tours = seed_population(distances.as_ref(), cities, n_agents, init_tour, &mut rng);
 
-    // An agent's candidate solution is a tour (a permutation of city IDs). `Position` is
-    // reserved for dense `0..n` indices, so this module never calls a tour a "position".
-    let mut tours: Vec<Vec<usize>> = (0..n_agents)
-        .map(|idx| {
-            if idx == 0 {
-                init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
-                    let mut p = city_ids.clone();
-                    for i in (1..n_cities).rev() {
-                        let j = rng.random_range(0..=i);
-                        p.swap(i, j);
-                    }
-                    p
-                })
-            } else {
-                let mut p = city_ids.clone();
-                for i in (1..n_cities).rev() {
-                    let j = rng.random_range(0..=i);
-                    p.swap(i, j);
-                }
-                p
-            }
-        })
-        .collect();
-
-    let mut velocities: Vec<Velocity> = vec![Vec::new(); n_agents];
-    let mut costs: Vec<f32> = tours.iter().map(|p| distances.tour_length(p)).collect();
+    let mut costs: Vec<f32> = tours.iter().map(|t| distances.tour_length(t)).collect();
 
     let (best_idx, _) = costs
         .iter()
@@ -71,6 +106,8 @@ pub fn solve(
         .unwrap();
     let mut gbest: Vec<usize> = tours[best_idx].clone();
     let mut gbest_cost: f32 = costs[best_idx];
+    let start_gbest_cost = gbest_cost;
+    tracing::info!(start_gbest = start_gbest_cost, "GSA: seeded population");
 
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
@@ -78,9 +115,7 @@ pub fn solve(
 
     let epochs = opts.epochs;
     let mut budget = Budget::new(epochs, opts.stagnation_epochs);
-    // Same horizon problem as PSO's inertia: with the zero left in place the denominator is
-    // `max(1)`, so `g` decays to nothing within a few epochs and the rest of the run is a random
-    // walk at a fixed near-zero gravitational constant.
+    // An uncapped run has no horizon of its own; the default keeps the decay's shape.
     let horizon = if epochs == 0 {
         HeuristicOptions::default().epochs
     } else {
@@ -89,10 +124,13 @@ pub fn solve(
     // Starts true so the first epoch runs, then carries the previous epoch's result into the
     // budget — one decision point for both the cap and the convergence threshold.
     let mut improved = true;
+    let mut used = HashSet::with_capacity(n_cities);
+    let mut ranked: Vec<usize> = (0..n_agents).collect();
 
     while budget.record(improved) {
         let epoch = budget.index();
         let best_at_epoch_start = gbest_cost;
+
         // Spread-based mass normalization (Rashedi 2009)
         let worst_cost = costs.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         #[allow(clippy::cast_precision_loss)]
@@ -108,45 +146,42 @@ pub fn solve(
                 .collect()
         };
 
-        // Kbest: top ⌈N/2⌉ agents by mass (heaviest = shortest tours)
-        let k_best = n_agents.div_ceil(2);
-        let mut ranked: Vec<usize> = (0..n_agents).collect();
-        ranked.sort_unstable_by(|&a, &b| masses[b].partial_cmp(&masses[a]).unwrap());
+        // Kbest: heaviest agents, shrinking from N to 1 over the run.
+        let k_best = kbest_size(n_agents, epoch, horizon);
+        ranked.sort_unstable_by(|&a, &b| masses[b].total_cmp(&masses[a]));
         let kbest_indices = &ranked[..k_best];
 
-        // Decaying gravitational constant
         #[allow(clippy::cast_precision_loss)]
-        let g = G0 * (-(ALPHA * epoch as f64) / horizon as f64).exp();
+        let g = G0 * (-(ALPHA * epoch as f64) / horizon.max(1) as f64).exp();
 
         for i in 0..n_agents {
-            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-            let inertia_keep = (INERTIA_W * velocities[i].len() as f64).round() as usize;
-            let mut new_vel = trim_velocity(&velocities[i], inertia_keep);
-
-            for &j in kbest_indices {
-                if i == j {
-                    continue; // self-pull is a no-op; skip for efficiency
-                }
+            let mut candidate = tours[i].clone();
+            if n_cities >= 4
+                && let Some(j) = sample_attractor(kbest_indices, &masses, i, &mut rng)
+            {
                 let r: f64 = rng.random();
-                #[allow(clippy::cast_possible_truncation)]
-                let n_swaps = (r * g * masses[j]).round() as usize;
-                if n_swaps == 0 {
-                    continue;
-                }
-                let pull = swap_sequence(&tours[i], &tours[j]);
-                new_vel.extend(trim_velocity(&pull, n_swaps));
+                #[allow(clippy::cast_precision_loss)]
+                let min_fraction = 1.0 / n_cities as f64;
+                let fraction = (GRAV_SCALE * g * masses[j] * r).clamp(min_fraction, MAX_FRACTION);
+                candidate = move_toward(&tours[i], &tours[j], fraction, &mut rng, &mut used);
             }
+            random_reversal(&mut candidate, &mut rng);
 
-            new_vel.truncate(v_max);
-            tours[i] = apply_swaps(&tours[i], &new_vel);
-            velocities[i] = new_vel;
+            // Greedy acceptance is the memetic deviation: without per-agent memory,
+            // always-accepting an unconditional reversal drifts the whole swarm to a
+            // noise floor and freezes gbest at the best seed.
+            let candidate_cost = distances.tour_length(&candidate);
+            if candidate_cost < costs[i] {
+                tours[i] = candidate;
+                costs[i] = candidate_cost;
 
-            costs[i] = distances.tour_length(&tours[i]);
-            if costs[i] < gbest_cost {
-                gbest = tours[i].clone();
-                gbest_cost = costs[i];
-                if let Some(tx) = progress_tx {
-                    let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+                if candidate_cost < gbest_cost {
+                    gbest = tours[i].clone();
+                    gbest_cost = candidate_cost;
+                    if let Some(tx) = progress_tx {
+                        let _ =
+                            tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
+                    }
                 }
             }
         }
@@ -168,10 +203,24 @@ pub fn solve(
         );
     }
 
+    tracing::info!(
+        start_gbest = start_gbest_cost,
+        pre_polish_gbest = gbest_cost,
+        "GSA: loop finished"
+    );
+
+    // The swarm explores; the polish exploits. This is the memetic half.
+    let polished = super::two_opt::solve(problem, opts, None, Some(&gbest));
+
     if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(
+            Route::new(polished.route()),
+            polished.total,
+        ));
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&gbest, distances.as_ref())
+
+    polished
 }
 
 #[cfg(test)]
@@ -246,22 +295,42 @@ mod tests {
     }
 
     #[test]
-    fn test_gsa_uniform_mass_when_converged() {
-        // When all agents share identical cost, sum_fitness=0 → uniform mass fallback.
-        // Solver must not panic or produce NaN.
+    fn test_gsa_never_returns_worse_than_its_seed() {
         let (cities, problem) = five_city_problem();
-        // Force all agents to share the same tour (same cost) by providing init_tour
-        // and running 0 epochs so tours never diverge.
-        let tour: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        // Run a few epochs; all agents start from the same init_tour so sum_fitness
-        // is 0 on the first epoch, exercising the uniform-mass fallback.
-        let opts2 = HeuristicOptions {
-            epochs: 5,
-            n_nearest: 5,
+        let dm = distance_matrix::from_cities(&cities);
+        let seed: Vec<usize> = cities.iter().map(|c| c.id).rev().collect();
+        let seed_cost = dm.tour_length(&seed);
+        let opts = HeuristicOptions {
+            epochs: 20,
             ..HeuristicOptions::default()
         };
-        let sol = solve(&problem, &opts2, None, Some(&tour));
-        assert_eq!(sol.route().len(), cities.len());
-        assert!(sol.total.is_finite());
+        let sol = solve(&problem, &opts, None, Some(&seed));
+
+        assert!(
+            sol.total <= seed_cost + 1e-4,
+            "the elitist gbest must not return worse than the seed: {} > {seed_cost}",
+            sol.total
+        );
+    }
+
+    #[test]
+    fn test_kbest_size_shrinks_to_one() {
+        assert_eq!(kbest_size(25, 0, 10_000), 25);
+        assert_eq!(kbest_size(25, 10_000, 10_000), 1);
+        assert_eq!(kbest_size(25, 20_000, 10_000), 1);
+        assert_eq!(kbest_size(1, 0, 10_000), 1);
+    }
+
+    #[test]
+    fn test_sample_attractor_falls_back_to_uniform_on_zero_mass() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let kbest = [0usize, 1, 2];
+        let masses = [0.0, 0.0, 0.0];
+        for _ in 0..20 {
+            let j = sample_attractor(&kbest, &masses, 0, &mut rng).unwrap();
+            assert!(j == 1 || j == 2);
+        }
+        assert_eq!(sample_attractor(&[0], &[1.0], 0, &mut rng), None);
     }
 }
