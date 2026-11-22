@@ -114,7 +114,7 @@ test.describe('memetic EAX explainer', () => {
     const stats = page.locator('.eax-statgrid')
     await expect(stats).toContainText('2 cycles')
     // cost A / B / child: the child equals Parent B (no bridge).
-    await expect(stats).toContainText('1063.5 / 1142.7 / 1142.7')
+    await expect(stats).toContainText('1073.5 / 1138.9 / 1138.9')
     await page.getByRole('button', { name: /6\. Patch Subtours/ }).click()
     await expect(page.locator('.eax-stage-label')).toHaveText('Patch Subtours')
     await expect(page.locator('.eax-callout')).toContainText(

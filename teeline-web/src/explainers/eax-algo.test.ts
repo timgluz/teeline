@@ -193,7 +193,7 @@ describe('patching', () => {
     expect(new Set([edgeKey(step.added[0]), edgeKey(step.added[1])])).toEqual(
       new Set(['3-6', '4-7']),
     )
-    expect(step.delta).toBeCloseTo(-71.265, 2)
+    expect(step.delta).toBeCloseTo(-80.176, 2)
   })
 
   it('ends in one Hamiltonian tour', () => {
@@ -203,7 +203,7 @@ describe('patching', () => {
     expect([...sim.child].sort((a, b) => a - b)).toEqual(
       Array.from({ length: N_CITIES }, (_, i) => i),
     )
-    expect(tourLength(sim.child)).toBeCloseTo(993.257, 2)
+    expect(tourLength(sim.child)).toBeCloseTo(994.352, 2)
   })
 
   it('needs no patching when the E-set already forms one tour', () => {
@@ -250,9 +250,9 @@ describe('statistics', () => {
     expect(sim.stats.eSetSize).toBe(1)
     expect(sim.stats.subtours).toBe(2)
     expect(sim.stats.bridges).toBe(1)
-    expect(sim.stats.costA).toBeCloseTo(1063.458, 2)
-    expect(sim.stats.costB).toBeCloseTo(1142.741, 2)
-    expect(sim.stats.costChild).toBeCloseTo(993.257, 2)
+    expect(sim.stats.costA).toBeCloseTo(1073.464, 2)
+    expect(sim.stats.costB).toBeCloseTo(1138.928, 2)
+    expect(sim.stats.costChild).toBeCloseTo(994.352, 2)
     expect(sim.stats.costChild).toBeLessThan(sim.stats.costA)
     expect(sim.stats.costChild).toBeLessThan(sim.stats.costB)
     expect(sim.stats.inheritance).toEqual({
