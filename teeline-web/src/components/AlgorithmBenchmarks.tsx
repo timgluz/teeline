@@ -862,7 +862,11 @@ function Scatter({
   // Both axes start at zero: an axis that starts near the minimum would exaggerate the
   // differences between solvers on the same instance.
   const yMax = Math.max(...ys)
-  const yTicks = niceTicks(yMax)
+  // A zero series still needs a non-zero top, or the axis has no height. Use a small padded top
+  // rather than the arbitrary 0–1 default, so the chart is labelled at the scale of its data.
+  // A non-zero series already gets its padding from the next nice tick.
+  const ySeed = yMax > 0 ? yMax : axis === 'gap' ? 0.1 : 1
+  const yTicks = niceTicks(ySeed)
   // The top tick bounds the plot, so the labels stay round and the tallest point stays inside.
   const yTop = yTicks[yTicks.length - 1]
 
@@ -872,10 +876,12 @@ function Scatter({
       : PAD.left + ((x - xMin) / (xMax - xMin)) * plotW
   const sy = (y: number) => PAD.top + (1 - y / yTop) * plotH
 
-  const xTicks = [0, 0.5, 1].map((f) => xMin + f * (xMax - xMin))
+  // A single-instance chart has one x value: the three fractions collapse onto it, so dedupe
+  // them (and their keys) instead of drawing three labels at the same spot.
+  const xTicks = [...new Set([0, 0.5, 1].map((f) => xMin + f * (xMax - xMin)))]
   const yFormat =
     axis === 'gap'
-      ? (v: number) => `${v.toFixed(1)}%`
+      ? (v: number) => `${v.toFixed(yTop < 1 ? 2 : 1)}%`
       : (v: number) => v.toFixed(0)
 
   // Placement is shared with the landing chart so the two cannot drift. A comparison labels
