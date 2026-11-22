@@ -1,6 +1,7 @@
 ---
 id: "branch_bound"
 name: "Branch and Bound"
+version: "2.0.0"
 typeBadge: "Exact"
 description: "Exact depth-first enumeration of candidate tours, pruned by a minimum-spanning-tree lower bound on the unvisited cities."
 hasExplainer: true
@@ -60,3 +61,9 @@ teeline solve branch_bound -i ./data/discopt/tsp_5_1.tsp --verbose
 
 - [EECS 281: Backtracking and Branch & Bound (YouTube)](https://www.youtube.com/watch?v=hNs7G1b2iFY&t=5480s)
 - [GeeksForGeeks article](https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/)
+
+## Changelog
+
+| Version | Date | Change |
+| --- | --- | --- |
+| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Exact by default: removed the `n_nearest` candidate restriction that made the default a beam search, and added the 24-city exact-input guard. `--n_nearest` is now ignored. Tier A returns the published optima — burma14 **3323**, gr17 **2085**, ulysses16 **6859** — instead of 3651 / 2187 / 6909. |
