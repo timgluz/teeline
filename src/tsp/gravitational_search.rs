@@ -155,16 +155,24 @@ pub fn solve(
         let g = G0 * (-(ALPHA * epoch as f64) / horizon.max(1) as f64).exp();
 
         for i in 0..n_agents {
-            let mut candidate = tours[i].clone();
-            if n_cities >= 4
-                && let Some(j) = sample_attractor(kbest_indices, &masses, i, &mut rng)
-            {
-                let r: f64 = rng.random();
-                #[allow(clippy::cast_precision_loss)]
-                let min_fraction = 1.0 / n_cities as f64;
-                let fraction = (GRAV_SCALE * g * masses[j] * r).clamp(min_fraction, MAX_FRACTION);
-                candidate = move_toward(&tours[i], &tours[j], fraction, &mut rng, &mut used);
-            }
+            // Only clone when there is no attractor: `move_toward` already builds a new
+            // tour, so cloning first would allocate twice on the common path.
+            let attractor = if n_cities >= 4 {
+                sample_attractor(kbest_indices, &masses, i, &mut rng)
+            } else {
+                None
+            };
+            let mut candidate = match attractor {
+                Some(j) => {
+                    let r: f64 = rng.random();
+                    #[allow(clippy::cast_precision_loss)]
+                    let min_fraction = 1.0 / n_cities as f64;
+                    let fraction =
+                        (GRAV_SCALE * g * masses[j] * r).clamp(min_fraction, MAX_FRACTION);
+                    move_toward(&tours[i], &tours[j], fraction, &mut rng, &mut used)
+                }
+                None => tours[i].clone(),
+            };
             random_reversal(&mut candidate, &mut rng);
 
             // Greedy acceptance is the memetic deviation: without per-agent memory,
