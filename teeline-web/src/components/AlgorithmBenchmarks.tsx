@@ -876,7 +876,9 @@ function Scatter({
       : PAD.left + ((x - xMin) / (xMax - xMin)) * plotW
   const sy = (y: number) => PAD.top + (1 - y / yTop) * plotH
 
-  const xTicks = [0, 0.5, 1].map((f) => xMin + f * (xMax - xMin))
+  // A single-instance chart has one x value: the three fractions collapse onto it, so dedupe
+  // them (and their keys) instead of drawing three labels at the same spot.
+  const xTicks = [...new Set([0, 0.5, 1].map((f) => xMin + f * (xMax - xMin)))]
   const yFormat =
     axis === 'gap'
       ? (v: number) => `${v.toFixed(yTop < 1 ? 2 : 1)}%`
