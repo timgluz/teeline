@@ -204,6 +204,35 @@ function subtourRings(
   return []
 }
 
+function frameCallout(frame: Frame, sim: Simulation): string {
+  const allSelected = sim.selected.length === sim.cycles.length
+  if (frame.stage >= 5 && allSelected) {
+    return 'All AB-cycles selected: Parent A becomes Parent B exactly — nothing to patch.'
+  }
+  switch (frame.kind) {
+    case 'parents':
+      return `Both parents are crossing-free; ${sim.stats.sharedEdges} of ${N_CITIES} edges are shared.`
+    case 'union':
+      return 'The union graph fades the shared backbone and keeps A-only (blue) and B-only (amber) edges.'
+    case 'cycle':
+      return `Cycle #${(frame.cycleId ?? 0) + 1}: ${sim.cycles[frame.cycleId ?? 0].vertices.length} cities, alternating A-only and B-only edges.`
+    case 'cycles-summary':
+      return `${sim.cycles.length} AB-cycles partition the symmetric difference.`
+    case 'select':
+      return 'Pick the E-set: 1-AB pins one cycle, Rand selects a seeded subset, or click a cycle.'
+    case 'remove-a':
+      return 'Apply the E-set: remove the selected A-edges (dashed red).'
+    case 'add-b':
+      return 'Add the selected B-edges. Every city keeps degree two, but the tour can split into subtours.'
+    case 'bridge':
+      return `Patch the smallest subtour with the cheapest bridge (Δ ${(frame.bridge?.delta ?? 0).toFixed(1)}).`
+    case 'no-patch':
+      return 'No patching needed — the selected E-set already forms one tour.'
+    case 'final':
+      return `Final child: ${sim.stats.costChild.toFixed(1)} vs Parent A ${sim.stats.costA.toFixed(1)} and Parent B ${sim.stats.costB.toFixed(1)}.`
+  }
+}
+
 function Graph({
   frame,
   sim,
@@ -617,6 +646,8 @@ export default function EaxExplainer() {
         </span>
       </div>
 
+      <div className="eax-callout">{frameCallout(frame, sim)}</div>
+
       <div className="eax-viz-row">
         <Graph frame={frame} sim={sim} preview={previewOn ? preview : null} />
         <aside className="eax-side">
@@ -802,6 +833,7 @@ const CSS = `
 .eax-stage-line { display: flex; justify-content: space-between; align-items: baseline; }
 .eax-stage-label { font-weight: 650; font-size: 1rem; }
 .eax-hint { color: var(--eax-muted); font-size: 0.75rem; }
+.eax-callout { font-size: 0.82rem; color: var(--eax-muted); background: var(--eax-panel); border-left: 3px solid var(--eax-child); border-radius: 4px; padding: 6px 10px; }
 
 .eax-viz-row { display: flex; gap: 12px; align-items: stretch; }
 .eax-canvas {

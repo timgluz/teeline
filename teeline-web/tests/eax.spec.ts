@@ -114,6 +114,20 @@ test.describe('memetic EAX explainer', () => {
     await expect(stats).toContainText('1082.2 / 1156.5 / 1156.5')
     await page.getByRole('button', { name: /6\. Patch Subtours/ }).click()
     await expect(page.locator('.eax-stage-label')).toHaveText('Patch Subtours')
+    await expect(page.locator('.eax-callout')).toContainText(
+      'Parent A becomes Parent B exactly',
+    )
+  })
+
+  test('C2 alone needs no patching', async ({ page }) => {
+    // Add C2, then deselect C1 so only C2 remains.
+    await page.getByRole('button', { name: /Cycle #2/ }).click()
+    await page.getByRole('button', { name: /Cycle #1/ }).click()
+    await expect(page.locator('.eax-footer')).toContainText('E-set: C2')
+    await page.getByRole('button', { name: /6\. Patch Subtours/ }).click()
+    await expect(page.locator('.eax-callout')).toContainText(
+      'No patching needed',
+    )
   })
 
   test('the last active cycle cannot be deselected', async ({ page }) => {
