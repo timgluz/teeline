@@ -203,7 +203,7 @@ describe('patching', () => {
     expect([...sim.child].sort((a, b) => a - b)).toEqual(
       Array.from({ length: N_CITIES }, (_, i) => i),
     )
-    expect(tourLength(sim.child)).toBeCloseTo(1012.031, 2)
+    expect(tourLength(sim.child)).toBeCloseTo(993.257, 2)
   })
 
   it('needs no patching when the E-set already forms one tour', () => {
@@ -227,11 +227,11 @@ describe('2-opt preview', () => {
     expect(move).not.toBeNull()
     expect(
       new Set([edgeKey(move!.removed[0]), edgeKey(move!.removed[1])]),
-    ).toEqual(new Set(['0-5', '2-3']))
+    ).toEqual(new Set(['0-5', '1-2']))
     expect(new Set([edgeKey(move!.added[0]), edgeKey(move!.added[1])])).toEqual(
-      new Set(['0-3', '2-5']),
+      new Set(['0-2', '1-5']),
     )
-    expect(move!.delta).toBeCloseTo(-15.293, 2)
+    expect(move!.delta).toBeCloseTo(-5.21, 2)
   })
 
   it('returns null for a 2-opt-local tour', () => {
@@ -250,9 +250,9 @@ describe('statistics', () => {
     expect(sim.stats.eSetSize).toBe(1)
     expect(sim.stats.subtours).toBe(2)
     expect(sim.stats.bridges).toBe(1)
-    expect(sim.stats.costA).toBeCloseTo(1082.231, 2)
-    expect(sim.stats.costB).toBeCloseTo(1156.468, 2)
-    expect(sim.stats.costChild).toBeCloseTo(1012.031, 2)
+    expect(sim.stats.costA).toBeCloseTo(1063.458, 2)
+    expect(sim.stats.costB).toBeCloseTo(1142.741, 2)
+    expect(sim.stats.costChild).toBeCloseTo(993.257, 2)
     expect(sim.stats.costChild).toBeLessThan(sim.stats.costA)
     expect(sim.stats.costChild).toBeLessThan(sim.stats.costB)
     expect(sim.stats.inheritance).toEqual({

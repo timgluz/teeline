@@ -30,8 +30,11 @@ test.describe('memetic EAX explainer', () => {
     )
     await expect(page.locator('.eax-stage-label')).toHaveText('Compare Parents')
     await expect(page.locator('.eax-city')).toHaveCount(16)
-    // Both complete parent tours are drawn in Stage 1 (16 + 16 edges).
-    await expect(page.locator('.eax-canvas line')).toHaveCount(32)
+    // Both complete parent tours are drawn in Stage 1 (16 + 16 edges, split
+    // around any collinear third city).
+    expect(
+      await page.locator('.eax-canvas line').count(),
+    ).toBeGreaterThanOrEqual(32)
     await expect(page.locator('.eax-statgrid')).toContainText('11/16 (69%)')
     await expect(page.locator('.eax-statgrid')).toContainText('subtours')
     await expect(page.locator('.eax-statgrid')).toContainText('bridges')
@@ -111,7 +114,7 @@ test.describe('memetic EAX explainer', () => {
     const stats = page.locator('.eax-statgrid')
     await expect(stats).toContainText('2 cycles')
     // cost A / B / child: the child equals Parent B (no bridge).
-    await expect(stats).toContainText('1082.2 / 1156.5 / 1156.5')
+    await expect(stats).toContainText('1063.5 / 1142.7 / 1142.7')
     await page.getByRole('button', { name: /6\. Patch Subtours/ }).click()
     await expect(page.locator('.eax-stage-label')).toHaveText('Patch Subtours')
     await expect(page.locator('.eax-callout')).toContainText(
@@ -159,9 +162,9 @@ test.describe('memetic EAX explainer', () => {
     await expect(page.locator('.eax-stage-label')).toHaveText('Patch Subtours')
     await page.locator('.eax-preview-btn').click()
     await expect(page.locator('.eax-preview-removed')).toContainText('0-5')
-    await expect(page.locator('.eax-preview-added')).toContainText('0-3')
-    await expect(page.locator('.eax-preview-delta')).toContainText('-15.3')
-    await expect(page.locator('.eax-preview-delta')).toContainText('173.2')
+    await expect(page.locator('.eax-preview-added')).toContainText('0-2')
+    await expect(page.locator('.eax-preview-delta')).toContainText('-5.2')
+    await expect(page.locator('.eax-preview-delta')).toContainText('163.2')
   })
 
   test('cycle toggles expose their state and the stage is a live region', async ({

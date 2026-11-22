@@ -60,6 +60,72 @@ function parsePair(key: string): Edge {
   return [u, v]
 }
 
+const CITY_RADIUS = 5.5
+const EDGE_CLEARANCE = 4
+
+interface Point {
+  x: number
+  y: number
+}
+
+function segmentPoints(edge: Edge, offset = 0): [Point, Point] {
+  const a = CITIES[edge[0]]
+  const b = CITIES[edge[1]]
+  if (!offset) return [a, b]
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len = Math.hypot(dx, dy) || 1
+  const nx = (-dy / len) * offset
+  const ny = (dx / len) * offset
+  return [
+    { x: a.x + nx, y: a.y + ny },
+    { x: b.x + nx, y: b.y + ny },
+  ]
+}
+
+/**
+ * Splits an edge at any non-incident city dot it would otherwise run through.
+ * A long edge that happens to be collinear with a third city must not read as
+ * two edges meeting at that city.
+ */
+function visibleSegments(edge: Edge, offset = 0): Array<[Point, Point]> {
+  const [a, b] = segmentPoints(edge, offset)
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len2 = dx * dx + dy * dy
+  if (len2 === 0) return [[a, b]]
+  const len = Math.sqrt(len2)
+  const gaps: Array<{ t: number; half: number }> = []
+  for (let c = 0; c < N_CITIES; c++) {
+    if (c === edge[0] || c === edge[1]) continue
+    const p = CITIES[c]
+    const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2
+    if (t <= 0 || t >= 1) continue
+    const qx = a.x + t * dx
+    const qy = a.y + t * dy
+    const d = Math.hypot(p.x - qx, p.y - qy)
+    if (d < CITY_RADIUS + EDGE_CLEARANCE) {
+      gaps.push({
+        t,
+        half:
+          Math.sqrt(Math.max(0, CITY_RADIUS ** 2 - d ** 2)) + EDGE_CLEARANCE,
+      })
+    }
+  }
+  if (gaps.length === 0) return [[a, b]]
+  gaps.sort((p, q) => p.t - q.t)
+  const at = (t: number): Point => ({ x: a.x + t * dx, y: a.y + t * dy })
+  const out: Array<[Point, Point]> = []
+  let from = 0
+  for (const gap of gaps) {
+    const to = Math.max(from, gap.t - gap.half / len)
+    if (to > from) out.push([at(from), at(to)])
+    from = Math.min(1, gap.t + gap.half / len)
+  }
+  if (from < 1) out.push([at(from), at(1)])
+  return out
+}
+
 interface EdgeDraw {
   edge: Edge
   cls: string
@@ -288,59 +354,46 @@ function Graph({
         )),
       )}
 
-      {draws.map((d, i) => {
-        const pa = CITIES[d.edge[0]]
-        const pb = CITIES[d.edge[1]]
-        let x1 = pa.x
-        let y1 = pa.y
-        let x2 = pb.x
-        let y2 = pb.y
-        if (d.offset) {
-          const dx = pb.x - pa.x
-          const dy = pb.y - pa.y
-          const len = Math.hypot(dx, dy) || 1
-          const nx = (-dy / len) * d.offset
-          const ny = (dx / len) * d.offset
-          x1 += nx
-          y1 += ny
-          x2 += nx
-          y2 += ny
-        }
-        return (
+      {draws.map((d, i) =>
+        visibleSegments(d.edge, d.offset).map(([p1, p2], j) => (
           <line
-            key={`e-${i}-${edgeKey(d.edge)}`}
-            x1={x1}
-            y1={y1}
-            x2={x2}
-            y2={y2}
+            key={`e-${i}-${j}-${edgeKey(d.edge)}`}
+            x1={p1.x}
+            y1={p1.y}
+            x2={p2.x}
+            y2={p2.y}
             className={d.cls}
             style={d.color ? { stroke: d.color } : undefined}
           />
-        )
-      })}
+        )),
+      )}
 
       {frame.kind === 'final' && preview && (
         <>
-          {preview.removed.map((e, i) => (
-            <line
-              key={`pr-${i}`}
-              x1={CITIES[e[0]].x}
-              y1={CITIES[e[0]].y}
-              x2={CITIES[e[1]].x}
-              y2={CITIES[e[1]].y}
-              className="eax-edge eax-edge-removed"
-            />
-          ))}
-          {preview.added.map((e, i) => (
-            <line
-              key={`pa-${i}`}
-              x1={CITIES[e[0]].x}
-              y1={CITIES[e[0]].y}
-              x2={CITIES[e[1]].x}
-              y2={CITIES[e[1]].y}
-              className="eax-edge eax-edge-bridge"
-            />
-          ))}
+          {preview.removed.map((e, i) =>
+            visibleSegments(e).map(([p1, p2], j) => (
+              <line
+                key={`pr-${i}-${j}`}
+                x1={p1.x}
+                y1={p1.y}
+                x2={p2.x}
+                y2={p2.y}
+                className="eax-edge eax-edge-removed"
+              />
+            )),
+          )}
+          {preview.added.map((e, i) =>
+            visibleSegments(e).map(([p1, p2], j) => (
+              <line
+                key={`pa-${i}-${j}`}
+                x1={p1.x}
+                y1={p1.y}
+                x2={p2.x}
+                y2={p2.y}
+                className="eax-edge eax-edge-bridge"
+              />
+            )),
+          )}
         </>
       )}
 
