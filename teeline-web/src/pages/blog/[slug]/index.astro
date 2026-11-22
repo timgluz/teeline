@@ -29,6 +29,7 @@ const jsonLd = {
 <BaseLayout
   title={`${post.data.title} — Teeline`}
   description={post.data.description}
+  ogTitle={post.data.socialTitle ?? post.data.title}
   path={`/blog/${post.id}/`}
   ogType="article"
 >

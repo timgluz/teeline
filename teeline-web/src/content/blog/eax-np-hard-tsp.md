@@ -1,5 +1,6 @@
 ---
-title: "The Traveling Salesman Problem Is NP-Hard. EAX Algorithm Matched the Optimum on 24,978 Cities."
+title: "The Traveling Salesman Problem Is NP-Hard. EAX Matched the Optimum on 24,978 Cities."
+socialTitle: "TSP Is NP-Hard. EAX Matched the Optimum on 24,978 Cities."
 description: "TSP is famously NP-hard, yet Edge Assembly Crossover has matched proven-optimal tours on maps of up to 24,978 cities — by evolving roads, not city lists."
 pubDate: 2026-11-22
 tags: ["algorithms", "eax", "tsp", "complexity"]
