@@ -85,7 +85,7 @@ function buildEdges(frame: Frame, sim: Simulation): EdgeDraw[] {
         const shared = bSet.has(edgeKey(edge))
         out.push({
           edge,
-          cls: `eax-edge eax-edge-a${shared ? ' eax-edge-shared' : ''}`,
+          cls: `eax-edge eax-edge-a${shared ? ' eax-edge-dashed' : ''}`,
           offset: 1.6,
         })
       }
@@ -93,7 +93,7 @@ function buildEdges(frame: Frame, sim: Simulation): EdgeDraw[] {
         const shared = aSet.has(edgeKey(edge))
         out.push({
           edge,
-          cls: `eax-edge eax-edge-b${shared ? ' eax-edge-shared' : ''}`,
+          cls: `eax-edge eax-edge-b${shared ? ' eax-edge-dashed' : ''}`,
           offset: -1.6,
         })
       }
@@ -810,10 +810,11 @@ const CSS = `
 .eax-side { width: 190px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
 
 .eax-bg { fill: var(--eax-panel); }
-.eax-edge { fill: none; stroke-width: 2; stroke-linecap: round; }
+.eax-edge { fill: none; stroke: var(--eax-shared); stroke-width: 2; stroke-linecap: round; }
 .eax-edge-a { stroke: var(--eax-a); }
 .eax-edge-b { stroke: var(--eax-b); }
-.eax-edge-shared { stroke-dasharray: 5 4; }
+.eax-edge-shared { stroke: var(--eax-shared); stroke-dasharray: 5 4; }
+.eax-edge-dashed { stroke-dasharray: 5 4; }
 .eax-edge-dim { opacity: 0.22; }
 .eax-edge-cycle-hit { stroke-width: 3.4; }
 .eax-edge-selected { stroke-width: 3.2; }
