@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'preact/hooks'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'preact/hooks'
 import {
   CITIES,
   N_CITIES,
@@ -546,6 +546,7 @@ export default function EaxExplainer() {
   const [running, setRunning] = useState(false)
   const [previewOn, setPreviewOn] = useState(false)
   const [notice, setNotice] = useState('')
+  const stageRef = useRef<HTMLSpanElement>(null)
 
   const sim = useMemo(() => simulate(selected), [selected])
   const frames = sim.frames
@@ -683,6 +684,7 @@ export default function EaxExplainer() {
             onClick={() => {
               pause()
               jumpToStage(s.id)
+              stageRef.current?.focus()
             }}
           >
             {s.id}. {s.name}
@@ -691,7 +693,12 @@ export default function EaxExplainer() {
       </nav>
 
       <div className="eax-stage-line">
-        <span className="eax-stage-label" aria-live="polite">
+        <span
+          ref={stageRef}
+          className="eax-stage-label"
+          aria-live="polite"
+          tabIndex={-1}
+        >
           {stageName}
         </span>
         <span className="eax-hint">
@@ -885,6 +892,7 @@ const CSS = `
 .eax-stage-active { border-color: var(--eax-child); color: var(--eax-child-ink); font-weight: 600; }
 .eax-stage-line { display: flex; justify-content: space-between; align-items: baseline; }
 .eax-stage-label { font-weight: 650; font-size: 1rem; }
+.eax-stage-label:focus { outline: 2px solid var(--eax-child); outline-offset: 2px; border-radius: 4px; }
 .eax-hint { color: var(--eax-muted); font-size: 0.75rem; }
 .eax-callout { font-size: 0.82rem; color: var(--eax-muted); background: var(--eax-panel); border-left: 3px solid var(--eax-child); border-radius: 4px; padding: 6px 10px; }
 
@@ -931,7 +939,12 @@ const CSS = `
   padding: 5px 8px; font-size: 0.76rem; cursor: pointer; font-family: inherit; color: var(--eax-text);
 }
 .eax-cycle-btn:hover { border-color: var(--eax-child); }
-.eax-cycle-active { border-color: var(--eax-child); font-weight: 600; }
+.eax-cycle-active { border-color: var(--eax-child); font-weight: 600; animation: eax-pulse 0.5s ease-out 1; }
+@keyframes eax-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.45); }
+  100% { box-shadow: 0 0 0 7px rgba(99, 102, 241, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .eax-cycle-active { animation: none; } }
 .eax-swatch { width: 14px; height: 4px; border-radius: 2px; display: inline-block; flex-shrink: 0; }
 
 .eax-strategy { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }

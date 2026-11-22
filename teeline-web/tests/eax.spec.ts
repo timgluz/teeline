@@ -61,6 +61,11 @@ test.describe('memetic EAX explainer', () => {
     }
   })
 
+  test('a stage jump moves focus to the stage heading', async ({ page }) => {
+    await page.getByRole('button', { name: /3\. AB-Cycles/ }).click()
+    await expect(page.locator('.eax-stage-label')).toBeFocused()
+  })
+
   test('Step and Back walk the same frames in both directions', async ({
     page,
   }) => {
