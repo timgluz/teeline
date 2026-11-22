@@ -1,0 +1,95 @@
+{
+  "schema_version": 2,
+  "solver": "2opt",
+  "measurement": {
+    "dirty": false,
+    "environment": {
+      "build": "release",
+      "os": "linux",
+      "rust_version": "1.99.0"
+    },
+    "git_commit": "e4588d6f",
+    "git_commit_source": "jsonl",
+    "measured_at": "2026-10-11T10:55:06Z",
+    "teeline_version": "1.0.12"
+  },
+  "configs": ["budget"],
+  "results": {
+    "gr17": {
+      "cities": 17,
+      "optimal_cost": 2085.0,
+      "layout": "derived",
+      "by_config": {
+        "budget": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "gap_pct": {
+            "median": 0.0,
+            "best": 0.0,
+            "worst": 0.0,
+            "mean": 0.0
+          },
+          "tour_cost": {
+            "median": 2085.0,
+            "best": 2085.0,
+            "worst": 2085.0,
+            "mean": 2085.0
+          },
+          "wall_s": {
+            "median": 0.0127,
+            "best": 0.0116,
+            "worst": 0.0171,
+            "mean": 0.014
+          },
+          "peak_rss_kb": {
+            "median": 6948.0,
+            "best": 6816.0,
+            "worst": 7004.0,
+            "mean": 6923.2
+          },
+          "optimal_cost": 2085.0,
+          "layout": "derived"
+        }
+      }
+    },
+    "a280": {
+      "cities": 280,
+      "optimal_cost": 2579.0,
+      "layout": "real",
+      "by_config": {
+        "budget": {
+          "runs": 5,
+          "timeouts": 0,
+          "errors": 0,
+          "gap_pct": {
+            "median": 0.0,
+            "best": 0.0,
+            "worst": 0.0,
+            "mean": 0.0
+          },
+          "tour_cost": {
+            "median": 2579.0,
+            "best": 2579.0,
+            "worst": 2579.0,
+            "mean": 2579.0
+          },
+          "wall_s": {
+            "median": 6.03,
+            "best": 5.91,
+            "worst": 6.44,
+            "mean": 6.08
+          },
+          "peak_rss_kb": {
+            "median": 8008.0,
+            "best": 7900.0,
+            "worst": 8200.0,
+            "mean": 8020.0
+          },
+          "optimal_cost": 2579.0,
+          "layout": "real"
+        }
+      }
+    }
+  }
+}

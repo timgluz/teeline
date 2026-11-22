@@ -129,6 +129,25 @@ test.describe('algorithm benchmark section', () => {
     await expect(summaryRow.locator('td').last()).toHaveText('—')
   })
 
+  test('an all-optimal shard keeps a tight gap axis instead of an empty 0–1% frame', async ({
+    page,
+  }) => {
+    await fulfil(page, fixture('algorithm-optimal.json'))
+    await page.goto('/algorithms/2opt/')
+    await scrollToSection(page)
+
+    const section = page.locator(
+      'section[aria-labelledby="benchmarks-heading"]',
+    )
+    const chart = section.locator('svg[role="img"]')
+    await expect(chart).toBeVisible()
+    // The top is the padded data maximum (0.10%), not the arbitrary 1.0% default.
+    await expect(chart).toContainText('0.10%')
+    await expect(chart).not.toContainText('1.0%')
+    // The table still carries the zero gaps.
+    await expect(section).toContainText('0.00%')
+  })
+
   test('the summary table jumps to the benchmark section, clear of the nav', async ({
     page,
   }) => {
