@@ -112,7 +112,8 @@ never the solver's own output.
 ## References
 
 - Nagata, Y. & Kobayashi, S. (1997) — "Edge Assembly Crossover: A High-Power Genetic Algorithm for the Traveling Salesman Problem", *Proceedings of the 7th International Conference on Genetic Algorithms (ICGA)*, 450–457. [dblp](https://dblp.org/rec/conf/icga/NagataK97.html)
+  (the original EAX paper: AB-cycles, E-set selection, and subtour patching)
 - Nagata, Y. & Kobayashi, S. (2013) — "A Powerful Genetic Algorithm Using Edge Assembly Crossover for the Traveling Salesman Problem", *INFORMS Journal on Computing*, **25**(2), 346–363. DOI: 10.1287/ijoc.1120.0506
-- Nagata, Y. (2006) — "New EAX Crossover for Large TSP Instances", *Parallel Problem Solving from Nature — PPSN IX*, LNCS 4193, 372–381. DOI: 10.1007/11844297_38
-- Nagata, Y. (2006) — "Fast EAX Algorithm Considering Population Diversity for Traveling Salesman Problems", *Evolutionary Computation in Combinatorial Optimization (EvoCOP)*, LNCS 3906, 171–182. DOI: 10.1007/11730095_15
+  (GA-EAX: population, family-based replacement, and candidate-restricted local search)
 - Michalewicz, Z. & Fogel, D. B. (2004) — *How to Solve It: Modern Heuristics* (2nd ed.), Springer, Chapter 8 (Edge Assembly Crossover). DOI: 10.1007/978-3-662-07807-5
+  (textbook treatment, including EAX)
