@@ -76,7 +76,7 @@ test.describe('landing benchmark chart', () => {
     await expect(section).toContainText('Local search 300 s (provisional)')
   })
 
-  test('shades each family cluster and hides it with the family filter', async ({
+  test('outlines each family cluster and hides it with the family filter', async ({
     page,
   }) => {
     await openLanding(page, fixture('problem-berlin52.json'))
@@ -89,7 +89,9 @@ test.describe('landing benchmark chart', () => {
     await expect(hulls).toHaveCount(2)
     await expect(hulls.first()).toHaveAttribute('data-family-cluster', 'local')
     await expect(hulls.nth(1)).toHaveAttribute('data-family-cluster', 'meta')
-    await expect(section).toContainText('Shaded areas group solvers by family.')
+    await expect(section).toContainText(
+      'Dashed outlines group solvers by family.',
+    )
 
     await section.getByRole('button', { name: 'Local search' }).click()
     await expect(hulls).toHaveCount(1)

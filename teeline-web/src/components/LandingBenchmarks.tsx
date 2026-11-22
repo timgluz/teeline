@@ -51,6 +51,8 @@ const FAMILIES: SolverFamily[] = [
 /** Tooltip size estimate, so it can be clamped inside the viewport before it paints. */
 const TOOLTIP_WIDTH = 224
 const TOOLTIP_HEIGHT = 108
+/** Shared by the caption and the chart's aria-label, so the two cannot drift apart. */
+const CLUSTER_NOTE = 'Dashed outlines group solvers by family.'
 
 function formatY(axis: ChartAxis, value: number): string {
   return axis === 'gap' ? `${value.toFixed(1)}%` : value.toFixed(0)
@@ -397,9 +399,7 @@ function Scatter({
         class="h-auto w-full"
         role="img"
         aria-label={`Runtime against ${series.axisLabel} on ${series.dataset}${
-          familyClusters.length > 0
-            ? '; shaded areas group solvers by family'
-            : ''
+          familyClusters.length > 0 ? `; ${CLUSTER_NOTE}` : ''
         }`}
       >
         {/* Behind the grid and the points: a highlight, not a layer the reader has to see past. */}
@@ -546,9 +546,7 @@ function Scatter({
       </svg>
 
       {familyClusters.length > 0 && (
-        <p class="mt-2 font-mono text-xs text-text-dim">
-          Shaded areas group solvers by family.
-        </p>
+        <p class="mt-2 font-mono text-xs text-text-dim">{CLUSTER_NOTE}</p>
       )}
 
       {hovered && (
