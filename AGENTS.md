@@ -131,6 +131,23 @@ needed, put it next to the code it explains and point at the specific thing that
 Historical narrative does not belong in source comments — if a bug's story matters, the task,
 PR description or commit message is the place for it.
 
+## Algorithm pages & changelogs
+
+A solver's page under `docs/algorithms/` is part of its contract. Any change that alters
+observable behaviour — default parameters, search semantics, output quality, determinism,
+registration, or a guard that rejects inputs — must update that page in the same PR:
+
+- Bump the `version` in the page frontmatter. Follow the rule in
+  `teeline-web/src/content.config.ts`: a behaviour-changing rewrite bumps the major;
+  smaller corrections use minor or patch.
+- Add a `## Changelog` row with the date and the user-visible change, including new
+  benchmark numbers when the change affects them.
+- Keep the description, options, usage and benchmark notes consistent with the new
+  behaviour. Removed or ignored flags must be documented as such.
+
+The changelog is where behavioural history belongs; source comments carry only the
+non-obvious *why* (see Code Comments).
+
 ## teeline-web WASM Development Gotcha
 
 `teeline-web/src/teeline-wasm.d.ts` is an **ambient module declaration** that TypeScript uses as the sole source of truth for `'teeline-wasm'` imports — it completely shadows `node_modules/teeline-wasm/teeline_wasm.d.ts`. **Any new WIT export must be added to this ambient file**, or tsc will fail with "Module 'teeline-wasm' has no exported member '...'".
