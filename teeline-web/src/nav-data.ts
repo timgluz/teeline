@@ -71,7 +71,7 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   pso: {
     id: 'pso',
     name: 'Particle Swarm',
-    complexity: 'O(epochs · swarm · n)',
+    complexity: 'O(epochs · swarm · n) + 2-opt polish',
   },
   cs: { id: 'cs', name: 'Cuckoo Search', complexity: 'O(epochs · nests · n)' },
   fpa: {
