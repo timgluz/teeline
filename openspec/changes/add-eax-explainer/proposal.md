@@ -15,11 +15,11 @@ teach the opposite of what the solver does.
   1. compare Parent A and Parent B;
   2. build the union graph (shared edges muted, A/B-only edges highlighted);
   3. partition into non-trivial AB-cycles;
-  4. select the E-set (`1-AB`, `Rand`, or click a cycle);
+  4. select the E-set (`1-AB` → the pinned cycle, `Rand` → seeded ≈1/2, or click a cycle);
   5. apply the symmetric difference and show the resulting subtours;
   6. merge subtours with cheapest-bridge patching, preview one 2-opt move, and settle on the
      final child tour.
-- Add a pure-TypeScript `eax-algo.ts` simulation for a pinned 24-city fixture: union graph,
+- Add a pure-TypeScript `eax-algo.ts` simulation for a pinned 16-city fixture: union graph,
   AB-cycle decomposition, E-set selection, symmetric difference, component detection, bridge
   patching, one-step 2-opt preview, and teaching statistics. It is a visualization, not a
   second solver path; the production solve path is unchanged.
