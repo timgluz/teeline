@@ -1,5 +1,5 @@
 ---
-title: "The Traveling Salesman Problem Is NP-Hard. This Genetic Algorithm Matched the Optimum on 24,978 Cities."
+title: "The Traveling Salesman Problem Is NP-Hard. EAX Algorithm Matched the Optimum on 24,978 Cities."
 description: "TSP is famously NP-hard, yet Edge Assembly Crossover has matched proven-optimal tours on maps of up to 24,978 cities — by evolving roads, not city lists."
 pubDate: 2026-11-22
 tags: ["algorithms", "eax", "tsp", "complexity"]
@@ -16,7 +16,7 @@ The escape hatch is that nobody knows a guaranteed fast algorithm — and that i
 
 The algorithm I want to tell you about is a genetic algorithm. That is the surprising part. Genetic algorithms have a bad reputation on TSP, for a good reason I'll get to. In our own benchmark, a standard order-based GA lands around 8% above optimal on a 52-city map — and 70% above by 100 cities. They are also not what you picture when you picture the state of the art.
 
-Yet in 2006 Yuichi Nagata [reported](https://doi.org/10.1007/11844297_38) that his Edge Assembly Crossover found optimal tours for benchmark instances of up to 24,978 cities within a day, on a single 1.3 GHz processor — slower than the phone in your pocket. Those tours could be called optimal only because exact solvers such as Concorde had already proved the best possible length, after enormous computation. EAX matched the proof without producing one.
+Yet in 2006 Yuichi Nagata [reported](https://doi.org/10.1007/11844297_38) that his Edge Assembly Crossover (EAX) found optimal tours for benchmark instances of up to 24,978 cities within a day, on a single 1.3 GHz processor — slower than the phone in your pocket. Those tours could be called optimal only because exact solvers such as Concorde had already proved the best possible length, after enormous computation. EAX matched the proof without producing one.
 
 The version on this site is a compact reimplementation of the same idea, and I'll show you what it does on maps up to 1,000 cities below.
 
