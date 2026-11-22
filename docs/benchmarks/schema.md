@@ -451,6 +451,28 @@ run must cover that solver's whole tier — every instance, every config — or 
 instances it omits are lost. The cadence is differential per *algorithm*, not per
 *instance*.
 
+### Single-solver publishing
+
+Between full-suite releases, a newly added or changed solver often has good data before the
+rest of the tree is re-measured. `--solver <id>` (repeatable) publishes only that solver's
+shard so its algorithm page renders, while everything else stays as the last complete sweep
+left it:
+
+```bash
+scripts/bench-matrix.sh bench/matrix/tier-a.toml --solver eax   # appends to tier-a.jsonl
+scripts/publish-benchmarks.sh --tier a --solver eax --dry-run    # inspect
+scripts/publish-benchmarks.sh --tier a --solver eax --only r2    # upload
+```
+
+This uploads `algorithms/eax.json` and `index.json` only. The other solver shards are
+byte-identical and skipped, and the problem leaderboards are **not** rewritten — ranking a
+v1.0.17 result against a v1.0.12 board would be incomparable. Pass `--merge-leaderboards` when
+that mix is deliberate; `--snapshot` requires it, because a snapshot must be a complete tree.
+
+The shard's own `measurement` block states the commit/version that produced it, so a reader can
+see that this algorithm is newer than the rest of the tree. A solver publish never changes
+another solver's provenance.
+
 ## Publishing
 
 Reads are public; writes need a Cloudflare credential with R2 edit access.
