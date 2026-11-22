@@ -1,6 +1,7 @@
 ---
 id: "pso"
 name: "Particle Swarm Optimisation"
+version: "2.0.0"
 typeBadge: "Heuristic — swarm metaheuristic"
 description: "Swarm metaheuristic where particles exchange order-crossover segments, explore with 2-opt reversals, and finish with a 2-opt polish."
 hasExplainer: true
@@ -37,19 +38,18 @@ Auto-expands to `pipeline(shuffle, pso)`.
 
 ```text
 procedure ParticleSwarm(cities, n_particles, epochs):
-    particles ← initialize_particles(n_particles, cities)
+    particles ← half_nn_seeded(half_random(n_particles, cities))
     gbest ← best_tour(particles)
     for epoch in 1..epochs:
         ω ← inertia_decay(epoch)
         for each particle p:
-            v ← ω × p.velocity
-              + c1 × toward(p.position, p.best)
-              + c2 × toward(p.position, gbest)
-            p.position ← apply_swaps(p.position, v)
+            p.position ← order_crossover(p.position, p.best, c1 × r1)
+            p.position ← order_crossover(p.position, gbest, c2 × r2)
+            p.position ← random_2opt_reversals(p.position, ω)
             if length(p.position) < length(p.best):
                 p.best ← p.position
         gbest ← best_tour(particles)
-    return gbest
+    return 2opt_polish(gbest)
 ```
 
 ## Options
@@ -72,3 +72,9 @@ teeline solve pso -i ./data/tsplib/berlin52.tsp --n_nearest=50
 - [Particle swarm optimisation (Wikipedia)](https://en.wikipedia.org/wiki/Particle_swarm_optimization)
 - Kennedy, J. & Eberhart, R. (1995) — "Particle Swarm Optimization", *Proc. IEEE ICNN'95*, Vol. 4, pp. 1942–1948. DOI: 10.1109/ICNN.1995.488968
 - Clerc, M. (2004) — "Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem", in *New Optimization Techniques in Engineering*, Springer, pp. 219–239
+
+## Changelog
+
+| Version | Date | Change |
+| --- | --- | --- |
+| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Replaced the swap-list velocity with edge-preserving order-crossover moves, a 2-opt reversal perturbation, and a final 2-opt polish. Tier A median gap: **150.35% → 6.88%**; `dsj1000`: **2340.27% → 11.17%**. |

@@ -6,6 +6,9 @@ const docs = defineCollection({
   schema: z.object({
     id: z.string(),
     name: z.string(),
+    // Per-algorithm semver, independent of the teeline release version. Algorithms that
+    // predate versioning start at 1.0.0; a behaviour-changing rewrite bumps the major.
+    version: z.string().default('1.0.0'),
     typeBadge: z.string(),
     description: z.string(),
     hasExplainer: z.boolean().default(false),
