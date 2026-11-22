@@ -24,6 +24,7 @@ Jump to: [accepted](#accepted) · [proposed](#proposed) · [hold](#hold) · [dec
 | algorithm_id | algo family | state | short description | references | comments |
 | --- | --- | --- | --- | --- | --- |
 | `spectral_fiedler` | constructive | accepted | Spectral constructive solver: kNN affinity graph, normalized Laplacian eigenvectors, polar-angle ordering. | [#646](https://github.com/timgluz/teeline/issues/646), [Fiedler vector](https://en.wikipedia.org/wiki/Algebraic_connectivity) | Accepted 2026-11 in #646; zero-dependency plan with aliases `spectral`/`fiedler`. Define behavior for disconnected graphs and asymmetric EXPLICIT inputs before implementation. |
+| `popmusic` | decomposition | accepted | Re-optimize short tour stretches (R consecutive cities plus nearby cities) with fixed endpoints until no stretch improves. | [Taillard & Helsgaun 2019](https://doi.org/10.1016/j.ejor.2018.06.039), [Taillard 2019](https://arodes.hes-so.ch/nanna/record/8174/files/Published%20version.pdf) | Accepted 2026-11; tracked in [#770](https://github.com/timgluz/teeline/issues/770). Proposed independently by both reviewers. Site/benchmark family: `meta` for v1; the exact fixed-endpoint path DP is the first milestone. |
 
 ### Proposed
 
@@ -36,7 +37,6 @@ Jump to: [accepted](#accepted) · [proposed](#proposed) · [hold](#hold) · [dec
 | `dynasearch` | local | proposed | Dynamic-programming local search: applies the jointly optimal batch of independent 2-opt reversals in one pass. | [Potts & van de Velde 1995](https://research.utwente.nl/en/publications/dynasearch-interative-local-improvement-by-dynamic-programming-pa), [Congram et al. 2002](https://doi.org/10.1287/ijoc.14.1.52.7712) | Searches an exponential-size neighborhood in polynomial time, unlike single-move 2-opt/3-opt. Pure Rust, ~200 LOC; O(n²) per pass, best at n≤2000. |
 | `balas-simonetti-dp` | local/exact | proposed | Sliding-window bitmask DP: finds the best tour where each city moves at most k positions. | [Balas & Simonetti 2001](https://doi.org/10.1287/ijoc.13.1.56.9748) | Deterministic and linear-time in n (exponential in k); reuses BHK-style bitmask DP on any instance size and works on EXPLICIT matrices. k=6–10 is practical, but the state definition is fiddly. |
 | `guided-local-search` | meta | proposed | Penalize frequently used edges to escape local optima. | [GLS](https://en.wikipedia.org/wiki/Guided_local_search) | Strong TSP results but penalty/λ parameters need calibration; benchmark before adding another meta solver. |
-| `popmusic` | decomposition | proposed | Re-optimize short tour stretches (R consecutive cities plus nearby cities) with fixed endpoints until no stretch improves. | [Taillard & Helsgaun 2019](https://doi.org/10.1016/j.ejor.2018.06.039), [Taillard 2019](https://arodes.hes-so.ch/nanna/record/8174/files/Published%20version.pdf) | Proposed independently by both reviewers, so the idea has legs. New family: pairs `bhk`/`3opt`/`lk` as sub-solvers; pure Rust, no O(n²) full-matrix requirement. Needs an R parameter and a family ADR. |
 
 ### Hold
 
