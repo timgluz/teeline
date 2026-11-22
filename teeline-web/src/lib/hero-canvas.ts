@@ -1,5 +1,35 @@
 import { berlin52, type HeroCity } from './hero-cities'
 
+/** How long an ordinary 2-opt frame stays on screen. */
+export const FRAME_DWELL_MS = 240
+/** A long break on the converged tour, so the loop settles before it reverses. */
+export const HOLD_AT_OPTIMUM_MS = 1400
+/** A shorter break on the seed before the improvements replay. */
+export const HOLD_AT_SEED_MS = 900
+
+const ROUTE_FROM = '#6366f1'
+const ROUTE_TO = '#22d3a5'
+const CITY_FILL = '#6366f1'
+const CITY_STROKE = '#0a0a0b'
+const CITY_DRAGGING = '#22d3a5'
+
+/**
+ * The dwell for a frame before the loop advances.
+ *
+ * Endpoints read as a break in the loop rather than another step: the converged tour gets the
+ * longest hold, so the eye can see what the solver settled on before the tour unwinds.
+ */
+export function frameDwell(frameIdx: number, optimumIndex: number): number {
+  if (frameIdx === optimumIndex) return HOLD_AT_OPTIMUM_MS
+  if (frameIdx === 0) return HOLD_AT_SEED_MS
+  return FRAME_DWELL_MS
+}
+
+interface Frame {
+  route: number[]
+  cost: number
+}
+
 export function initHeroCanvas(): void {
   const svg = document.getElementById(
     'hero-canvas',
@@ -51,9 +81,9 @@ export function initHeroCanvas(): void {
     return route
   }
 
-  function buildFrames(): { route: number[]; cost: number }[] {
+  function buildFrames(): { frames: Frame[]; optimumIndex: number } {
     let route = nearestNeighborSeed()
-    const frames: { route: number[]; cost: number }[] = []
+    const frames: Frame[] = []
     frames.push({ route: route.slice(), cost: routeCost(route) })
     let improved = true
     while (improved && frames.length < 120) {
@@ -74,16 +104,44 @@ export function initHeroCanvas(): void {
         if (frames.length >= 120) break
       }
     }
+    const optimumIndex = frames.length - 1
     const reversed = frames.slice(1, -1).reverse()
-    return frames.concat(reversed)
+    return { frames: frames.concat(reversed), optimumIndex }
   }
 
-  let frames = buildFrames()
+  let built = buildFrames()
+  let frames = built.frames
+  let optimumIndex = built.optimumIndex
   let best = Math.min(...frames.map((f) => f.cost))
+
+  const reduceMotion =
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
+
+  // The gradient spans the viewBox rather than the path's bounding box, so the colours stay put
+  // as the tour changes shape between frames.
+  const defs = document.createElementNS(NS, 'defs')
+  const gradient = document.createElementNS(NS, 'linearGradient')
+  gradient.setAttribute('id', 'hero-route-gradient')
+  gradient.setAttribute('gradientUnits', 'userSpaceOnUse')
+  gradient.setAttribute('x1', '0')
+  gradient.setAttribute('y1', '0')
+  gradient.setAttribute('x2', '1800')
+  gradient.setAttribute('y2', '1200')
+  for (const [offset, colour] of [
+    ['0%', ROUTE_FROM],
+    ['100%', ROUTE_TO],
+  ] as const) {
+    const stop = document.createElementNS(NS, 'stop')
+    stop.setAttribute('offset', offset)
+    stop.setAttribute('stop-color', colour)
+    gradient.appendChild(stop)
+  }
+  defs.appendChild(gradient)
+  root.appendChild(defs)
 
   const pathEl = document.createElementNS(NS, 'path')
   pathEl.setAttribute('fill', 'none')
-  pathEl.setAttribute('stroke', '#6366F1')
+  pathEl.setAttribute('stroke', 'url(#hero-route-gradient)')
   pathEl.setAttribute('stroke-width', '3')
   pathEl.setAttribute('stroke-linecap', 'round')
   pathEl.setAttribute('stroke-linejoin', 'round')
@@ -98,8 +156,8 @@ export function initHeroCanvas(): void {
     circle.setAttribute('cx', String(c.x))
     circle.setAttribute('cy', String(c.y))
     circle.setAttribute('r', '10')
-    circle.setAttribute('fill', '#141416')
-    circle.setAttribute('stroke', '#8A8A92')
+    circle.setAttribute('fill', CITY_FILL)
+    circle.setAttribute('stroke', CITY_STROKE)
     circle.setAttribute('stroke-width', '2')
     circle.setAttribute('cursor', 'grab')
     nodeG.appendChild(circle)
@@ -134,11 +192,17 @@ export function initHeroCanvas(): void {
     dragging = i
     root.setPointerCapture(evt.pointerId)
     nodeEls[i]?.setAttribute('cursor', 'grabbing')
+    nodeEls[i]?.setAttribute('fill', CITY_DRAGGING)
   }
 
   nodeEls.forEach((el, i) => {
     el?.addEventListener('pointerdown', (e) => onDown(i, e))
   })
+
+  let frameIdx = reduceMotion ? optimumIndex : 0
+  let iterationCount = reduceMotion ? optimumIndex : 0
+  let lastFrame = frames[frameIdx].cost
+  let lastAdvance = performance.now()
 
   root.addEventListener('pointermove', (evt) => {
     if (dragging === null) return
@@ -147,30 +211,39 @@ export function initHeroCanvas(): void {
     cities[dragging].y = Math.max(0, Math.min(1200, p.y))
     nodeEls[dragging]?.setAttribute('cx', String(cities[dragging].x))
     nodeEls[dragging]?.setAttribute('cy', String(cities[dragging].y))
-    frames = buildFrames()
+    const rebuilt = buildFrames()
+    frames = rebuilt.frames
+    optimumIndex = rebuilt.optimumIndex
     best = Math.min(best, ...frames.map((f) => f.cost))
     bestNode.textContent = best.toLocaleString('en-US', {
       maximumFractionDigits: 0,
     })
-    renderRoute(frames[0].route)
-    length.textContent = Math.round(frames[0].cost).toLocaleString('en-US')
-    iterations.textContent = '0'
-    frameIdx = 0
+    frameIdx = reduceMotion ? optimumIndex : 0
+    iterationCount = reduceMotion ? optimumIndex : 0
+    lastFrame = frames[frameIdx].cost
+    lastAdvance = performance.now()
+    renderRoute(frames[frameIdx].route)
+    length.textContent = Math.round(frames[frameIdx].cost).toLocaleString(
+      'en-US',
+    )
+    iterations.textContent = String(iterationCount)
   })
 
   function onUp(): void {
     dragging = null
-    nodeEls.forEach((el) => el?.setAttribute('cursor', 'grab'))
+    nodeEls.forEach((el) => {
+      el?.setAttribute('cursor', 'grab')
+      el?.setAttribute('fill', CITY_FILL)
+    })
   }
   root.addEventListener('pointerup', onUp)
   root.addEventListener('pointercancel', onUp)
 
-  let frameIdx = 0
-  let iterationCount = 0
-  let lastFrame = frames[0].cost
-
-  function step(): void {
-    if (dragging === null) {
+  function step(now: number): void {
+    if (
+      dragging === null &&
+      now - lastAdvance >= frameDwell(frameIdx, optimumIndex)
+    ) {
       frameIdx = (frameIdx + 1) % frames.length
       const f = frames[frameIdx]
       renderRoute(f.route)
@@ -185,13 +258,14 @@ export function initHeroCanvas(): void {
       iterations.textContent = String(iterationCount)
       lastFrame = f.cost
       if (frameIdx === 0) iterationCount = 0
+      lastAdvance = now
     }
     requestAnimationFrame(step)
   }
 
-  renderRoute(frames[0].route)
-  length.textContent = Math.round(frames[0].cost).toLocaleString('en-US')
+  renderRoute(frames[frameIdx].route)
+  length.textContent = Math.round(frames[frameIdx].cost).toLocaleString('en-US')
   bestNode.textContent = Math.round(best).toLocaleString('en-US')
-  iterations.textContent = '0'
-  requestAnimationFrame(step)
+  iterations.textContent = String(iterationCount)
+  if (!reduceMotion) requestAnimationFrame(step)
 }
