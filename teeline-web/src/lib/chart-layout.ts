@@ -32,6 +32,47 @@ export function niceTicks(max: number, desired = 5): number[] {
   return ticks
 }
 
+/**
+ * The value a long-tailed series should be cut at, or null when no cut is warranted.
+ *
+ * A few solvers that leave a gap many times larger than the rest — random shuffle always does
+ * — stretch a linear axis until every comparable solver is a line at zero. The cut is the jump
+ * with the largest ratio, accepted only when the values above it stay a minority of the series:
+ * when half the points sit above a jump, that is the data rather than an outlier.
+ */
+export function tailCap(values: number[], minRatio = 2.5): number | null {
+  const sorted = values
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((a, b) => a - b)
+  if (sorted.length < 4) return null
+
+  const maxTail = Math.floor(sorted.length / 3)
+  let cut: number | null = null
+  let best = minRatio
+  for (let index = 0; index < sorted.length - 1; index += 1) {
+    if (sorted.length - 1 - index > maxTail) continue
+    const ratio = sorted[index + 1] / sorted[index]
+    if (ratio > best) {
+      best = ratio
+      cut = sorted[index]
+    }
+  }
+  return cut
+}
+
+/**
+ * The top tick of a y axis that tolerates a long tail.
+ *
+ * The cap is rounded up to the next nice tick, so a point just past the cut still fits; only
+ * the genuine outliers end up above the axis and are reported as off-scale.
+ */
+export function axisTop(values: number[]): number {
+  const finite = values.filter((value) => Number.isFinite(value) && value > 0)
+  const max = finite.length > 0 ? Math.max(...finite) : 0
+  const ticks = niceTicks(tailCap(finite) ?? max)
+  return ticks[ticks.length - 1]
+}
+
 export interface LabelRequest {
   text: string
   /** The point the label belongs to, in viewBox units. */

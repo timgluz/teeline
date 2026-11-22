@@ -5,6 +5,7 @@ import '@fontsource/inter/600.css'
 import '@fontsource/jetbrains-mono/400.css'
 import '../styles/global.css'
 import Topbar from '../components/Topbar.astro'
+import { ALGORITHM_COUNT } from '../nav-data'
 
 interface Props {
   title?: string
@@ -13,7 +14,7 @@ interface Props {
 
 const {
   title = 'Teeline — Traveling Salesman Problem Solver',
-  description = 'Solve the Traveling Salesman Problem in your browser. 20 algorithms from Held-Karp to Ant Colony, compiled to WebAssembly. Nothing leaves your machine.',
+  description = `Solve the Traveling Salesman Problem in your browser. ${ALGORITHM_COUNT} algorithms from Held-Karp to Ant Colony, compiled to WebAssembly. Nothing leaves your machine.`,
 } = Astro.props
 ---
 
