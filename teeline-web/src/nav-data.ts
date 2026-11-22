@@ -77,12 +77,12 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   fpa: {
     id: 'fpa',
     name: 'Flower Pollination',
-    complexity: 'O(epochs · pop · n)',
+    complexity: 'O(epochs · pop · n) + 2-opt polish',
   },
   gsa: {
     id: 'gsa',
     name: 'Gravitational Search',
-    complexity: 'O(epochs · pop²)',
+    complexity: 'O(epochs · pop · n) + 2-opt polish',
   },
   som: {
     id: 'som',
