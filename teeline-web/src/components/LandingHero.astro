@@ -1,5 +1,6 @@
 ---
 import { berlin52 } from '../lib/hero-cities'
+import { ALGORITHM_COUNT } from '../nav-data'
 ---
 
 <header class="relative overflow-hidden">
@@ -28,8 +29,8 @@ import { berlin52 } from '../lib/hero-cities'
         Solve the Traveling Salesman Problem, in your browser.
       </h1>
       <p class="mt-5 max-w-lg text-base text-text-dim">
-        20 algorithms from Held-Karp to Ant Colony, compiled to WebAssembly.
-        Nothing leaves your machine — drag the cities and watch the tour recompute.
+        {ALGORITHM_COUNT} algorithms from Held-Karp to Ant Colony, compiled to WebAssembly.
+        Nothing leaves your machine — watch 2-opt untangle a fresh random tour.
       </p>
       <div class="mt-8 flex flex-wrap gap-4">
         <a href="/solve/" class="inline-flex items-center gap-2 rounded-md bg-accent px-5 py-2.5 font-medium text-white transition-colors hover:bg-accent/90">
@@ -47,7 +48,7 @@ import { berlin52 } from '../lib/hero-cities'
         </div>
         <div>
           <dt class="font-mono text-xs uppercase tracking-wider text-text-dim">Algorithms</dt>
-          <dd class="mt-1 font-mono text-sm text-text">20</dd>
+          <dd class="mt-1 font-mono text-sm text-text">{ALGORITHM_COUNT}</dd>
         </div>
         <div>
           <dt class="font-mono text-xs uppercase tracking-wider text-text-dim">Runtime</dt>
@@ -62,7 +63,7 @@ import { berlin52 } from '../lib/hero-cities'
         <div class="mb-3 flex items-center justify-between">
           <div>
             <p class="font-mono text-sm text-text">berlin52</p>
-            <p class="font-mono text-xs text-text-dim">2-opt · nearest-neighbour seed</p>
+            <p class="font-mono text-xs text-text-dim">2-opt · random seed</p>
           </div>
           <span id="hero-solve-status" class="font-mono text-xs text-accent">solving</span>
         </div>
@@ -73,7 +74,6 @@ import { berlin52 } from '../lib/hero-cities'
           role="img"
           aria-label="Live TSP solver tour"
         ></svg>
-        <p class="mt-2 font-mono text-xs text-text-dim">drag any city to edit</p>
         <div class="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-3">
           <div>
             <p class="font-mono text-xs uppercase tracking-wider text-text-dim">tour length</p>
