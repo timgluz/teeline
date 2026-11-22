@@ -6,7 +6,7 @@ avoid investigating the same idea twice.
 
 This is not a roadmap: `proposed` means worth a look, not scheduled work.
 
-Rows are ordered accepted → proposed → hold → declined.
+Jump to: [accepted](#accepted) · [proposed](#proposed) · [hold](#hold) · [declined](#declined).
 
 ## States
 
@@ -19,9 +19,16 @@ Rows are ordered accepted → proposed → hold → declined.
 
 ## Candidates
 
+### Accepted
+
 | algorithm_id | algo family | state | short description | references | comments |
 | --- | --- | --- | --- | --- | --- |
 | `spectral_fiedler` | constructive | accepted | Spectral constructive solver: kNN affinity graph, normalized Laplacian eigenvectors, polar-angle ordering. | [#646](https://github.com/timgluz/teeline/issues/646), [Fiedler vector](https://en.wikipedia.org/wiki/Algebraic_connectivity) | Accepted 2026-11 in #646; zero-dependency plan with aliases `spectral`/`fiedler`. Define behavior for disconnected graphs and asymmetric EXPLICIT inputs before implementation. |
+
+### Proposed
+
+| algorithm_id | algo family | state | short description | references | comments |
+| --- | --- | --- | --- | --- | --- |
 | `attention-model` | learned | proposed | Kool et al. attention encoder–decoder; autoregressive construction with one greedy rollout. | [paper](https://arxiv.org/abs/1803.08475), [repo](https://github.com/wouterkool/attention-learn-to-route) | Simplest first learned-family candidate: 2.8 MB TSP100 checkpoint, MIT. Gate on ONNX + `tract` (or a Python sidecar) before committing to the family. |
 | `pomo` | learned | proposed | Multi-start policy optimization: many greedy rollouts from different starts, keep the best. | [paper](https://arxiv.org/abs/2010.16011), [repo](https://github.com/yd-kwon/POMO) | Stronger than `attention-model` (~1% TSP100 greedy, ~0.14% with 8× augmentation) but multi-start decoding is extra work. Try after the first learned baseline. |
 | `cpsat-tsp` | exact | proposed | OR-Tools CP-SAT circuit/MTZ formulation. | [OR-Tools](https://github.com/google/or-tools), [CP-SAT](https://developers.google.com/optimization/cp/cp_solver) | Best non-ML exact addition, but needs a Python/C++ sidecar or FFI and an ADR for the dependency. |
@@ -30,6 +37,11 @@ Rows are ordered accepted → proposed → hold → declined.
 | `balas-simonetti-dp` | local/exact | proposed | Sliding-window bitmask DP: finds the best tour where each city moves at most k positions. | [Balas & Simonetti 2001](https://doi.org/10.1287/ijoc.13.1.56.9748) | Deterministic and linear-time in n (exponential in k); reuses BHK-style bitmask DP on any instance size and works on EXPLICIT matrices. k=6–10 is practical, but the state definition is fiddly. |
 | `guided-local-search` | meta | proposed | Penalize frequently used edges to escape local optima. | [GLS](https://en.wikipedia.org/wiki/Guided_local_search) | Strong TSP results but penalty/λ parameters need calibration; benchmark before adding another meta solver. |
 | `popmusic` | decomposition | proposed | Re-optimize short tour stretches (R consecutive cities plus nearby cities) with fixed endpoints until no stretch improves. | [Taillard & Helsgaun 2019](https://doi.org/10.1016/j.ejor.2018.06.039), [Taillard 2019](https://arodes.hes-so.ch/nanna/record/8174/files/Published%20version.pdf) | Proposed independently by both reviewers, so the idea has legs. New family: pairs `bhk`/`3opt`/`lk` as sub-solvers; pure Rust, no O(n²) full-matrix requirement. Needs an R parameter and a family ADR. |
+
+### Hold
+
+| algorithm_id | algo family | state | short description | references | comments |
+| --- | --- | --- | --- | --- | --- |
 | `bq-nco` | learned | hold | Bisimulation-quotiented MDP policy; each decision solves the remaining tail subproblem. | [paper](https://arxiv.org/abs/2301.03313), [repo](https://github.com/naver/bq-nco) | Strong out-of-distribution generalization with one greedy rollout, but the BQ-MDP decoder runs the model at every step, so inference is pricier. License needs checking (repo reports NOASSERTION). |
 | `rlor-tsp` | learned | hold | PPO-trained attention model hosted on Hugging Face. | [HF](https://huggingface.co/cpwan/RLOR-TSP), [paper](https://arxiv.org/abs/2303.13117) | TSP50-only and its demo Space is broken; useful only as a quick HF plumbing proof, not a final family member. |
 | `dimes` | learned | hold | Differentiable meta-solver: continuous solution distribution + MAML initialization + active search. | [paper](https://arxiv.org/abs/2210.04123), [repo](https://github.com/DIMESTeam/DIMES) | Scales to 10k nodes but heavy (PyTorch Geometric, custom CUDA sampler); no lightweight/WASM path. |
@@ -48,6 +60,11 @@ Rows are ordered accepted → proposed → hold → declined.
 | `softassign-sinkhorn` | relaxation | hold | Relax the tour permutation matrix into the doubly stochastic Birkhoff polytope via Sinkhorn normalization and annealing, then round. | [Gold & Rangarajan 1996](https://proceedings.neurips.cc/paper_files/paper/1995/file/b1563a78ec59337587f6ab6397699afc-Paper.pdf), [Rangarajan et al. 1996](https://doi.org/10.1162/neco.1996.8.5.1041) | Genuinely orthogonal: relaxes permutations directly and works on EXPLICIT matrices without an embedding. O(n²) memory/step, annealing-sensitive, and rounded matrices still need subtour patching; quality trails 2opt/lk. Needs a relaxation-family ADR. |
 | `portfolio` | strategy | hold | Run a small portfolio under one budget and return the best. | [Algorithm selection](https://en.wikipedia.org/wiki/Algorithm_selection) | Not a published algorithm; needs a fairness/budget ADR before it belongs in the benchmark. |
 | `si-tsp` | matheuristic | hold | Spatially informed MIP: Voronoi-based variable pruning before a MILP. | [paper](https://www.tandfonline.com/doi/full/10.1080/00330124.2025.2565474) | Niche hybrid exact/heuristic; no obvious pure-Rust path. |
+
+### Declined
+
+| algorithm_id | algo family | state | short description | references | comments |
+| --- | --- | --- | --- | --- | --- |
 | `llm-end-to-end` | learned | declined | Ask an LLM to emit a tour directly. | [ViTSP](https://mlanthology.org/iclr/2026/yin2026iclr-vitsp/) | Expensive, slow, non-reproducible and poor TSP quality; ViTSP's decomposition use is the interesting version. |
 | `concorde` | exact | declined | Branch-and-cut reference solver. | [Concorde](https://www.math.uwaterloo.ca/tsp/concorde.html) | External C code, license/distribution constraints, not pure Rust. |
 | `astar-1tree` | exact | declined | A*/best-first B&B over edge decisions with the Held–Karp 1-tree bound. | [Held–Karp 1970](https://doi.org/10.1287/opre.18.6.1138), [Volgenant–Jonker 1982](https://doi.org/10.1016/0377-2217(82)90015-7), [Valenzuela–Jones 1997](https://homes.di.unimi.it/righini/Didattica/OttimizzazioneDiscreta/MaterialeOD/1997%20Valenzuela%20Jones%20-%20HK%20lower%20bound.pdf) | Rejected 2026-11: per-node subgradient tuning and brittle forced-edge handling, and the 14–17 city exact benchmark would not show its advantage. |
