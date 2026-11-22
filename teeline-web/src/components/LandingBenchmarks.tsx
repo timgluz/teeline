@@ -269,8 +269,8 @@ export default function LandingBenchmarks({
           <span class="ml-auto font-mono text-xs text-text-dim">
             {shownSolvers} solver
             {shownSolvers === 1 ? '' : 's'}
-            {/* A solver publishing two configs is two points, so "solvers" must not be the
-                point count — branch_bound's beam search and exact runs are separate results. */}
+            {/* A solver publishing more than one config is more than one point, so
+                "solvers" must not be the point count — each config is a separate result. */}
             {shownPoints.length > shownSolvers
               ? ` · ${shownPoints.length} results`
               : ''}{' '}

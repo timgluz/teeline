@@ -186,7 +186,8 @@ berlin52 = "all"
 
 [configs.budget]               # the budget-limited run: no args, the family timeout is the limit
 
-[configs.exact]                # a named set of extra CLI args
+[configs.exact]                # illustrative: a named set of extra CLI args
+                               # (branch_bound is exact by default and needs no such config)
 solvers = ["branch_bound"]
 instances = ["burma14", "gr17", "ulysses16"]
 args = ["--n_nearest", "100"]

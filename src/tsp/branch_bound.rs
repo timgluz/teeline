@@ -1,9 +1,8 @@
 use super::DistanceSource;
-use super::kdtree::{self, KDPoint, KDTree};
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -21,7 +20,7 @@ type PathEvaluator = Rc<dyn Fn(&Path) -> f32>;
 
 pub fn solve(
     problem: &TspProblem,
-    opts: &HeuristicOptions,
+    _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
 ) -> Solution {
@@ -49,30 +48,16 @@ pub fn solve(
         .map(|t| distances.tour_length(t))
         .unwrap_or(f32::MAX);
 
-    let n_nearest = opts.n_nearest;
-    // Gate: only build KD-tree when n_nearest actually restricts the candidate
-    // set. When n_nearest >= n_cities every city is a candidate anyway — skip
-    // the overhead and keep exact B&B behaviour.
-    let kd_tree: Option<KDTree> = if n_nearest > 0 && n_nearest < n_cities {
-        Some(kdtree::from_cities(cities))
-    } else {
-        None
-    };
-    let city_map: HashMap<usize, KDPoint> = cities.iter().map(|p| (p.id, *p)).collect();
-
     let fitness_fn = build_evaluator(distances);
     let (best_path, best_distance) = backtrack(
         &fitness_fn,
         distances.as_ref(),
-        &city_map,
         &mut open_path,
         &unvisited_cities,
         1,
         0.0,
         initial_upper_bound,
         progress_tx,
-        kd_tree.as_ref(),
-        n_nearest,
     );
 
     if let Some(tx) = progress_tx {
@@ -101,15 +86,12 @@ fn build_evaluator(distances: &Arc<dyn DistanceSource>) -> PathEvaluator {
 fn backtrack(
     evaluate_fn: &PathEvaluator,
     distances: &dyn DistanceSource,
-    city_map: &HashMap<usize, KDPoint>,
     path: &mut Path,
     unvisited_cities: &UniqSet,
     k: usize,
     running_cost: f32,
     upper_bound: f32,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
-    kd: Option<&KDTree>,
-    n_nearest: usize,
 ) -> (Path, f32) {
     let mut best_path = path.clone();
     let mut best_distance = upper_bound;
@@ -133,9 +115,6 @@ fn backtrack(
         running_cost,
         best_distance,
         distances,
-        city_map,
-        kd,
-        n_nearest,
     );
 
     for candidate in candidates.iter() {
@@ -159,15 +138,12 @@ fn backtrack(
         let (sub_res, sub_dist) = backtrack(
             evaluate_fn,
             distances,
-            city_map,
             path,
             &next_cities,
             k + 1,
             running_cost + next_distance,
             best_distance,
             progress_tx,
-            kd,
-            n_nearest,
         );
 
         if sub_dist < best_distance {
@@ -187,7 +163,6 @@ fn is_solution(path: &Path, k: usize, n_cities: usize) -> bool {
     k == n_cities && k > 1 && uniq_ids.len() == n_cities
 }
 
-#[allow(clippy::too_many_arguments)]
 fn construct_candidates(
     path: &Path,
     k: usize,
@@ -195,46 +170,19 @@ fn construct_candidates(
     running_cost: f32,
     best_distance: f32,
     distances: &dyn DistanceSource,
-    city_map: &HashMap<usize, KDPoint>,
-    kd: Option<&KDTree>,
-    n_nearest: usize,
 ) -> Path {
     if unvisited_cities.is_empty() {
         return vec![];
     }
 
-    // When a KD-tree is available, restrict candidates to the n_nearest
-    // geometrically-closest unvisited cities. Fall back to the full unvisited
-    // set only if zero neighbors survive the intersection (last few cities in
-    // the tour where all geometric neighbors are already visited).
-    let candidate_ids: Vec<usize> = match kd {
-        Some(tree) => {
-            let current_id = path[k - 1];
-            let current_pt = city_map
-                .get(&current_id)
-                .expect("current city must be in city_map");
-
-            let restricted: Vec<usize> = tree
-                .nearest(current_pt, n_nearest)
-                .nearest()
-                .iter()
-                .map(|item| item.point.id)
-                .filter(|id| unvisited_cities.contains(id))
-                .collect();
-
-            if restricted.is_empty() {
-                unvisited_cities.iter().copied().collect()
-            } else {
-                restricted
-            }
-        }
-        None => unvisited_cities.iter().copied().collect(),
-    };
+    // Every unvisited city is a candidate: this solver is exact, so a
+    // geometric nearest-neighbour restriction would silently turn it into a
+    // beam search. `n_nearest` is ignored for that reason.
+    let candidate_ids: Vec<usize> = unvisited_cities.iter().copied().collect();
 
     // MST of {start_city} ∪ unvisited is a lower bound on the minimum cost of
     // completing the tour from any candidate through the remaining cities back
-    // to the start. Computed on ALL remaining unvisited cities (not just the
-    // restricted candidates) so the bound stays valid.
+    // to the start.
     let start_city = path[0];
     let mst_nodes: Vec<usize> = std::iter::once(start_city)
         .chain(unvisited_cities.iter().copied())
@@ -326,57 +274,9 @@ mod tests {
         TspProblem::new(cities, dm)
     }
 
-    #[test]
-    fn test_solve_visits_all_cities() {
-        let problem = tsp5_problem();
-        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
-
-        let mut visited: Vec<usize> = tour.route().to_vec();
-        visited.sort();
-        assert_eq!(visited, vec![0, 1, 2, 3, 4]);
-    }
-
-    #[test]
-    fn test_solve_finds_optimal_tour_on_tsp5() {
-        let problem = tsp5_problem();
-        // n_nearest=0: no KD restriction — exact B&B.
-        let opts = HeuristicOptions {
-            n_nearest: 0,
-            ..Default::default()
-        };
-        let tour = solve(&problem, &opts, None, None);
-
-        assert!(
-            (tour.total - 4.0).abs() < 1e-3,
-            "expected optimal tour ~4.0, got {}",
-            tour.total
-        );
-    }
-
-    #[test]
-    fn test_solve_matches_bellman_karp_on_tsp5() {
-        let problem = tsp5_problem();
-        let opts = HeuristicOptions {
-            n_nearest: 0,
-            ..Default::default()
-        };
-        let bb_tour = solve(&problem, &opts, None, None);
-        let bhk_tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
-
-        assert!(
-            (bb_tour.total - bhk_tour.total).abs() < 1e-3,
-            "B&B tour {} should match BHK tour {}",
-            bb_tour.total,
-            bhk_tour.total
-        );
-    }
-
-    #[test]
-    fn test_solve_matches_bhk_on_tsp8() {
-        // Uses 1-indexed city IDs (matching TSPLIB convention) to avoid the
-        // UNVISITED_NODE=0 sentinel colliding with city ID 0 from build_points.
-        // Points are arranged so the sorted-ID sequential tour crosses itself —
-        // B&B must find the same optimal as BHK, not just return input order.
+    /// 1-indexed IDs keep the `UNVISITED_NODE = 0` sentinel out of the city set.
+    /// The sorted-ID tour crosses itself, so matching BHK is evidence of a real search.
+    fn tsp8_problem() -> TspProblem {
         let coords: &[&[f32]] = &[
             &[0.0, 0.0],
             &[3.0, 1.0],
@@ -393,14 +293,49 @@ mod tests {
             .map(|(i, c)| kdtree::KDPoint::new_with_id(i + 1, c))
             .collect();
         let dm = distance_matrix::from_cities(&cities);
-        let problem = TspProblem::new(cities, dm);
+        TspProblem::new(cities, dm)
+    }
 
-        // n_nearest=0: no KD restriction — exact B&B.
-        let opts = HeuristicOptions {
-            n_nearest: 0,
-            ..Default::default()
-        };
-        let bb = solve(&problem, &opts, None, None);
+    #[test]
+    fn test_solve_visits_all_cities() {
+        let problem = tsp5_problem();
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
+
+        let mut visited: Vec<usize> = tour.route().to_vec();
+        visited.sort();
+        assert_eq!(visited, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_solve_finds_optimal_tour_on_tsp5() {
+        let problem = tsp5_problem();
+        let tour = solve(&problem, &HeuristicOptions::default(), None, None);
+
+        assert!(
+            (tour.total - 4.0).abs() < 1e-3,
+            "expected optimal tour ~4.0, got {}",
+            tour.total
+        );
+    }
+
+    #[test]
+    fn test_solve_matches_bellman_karp_on_tsp5() {
+        let problem = tsp5_problem();
+        let bb_tour = solve(&problem, &HeuristicOptions::default(), None, None);
+        let bhk_tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+
+        assert!(
+            (bb_tour.total - bhk_tour.total).abs() < 1e-3,
+            "B&B tour {} should match BHK tour {}",
+            bb_tour.total,
+            bhk_tour.total
+        );
+    }
+
+    #[test]
+    fn test_solve_matches_bhk_on_tsp8() {
+        let problem = tsp8_problem();
+        let bb = solve(&problem, &HeuristicOptions::default(), None, None);
         let bhk = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
 
         assert!(
@@ -416,11 +351,7 @@ mod tests {
         // When a good init_tour is provided the upper bound is seeded tightly,
         // pruning more branches early. The result must still be the exact optimal.
         let problem = tsp5_problem();
-        // n_nearest=0: no KD restriction — exact B&B.
-        let opts = HeuristicOptions {
-            n_nearest: 0,
-            ..Default::default()
-        };
+        let opts = HeuristicOptions::default();
         let without_seed = solve(&problem, &opts, None, None);
 
         // Use the unseeded result as the init_tour for the second run.
@@ -454,89 +385,33 @@ mod tests {
     }
 
     #[test]
-    fn test_n_nearest_3_finds_same_optimal_on_tsp5() {
-        // n_nearest=3 < 5 cities — KD restriction is active, but tsp5 is
-        // simple enough that the optimal successor is always within the 3
-        // nearest, so the result must match exact B&B.
-        let problem = tsp5_problem();
-        let restricted_opts = HeuristicOptions {
-            n_nearest: 3,
-            ..Default::default()
-        };
-        let exact_opts = HeuristicOptions {
-            n_nearest: 0,
+    fn n_nearest_is_ignored_and_the_search_stays_exact() {
+        // `n_nearest` is a heuristic option used by other solvers. `branch_bound`
+        // must not let it shrink the candidate set: that would turn an exact
+        // solver into a beam search, which is the bug this guards against.
+        let opts = HeuristicOptions {
+            n_nearest: 1,
             ..Default::default()
         };
 
-        let restricted = solve(&problem, &restricted_opts, None, None);
-        let exact = solve(&problem, &exact_opts, None, None);
-
-        assert!(
-            (restricted.total - exact.total).abs() < 1e-3,
-            "n_nearest=3 tour {:.3} should match exact {:.3}",
-            restricted.total,
-            exact.total,
-        );
-    }
-
-    #[test]
-    fn test_n_nearest_visits_all_cities_on_tsp8() {
-        // Same 8-city layout as test_solve_matches_bhk_on_tsp8.
-        // With n_nearest=4, the KD restriction is active (4 < 8).
-        let coords: &[&[f32]] = &[
-            &[0.0, 0.0],
-            &[3.0, 1.0],
-            &[1.0, 3.0],
-            &[4.0, 4.0],
-            &[2.0, 0.5],
-            &[0.5, 2.0],
-            &[3.5, 2.5],
-            &[1.5, 4.0],
-        ];
-        let cities: Vec<kdtree::KDPoint> = coords
-            .iter()
-            .enumerate()
-            .map(|(i, c)| kdtree::KDPoint::new_with_id(i + 1, c))
-            .collect();
-        let dm = distance_matrix::from_cities(&cities);
-        let problem = TspProblem::new(cities, dm);
-
-        let restricted_opts = HeuristicOptions {
-            n_nearest: 4,
-            ..Default::default()
-        };
-        let tour = solve(&problem, &restricted_opts, None, None);
-
-        // All 8 cities visited exactly once.
-        let mut visited: Vec<usize> = tour.route().to_vec();
-        visited.sort();
-        assert_eq!(visited, vec![1, 2, 3, 4, 5, 6, 7, 8]);
-
-        // Gap vs unrestricted B&B should be < 10%.
-        let exact_opts = HeuristicOptions {
-            n_nearest: 0,
-            ..Default::default()
-        };
-        let exact = solve(&problem, &exact_opts, None, None);
-        let gap = (tour.total - exact.total) / exact.total;
-        assert!(
-            gap < 0.10,
-            "n_nearest=4 gap {:.1}% should be < 10% vs exact {:.3}",
-            gap * 100.0,
-            exact.total,
-        );
+        for problem in [tsp5_problem(), tsp8_problem()] {
+            let exact = solve(&problem, &opts, None, None);
+            let bhk = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+            assert!(
+                (exact.total - bhk.total).abs() < 1e-3,
+                "branch_bound with n_nearest=1 returned {:.3}, expected BHK optimum {:.3}",
+                exact.total,
+                bhk.total,
+            );
+        }
     }
 
     #[test]
     fn progress_path_includes_city_zero() {
         let problem = tsp5_problem();
         let (tx, rx) = mpsc::channel();
-        let opts = HeuristicOptions {
-            n_nearest: 0,
-            ..Default::default()
-        };
 
-        let _ = solve(&problem, &opts, Some(&tx), None);
+        let _ = solve(&problem, &HeuristicOptions::default(), Some(&tx), None);
         drop(tx);
 
         let updates: Vec<Vec<usize>> = rx

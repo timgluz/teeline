@@ -12,10 +12,10 @@
 /// because solution quality depends on runtime epochs.
 use std::path::Path;
 use teeline::tsp::{
-    CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, TspProblem, bellman_karp,
-    branch_bound, cuckoo_search, distance_matrix, flower_pollination, genetic_algorithm,
-    gravitational_search, kdtree, nearest_neighbor, particle_swarm, simulated_annealing,
-    stochastic_hill, tabu_search, tsplib, two_opt,
+    AppOptions, CSOptions, FPAOptions, GAOptions, HeuristicOptions, SAOptions, Solvers, TspProblem,
+    bellman_karp, branch_bound, cuckoo_search, distance_matrix, flower_pollination,
+    genetic_algorithm, gravitational_search, kdtree, nearest_neighbor, particle_swarm,
+    simulated_annealing, solve_with_context, stochastic_hill, tabu_search, tsplib, two_opt,
 };
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -288,6 +288,24 @@ fn bellman_karp_optimal_tour_tsp5() {
         "BHK should find optimal tour ~4.0, got {}",
         tour.total
     );
+}
+
+#[test]
+fn exact_solvers_reject_more_than_24_cities() {
+    let coords: Vec<Vec<f32>> = (0..25).map(|i| vec![i as f32, 0.0]).collect();
+    let cities = kdtree::build_points(&coords);
+    let problem = make_problem_unrounded(&cities);
+
+    for solver in [Solvers::BellmanKarp, Solvers::BranchBound] {
+        let err = solve_with_context(solver, &problem, &AppOptions::default(), None, None)
+            .err()
+            .expect("exact solver must reject an oversized input");
+        assert!(err.contains("24"), "error must name the limit: {err}");
+        assert!(
+            err.contains("heuristic"),
+            "error must suggest a heuristic solver: {err}"
+        );
+    }
 }
 
 #[test]

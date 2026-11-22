@@ -1,65 +1,53 @@
 ---
 id: "branch_bound"
 name: "Branch and Bound"
+version: "2.0.0"
 typeBadge: "Exact"
-description: "Systematic enumeration of candidate tours that prunes any branch whose lower-bound cost already exceeds the best complete tour found so far."
+description: "Exact depth-first enumeration of candidate tours, pruned by a minimum-spanning-tree lower bound on the unvisited cities."
 hasExplainer: true
 ---
 
 # Branch and Bound
 
+<!-- The #benchmarks anchor is rendered by AlgorithmBenchmarks, not by a heading in this file. -->
+<!-- markdownlint-disable MD051 -->
 | | |
 | --- | --- |
 | **Alias** | `branch_bound` |
-| **Type** | Exact — **only when `--n_nearest` ≥ the number of cities** |
+| **Type** | Exact |
 | **Complexity** | Exponential worst-case; effective pruning often makes it practical for small instances |
 | **Benchmarks** | [published results ↓](#benchmarks) |
 
 ## Description
 
-Systematic enumeration of candidate tours that prunes any branch whose lower-bound cost already exceeds the best complete tour found so far. Explores the search tree depth-first, backtracking whenever it can prove no improvement is possible below the current node.
+Exact depth-first enumeration of candidate tours. At each partial tour it sorts the unvisited
+cities by a lower bound — the cost so far, plus the edge to the next city, plus a minimum
+spanning tree over the start city and every remaining unvisited city — and prunes any branch
+whose bound cannot beat the best complete tour found so far. A nearest-neighbour tour (or the
+pipeline's warm-start tour) seeds that upper bound.
 
-**Do not use on more than ~20 cities** — worst-case complexity is factorial.
+Every unvisited city is always a candidate. `--n_nearest` is a heuristic option used by other
+solvers and is **ignored** here: restricting the candidate set would silently turn an exact
+solver into a beam search.
 
-## Not exact at the default settings
-
-This solver is labelled exact, and it is — but only when the candidate set covers every city. The
-default `--n_nearest 3` restricts branching to the three nearest cities when extending a partial
-tour, which turns the search into a **beam search**: it can no longer reach tours whose edges leave
-that candidate set, so it returns valid but suboptimal tours. Measured against three instances with
-known optima:
-
-| Instance | Optimum | `--n_nearest 3` (default) | `--n_nearest 100` |
-| --- | --- | --- | --- |
-| burma14 | 3323 | 3651 (+9.9 %) | 3323 |
-| gr17 | 2085 | 2187 (+4.9 %) | 2085 |
-| ulysses16 | 6859 | 6909 (+0.7 %) | 6859 |
-
-With the candidate set widened to all cities, all three optima are found.
-
-This is easy to miss from the outside: the tour is still a valid tour, the solver still reports
-success, and the gap only shows up if you compare against a known optimum or against
-`bellman_karp`. **If you need a proof of optimality, pass `--n_nearest` at least equal to the
-number of cities.** A small value buys a large speed-up and a quietly worse answer.
-
-The trade-off is a property of candidate-list pruning in general, not a defect unique to this
-solver — but it is documented here because this is the only solver that *claims* exactness while
-defaulting to a pruned search.
+**Do not use on more than 24 cities.** The dispatcher rejects larger inputs with an error
+rather than letting an exponential search run until the caller gives up.
 
 ```text
 procedure BranchAndBound(cities):
-    best ← nearest_neighbor(cities)   // initial upper bound
-    queue ← [partial tour starting at city 0]
-    while queue not empty:
-        node ← pop_most_promising(queue)
-        if lower_bound(node) ≥ length(best):
-            continue                   // prune branch
-        if node is a complete tour:
-            best ← node
-        else:
-            for each unvisited city c:
-                queue.push(extend(node, c))
+    best ← nearest_neighbor(cities)   // or the pipeline warm-start
+    dfs(path = [city0], unvisited = rest, cost = 0)
     return best
+
+procedure dfs(path, unvisited, cost):
+    if unvisited is empty:
+        best ← min(best, cost + d(last, city0))
+        return
+    mst ← minimum_spanning_tree({city0} ∪ unvisited)
+    for c in sort_by(cost + d(last, c) + mst):
+        if cost + d(last, c) + mst ≥ length(best):
+            break
+        dfs(path + [c], unvisited \ {c}, cost + d(last, c))
 ```
 
 ## Usage
@@ -73,3 +61,9 @@ teeline solve branch_bound -i ./data/discopt/tsp_5_1.tsp --verbose
 
 - [EECS 281: Backtracking and Branch & Bound (YouTube)](https://www.youtube.com/watch?v=hNs7G1b2iFY&t=5480s)
 - [GeeksForGeeks article](https://www.geeksforgeeks.org/traveling-salesman-problem-using-branch-and-bound-2/)
+
+## Changelog
+
+| Version | Date | Change |
+| --- | --- | --- |
+| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Exact by default: removed the `n_nearest` candidate restriction that made the default a beam search, and added the 24-city exact-input guard. `--n_nearest` is now ignored. Tier A returns the published optima — burma14 **3323**, gr17 **2085**, ulysses16 **6859** — instead of 3651 / 2187 / 6909. |

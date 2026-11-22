@@ -72,7 +72,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 | File                      | Algorithm                                                                                                                                                                        | Alias          |
 | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
 | `bellman_karp.rs`         | Bellman–Held–Karp (exact, exponential)                                                                                                                                           | `bhk`          |
-| `branch_bound.rs`         | Branch and bound (exact)                                                                                                                                                         | —              |
+| `branch_bound.rs`         | Branch and bound (exact by default; ignores `n_nearest`)                                                                                                                         | —              |
 | `nearest_neighbor.rs`     | Greedy nearest neighbor via KD-tree                                                                                                                                              | `nn`           |
 | `two_opt.rs`              | 2-opt local search                                                                                                                                                               | `2opt`         |
 | `stochastic_hill.rs`      | Hill climbing with random restarts                                                                                                                                               | —              |
@@ -108,7 +108,7 @@ cat ./data/tsplib/berlin52.tsp | ./target/debug/teeline solve nn
 ## Important Notes
 
 - The CLI binary is produced by the `teeline-cli` workspace member (`cargo build -p teeline-cli`). The binary is named `teeline` (at `target/debug/teeline` and `target/release/teeline`). Any older `target/release/bin` is a stale artifact from before the workspace split — ignore it.
-- `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity — don't use them on datasets larger than ~30 cities.
+- `bellman_karp` and `branch_bound` are exact algorithms with factorial/exponential complexity. The dispatcher rejects inputs above 24 cities (`EXACT_MAX_CITIES`).
 - TSPLIB parsing normalizes all keys to uppercase and lowercases metadata values; city coordinates are stored as `f32`.
 - `DistanceSource::is_coordinate_metric()` means "distances are computed from these coordinates" — it is `false` for every EXPLICIT matrix, even when the file supplies `DISPLAY_DATA_SECTION`. `two_opt`/`or_opt` use it to stay on the exact full scan. `TspLibData.has_real_coordinates` is the separate "the file supplied coordinates" flag.
 - `teeline convert` converts DiscOpt coordinate files (first line ignored, remaining lines are `x y` pairs) to TSPLIB EUC_2D format. It replaces the old `convert2tsplib.py` script.
@@ -130,6 +130,23 @@ needed, put it next to the code it explains and point at the specific thing that
 
 Historical narrative does not belong in source comments — if a bug's story matters, the task,
 PR description or commit message is the place for it.
+
+## Algorithm pages & changelogs
+
+A solver's page under `docs/algorithms/` is part of its contract. Any change that alters
+observable behaviour — default parameters, search semantics, output quality, determinism,
+registration, or a guard that rejects inputs — must update that page in the same PR:
+
+- Bump the `version` in the page frontmatter. Follow the rule in
+  `teeline-web/src/content.config.ts`: a behaviour-changing rewrite bumps the major;
+  smaller corrections use minor or patch.
+- Add a `## Changelog` row with the date and the user-visible change, including new
+  benchmark numbers when the change affects them.
+- Keep the description, options, usage and benchmark notes consistent with the new
+  behaviour. Removed or ignored flags must be documented as such.
+
+The changelog is where behavioural history belongs; source comments carry only the
+non-obvious *why* (see Code Comments).
 
 ## teeline-web WASM Development Gotcha
 

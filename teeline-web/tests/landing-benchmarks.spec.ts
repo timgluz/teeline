@@ -122,8 +122,8 @@ test.describe('landing benchmark chart', () => {
     await expect(section).toBeVisible()
     await expect(section).toContainText('gap from the known optimum')
     await expect(section).toContainText('Metaheuristic 300 s')
-    // branch_bound publishes two configs, so it is two points but one solver; gsa only timed
-    // out, so it is counted rather than plotted.
+    // The synthetic fixture gives branch_bound two configs, so it is two points but one
+    // solver; gsa only timed out, so it is counted rather than plotted.
     await expect(section).toContainText('6 solvers · 7 results')
     await expect(section).toContainText('not plotted: 1 did not finish')
     // Shuffle leaves a gap an order of magnitude larger than the rest, so it is named above

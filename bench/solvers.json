@@ -27,7 +27,7 @@
       "family": "exact",
       "deterministic": true,
       "doc": "branch-bound",
-      "notes": "Default `n_nearest=3` restricts branching to the 3 nearest cities, which makes it a BEAM SEARCH, not an exact solver: measured burma14 3651 / gr17 2187 / ulysses16 6909 against known optima 3323 / 2085 / 6859. With `--n_nearest 100` it returns all three optima. Output is reproducible across runs (identical over 3 invocations of each instance). Benchmark both configs: `default` (n_nearest=3) and `exact` (--n_nearest 100).",
+      "notes": "Exact by default: every unvisited city is a candidate and `n_nearest` is ignored, so the search cannot silently degrade into a beam search. Exponential worst case; the dispatcher rejects inputs above 24 cities (EXACT_MAX_CITIES). Seeded from the pipeline's NN tour as an upper bound. Measured optimal on burma14/gr17/ulysses16 and reproducible across 3 invocations of each instance.",
       "deterministic_method": "measured",
       "determinism_evidence": {
         "instance": "burma14/gr17/ulysses16",
@@ -35,8 +35,7 @@
         "outcome": "identical"
       },
       "default_configs": [
-        "default",
-        "exact"
+        "default"
       ]
     },
     {

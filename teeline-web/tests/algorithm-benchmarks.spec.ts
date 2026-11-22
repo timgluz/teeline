@@ -319,8 +319,10 @@ test.describe('algorithm benchmark section', () => {
     // Different families: both allowances are stated, because their gaps are not like-for-like.
     await expect(section).toContainText('different families')
 
-    // branch_bound publishes an `exact` config that 2opt does not: it must not be paired with
-    // 2opt's budget run, so 2opt's own row stays the only thing in those columns.
+    // The branch_bound fixture has an `exact` config that 2opt does not: it must not be
+    // paired with 2opt's budget run, so 2opt's own row stays the only thing in those columns.
+    // (The fixture deliberately keeps two configs to exercise this mechanism; the live shard
+    // now publishes a single exact `budget` config.)
     await expect(section.locator('tfoot tr').nth(1)).toContainText(
       'Branch & Bound',
     )

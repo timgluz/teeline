@@ -243,7 +243,7 @@ done
 | Algorithm | Alias | Type | Docs |
 | ----------- | ------- | ------ | ------ |
 | Bellman–Held–Karp | `bhk` | exact | [→](docs/algorithms/bellman-held-karp.md) |
-| Branch and Bound | `branch_bound` | exact | [→](docs/algorithms/branch-bound.md) |
+| Branch and Bound | `branch_bound` | exact — ignores `n_nearest` | [→](docs/algorithms/branch-bound.md) |
 | Nearest Neighbor | `nn` | heuristic — constructive | [→](docs/algorithms/nearest-neighbor.md) |
 | Christofides | `christofides`, `chr` | heuristic — constructive | [→](docs/algorithms/christofides.md) |
 | Greedy Edge | `greedy_edge`, `gec` | heuristic — constructive | [→](docs/algorithms/greedy-edge.md) |
@@ -333,7 +333,7 @@ teeline pipeline --steps=nn,sa --epochs=5000 --cooling_rate=0.005 \
     -i ./data/tsplib/berlin52.tsp
 ```
 
-Constructive solvers (`nn`, `bhk`, `branch_bound`) ignore `initial_tour` and are best placed first. A warning is printed if `nn` appears at a non-first position, as it would discard the warm-start seed.
+Constructive solvers (`nn`, `bhk`) ignore `initial_tour` and are best placed first. `branch_bound` consumes it as an upper bound, so `pipeline(nn, branch_bound)` is the intended warm start. A warning is printed if `nn` appears at a non-first position, as it would discard the warm-start seed.
 
 ---
 

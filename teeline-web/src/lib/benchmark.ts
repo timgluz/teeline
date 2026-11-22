@@ -434,9 +434,9 @@ function parseLeaderboard(raw: unknown): LeaderboardEntry[] {
   return raw.map((value, i) => {
     const entry = asRecord(value, `leaderboard[${i}]`)
     return {
-      // A solver may appear more than once (branch_bound publishes `budget` and `exact`):
-      // these are (solver, config) rows, not solvers, and collapsing them would present a
-      // beam search and an exact run as one entry.
+      // A solver may appear more than once when it publishes several configs: these are
+      // (solver, config) rows, not solvers, and collapsing them would present two
+      // different experiments as one entry.
       solver: asString(entry.solver, `leaderboard[${i}].solver`),
       config: optionalString(entry.config) ?? 'default',
       runs: asNumber(entry.runs, `leaderboard[${i}].runs`),
@@ -931,10 +931,10 @@ export interface ComparisonPair {
 /**
  * Pair two solvers' rows by (instance, config).
  *
- * The key is the pair, not the instance: `branch_bound` publishes `budget` and `exact`, which
- * answer different questions, so a row matches only when the config matches too. A comparator
- * that publishes no such config reads as "not measured" rather than borrowing a number from
- * another config, which would compare two experiments and call it a comparison of algorithms.
+ * The key is the pair, not the instance: a solver may publish several configs that answer
+ * different questions, so a row matches only when the config matches too. A comparator that
+ * publishes no such config reads as "not measured" rather than borrowing a number from another
+ * config, which would compare two experiments and call it a comparison of algorithms.
  */
 export function pairRows(
   primary: BenchmarkRow[],

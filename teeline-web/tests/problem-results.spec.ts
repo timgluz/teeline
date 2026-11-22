@@ -112,7 +112,9 @@ test.describe('problem page leaderboard', () => {
     await openLeaderboard(page, fixture('problem-synthetic.json'))
 
     const section = page.locator('#results')
-    // branch_bound publishes `budget` and `exact`: two rows, so the config column appears.
+    // The synthetic fixture gives branch_bound `budget` and `exact`: two rows, so the
+    // config column appears. (This exercises the multi-config mechanism; the live shard
+    // now publishes a single exact `budget` config.)
     await expect(
       section.getByRole('columnheader', { name: 'Config' }),
     ).toBeVisible()

@@ -88,20 +88,25 @@ fn fourier_and_som_return_valid_tours_on_gr17() {
 }
 
 #[test]
-fn branch_bound_returns_a_valid_tour_on_gr17() {
+fn branch_bound_returns_the_gr17_optimum_from_a_derived_layout() {
     let problem = load("gr17.tsp").to_problem(DistanceBackend::Auto).unwrap();
+    // branch_bound is exact by default now, so an unseeded solve in a debug
+    // build is unnecessarily slow. Seed the upper bound the way the pipeline does.
+    let seed = nearest_neighbor::solve(&problem, &HeuristicOptions::default(), None, None);
     let solution = branch_bound::solve(
         &problem,
-        &HeuristicOptions {
-            n_nearest: 3,
-            ..Default::default()
-        },
+        &HeuristicOptions::default(),
         None,
-        None,
+        Some(seed.route()),
     );
     assert!(
         is_valid(solution.route(), &problem),
         "branch_bound tour is invalid"
+    );
+    assert!(
+        (solution.total - 2085.0).abs() < 1e-3,
+        "branch_bound should return gr17's optimum 2085, got {}",
+        solution.total
     );
 }
 
