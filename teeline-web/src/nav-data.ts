@@ -106,6 +106,9 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   },
 }
 
+/** Every algorithm with a docs page and a nav entry; the single source for the count. */
+export const ALGORITHM_COUNT = Object.keys(SOLVER_META).length
+
 export interface SolverGroup {
   label: string
   ids: string[]

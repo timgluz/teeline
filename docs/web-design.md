@@ -65,7 +65,8 @@ Tailwind utility classes. **Never** invent new hex values for a page; reuse the 
 
 One animated thing per page, and only when it communicates state:
 
-- The hero route solving itself on a loop (already implemented in `hero-canvas.ts`).
+- The hero route solving itself: a fresh random tour is untangled by 2-opt, held for 5 s,
+  then reshuffled (`hero-canvas.ts`). Frames are paced by elapsed time, not refresh rate.
 - Status dots pulsing (live indicator).
 - Hover: border brightens `#232327` → `#3A3A40`, background lifts one surface step.
   No scale transforms, no glow blooms.
