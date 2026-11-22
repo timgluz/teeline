@@ -36,6 +36,7 @@ fn move_toward(
     target: &[usize],
     fraction: f64,
     rng: &mut impl RngExt,
+    used: &mut HashSet<usize>,
 ) -> Vec<usize> {
     let n = cur.len();
     if n < 4 {
@@ -45,7 +46,7 @@ fn move_toward(
     let start = rng.random_range(0..n);
 
     let mut child = vec![usize::MAX; n];
-    let mut used = HashSet::with_capacity(seg_len);
+    used.clear();
     for k in 0..seg_len {
         let idx = (start + k) % n;
         child[idx] = target[idx];
@@ -95,9 +96,15 @@ pub fn solve(
     let mut rng = rand::rng();
     let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
 
-    // One candidate list for all constructive seeds. A failure (for example an input
-    // without usable coordinates) just leaves that half of the swarm random.
-    let candidates = CandidateList::build(cities, MIN_CANDIDATE_K).ok();
+    // One candidate list for all constructive seeds. Coordinate metrics rank by the
+    // KD-tree; EXPLICIT inputs rank by the exact distance source, because their layout is
+    // a display aid (or a derived embedding), not the objective.
+    let candidates = if distances.is_coordinate_metric() {
+        CandidateList::build(cities, MIN_CANDIDATE_K)
+    } else {
+        CandidateList::build_from_distances(distances.as_ref(), cities, MIN_CANDIDATE_K)
+    }
+    .ok();
 
     let mut tours: Vec<Vec<usize>> = Vec::with_capacity(n_particles);
     for idx in 0..n_particles {
@@ -153,6 +160,9 @@ pub fn solve(
     // Starts true so the first epoch runs, then carries the previous epoch's result into the
     // budget — one decision point for both the cap and the convergence threshold.
     let mut improved = true;
+    // Reused by every move; the set's capacity survives across epochs, so the hot loop does
+    // not allocate one per crossover.
+    let mut used = HashSet::with_capacity(MIN_CANDIDATE_K.max(8));
 
     while budget.record(improved) {
         let epoch = budget.index();
@@ -167,8 +177,8 @@ pub fn solve(
             // Cognitive, then social. Each move is recomputed from the current tour: a swap
             // list computed against the pre-cognitive tour would be applied at ranks the
             // first move had already shifted.
-            let cog = move_toward(&tours[i], &pbest[i], C1 * r1, &mut rng);
-            let mut next = move_toward(&cog, &gbest, C2 * r2, &mut rng);
+            let cog = move_toward(&tours[i], &pbest[i], C1 * r1, &mut rng, &mut used);
+            let mut next = move_toward(&cog, &gbest, C2 * r2, &mut rng, &mut used);
             perturb(&mut next, w, &mut rng);
             tours[i] = next;
 
@@ -277,7 +287,8 @@ mod tests {
         let mut rng = rand::rngs::StdRng::seed_from_u64(7);
         let cur = vec![0, 1, 2, 3, 4, 5];
         let target = vec![3, 4, 5, 0, 1, 2];
-        let child = move_toward(&cur, &target, 0.5, &mut rng);
+        let mut used = HashSet::new();
+        let child = move_toward(&cur, &target, 0.5, &mut rng, &mut used);
 
         let mut sorted = child.clone();
         sorted.sort();
