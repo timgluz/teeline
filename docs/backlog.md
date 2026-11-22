@@ -12,14 +12,13 @@ Nothing here is a commitment — the list exists so ideas are not lost.
 | 2 | [Tier A benchmark campaign](#2-tier-a-benchmark-campaign) | benchmarks | high | mostly complete |
 | 3 | [Benchmark docs and schema update](#3-benchmark-docs-and-schema-update) | docs | medium | open |
 | 4 | [Benchmark regression history](#4-benchmark-regression-history) | benchmarks | low | open |
-| 5 | [Single-solver benchmark skill](#5-single-solver-benchmark-skill) | tooling | medium | open |
-| 6 | [Lin-Kernighan shared plateau option](#6-lin-kernighan-shared-plateau-option) | solver | medium | open |
-| 7 | [DuckDB blog post](#7-duckdb-blog-post) | blog | medium | open |
-| 8 | [Dedicated CLI e2e workflow](#8-dedicated-cli-e2e-workflow) | ci | medium | open |
-| 9 | [jaq for TOML queries](#9-jaq-for-toml-queries) | testing | low | open |
-| 10 | [Missing optimal tours](#10-missing-optimal-tours) | data | medium | open |
-| 11 | [Progress listener seam](#11-progress-listener-seam) | solver | low | open |
-| 12 | [Passkeys blog — technical recipe](#12-passkeys-blog--technical-recipe) | blog | medium | waiting |
+| 5 | [Lin-Kernighan shared plateau option](#5-lin-kernighan-shared-plateau-option) | solver | medium | open |
+| 6 | [DuckDB blog post](#6-duckdb-blog-post) | blog | medium | open |
+| 7 | [Dedicated CLI e2e workflow](#7-dedicated-cli-e2e-workflow) | ci | medium | open |
+| 8 | [jaq for TOML queries](#8-jaq-for-toml-queries) | testing | low | open |
+| 9 | [Missing optimal tours](#9-missing-optimal-tours) | data | medium | open |
+| 10 | [Progress listener seam](#10-progress-listener-seam) | solver | low | open |
+| 11 | [Passkeys blog — technical recipe](#11-passkeys-blog--technical-recipe) | blog | medium | waiting |
 
 ## 1. Pipeline solver
 
@@ -70,19 +69,7 @@ against an earlier release, but nothing consumes that history yet.
 page, or queryable-only via criteriondb — then verify the retained snapshots are
 sufficient. Do not plot incomparable budgets as one line.
 
-## 5. Single-solver benchmark skill
-
-The cadence is manual and differential: at each release, re-measure only the algorithms
-that changed. That loop warrants a project-local `benchmark-solver` skill.
-
-**Next step:** add `.agents/skills/benchmark-solver/SKILL.md` that builds the release
-binary, runs `scripts/bench-matrix.sh --solver <id>`, folds the rows in, publishes to R2
-and verifies the live data. It must refuse to publish when shared code
-(`distance_matrix`, `kdtree`, `tsplib`, `comparison`, `mod`, `pipeline`, `graph`) has
-changed since the other solvers were measured — otherwise it mixes incomparable numbers
-under one version label.
-
-## 6. Lin-Kernighan shared plateau option
+## 5. Lin-Kernighan shared plateau option
 
 `lin_kernighan` is the last solver not using the shared plateau option. It uses
 `HeuristicOptions::platoo_epochs` (historical misspelling, default 10) as a restart
@@ -94,7 +81,7 @@ disabled). Decide explicitly whether to preserve LK's early-stop default by sett
 `LKOptions::default().stagnation_epochs = 10`, or adopt the convention and change default
 run behaviour.
 
-## 7. DuckDB blog post
+## 6. DuckDB blog post
 
 A post showing how to query the published benchmark data with DuckDB so readers can
 verify claims instead of trusting a chart. A single shard reads over HTTPS; globs over
@@ -103,7 +90,7 @@ HTTP do not, so multi-file queries need an explicit list or a local fetch.
 **Next step:** write the post with every query run against the live tree, including the
 budget/timeout/spread caveats and a worked comparison.
 
-## 8. Dedicated CLI e2e workflow
+## 7. Dedicated CLI e2e workflow
 
 The BATS suite (`tests/e2e/`, ~85 cases) runs only as a step inside `rust.yml`. That
 gives it the Rust workflow's triggers: too broad for `scripts/` changes, and too narrow
@@ -115,7 +102,7 @@ uses `paths` covering `scripts/**`, `tests/**`, `bench/**`, `teeline-cli/**`, `s
 `Taskfile.yml`, `docs/problems/**`, `docs/benchmarks/schema.md` and the workflow itself.
 Remove the suite from `rust.yml` so it runs once per PR.
 
-## 9. jaq for TOML queries
+## 8. jaq for TOML queries
 
 Shell and BATS code reads TOML through `python3` heredocs. `jaq` reads TOML natively, so
 the budget-agreement check in `tests/e2e/bench-matrix.bats` can become a short
@@ -126,7 +113,7 @@ comparison.
 sides so key order cannot make the test flaky. Keep
 `scripts/bench-matrix-plan.py` on `tomllib` — it is program logic, not a query.
 
-## 10. Missing optimal tours
+## 9. Missing optimal tours
 
 25 of the 111 problems publish an optimum but ship no `.opt.tour`, so the web overlay
 silently skips them. Two are Tier A instances (`burma14`, `dsj1000`).
@@ -137,7 +124,7 @@ checked procedure for `data/tsplib/` — `data/` is gitignored and nothing curre
 uploads the `tsplib/` prefix. Add a check that fails when a problem with a known optimum
 has no tour.
 
-## 11. Progress listener seam
+## 10. Progress listener seam
 
 Every solver takes `progress_tx: Option<&mpsc::Sender<ProgressMessage>>` — one identical
 signature across ~24 files, with two consumers (the Qt engine and one test). Replacing it
@@ -149,7 +136,7 @@ listeners, and would retire the test-only iteration counter in
 single `emit`, hot-path cost, whether the Qt channel sits behind an adapter listener),
 then change the signatures in one focused PR.
 
-## 12. Passkeys blog — technical recipe
+## 11. Passkeys blog — technical recipe
 
 The story post ("Passkeys instead of a login provider") is published. The follow-up
 technical recipe is deliberately waiting on feedback.
