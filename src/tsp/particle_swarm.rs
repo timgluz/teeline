@@ -116,14 +116,14 @@ pub fn solve(
             // Half the swarm starts from diverse nearest-neighbour tours; the rest stays
             // random so the population does not collapse onto one basin.
             match &candidates {
-                Some(cands) => {
+                Some(cands) if n_cities >= 4 => {
                     let start = rng.random_range(0..n_cities);
                     randomized_tour(distances.as_ref(), cands, start, 2, &mut rng)
                         .into_iter()
                         .map(|pos| cities[pos].id)
                         .collect()
                 }
-                None => random_tour(&city_ids, &mut rng),
+                _ => random_tour(&city_ids, &mut rng),
             }
         } else {
             random_tour(&city_ids, &mut rng)
