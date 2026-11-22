@@ -73,6 +73,73 @@ export function axisTop(values: number[]): number {
   return ticks[ticks.length - 1]
 }
 
+export interface ChartPoint {
+  x: number
+  y: number
+}
+
+function cross(o: ChartPoint, a: ChartPoint, b: ChartPoint): number {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+}
+
+/**
+ * The outer ring of a point cloud, or an empty list when there is no area to enclose.
+ *
+ * A cluster highlight is a reading aid, not a claim: fewer than three distinct points, or a
+ * set that is perfectly collinear, has no interior, and drawing a hull around it would put a
+ * shape where the data only supports a line.
+ */
+export function convexHull(points: ChartPoint[]): ChartPoint[] {
+  const unique = [
+    ...new Map(
+      points.map((point) => [`${point.x},${point.y}`, point]),
+    ).values(),
+  ]
+  if (unique.length < 3) return []
+
+  const sorted = unique.sort((a, b) => a.x - b.x || a.y - b.y)
+  const lower: ChartPoint[] = []
+  for (const point of sorted) {
+    while (
+      lower.length >= 2 &&
+      cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0
+    ) {
+      lower.pop()
+    }
+    lower.push(point)
+  }
+
+  const upper: ChartPoint[] = []
+  for (let index = sorted.length - 1; index >= 0; index -= 1) {
+    const point = sorted[index]
+    while (
+      upper.length >= 2 &&
+      cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0
+    ) {
+      upper.pop()
+    }
+    upper.push(point)
+  }
+
+  lower.pop()
+  upper.pop()
+  return lower.length + upper.length >= 3 ? [...lower, ...upper] : []
+}
+
+function roundCoordinate(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+/** A closed SVG path around the hull, or an empty string when there is no hull. */
+export function hullPath(points: ChartPoint[]): string {
+  const hull = convexHull(points)
+  if (hull.length < 3) return ''
+  const vertices = hull.map(
+    (point) => `${roundCoordinate(point.x)} ${roundCoordinate(point.y)}`,
+  )
+  return `M${vertices.join(' L')} Z`
+}
+
 export interface LabelRequest {
   text: string
   /** The point the label belongs to, in viewBox units. */

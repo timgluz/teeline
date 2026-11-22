@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'preact/hooks'
 
-import { axisTop, niceTicks, placeLabels } from '../lib/chart-layout'
+import { axisTop, hullPath, niceTicks, placeLabels } from '../lib/chart-layout'
 import {
   FAMILY_COLORS,
   FAMILY_LABELS,
@@ -343,6 +343,18 @@ function Scatter({
   const inRange = points.filter((point) => point.y <= yTop)
   const offScale = points.filter((point) => point.y > yTop)
 
+  // Families are the chart's grouping already (colour and chips); a hull makes the shape of
+  // each group visible without changing what any point claims. Off-scale points are left out:
+  // a hull around a clamped point would draw a boundary the data does not have.
+  const familyClusters = FAMILIES.flatMap((family) => {
+    const path = hullPath(
+      inRange
+        .filter((point) => point.family === family)
+        .map((point) => ({ x: sx(point.wallS), y: sy(point.y) })),
+    )
+    return path ? [{ family, path }] : []
+  })
+
   const labelled = new Set(
     series.labelled.map((entry) => `${entry.solver}/${entry.config}`),
   )
@@ -384,8 +396,29 @@ function Scatter({
         viewBox={`0 0 ${W} ${H}`}
         class="h-auto w-full"
         role="img"
-        aria-label={`Runtime against ${series.axisLabel} on ${series.dataset}`}
+        aria-label={`Runtime against ${series.axisLabel} on ${series.dataset}${
+          familyClusters.length > 0
+            ? '; shaded areas group solvers by family'
+            : ''
+        }`}
       >
+        {/* Behind the grid and the points: a highlight, not a layer the reader has to see past. */}
+        <g aria-hidden="true" pointer-events="none">
+          {familyClusters.map(({ family, path }) => (
+            <path
+              key={family}
+              d={path}
+              fill={FAMILY_COLORS[family]}
+              fill-opacity="0.04"
+              stroke={FAMILY_COLORS[family]}
+              stroke-opacity="0.45"
+              stroke-width="1.25"
+              stroke-dasharray="5 4"
+              stroke-linejoin="round"
+              data-family-cluster={family}
+            />
+          ))}
+        </g>
         {yTicks.map((value) => (
           <g key={`y${value}`}>
             <line
@@ -511,6 +544,12 @@ function Scatter({
           </text>
         ))}
       </svg>
+
+      {familyClusters.length > 0 && (
+        <p class="mt-2 font-mono text-xs text-text-dim">
+          Shaded areas group solvers by family.
+        </p>
+      )}
 
       {hovered && (
         <div

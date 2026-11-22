@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   axisTop,
+  convexHull,
+  hullPath,
   niceTicks,
   placeLabels,
   tailCap,
@@ -33,8 +35,8 @@ describe('niceTicks', () => {
 })
 
 describe('tailCap', () => {
-  // The live berlin52 gaps: fifteen comparable solvers, then four that leave a gap several
-  // times larger and would otherwise flatten the chart.
+  // The berlin52 gaps from before the swarm fix: fifteen comparable solvers, then four that
+  // leave a gap several times larger and would otherwise flatten the chart.
   const BERLIN52_GAPS = [
     0, 2.1612, 2.6386, 7.372, 7.6637, 8.4991, 8.8173, 11.0581, 11.1774, 13.3254,
     14.943, 15.4071, 17.2898, 18.4964, 19.0666, 31.9411, 110.1565, 129.3556,
@@ -84,6 +86,46 @@ describe('axisTop', () => {
 
   it('falls back to a sane axis for no data', () => {
     expect(axisTop([])).toBe(1)
+  })
+})
+
+describe('convexHull', () => {
+  it('keeps the outer ring and drops a point inside it', () => {
+    const hull = convexHull([
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 5, y: 5 },
+    ])
+    expect(hull).toHaveLength(4)
+    expect(hull).not.toContainEqual({ x: 5, y: 5 })
+  })
+
+  it('does not invent an area for a line or a pair', () => {
+    expect(
+      convexHull([
+        { x: 0, y: 0 },
+        { x: 5, y: 5 },
+        { x: 10, y: 10 },
+      ]),
+    ).toEqual([])
+    expect(
+      convexHull([
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+      ]),
+    ).toEqual([])
+  })
+
+  it('writes a closed path for a triangle', () => {
+    expect(
+      hullPath([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 0, y: 10 },
+      ]),
+    ).toBe('M0 0 L10 0 L0 10 Z')
   })
 })
 
