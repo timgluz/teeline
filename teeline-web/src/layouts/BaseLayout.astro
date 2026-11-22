@@ -18,6 +18,9 @@ interface Props {
   path?: string
   ogType?: 'website' | 'article'
   ogDescription?: string
+  // Social cards have much less room than a page title, so a page can supply a
+  // shorter one without changing its <title> or H1.
+  ogTitle?: string
   // Per-page card: the site default is a single brand image, which says nothing about the page it
   // is attached to. When a page passes its own, the dimensions and the Twitter card follow it.
   ogImage?: string
@@ -32,6 +35,7 @@ const {
   path,
   ogType = 'website',
   ogDescription,
+  ogTitle,
   ogImage = DEFAULT_OG_IMAGE,
   ogImageAlt = 'teeline — TSPSolver, find your path',
   ogImageWidth,
@@ -52,14 +56,14 @@ const canonicalUrl = path ? `https://tspsolver.com${path}` : undefined
     <meta name="description" content={description} />
     <meta property="og:type" content={ogType} />
     {canonicalUrl && <meta property="og:url" content={canonicalUrl} />}
-    <meta property="og:title" content={title} />
+    <meta property="og:title" content={ogTitle ?? title} />
     <meta property="og:description" content={ogDescription ?? description} />
     <meta property="og:image" content={ogImage} />
     {resolvedOgWidth && <meta property="og:image:width" content={String(resolvedOgWidth)} />}
     {resolvedOgHeight && <meta property="og:image:height" content={String(resolvedOgHeight)} />}
     <meta property="og:image:alt" content={ogImageAlt} />
     <meta name="twitter:card" content={isDefaultOgImage ? 'summary' : 'summary_large_image'} />
-    <meta name="twitter:title" content={title} />
+    <meta name="twitter:title" content={ogTitle ?? title} />
     <meta name="twitter:description" content={ogDescription ?? description} />
     <meta name="twitter:image" content={ogImage} />
     <meta name="twitter:image:alt" content={ogImageAlt} />
