@@ -62,7 +62,7 @@ The explainer SHALL render the union multigraph of both parents, fade shared edg
 #### Scenario: Shared and unique edges are distinguished
 
 - **WHEN** the visitor reaches the Union Graph stage
-- **THEN** shared edges are muted, A-only edges and B-only edges are drawn in distinct colours, and every active city shows degree two or four
+- **THEN** shared edges are muted, A-only edges and B-only edges are drawn in distinct colours, and the difference edges show degree two at every active city (the union graph degree is two, three, or four)
 
 #### Scenario: Cycles alternate origin
 
@@ -71,8 +71,8 @@ The explainer SHALL render the union multigraph of both parents, fade shared edg
 
 #### Scenario: The fixture has two legible cycles
 
-- **WHEN** the explainer loads its pinned 24-city fixture
-- **THEN** the symmetric difference decomposes into exactly two non-trivial AB-cycles and the parents share at least 60% of their edges
+- **WHEN** the explainer loads its pinned 16-city fixture
+- **THEN** every active city has difference degree two, the symmetric difference decomposes into exactly two non-trivial AB-cycles, and the parents share 68.75% of their edges
 
 ### Requirement: Interactive E-set selection
 
@@ -81,7 +81,7 @@ The explainer SHALL let the visitor select the crossover E-set with `1-AB`, `Ran
 #### Scenario: One-AB selects one cycle
 
 - **WHEN** the visitor selects `1-AB`
-- **THEN** exactly one AB-cycle is active and the others are dimmed
+- **THEN** exactly the pinned cycle C1 is active (the others dimmed), and the explainer notes that the solver picks this cycle at random while the explainer pins it for reproducibility
 
 #### Scenario: Rand selects a seeded subset
 
@@ -106,6 +106,11 @@ The explainer SHALL apply the selected E-set to Parent A as a symmetric differen
 
 - **WHEN** the visitor reaches the Apply E-set stage
 - **THEN** A-edges in the E-set are removed, B-edges in the E-set are added, and every city keeps degree two
+
+#### Scenario: Default selection produces subtours
+
+- **WHEN** the visitor accepts the default `1-AB` selection
+- **THEN** the apply stage yields exactly two subtours, so the patching stage is reachable
 
 #### Scenario: Subtours are colour-coded
 
@@ -162,12 +167,12 @@ The explainer SHALL offer an optional one-move 2-opt preview on the patched chil
 
 ### Requirement: Teaching statistics explain quality preservation
 
-The explainer SHALL display statistics that make edge inheritance legible: shared edges and ratio, AB-cycle count and lengths, E-set size, subtour count, bridges added, child versus parent costs, and the child's edge inheritance (A, B, or new).
+The explainer SHALL display statistics that make edge inheritance legible: shared edges and ratio, AB-cycle count and lengths, E-set size, subtour count, bridges added, child versus parent costs, and the child's edge inheritance as a partition (`shared`, `from A`, `from B`, `new`).
 
 #### Scenario: Edge inheritance is visible
 
 - **WHEN** the final child tour is shown
-- **THEN** the statistics report how many child edges came from A, from B, and were new
+- **THEN** the statistics report how many child edges are shared, from A, from B, and new
 
 #### Scenario: Cost comparison is visible
 
