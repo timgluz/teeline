@@ -2,6 +2,7 @@ use rand::RngExt;
 /// Route is ordered list of city ids that our traveling salesperson
 /// is going to visit
 use rand::seq::SliceRandom;
+use std::collections::HashSet;
 
 use super::kdtree::KDPoint;
 
@@ -23,6 +24,7 @@ impl Route {
         Route { route }
     }
 
+    /// Returns the city ID at route rank `pos` (not a dense city position).
     pub fn get(&self, pos: usize) -> Option<usize> {
         self.route.get(pos).copied()
     }
@@ -99,6 +101,7 @@ fn random_pair(n_items: usize) -> (usize, usize) {
     }
 }
 
+/// Reverses the route segment between two route ranks (a 2-opt move).
 fn swap_cities(route: &mut [usize], from: usize, to: usize) {
     if to >= route.len() {
         panic!("to can not be same or bigger than route size");
@@ -114,9 +117,16 @@ fn swap_cities(route: &mut [usize], from: usize, to: usize) {
 
 /// Greedy swap sequence that transforms `from` into `to`.
 /// Returns `Vec<(pos_i, pos_j)>` of swaps to apply in order.
-/// Both slices must be permutations of the same elements.
+///
+/// Both inputs are **routes** (sequences of city IDs), not position lists; the returned
+/// pairs are route ranks.
 pub fn swap_sequence(from: &[usize], to: &[usize]) -> Vec<(usize, usize)> {
     let n = from.len();
+    assert_eq!(
+        n,
+        to.len(),
+        "swap_sequence: routes must have the same length"
+    );
     let mut tmp = from.to_vec();
     let mut seq: Vec<(usize, usize)> = Vec::new();
     for i in 0..n.saturating_sub(1) {
@@ -133,13 +143,77 @@ pub fn swap_sequence(from: &[usize], to: &[usize]) -> Vec<(usize, usize)> {
     seq
 }
 
-/// Apply an ordered list of `(i, j)` swaps to `position`, returning the result.
-pub fn apply_swaps(position: &[usize], swaps: &[(usize, usize)]) -> Vec<usize> {
-    let mut pos = position.to_vec();
+/// Apply an ordered list of route-rank swaps to a route of city IDs, returning the result.
+pub fn apply_swaps(route: &[usize], swaps: &[(usize, usize)]) -> Vec<usize> {
+    let mut pos = route.to_vec();
     for &(i, j) in swaps {
         pos.swap(i, j);
     }
     pos
+}
+
+/// Fisher-Yates shuffle of `city_ids`; the shared random start for population solvers.
+pub(crate) fn random_tour(city_ids: &[usize], rng: &mut impl RngExt) -> Vec<usize> {
+    let mut tour = city_ids.to_vec();
+    for i in (1..tour.len()).rev() {
+        let j = rng.random_range(0..=i);
+        tour.swap(i, j);
+    }
+    tour
+}
+
+/// Order-crossover move toward `target`: copy a random contiguous segment of `target`
+/// (wrapping around the ends) and fill the rest in `cur`'s relative order.
+///
+/// A transposition can break four edges at once and is blind to tour rotation; this move
+/// keeps the target's edges inside the copied segment and breaks only its junctions.
+/// `used` is caller-owned scratch so a hot loop does not allocate one per move.
+pub(crate) fn move_toward(
+    cur: &[usize],
+    target: &[usize],
+    fraction: f64,
+    rng: &mut impl RngExt,
+    used: &mut HashSet<usize>,
+) -> Vec<usize> {
+    let n = cur.len();
+    if n < 4 {
+        return target.to_vec();
+    }
+    let seg_len = ((fraction * n as f64).round() as usize).clamp(1, n - 1);
+    let start = rng.random_range(0..n);
+
+    let mut child = vec![usize::MAX; n];
+    used.clear();
+    for k in 0..seg_len {
+        let idx = (start + k) % n;
+        child[idx] = target[idx];
+        used.insert(target[idx]);
+    }
+
+    let mut fill = (start + seg_len) % n;
+    for k in 0..n {
+        let city = cur[(start + seg_len + k) % n];
+        if !used.contains(&city) {
+            child[fill] = city;
+            fill = (fill + 1) % n;
+        }
+    }
+
+    child
+}
+
+/// One random 2-opt reversal. Shared by the PSO perturbation and FPA's local pollination.
+pub(crate) fn random_reversal(tour: &mut [usize], rng: &mut impl RngExt) {
+    let n = tour.len();
+    if n < 3 {
+        return;
+    }
+    let a = rng.random_range(0..n);
+    let b = rng.random_range(0..n);
+    let (lo, hi) = if a < b { (a, b) } else { (b, a) };
+    if hi - lo > 1 {
+        tour[lo..=hi].reverse();
+    }
 }
 
 #[cfg(test)]
@@ -199,5 +273,43 @@ mod tests {
         let route2 = route1.random_successor();
 
         assert!(route1.len() == route2.len())
+    }
+
+    #[test]
+    fn test_random_tour_is_a_permutation() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let ids = vec![0, 1, 2, 3, 4, 5];
+        let mut tour = random_tour(&ids, &mut rng);
+        tour.sort();
+        assert_eq!(tour, ids);
+    }
+
+    #[test]
+    fn test_move_toward_returns_a_permutation() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let cur = vec![0, 1, 2, 3, 4, 5];
+        let target = vec![3, 4, 5, 0, 1, 2];
+        let mut used = HashSet::new();
+        let mut child = move_toward(&cur, &target, 0.5, &mut rng, &mut used);
+        child.sort();
+        assert_eq!(child, cur);
+    }
+
+    #[test]
+    fn test_move_toward_copies_a_target_segment() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let cur = vec![0, 1, 2, 3, 4, 5, 6, 7];
+        let target: Vec<usize> = (0..8).rev().collect();
+        let mut used = HashSet::new();
+        let child = move_toward(&cur, &target, 0.5, &mut rng, &mut used);
+
+        let copied = child.iter().zip(&target).filter(|(a, b)| a == b).count();
+        assert!(
+            copied >= 4,
+            "expected at least the 4-city target segment, got {copied}"
+        );
     }
 }

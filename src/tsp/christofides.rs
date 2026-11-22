@@ -1,3 +1,5 @@
+use super::DistanceSource;
+use super::Position;
 use std::sync::mpsc;
 
 use super::progress::ProgressMessage;
@@ -26,11 +28,11 @@ pub fn solve(
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::Done);
         }
-        return Solution::from_parts(&path, cities, distances);
+        return Solution::from_parts(&path, distances.as_ref());
     }
 
     // Step 1: Minimum Spanning Tree via Prim's.
-    let mst_edges = prim_mst(n, distances);
+    let mst_edges = prim_mst(n, distances.as_ref());
 
     // Emit a placeholder progress update so the viz window doesn't appear frozen.
     if let Some(tx) = progress_tx {
@@ -46,17 +48,20 @@ pub fn solve(
     );
 
     // Step 3: Greedy minimum-weight perfect matching on odd-degree nodes.
-    let matching = greedy_matching(&odd, distances, n);
+    let matching = greedy_matching(&odd, distances.as_ref(), n);
 
     // Step 4: Build multigraph (MST edges ∪ matching edges).
     let mut adj = build_multigraph(n, &mst_edges, &matching);
 
     // Step 5: Eulerian circuit via Hierholzer's algorithm.
-    let circuit = hierholzer(&mut adj, 0);
+    let circuit = hierholzer(&mut adj, Position::new(0));
 
     // Step 6: Shortcut repeated cities → Hamiltonian tour.
     let hamiltonian = shortcut(&circuit, n);
-    let path: Vec<usize> = hamiltonian.iter().map(|&pos| cities[pos].id).collect();
+    let path: Vec<usize> = hamiltonian
+        .iter()
+        .map(|pos| cities[pos.into_inner()].id)
+        .collect();
 
     if let Some(tx) = progress_tx {
         let total = distances.tour_length(&path);
@@ -64,7 +69,7 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::Done);
     }
 
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, distances.as_ref())
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +77,7 @@ pub fn solve(
 // ---------------------------------------------------------------------------
 
 /// Returns MST edges as `(pos_a, pos_b)` position-index pairs.
-fn prim_mst(n: usize, distances: &super::distance_matrix::DistanceMatrix) -> Vec<(usize, usize)> {
+fn prim_mst(n: usize, distances: &dyn DistanceSource) -> Vec<(Position, Position)> {
     let mut in_mst = vec![false; n];
     let mut key = vec![f32::MAX; n]; // minimum edge weight to bring each vertex into the tree
     let mut parent = vec![usize::MAX; n];
@@ -94,13 +99,13 @@ fn prim_mst(n: usize, distances: &super::distance_matrix::DistanceMatrix) -> Vec
         in_mst[u] = true;
 
         if parent[u] != usize::MAX {
-            edges.push((u, parent[u]));
+            edges.push((Position::new(u), Position::new(parent[u])));
         }
 
         for v in 0..n {
             if !in_mst[v] {
                 let d = distances
-                    .distance_by_pos(u, v)
+                    .distance_by_pos(Position::new(u), Position::new(v))
                     .expect("city IDs are valid — distance matrix was built from the same cities");
                 if d < key[v] {
                     key[v] = d;
@@ -117,13 +122,16 @@ fn prim_mst(n: usize, distances: &super::distance_matrix::DistanceMatrix) -> Vec
 // Step 2: Odd-degree vertices
 // ---------------------------------------------------------------------------
 
-fn odd_degree_nodes(mst_edges: &[(usize, usize)], n: usize) -> Vec<usize> {
+fn odd_degree_nodes(mst_edges: &[(Position, Position)], n: usize) -> Vec<Position> {
     let mut degree = vec![0u32; n];
     for &(u, v) in mst_edges {
-        degree[u] += 1;
-        degree[v] += 1;
+        degree[u.into_inner()] += 1;
+        degree[v.into_inner()] += 1;
     }
-    (0..n).filter(|&i| degree[i] % 2 == 1).collect()
+    (0..n)
+        .filter(|&i| degree[i] % 2 == 1)
+        .map(Position::new)
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -136,12 +144,12 @@ fn odd_degree_nodes(mst_edges: &[(usize, usize)], n: usize) -> Vec<usize> {
 /// `matched` is indexed by position (0..n), not by index into `odd`, so it is
 /// sized to `n` even though only `odd.len()` positions are relevant.
 fn greedy_matching(
-    odd: &[usize],
-    distances: &super::distance_matrix::DistanceMatrix,
+    odd: &[Position],
+    distances: &dyn DistanceSource,
     n: usize,
-) -> Vec<(usize, usize)> {
+) -> Vec<(Position, Position)> {
     let k = odd.len();
-    let mut pairs: Vec<(f32, usize, usize)> = Vec::with_capacity(k * k / 2);
+    let mut pairs: Vec<(f32, Position, Position)> = Vec::with_capacity(k * k / 2);
     for i in 0..k {
         for j in i + 1..k {
             let d = distances
@@ -156,9 +164,9 @@ fn greedy_matching(
     let mut matched = vec![false; n];
     let mut result = Vec::with_capacity(k / 2);
     for (_, u, v) in pairs {
-        if !matched[u] && !matched[v] {
-            matched[u] = true;
-            matched[v] = true;
+        if !matched[u.into_inner()] && !matched[v.into_inner()] {
+            matched[u.into_inner()] = true;
+            matched[v.into_inner()] = true;
             result.push((u, v));
         }
     }
@@ -171,13 +179,13 @@ fn greedy_matching(
 
 fn build_multigraph(
     n: usize,
-    mst_edges: &[(usize, usize)],
-    matching: &[(usize, usize)],
-) -> Vec<Vec<usize>> {
+    mst_edges: &[(Position, Position)],
+    matching: &[(Position, Position)],
+) -> Vec<Vec<Position>> {
     let mut adj = vec![vec![]; n];
     for &(u, v) in mst_edges.iter().chain(matching.iter()) {
-        adj[u].push(v);
-        adj[v].push(u);
+        adj[u.into_inner()].push(v);
+        adj[v.into_inner()].push(u);
     }
     adj
 }
@@ -194,16 +202,16 @@ fn build_multigraph(
 ///
 /// `start` must be non-isolated (degree ≥ 1). This is guaranteed by the n≥4
 /// guard in `solve()` and the connected MST.
-fn hierholzer(adj: &mut [Vec<usize>], start: usize) -> Vec<usize> {
+fn hierholzer(adj: &mut [Vec<Position>], start: Position) -> Vec<Position> {
     let mut stack = vec![start];
     let mut circuit = Vec::new();
 
     while let Some(&v) = stack.last() {
-        if !adj[v].is_empty() {
-            let u = adj[v].pop().unwrap();
+        if !adj[v.into_inner()].is_empty() {
+            let u = adj[v.into_inner()].pop().unwrap();
             // Remove the reverse half-edge (one occurrence only — multi-edges are valid).
-            if let Some(pos) = adj[u].iter().position(|&x| x == v) {
-                adj[u].swap_remove(pos);
+            if let Some(pos) = adj[u.into_inner()].iter().position(|&x| x == v) {
+                adj[u.into_inner()].swap_remove(pos);
             }
             stack.push(u);
         } else {
@@ -227,13 +235,13 @@ fn hierholzer(adj: &mut [Vec<usize>], start: usize) -> Vec<usize> {
 
 /// Remove repeated position indices from the Eulerian circuit, keeping the
 /// first occurrence of each.  Returns a permutation of 0..n.
-fn shortcut(circuit: &[usize], n: usize) -> Vec<usize> {
+fn shortcut(circuit: &[Position], n: usize) -> Vec<Position> {
     let mut seen = vec![false; n];
     circuit
         .iter()
         .filter(|&&v| {
-            let fresh = !seen[v];
-            seen[v] = true;
+            let fresh = !seen[v.into_inner()];
+            seen[v.into_inner()] = true;
             fresh
         })
         .copied()
@@ -256,6 +264,17 @@ mod tests {
         TspProblem::new(cities, dm)
     }
 
+    fn pos_edges(pairs: &[(usize, usize)]) -> Vec<(Position, Position)> {
+        pairs
+            .iter()
+            .map(|&(u, v)| (Position::new(u), Position::new(v)))
+            .collect()
+    }
+
+    fn positions(indices: &[usize]) -> Vec<Position> {
+        indices.iter().copied().map(Position::new).collect()
+    }
+
     // ------------------------------------------------------------------
     // Step 1: Prim's MST
     // ------------------------------------------------------------------
@@ -264,14 +283,14 @@ mod tests {
     fn prim_mst_has_n_minus_1_edges() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.]]);
         let n = problem.cities.len();
-        let edges = prim_mst(n, &problem.distances);
+        let edges = prim_mst(n, problem.distances.as_ref());
         assert_eq!(edges.len(), n - 1, "MST must have exactly n-1 edges");
         // All positions reachable
         let mut reachable = vec![false; n];
         reachable[0] = true;
         for &(u, v) in &edges {
-            reachable[u] = true;
-            reachable[v] = true;
+            reachable[u.into_inner()] = true;
+            reachable[v.into_inner()] = true;
         }
         assert!(reachable.iter().all(|&r| r), "MST must span all nodes");
     }
@@ -282,7 +301,7 @@ mod tests {
         // Optimal MST is the chain itself; weight = 4.0.
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [3., 0.], [4., 0.]]);
         let n = problem.cities.len();
-        let edges = prim_mst(n, &problem.distances);
+        let edges = prim_mst(n, problem.distances.as_ref());
         let weight: f32 = edges
             .iter()
             .map(|&(u, v)| problem.distances.distance_by_pos(u, v).unwrap())
@@ -300,7 +319,7 @@ mod tests {
     #[test]
     fn odd_degree_count_is_even() {
         // MST: (0-1), (1-2), (1-3) → degrees: 0→1, 1→3, 2→1, 3→1 → odd: {0,1,2,3} = 4, even.
-        let mst = vec![(0, 1), (1, 2), (1, 3)];
+        let mst = pos_edges(&[(0, 1), (1, 2), (1, 3)]);
         let odd = odd_degree_nodes(&mst, 4);
         assert_eq!(
             odd.len() % 2,
@@ -313,10 +332,14 @@ mod tests {
     fn odd_degree_nodes_correct_values() {
         // Path graph: (0-1), (1-2), (2-3)
         // Degrees: 0→1, 1→2, 2→2, 3→1 → odd: {0, 3}
-        let mst = vec![(0, 1), (1, 2), (2, 3)];
+        let mst = pos_edges(&[(0, 1), (1, 2), (2, 3)]);
         let mut odd = odd_degree_nodes(&mst, 4);
         odd.sort_unstable();
-        assert_eq!(odd, vec![0, 3], "endpoints of a path are odd-degree");
+        assert_eq!(
+            odd,
+            positions(&[0, 3]),
+            "endpoints of a path are odd-degree"
+        );
     }
 
     // ------------------------------------------------------------------
@@ -328,18 +351,23 @@ mod tests {
         // 5-node layout; verify each odd-degree node appears exactly once in the matching.
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
-        let mst = prim_mst(n, &problem.distances);
+        let mst = prim_mst(n, problem.distances.as_ref());
         let odd = odd_degree_nodes(&mst, n);
-        let matching = greedy_matching(&odd, &problem.distances, n);
+        let matching = greedy_matching(&odd, problem.distances.as_ref(), n);
 
         // Each odd-degree position must appear exactly once in the matching.
         let mut count = vec![0u32; n];
         for &(u, v) in &matching {
-            count[u] += 1;
-            count[v] += 1;
+            count[u.into_inner()] += 1;
+            count[v.into_inner()] += 1;
         }
         for &pos in &odd {
-            assert_eq!(count[pos], 1, "position {pos} must be matched exactly once");
+            assert_eq!(
+                count[pos.into_inner()],
+                1,
+                "position {} must be matched exactly once",
+                pos.into_inner()
+            );
         }
     }
 
@@ -351,12 +379,12 @@ mod tests {
     fn eulerian_circuit_length_equals_edges_plus_one() {
         let problem = make_problem(&[[0., 0.], [1., 0.], [2., 0.], [1., 1.], [3., 0.]]);
         let n = problem.cities.len();
-        let mst = prim_mst(n, &problem.distances);
+        let mst = prim_mst(n, problem.distances.as_ref());
         let odd = odd_degree_nodes(&mst, n);
-        let matching = greedy_matching(&odd, &problem.distances, n);
+        let matching = greedy_matching(&odd, problem.distances.as_ref(), n);
         let total_edges = mst.len() + matching.len();
         let mut adj = build_multigraph(n, &mst, &matching);
-        let circuit = hierholzer(&mut adj, 0);
+        let circuit = hierholzer(&mut adj, Position::new(0));
         assert_eq!(
             circuit.len(),
             total_edges + 1,
@@ -371,7 +399,7 @@ mod tests {
     #[test]
     fn shortcut_removes_duplicates() {
         // Circuit visits position 1 twice — shortcut keeps first occurrence.
-        let circuit = vec![0, 1, 3, 4, 2, 1, 0];
+        let circuit = positions(&[0, 1, 3, 4, 2, 1, 0]);
         let n = 5;
         let tour = shortcut(&circuit, n);
         assert_eq!(tour.len(), n, "shortcut must produce n-city tour");
@@ -379,7 +407,7 @@ mod tests {
         sorted.sort_unstable();
         assert_eq!(
             sorted,
-            vec![0, 1, 2, 3, 4],
+            positions(&[0, 1, 2, 3, 4]),
             "tour must be a permutation of 0..n"
         );
     }

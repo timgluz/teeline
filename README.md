@@ -86,7 +86,7 @@ A shell installer is also available:
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/timgluz/teeline/releases/latest/download/teeline-cli-installer.sh | sh
 ```
 
-Each release also includes `teeline-solver.wasm` — the WebAssembly component built with `cargo-component`.
+Each release also includes `teeline-solver.wasm` — the WebAssembly component built with `cargo-component`. The [web solver](https://www.tspsolver.com/solve/) downloads that asset from the latest release and redeploys automatically after a successful Release workflow; the `teeline-solver <version>` label is the `teeline-wasm` crate version.
 
 ### Shell completions
 
@@ -247,6 +247,7 @@ done
 | Nearest Neighbor | `nn` | heuristic — constructive | [→](docs/algorithms/nearest-neighbor.md) |
 | Christofides | `christofides`, `chr` | heuristic — constructive | [→](docs/algorithms/christofides.md) |
 | Greedy Edge | `greedy_edge`, `gec` | heuristic — constructive | [→](docs/algorithms/greedy-edge.md) |
+| Space-Filling Curve | `space_filling_curve`, `sfc`, `hilbert` | heuristic — constructive | [→](docs/algorithms/space-filling-curve.md) |
 | Fourier | `fourier` | heuristic — constructive | [→](docs/algorithms/fourier.md) |
 | Kohonen SOM | `som` | heuristic — constructive | [→](docs/algorithms/som.md) |
 | 2-opt | `2opt` | heuristic — local search | [→](docs/algorithms/two-opt.md) |
@@ -257,6 +258,7 @@ done
 | Simulated Annealing | `sa` | heuristic — local search | [→](docs/algorithms/simulated-annealing.md) |
 | Tabu Search | `tabu_search`, `tabu` | heuristic — local search | [→](docs/algorithms/tabu-search.md) |
 | Genetic Algorithm | `ga` | heuristic — evolutionary | [→](docs/algorithms/genetic-algorithm.md) |
+| Memetic EAX | `memetic_eax`, `memetic`, `eax` | heuristic — evolutionary | [→](docs/algorithms/memetic-eax.md) |
 | Particle Swarm | `pso` | heuristic — swarm | [→](docs/algorithms/particle-swarm.md) |
 | Gravitational Search | `gsa` | heuristic — swarm / physics | [→](docs/algorithms/gravitational-search.md) |
 | Cuckoo Search | `cs` | heuristic — nature-inspired | [→](docs/algorithms/cuckoo-search.md) |
@@ -264,6 +266,10 @@ done
 | Ant Colony Optimization | `ant_colony`, `aco` | heuristic — nature-inspired | [→](docs/algorithms/ant-colony.md) |
 
 Exact algorithms find the provably optimal tour but have exponential complexity — do not use on more than ~20 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics. (`savings`/`sav` is implemented but not yet documented.)
+
+### Large coordinate instances
+
+`sfc` is the intended 100k-city path: it never builds a distance matrix, and coordinate input above 20,000 cities selects the on-the-fly backend under the default `--distance-backend auto` policy. A 100k synthetic run takes about 0.23 s with 21 MB peak RSS. See [the SFC large-instance section](docs/algorithms/space-filling-curve.md#large-instances) and the [distance-source benchmarks](docs/benchmarks/distance-source.md). Other solvers remain O(n²) in memory or time, so the 100k claim is specific to `sfc`.
 
 ## Pipeline
 
@@ -279,7 +285,8 @@ Auto-expansion strategy depends on the solver type:
 | --- | --- | --- |
 | **Deterministic local search** (2opt, 3opt, tabu, or_opt, lk, branch_bound) | `pipeline(nn, solver)` | Monotone hill-climbers (and B&B's upper bound) benefit from a good start |
 | **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa, gsa, fourier, aco) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
-| **Constructive** (nn, christofides, greedy_edge, bhk) | no expansion | They build a tour from scratch |
+| **Constructive** (nn, christofides, greedy_edge, sfc, bhk) | no expansion | They build a tour from scratch |
+| **Self-seeding population** (eax) | no expansion | It builds its own diverse population; a single seed would reduce diversity |
 
 ```bash
 # sa auto-expands to pipeline(shuffle, sa)
@@ -511,7 +518,7 @@ In short:
 3. Add tests — unit tests go inline with the source file; library integration tests go in `tests/`; CLI end-to-end tests go in `tests/e2e/` as BATS scripts.
 4. Open a pull request and wait for a code review.
 
-When adding a new solver, follow the pattern of the existing ones: a `solve(cities: &[KDPoint], distances: &DistanceMatrix, options: &SolverOptions) -> Solution` function in its own file under `src/tsp/`, then register it in four places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, the `tsp::solve` dispatch match arm, and `Solvers::all_meta()` (the catalogue used by the `solvers` subcommand). The WASM surface picks it up automatically.
+When adding a new solver, follow the pattern of the existing ones: a `solve` function taking `&TspProblem` (which carries the cities and the `DistanceSource`) plus that solver's options, in its own file under `src/tsp/`, then register it in four places in `src/tsp/mod.rs`: the `Solvers` enum, the `FromStr` impl, the `tsp::solve` dispatch match arm, and `Solvers::all_meta()` (the catalogue used by the `solvers` subcommand). The WASM surface picks it up automatically.
 
 ---
 

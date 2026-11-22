@@ -44,6 +44,8 @@ PUBLIC_BASE="${PUBLIC_BASE:-https://static.tspsolver.com}"
 FETCH_PREVIOUS=1
 FORCE_SNAPSHOT=0
 FIRST_PUBLISH=0
+declare -a SOLVER_FILTER=()
+MERGE_LEADERBOARDS=0
 PREVIOUS_EXPLICIT=0
 CRITERIONDB_URL="${CRITERIONDB_URL:-http://127.0.0.1:8080}"
 CRITERIONDB_PROJECT="${CRITERIONDB_PROJECT:-default}"
@@ -65,6 +67,9 @@ Options:
   --first-publish      Confirm there is no previous tree and this run covers everything
   --budgets <path>     Per-family budgets file (default: bench/budgets.json)
   --only <sink>        r2 | criteriondb | both (default: both)
+  --solver <id>        Publish only this solver (repeatable). Leaves the problem
+                       leaderboards untouched unless --merge-leaderboards.
+  --merge-leaderboards Rebuild the problem leaderboards in a single-solver publish.
   --bucket <name>      R2 bucket name (default: $CF_R2_BUCKET)
   --require-clean      Refuse to publish unless the working tree is clean (CI use)
   --dry-run            Build and validate everything, upload nothing
@@ -86,6 +91,8 @@ while [[ $# -gt 0 ]]; do
     --first-publish) FIRST_PUBLISH=1; shift ;;
     --budgets) BUDGETS="${2:?}"; shift 2 ;;
     --only) ONLY="${2:?}"; shift 2 ;;
+    --solver) SOLVER_FILTER+=("${2:?}"); shift 2 ;;
+    --merge-leaderboards) MERGE_LEADERBOARDS=1; shift ;;
     --bucket) CF_R2_BUCKET="${2:?}"; shift 2 ;;
     --require-clean) REQUIRE_CLEAN=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -98,6 +105,26 @@ case "$ONLY" in
   r2|criteriondb|both) ;;
   *) echo "--only must be r2, criteriondb or both (got '$ONLY')" >&2; exit 2 ;;
 esac
+
+# A --solver publish is the between-releases path: one algorithm's shard is refreshed so its
+# page keeps rendering, while the full-suite problem leaderboards stay as the last complete
+# sweep left them. Rebuilding them from a one-solver measurement would rank incomparable
+# versions together. --merge-leaderboards opts back in when that is deliberate.
+SKIP_PROBLEMS=0
+if [[ ${#SOLVER_FILTER[@]} -gt 0 ]]; then
+  if [[ "$FIRST_PUBLISH" -eq 1 ]]; then
+    echo "ERROR: --solver needs a previous tree to merge with; drop --first-publish." >&2
+    exit 2
+  fi
+  if [[ "$MERGE_LEADERBOARDS" -eq 0 ]]; then
+    SKIP_PROBLEMS=1
+  fi
+  if [[ -n "$SNAPSHOT_TAG" && "$SKIP_PROBLEMS" -eq 1 ]]; then
+    echo "ERROR: --snapshot must be a complete tree; add --merge-leaderboards or drop --snapshot." >&2
+    exit 2
+  fi
+fi
+SOLVER_FILTER_CSV="$(IFS=,; echo "${SOLVER_FILTER[*]}")"
 
 if [[ -z "$RUNS" ]]; then
   if [[ -z "$TIER" ]]; then
@@ -309,7 +336,8 @@ mkdir -p "$STAGE/v2/algorithms" "$STAGE/v2/problems"
 
 python3 - "$RUNS" "$STAGE/v2" "$GIT_COMMIT" "$DIRTY" "$TEELINE_VERSION" \
           "$RUST_VERSION" "$GENERATED_AT" "$TIER" "$BUILD_PROFILE" \
-          "$PREVIOUS_ARG" "$BUDGETS" "$SNAPSHOT_TAG" "$PREFIX" <<'PY'
+          "$PREVIOUS_ARG" "$BUDGETS" "$SNAPSHOT_TAG" "$PREFIX" \
+          "$SOLVER_FILTER_CSV" "$SKIP_PROBLEMS" <<'PY'
 """Transform a JSONL benchmark run log into the docs/benchmarks/schema.md v2 contract.
 
 Statistics use the median as the headline (robust to the heavy right tail that
@@ -330,8 +358,10 @@ from pathlib import Path
 (
     runs_path, out_dir, git_commit, dirty, teeline_version,
     rust_version, generated_at, tier, build_profile,
-    previous_dir, budgets_path, snapshot_tag, prefix,
-) = sys.argv[1:14]
+    previous_dir, budgets_path, snapshot_tag, prefix, solver_filter_raw, skip_problems_raw,
+) = sys.argv[1:16]
+solver_filter = {s for s in solver_filter_raw.split(",") if s}
+skip_problems = skip_problems_raw == "1"
 
 ROOT = Path.cwd()
 # Field requirements are enforced per row below rather than through column lists: a run that
@@ -512,8 +542,14 @@ with open(runs_path, "r", encoding="utf-8") as fh:
             sys.exit(f"ERROR: {runs_path}:{lineno}: missing required field(s): {', '.join(absent)}")
 
         # Normalised to the canonical id here, so the agreement check below and every later
-        # lookup see one solver however the log spelled it.
-        solver = canonical_solver(str(obj["solver"]), lineno)
+        # lookup see one solver however the log spelled it. A --solver run skips the other
+        # solvers before validating them: their rows are irrelevant to this publish.
+        raw_solver = str(obj["solver"])
+        if solver_filter:
+            entry = solver_entry(raw_solver)
+            if entry is None or entry["id"] not in solver_filter:
+                continue
+        solver = canonical_solver(raw_solver, lineno)
         dataset = str(obj["dataset"])
 
         # `or` would turn a falsy-but-wrong value (0, "", false, []) into the default, which is
@@ -546,6 +582,17 @@ with open(runs_path, "r", encoding="utf-8") as fh:
                 f"{', '.join(STATUSES)}; got {status!r}"
             )
 
+        raw_layout = obj.get("layout")
+        if raw_layout is None:
+            layout = None
+        elif raw_layout in ("real", "derived"):
+            layout = raw_layout
+        else:
+            sys.exit(
+                f"ERROR: {runs_path}:{lineno}: 'layout' must be 'real' or 'derived', "
+                f"got {raw_layout!r}"
+            )
+
         run_no = obj.get("run")
         if isinstance(run_no, bool) or not isinstance(run_no, int):
             sys.exit(f"ERROR: {runs_path}:{lineno}: 'run' must be an integer, got {run_no!r}")
@@ -569,6 +616,7 @@ with open(runs_path, "r", encoding="utf-8") as fh:
             "config": config,
             "run": run_no,
             "status": status,
+            "layout": layout,
             # Only a completed run has numbers. A killed run has no tour to report, and
             # demanding one would force the harness to invent a 0 — the fabricated measurement
             # this parser exists to refuse. Non-ok rows are carried with nulls and are counted
@@ -591,6 +639,11 @@ with open(runs_path, "r", encoding="utf-8") as fh:
         rows.append(entry)
 
 if not rows:
+    if solver_filter:
+        sys.exit(
+            f"ERROR: {runs_path} has no rows for solver(s): "
+            f"{', '.join(sorted(solver_filter))}"
+        )
     sys.exit(f"ERROR: {runs_path} contains no runs")
 
 # Each solver's shard gets one `measurement` block, so it is built from the rows that
@@ -620,18 +673,23 @@ except FileNotFoundError:
 
 OPTIMAL_RE = re.compile(r"^optimalCost:\s*(.+)$", re.M)
 CITIES_RE = re.compile(r"^cities:\s*(\d+)$", re.M)
+MINIMAP_DERIVED_RE = re.compile(r"^minimapDerived:\s*(true|false)\s*$", re.M | re.I)
 
 instances = {}
 for doc in sorted((ROOT / "docs" / "problems").glob("*.md")):
     text = doc.read_text(encoding="utf-8")
     m_opt = OPTIMAL_RE.search(text)
     m_cit = CITIES_RE.search(text)
+    m_der = MINIMAP_DERIVED_RE.search(text)
     raw = m_opt.group(1).strip() if m_opt else "null"
     optimal = None if raw in ("null", "~", "") else float(raw)
     instances[doc.stem] = {
         "id": doc.stem,
         "cities": int(m_cit.group(1)) if m_cit else None,
         "optimal_cost": optimal,
+        # The minimap caption already distinguishes a derived layout; the benchmark rows
+        # reuse the same fact when the raw log does not carry one.
+        "layout": "derived" if m_der and m_der.group(1).lower() == "true" else "real",
     }
 
 # --- aggregate -------------------------------------------------------------
@@ -669,8 +727,12 @@ per_problem = defaultdict(list)
 
 for (sid, dataset, config), bucket in sorted(cells.items()):
     ok = bucket["ok"]
-    meta = instances.get(dataset, {"id": dataset, "cities": None, "optimal_cost": None})
+    meta = instances.get(
+        dataset, {"id": dataset, "cities": None, "optimal_cost": None, "layout": "real"}
+    )
     optimal = meta["optimal_cost"]
+    row_layout = next((r["layout"] for r in ok if r.get("layout")), None)
+    layout = row_layout or meta.get("layout", "real")
 
     gaps = []
     if optimal:
@@ -691,12 +753,14 @@ for (sid, dataset, config), bucket in sorted(cells.items()):
         entry["peak_rss_kb"] = rss
     if optimal is not None:
         entry["optimal_cost"] = optimal
+    entry["layout"] = layout
 
     slot = per_solver[sid]
     slot["configs"].add(config)
     problem = slot["results"].setdefault(dataset, {
         "cities": meta["cities"],
         "optimal_cost": optimal,
+        "layout": layout,
         "by_config": {},
     })
     problem["by_config"][config] = entry
@@ -704,6 +768,7 @@ for (sid, dataset, config), bucket in sorted(cells.items()):
     per_problem[dataset].append({
         "solver": sid,
         "config": config,
+        "layout": entry["layout"],
         "runs": entry["runs"],
         "timeouts": entry["timeouts"],
         "errors": entry["errors"],
@@ -819,7 +884,14 @@ def rank_key(b: dict):
     )
 
 final_problems: dict = {}
-for dataset in sorted(set(prev_problems) | set(per_problem)):
+if skip_problems:
+    # A single-solver publish must not re-rank full-suite leaderboards from one
+    # measurement: carry the previous problem shards over untouched.
+    final_problems = prev_problems
+
+for dataset in (
+    [] if skip_problems else sorted(set(prev_problems) | set(per_problem))
+):
     if dataset in per_problem:
         # Every entry is kept, including one whose runs all timed out; only the ranking
         # excludes it, by sorting it last.
@@ -830,13 +902,16 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
             if b.get("solver") not in measured
         ]
         board = kept + fresh
+        fresh_layout = next((b["layout"] for b in fresh if b.get("layout")), None)
         # Fall back to the previous instance metadata: a dataset with no problem doc still has
         # a known city count and possibly an optimal, and nulling them loses real information.
         if dataset in instances:
             cities, optimal = instances[dataset]["cities"], instances[dataset]["optimal_cost"]
+            layout = fresh_layout or instances[dataset]["layout"]
         else:
             prev_doc = prev_problems.get(dataset, {})
             cities, optimal = prev_doc.get("cities"), prev_doc.get("optimal_cost")
+            layout = fresh_layout or prev_doc.get("layout", "real")
     else:
         doc = prev_problems[dataset]
         # Drop entries for solvers re-measured in this run: their shards were replaced and no
@@ -845,6 +920,7 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
             b for b in doc.get("leaderboard", []) if b.get("solver") not in measured
         ]
         cities, optimal = doc.get("cities"), doc.get("optimal_cost")
+        layout = doc.get("layout", "real")
 
     # A dataset absent from this run log whose every entry belonged to a re-measured solver has an
     # empty board. Publishing it would advertise a problem page with no results and list a
@@ -857,11 +933,13 @@ for dataset in sorted(set(prev_problems) | set(per_problem)):
         "dataset": dataset,
         "cities": cities,
         "optimal_cost": optimal,
+        "layout": layout,
         "leaderboard": board,
     }
 
-for dataset, doc in sorted(final_problems.items()):
-    write_json(out / "problems" / f"{dataset}.json", doc)
+if not skip_problems:
+    for dataset, doc in sorted(final_problems.items()):
+        write_json(out / "problems" / f"{dataset}.json", doc)
 
 # --- index.json ------------------------------------------------------------
 #
@@ -929,7 +1007,8 @@ for (sid, dataset, config), bucket in sorted(cells.items()):
 print(f"    measured:   {len(measured)} solver(s) from {runs_path}")
 print(f"    algorithms: {len(final_algos)} shard(s) written"
       + (f" ({len(final_algos) - len(measured)} carried over)" if len(final_algos) > len(measured) else ""))
-print(f"    problems:   {len(final_problems)} shard(s) written")
+print(f"    problems:   {len(final_problems)} shard(s) "
+      + ("carried over" if skip_problems else "written"))
 print(f"    cells:      {len(cells)}  runs: {len(rows)}")
 PY
 

@@ -1,7 +1,8 @@
 use std::collections::HashSet;
+use teeline::tsp::DistanceSource;
 use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
-use teeline::tsp::{distance_matrix, kdtree};
+use teeline::tsp::{Position, distance_matrix, kdtree};
 
 /// Local float-comparison helper (mirrors `src/test/helpers.rs` semantics).
 /// The crate's `assert_approx` is behind `#[cfg(test)]` and not reachable from
@@ -92,8 +93,16 @@ fn test_distance_by_pos_out_of_range_returns_err() {
         vec![2.0, 0.0], // n=3
     ]);
     let dm = DistanceMatrix::from_cities(&cities).unwrap();
-    assert!(dm.distance_by_pos(3, 0).is_err(), "pos >= n must be Err");
-    assert!(dm.distance_by_pos(0, 3).is_err(), "pos >= n must be Err");
+    assert!(
+        dm.distance_by_pos(Position::new(3), Position::new(0))
+            .is_err(),
+        "pos >= n must be Err"
+    );
+    assert!(
+        dm.distance_by_pos(Position::new(0), Position::new(3))
+            .is_err(),
+        "pos >= n must be Err"
+    );
 }
 
 /// distance_between must return Err for an unknown city ID, not panic.
@@ -167,7 +176,7 @@ fn test_tour_length_by_pos_matches_tour_length() {
     ]);
     let dm = DistanceMatrix::from_cities(&cities).unwrap();
     let city_id_path = vec![0usize, 1, 2, 3, 4];
-    let pos_path = vec![0usize, 1, 2, 3, 4]; // positions == ids for 0-indexed cities
+    let pos_path: Vec<Position> = (0..5).map(Position::new).collect(); // positions == ids for 0-indexed cities
     assert_eq!(
         dm.tour_length(&city_id_path),
         dm.tour_length_by_pos(&pos_path)

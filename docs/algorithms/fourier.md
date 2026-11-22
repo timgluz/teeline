@@ -8,6 +8,8 @@ hasExplainer: true
 
 # Fourier-basis Constructive Solver
 
+<!-- The #benchmarks anchor is rendered by AlgorithmBenchmarks, not by a heading in this file. -->
+<!-- markdownlint-disable MD051 -->
 | | |
 | --- | --- |
 | **Alias** | `fourier` |
@@ -173,6 +175,9 @@ m     = 200
   point against the same id space it came from, as in `nearest_neighbor.rs`) would otherwise
   make curve sample 0 permanently unselectable whenever the query's id defaulted to `0`.
 - **WASM-compatible**: uses `num-complex = "0.4"` (no_std-compatible, no libm dependency).
+- **Explicit instances without coordinates**: the parser derives a 2D layout from the distance
+  matrix with classical MDS and Fourier fits its curve to that layout. Tours are still scored
+  with the exact matrix, but the fit is only as good as the derived geometry.
 
 ## Relationship to the Elastic Net
 

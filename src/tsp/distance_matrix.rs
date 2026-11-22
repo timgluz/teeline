@@ -51,10 +51,13 @@
     because it adds more complexity than any actual benefits;
 */
 
-use std::collections::HashMap;
+use std::borrow::Cow;
 
+use super::DistanceType;
+use super::Position;
+use super::distance_source::DistanceSource;
+use super::id_index::{IdIndex, unique_city_ids};
 use super::kdtree::KDPoint;
-use super::{CityTable, DistanceType, NearestResult, NearestResultItem};
 
 pub(crate) fn geo_distance(p1: &KDPoint, p2: &KDPoint) -> f32 {
     // Full-precision PI, deliberately, not TSPLIB's truncated `PI = 3.141592` from the
@@ -141,35 +144,165 @@ pub fn build(cities: &[KDPoint], dt: DistanceType) -> DistanceMatrix {
     DistanceMatrix::build(cities, dt).unwrap()
 }
 
+/// Packed lower-triangle storage.
+///
+/// Coordinate matrices are computed as `f32` and stay there. EXPLICIT files usually carry
+/// integer weights that fit in `u16`, which halves the stored footprint without changing any
+/// query result. Wider weights stay `f32`: `u32` is the same four bytes and would only add a
+/// conversion on every lookup.
+#[derive(Debug, Clone)]
+enum PackedDistances {
+    F32(Vec<f32>),
+    U16(Vec<u16>),
+}
+
+impl PackedDistances {
+    fn from_explicit(distances: Vec<f32>) -> Self {
+        if Self::fits_u16(&distances) {
+            Self::U16(distances.iter().map(|&d| d as u16).collect())
+        } else {
+            Self::F32(distances)
+        }
+    }
+
+    fn from_explicit_slice(distances: &[f32]) -> Self {
+        if Self::fits_u16(distances) {
+            Self::U16(distances.iter().map(|&d| d as u16).collect())
+        } else {
+            Self::F32(distances.to_vec())
+        }
+    }
+
+    /// True when every value is a non-negative integer ≤ `u16::MAX`.
+    ///
+    /// `-0.0` is rejected so the sign bit survives; the compact representation has no way to
+    /// carry it, and "preserve every distance exactly" is the contract.
+    fn fits_u16(distances: &[f32]) -> bool {
+        distances.iter().all(|&distance| {
+            distance.is_finite()
+                && !distance.is_sign_negative()
+                && distance.fract() == 0.0
+                && distance <= f32::from(u16::MAX)
+        })
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::F32(items) => items.len(),
+            Self::U16(items) => items.len(),
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    fn get(&self, index: usize) -> Option<f32> {
+        match self {
+            Self::F32(items) => items.get(index).copied(),
+            Self::U16(items) => items.get(index).map(|&value| f32::from(value)),
+        }
+    }
+
+    fn widen(&self) -> Cow<'_, [f32]> {
+        match self {
+            Self::F32(items) => Cow::Borrowed(items),
+            Self::U16(items) => Cow::Owned(items.iter().map(|&value| f32::from(value)).collect()),
+        }
+    }
+
+    fn bytes(&self) -> usize {
+        self.len() * self.element_bytes()
+    }
+
+    fn element_bytes(&self) -> usize {
+        match self {
+            Self::F32(_) => 4,
+            Self::U16(_) => 2,
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::F32(_) => "f32",
+            Self::U16(_) => "u16",
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DistanceMatrix {
-    n: usize,    // how many cities
-    size: usize, // how many distances under diagonal
-    items: Vec<f32>,
-    cities: CityTable,
-    city_idx: HashMap<usize, usize>, // translates city_id to matrix_id
+    n: usize, // how many cities
+    items: PackedDistances,
+    cities: Vec<KDPoint>, // position-indexed, same order as the matrix rows
+    city_idx: IdIndex,    // translates city_id to matrix position
+    is_coordinate_metric: bool,
 }
 
 impl DistanceMatrix {
-    pub fn new(n: usize, distances: Vec<f32>, cities: CityTable) -> Self {
-        let city_idx: HashMap<usize, usize> = cities.iter().map(|(k, c)| (c.id, *k)).collect();
+    /// Build an EXPLICIT matrix from packed lower-triangle weights.
+    ///
+    /// Values that fit in `u16` are stored at two bytes each; everything else stays `f32`.
+    /// Both representations preserve every value exactly.
+    pub fn new(n: usize, distances: Vec<f32>, cities: Vec<KDPoint>) -> Result<Self, &'static str> {
+        Self::from_parts(n, PackedDistances::from_explicit(distances), cities, false)
+    }
 
-        assert!(n == city_idx.len(), "city_idx size differs from n cities");
-        assert_eq!(
-            distances.len(),
-            n * (n - 1) / 2,
-            "distances length {} != n*(n-1)/2={} for n={}",
-            distances.len(),
-            n * (n - 1) / 2,
-            n
-        );
-        DistanceMatrix {
+    /// Like [`Self::new`], but packs straight from a borrowed slice, so a caller holding the
+    /// parsed weights does not have to clone them first.
+    pub fn from_explicit_slice(
+        n: usize,
+        distances: &[f32],
+        cities: Vec<KDPoint>,
+    ) -> Result<Self, &'static str> {
+        Self::from_parts(
             n,
-            size: distances.len(),
-            items: distances,
+            PackedDistances::from_explicit_slice(distances),
+            cities,
+            false,
+        )
+    }
+
+    fn from_parts(
+        n: usize,
+        items: PackedDistances,
+        cities: Vec<KDPoint>,
+        is_coordinate_metric: bool,
+    ) -> Result<Self, &'static str> {
+        if cities.len() != n {
+            return Err("city count does not match n");
+        }
+        let city_idx = IdIndex::build(&cities)?;
+
+        let expected = n
+            .checked_sub(1)
+            .and_then(|previous| n.checked_mul(previous))
+            .map(|pairs| pairs / 2)
+            .unwrap_or(0);
+        if items.len() != expected {
+            return Err("distance count does not match n*(n-1)/2");
+        }
+        Ok(DistanceMatrix {
+            n,
+            items,
             cities,
             city_idx,
-        }
+            is_coordinate_metric,
+        })
+    }
+
+    fn new_with_coordinates(
+        n: usize,
+        distances: Vec<f32>,
+        cities: Vec<KDPoint>,
+        is_coordinate_metric: bool,
+    ) -> Result<Self, &'static str> {
+        Self::from_parts(
+            n,
+            PackedDistances::F32(distances),
+            cities,
+            is_coordinate_metric,
+        )
     }
 
     // assumes that cities are already sorted by id and ids are incrementally crowing
@@ -214,15 +347,13 @@ impl DistanceMatrix {
         if n < 2 {
             return Err("distance matrix requires at least 2 points");
         }
+        // Reject duplicate ids before building the O(n^2) distance vector.
+        unique_city_ids(cities)?;
 
         let size = n * (n - 1) / 2; // how many items on distance vec
 
-        let mut city_table = CityTable::new();
-
         let mut distances = Vec::with_capacity(size);
         for (i, pt1) in cities.iter().enumerate() {
-            city_table.insert(i, *pt1);
-
             for pt2 in cities.iter().take(i) {
                 distances.push(distance(pt1, pt2));
             }
@@ -230,7 +361,7 @@ impl DistanceMatrix {
 
         distances.shrink_to_fit();
 
-        Ok(DistanceMatrix::new(n, distances, city_table))
+        DistanceMatrix::new_with_coordinates(n, distances, cities.to_vec(), true)
     }
 
     pub fn len(&self) -> usize {
@@ -241,192 +372,90 @@ impl DistanceMatrix {
         self.items.is_empty()
     }
 
-    pub fn num_cities(&self) -> usize {
+    pub fn num_distances(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Expand the packed lower triangle to `f32` values.
+    ///
+    /// A coordinate or wide EXPLICIT matrix borrows its storage; a `u16` EXPLICIT matrix
+    /// allocates the widened copy. Use [`Self::stored_bytes`] or [`Self::storage_kind`] for the
+    /// actual footprint.
+    pub fn distances(&self) -> Cow<'_, [f32]> {
+        self.items.widen()
+    }
+
+    /// Bytes actually held by the packed lower triangle.
+    pub fn stored_bytes(&self) -> usize {
+        self.items.bytes()
+    }
+
+    /// Bytes per stored distance: `2` for `u16`, `4` for `f32`.
+    pub fn storage_width(&self) -> usize {
+        self.items.element_bytes()
+    }
+
+    /// `"u16"` or `"f32"` — the storage chosen for this matrix.
+    pub fn storage_kind(&self) -> &'static str {
+        self.items.kind()
+    }
+}
+
+impl DistanceSource for DistanceMatrix {
+    fn num_cities(&self) -> usize {
         self.n
     }
 
-    pub fn num_distances(&self) -> usize {
-        self.size
-    }
-
-    pub fn distances(&self) -> &[f32] {
-        &self.items
-    }
-
-    // It returns distance by raw vector ids for backward support for some solutions
-    // preferred solution: distance_between as it checks if city exists on table
-    pub fn distance_by_pos(&self, pos1: usize, pos2: usize) -> Result<f32, &'static str> {
+    fn distance_by_pos(&self, pos1: Position, pos2: Position) -> Result<f32, &'static str> {
         if pos1 == pos2 {
             return Ok(0.0);
         }
+        let pos1 = pos1.into_inner();
+        let pos2 = pos2.into_inner();
         if pos1 >= self.n || pos2 >= self.n {
             return Err("position out of range");
         }
         let from = pos1.max(pos2);
         let to = pos1.min(pos2);
         let idx = from * (from - 1) / 2 + to;
-        self.items
-            .get(idx)
-            .copied()
-            .ok_or("distance index out of range")
+        self.items.get(idx).ok_or("distance index out of range")
     }
 
-    /// returns distance between city n and m
-    /// array is packed version of bottom triangle with given structure
-    /// ||d2,1|d3,1|d3,2|d4,1|d4,2|d4,3||
-    /// here bigger cityId works like padding, then smaller id acts as index from padding
-    pub fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
+    /// Hot-path override: the default would dispatch `city_id2pos` twice and
+    /// `distance_by_pos` once through the vtable for every lookup. This one resolves the
+    /// index directly and calls the primitive statically. The conformance suite proves it
+    /// returns the same values as the default.
+    fn distance_between(&self, city_id1: usize, city_id2: usize) -> Result<f32, &'static str> {
         if city_id1 == city_id2 {
             return Ok(0.0);
         }
         let pos1 = self
             .city_idx
-            .get(&city_id1)
-            .copied()
+            .get(city_id1)
+            .map(Position::new)
             .ok_or("city_id1 not in index")?;
         let pos2 = self
             .city_idx
-            .get(&city_id2)
-            .copied()
+            .get(city_id2)
+            .map(Position::new)
             .ok_or("city_id2 not in index")?;
         self.distance_by_pos(pos1, pos2)
     }
 
-    /// returns list of distances from city N, where 0 distance from the city;
-    pub fn distances_from(&self, city_id: usize) -> Vec<f32> {
-        let pos: usize = *self.city_idx.get(&city_id).expect("Unknown city id");
-
-        self.distances_from_index(pos)
+    fn pos2city_id(&self, pos: Position) -> Option<usize> {
+        self.cities.get(pos.into_inner()).map(|c| c.id)
     }
 
-    pub fn tour_length(&self, path: &[usize]) -> f32 {
-        if path.len() < 2 {
-            return 0.0;
-        }
-        // Translate city IDs to positions upfront; unknown city ID → return 0.0.
-        let positions: Option<Vec<usize>> = path.iter().map(|&id| self.city_id2pos(id)).collect();
-        match positions {
-            None => 0.0,
-            Some(pos_path) => self.tour_length_by_pos(&pos_path),
-        }
+    fn city_id2pos(&self, city_id: usize) -> Option<Position> {
+        self.city_idx.get(city_id).map(Position::new)
     }
 
-    /// Position-based tour length — no HashMap lookups per edge.
-    /// All positions must be in 0..num_cities().
-    pub fn tour_length_by_pos(&self, path: &[usize]) -> f32 {
-        if path.len() < 2 {
-            return 0.0;
-        }
-        let last = *path.last().unwrap();
-        let mut total = self.distance_by_pos(last, path[0]).unwrap_or(0.0);
-        for w in path.windows(2) {
-            total += self.distance_by_pos(w[0], w[1]).unwrap_or(0.0);
-        }
-        total
+    fn point_at(&self, pos: Position) -> Option<KDPoint> {
+        self.cities.get(pos.into_inner()).copied()
     }
 
-    pub fn city_index(&self) -> &HashMap<usize, usize> {
-        &self.city_idx
-    }
-
-    pub fn pos2city_id(&self, pos: usize) -> Option<usize> {
-        self.cities.get(&pos).map(|c| c.id)
-    }
-
-    pub fn city_id2pos(&self, city_id: usize) -> Option<usize> {
-        self.city_idx.get(&city_id).copied()
-    }
-
-    pub fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
-        let mut search_result = NearestResult::new(*target, n);
-
-        let city_pos = match self.city_id2pos(target.id) {
-            Some(pos) => pos,
-            None => return search_result, // unknown target → empty result, no panic
-        };
-
-        let distances_from_target = self.distances_from_index(city_pos);
-        for (pos, distance) in distances_from_target.iter().enumerate() {
-            if pos == city_pos {
-                continue; // skip self (belt-and-suspenders; add() already gates on pt.id)
-            }
-            // Look up by matrix position, not city_id.  city_id != pos when city IDs
-            // are not 0-based (e.g. 1-indexed TSPLIB files like berlin52.tsp).
-            if let Some(pt) = self.cities.get(&pos) {
-                search_result.add(*pt, *distance);
-            }
-        }
-
-        search_result
-    }
-
-    /// Nearest city satisfying `is_candidate`, ties broken by lowest city id.
-    ///
-    /// A predicate rather than a visited/unvisited set: taking `&HashSet<usize> visited`
-    /// let a caller pass its `unvisited` set without the compiler noticing, inverting the
-    /// test and returning `None` for every query.
-    ///
-    /// `target` is excluded internally, so `|id| unvisited.contains(&id)` is already
-    /// correct and a caller's extra `id != current_id` is harmless.
-    ///
-    /// O(n): the whole row is scanned. Deterministic by the total order
-    /// `(distance, city_id)` rather than iteration order, which is what makes `nn`
-    /// reproducible.
-    pub fn nearest_unvisited(
-        &self,
-        target: &KDPoint,
-        is_candidate: impl Fn(usize) -> bool,
-    ) -> Option<NearestResultItem> {
-        let city_pos = self.city_id2pos(target.id)?;
-        let row = self.distances_from_index(city_pos);
-
-        let mut best: Option<NearestResultItem> = None;
-        for (pos, distance) in row.iter().enumerate() {
-            if pos == city_pos {
-                continue;
-            }
-            // Unreachable: `build()`/`new()` populate `cities` for every position 0..n.
-            // Skipped to match `nearest()` above rather than asserting.
-            let Some(pt) = self.cities.get(&pos) else {
-                continue;
-            };
-            if !is_candidate(pt.id) {
-                continue;
-            }
-            let better = match &best {
-                None => true,
-                // `total_cmp`, not `<`: the latter is false against NaN, so a non-finite
-                // distance reaching `best` would block every later candidate and win by
-                // default. `total_cmp` is a genuine total order, so the result stays
-                // deterministic even on malformed input.
-                Some(current) => distance
-                    .total_cmp(&current.distance)
-                    .then_with(|| pt.id.cmp(&current.point.id))
-                    .is_lt(),
-            };
-            if better {
-                best = Some(NearestResultItem::new(*pt, *distance));
-            }
-        }
-
-        best
-    }
-
-    fn distances_from_index(&self, pos: usize) -> Vec<f32> {
-        let mut distances = Vec::with_capacity(self.n);
-        for i in 0..pos {
-            distances.push(
-                self.distance_by_pos(pos, i)
-                    .expect("valid position in distances_from_index"),
-            );
-        }
-        for i in pos..self.n {
-            distances.push(
-                self.distance_by_pos(i, pos)
-                    .expect("valid position in distances_from_index"),
-            );
-        }
-        distances
+    fn is_coordinate_metric(&self) -> bool {
+        self.is_coordinate_metric
     }
 }
 
@@ -441,14 +470,12 @@ mod tests {
         // Hand-built matrix: distance(0,1) = NaN, distance(0,2) = 5, distance(1,2) = 1.
         // Packed lower triangle is [d(1,0), d(2,0), d(2,1)].
         let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![2.0, 0.0]]);
-        let table: crate::tsp::CityTable =
-            cities.iter().enumerate().map(|(i, c)| (i, *c)).collect();
-        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], table);
+        let dm = DistanceMatrix::new(3, vec![f32::NAN, 5.0, 1.0], cities.clone()).unwrap();
 
         // City 1 must be skipped despite being "closest" only in the sense that NaN loses
         // every ordinary comparison — a NaN in `best` would otherwise stick forever.
         let pick = dm
-            .nearest_unvisited(&cities[0], |id| id != cities[0].id)
+            .nearest_unvisited(&cities[0], &|id| id != cities[0].id)
             .expect("city 2 is reachable");
         assert_eq!(pick.point.id, cities[2].id);
         assert_approx(5.0, pick.distance);
@@ -496,14 +523,14 @@ mod tests {
         let dm = DistanceMatrix::from_cities(&cities).unwrap();
         let start = cities[0].id;
 
-        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        let pick = dm.nearest_unvisited(&cities[0], &|id| id != start).unwrap();
         assert_eq!(pick.point.id, cities[1].id);
         assert_approx(1.0, pick.distance);
 
         // Excluding the three nearest leaves id 4.
         let excluded: Vec<usize> = vec![start, cities[1].id, cities[2].id, cities[3].id];
         let pick = dm
-            .nearest_unvisited(&cities[0], |id| !excluded.contains(&id))
+            .nearest_unvisited(&cities[0], &|id| !excluded.contains(&id))
             .unwrap();
         assert_eq!(pick.point.id, cities[4].id);
         assert_approx(4.0, pick.distance);
@@ -516,7 +543,7 @@ mod tests {
         let dm = DistanceMatrix::from_cities(&cities).unwrap();
         let start = cities[0].id;
 
-        let pick = dm.nearest_unvisited(&cities[0], |id| id != start).unwrap();
+        let pick = dm.nearest_unvisited(&cities[0], &|id| id != start).unwrap();
         assert_approx(1.0, pick.distance);
         assert_eq!(
             pick.point.id, cities[1].id,
@@ -530,7 +557,7 @@ mod tests {
         let dm = DistanceMatrix::from_cities(&cities).unwrap();
 
         assert!(
-            dm.nearest_unvisited(&cities[0], |_| false).is_none(),
+            dm.nearest_unvisited(&cities[0], &|_| false).is_none(),
             "an empty candidate set must yield None rather than a bogus city"
         );
     }
@@ -566,7 +593,7 @@ mod tests {
         assert_eq!(unvisited.len(), cities.len() - 1);
 
         let pick = dm
-            .nearest_unvisited(&cities[0], |id| id != start && unvisited.contains(&id))
+            .nearest_unvisited(&cities[0], &|id| id != start && unvisited.contains(&id))
             .expect("279 cities are unvisited, so a nearest must exist");
         assert!(
             unvisited.contains(&pick.point.id),
@@ -686,7 +713,127 @@ mod tests {
         assert!(res.is_ok());
         let res = res.unwrap();
 
-        assert_eq!(&[1.0], res.distances());
+        assert_eq!(res.distances().as_ref(), &[1.0]);
+    }
+
+    /// The memory model the benchmark and the 100k claim rest on: a coordinate matrix stores
+    /// four bytes per city pair. A wider element (or a padded layout) must fail here rather
+    /// than silently doubling the footprint.
+    #[test]
+    fn coordinate_matrix_stores_at_most_four_bytes_per_pair() {
+        let n = 64;
+        let coords: Vec<Vec<f32>> = (0..n)
+            .map(|i| vec![(i % 8) as f32, (i / 8) as f32])
+            .collect();
+        let cities = kdtree::build_points(&coords);
+        let dm = DistanceMatrix::build(&cities, DistanceType::Euc2D).unwrap();
+
+        let pairs = n * (n - 1) / 2;
+        let bytes = dm.stored_bytes();
+        assert!(
+            bytes <= 4 * pairs,
+            "coordinate matrix stores {bytes} bytes for {pairs} pairs, exceeding 4 bytes/pair"
+        );
+        assert_eq!(dm.storage_kind(), "f32");
+    }
+
+    fn explicit_cities(n: usize) -> Vec<KDPoint> {
+        (0..n)
+            .map(|i| KDPoint::new_with_id(i + 1, &[i as f32, 0.0]))
+            .collect()
+    }
+
+    #[test]
+    fn explicit_integers_use_u16_and_wider_values_stay_f32() {
+        let cities = explicit_cities(3);
+        let packed = vec![0.0, 65_535.0, 1.0];
+
+        let narrow = DistanceMatrix::new(3, packed.clone(), cities.clone()).unwrap();
+        assert_eq!(narrow.storage_kind(), "u16");
+        assert_eq!(narrow.stored_bytes(), packed.len() * 2);
+        assert_eq!(
+            narrow
+                .distance_by_pos(Position::new(2), Position::new(0))
+                .unwrap(),
+            65_535.0
+        );
+        assert_eq!(
+            narrow
+                .distance_by_pos(Position::new(2), Position::new(1))
+                .unwrap(),
+            1.0
+        );
+
+        for (packed, expected_kind) in [
+            (vec![1.0, 65_536.0, 2.0], "f32"), // does not fit u16
+            (vec![1.0, 1.5, 2.0], "f32"),
+            (vec![1.0, -1.0, 2.0], "f32"),
+            (vec![1.0, -0.0, 2.0], "f32"), // keeps the sign bit
+            (vec![1.0, f32::NAN, 2.0], "f32"),
+            (vec![1.0, f32::INFINITY, 2.0], "f32"),
+            (vec![1.0, f32::NEG_INFINITY, 2.0], "f32"),
+        ] {
+            let matrix = DistanceMatrix::new(3, packed.clone(), cities.clone()).unwrap();
+            assert_eq!(
+                matrix.storage_kind(),
+                expected_kind,
+                "packed values {packed:?}"
+            );
+            for (got, want) in matrix.distances().iter().zip(&packed) {
+                assert_eq!(got.to_bits(), want.to_bits(), "packed values {packed:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn from_explicit_slice_packs_without_an_owned_vec() {
+        let cities = explicit_cities(3);
+
+        let narrow = [0.0, 65_535.0, 1.0];
+        let matrix = DistanceMatrix::from_explicit_slice(3, &narrow, cities.clone()).unwrap();
+        assert_eq!(matrix.storage_kind(), "u16");
+        assert_eq!(matrix.distances().as_ref(), narrow.as_slice());
+
+        let wide = [0.0, 65_536.0, 1.0];
+        let matrix = DistanceMatrix::from_explicit_slice(3, &wide, cities).unwrap();
+        assert_eq!(matrix.storage_kind(), "f32");
+        assert_eq!(matrix.distances().as_ref(), wide.as_slice());
+    }
+
+    /// Compact and `f32` storage must produce bit-identical tours: compaction is a storage
+    /// change, never a numeric one.
+    #[test]
+    fn compact_storage_matches_f32_storage_for_every_pair() {
+        let n = 16;
+        let values: Vec<f32> = (0..n * (n - 1) / 2).map(|i| (i % 60_000) as f32).collect();
+        let cities = explicit_cities(n);
+
+        let compact = DistanceMatrix::new(n, values.clone(), cities.clone()).unwrap();
+        assert_eq!(compact.storage_kind(), "u16");
+        let reference =
+            DistanceMatrix::from_parts(n, PackedDistances::F32(values.clone()), cities, false)
+                .unwrap();
+
+        for a in 0..n {
+            for b in 0..n {
+                assert_eq!(
+                    compact
+                        .distance_by_pos(Position::new(a), Position::new(b))
+                        .unwrap(),
+                    reference
+                        .distance_by_pos(Position::new(a), Position::new(b))
+                        .unwrap(),
+                    "pair ({a}, {b})"
+                );
+            }
+        }
+
+        let route: Vec<usize> = (1..=n).collect();
+        assert_eq!(
+            compact.tour_length(&route),
+            reference.tour_length(&route),
+            "compaction changed the tour cost"
+        );
     }
 
     /// TSPLIB's EUC_2D is `nint(sqrt(dx^2 + dy^2))`. The rounding *is* the metric: unrounded,
@@ -901,5 +1048,43 @@ mod tests {
             3,
             "nearest to city 1 should be city 3, not city 2"
         );
+    }
+
+    #[test]
+    fn sparse_ids_resolve_through_the_sparse_index() {
+        // max_id (30) exceeds 4 * n (12), so `IdIndex` must take the sparse branch; the
+        // matrix still has to answer every position/id query exactly.
+        let cities = vec![
+            KDPoint::new_with_id(10, &[0.0, 0.0]),
+            KDPoint::new_with_id(20, &[3.0, 4.0]),
+            KDPoint::new_with_id(30, &[0.0, 1.0]),
+        ];
+        let dm = DistanceMatrix::from_cities_unrounded(&cities).unwrap();
+        assert!(
+            matches!(dm.city_idx, IdIndex::Sparse(_)),
+            "the test must exercise the sparse branch, not the dense fallback"
+        );
+
+        assert_eq!(dm.point_at(Position::new(0)).map(|c| c.id), Some(10));
+        assert_eq!(dm.pos2city_id(Position::new(1)), Some(20));
+        assert_eq!(dm.pos2city_id(Position::new(3)), None);
+        assert_eq!(dm.city_id2pos(30), Some(Position::new(2)));
+        assert_eq!(dm.city_id2pos(99), None);
+        assert_approx(5.0, dm.distance_between(10, 20).unwrap());
+        assert!(dm.distance_between(10, 99).is_err());
+
+        let d20_30 = 18.0_f32.sqrt();
+        assert_approx(1.0 + 5.0 + d20_30, dm.tour_length(&[10, 20, 30]));
+    }
+
+    #[test]
+    fn duplicate_ids_are_rejected_not_panicked() {
+        let cities = vec![
+            KDPoint::new_with_id(1, &[0.0, 0.0]),
+            KDPoint::new_with_id(1, &[1.0, 0.0]),
+            KDPoint::new_with_id(2, &[0.0, 1.0]),
+        ];
+        let result = DistanceMatrix::build(&cities, DistanceType::Euc2D);
+        assert!(result.is_err(), "duplicate IDs must return an error");
     }
 }

@@ -1,4 +1,4 @@
-use qtbridge::qobject_impl;
+use qtbridge::qobject;
 use std::path::Path;
 use teeline::tsp::{kdtree::KDPoint, opt_tour, tour_cost, tsplib};
 
@@ -40,79 +40,83 @@ impl Default for FileLoader {
     }
 }
 
-#[qobject_impl(Singleton)]
+#[qobject(Singleton, ConvertToCamelCase)]
 impl FileLoader {
     qproperty!(
         "cityCount",
         Member = city_count,
         Write = set_city_count,
-        Notify = "cityCountChanged"
+        Notify = city_count_changed
     );
     qproperty!(
         "problemName",
         Member = problem_name,
         Write = set_problem_name,
-        Notify = "problemNameChanged"
+        Notify = problem_name_changed
     );
     qproperty!(
         "edgeWeightType",
         Member = edge_weight_type,
         Write = set_edge_weight_type,
-        Notify = "edgeWeightTypeChanged"
+        Notify = edge_weight_type_changed
     );
     qproperty!(
         "isLoaded",
         Member = is_loaded,
         Write = set_is_loaded,
-        Notify = "isLoadedChanged"
+        Notify = is_loaded_changed
     );
     qproperty!(
         "errorMessage",
         Member = error_message,
         Write = set_error_message,
-        Notify = "errorMessageChanged"
+        Notify = error_message_changed
     );
     qproperty!(
         "citiesJson",
         Member = cities_json,
         Write = set_cities_json,
-        Notify = "citiesJsonChanged"
+        Notify = cities_json_changed
     );
     qproperty!(
         "recentFilesJson",
         Member = recent_files_json,
         Write = set_recent_files_json,
-        Notify = "recentFilesJsonChanged"
+        Notify = recent_files_json_changed
     );
     qproperty!(
         "filePath",
         Member = file_path,
         Write = set_file_path,
-        Notify = "filePathChanged"
+        Notify = file_path_changed
     );
     qproperty!(
         "hasOptTour",
         Member = has_opt_tour,
         Write = set_has_opt_tour,
-        Notify = "hasOptTourChanged"
+        Notify = has_opt_tour_changed
     );
     qproperty!(
         "optTourRouteJson",
         Member = opt_tour_route_json,
         Write = set_opt_tour_route_json,
-        Notify = "optTourRouteJsonChanged"
+        Notify = opt_tour_route_json_changed
     );
     qproperty!(
         "optTourCost",
-        Member = opt_tour_cost,
+        Read = get_opt_tour_cost,
         Write = set_opt_tour_cost,
-        Notify = "optTourCostChanged"
+        Notify = opt_tour_cost_changed
     );
+
+    fn get_opt_tour_cost(&self) -> f32 {
+        self.opt_tour_cost
+    }
     qproperty!(
         "optTourFilePath",
         Member = opt_tour_file_path,
         Write = set_opt_tour_file_path,
-        Notify = "optTourFilePathChanged"
+        Notify = opt_tour_file_path_changed
     );
 
     fn set_city_count(&mut self, v: i32) {
@@ -165,29 +169,29 @@ impl FileLoader {
     }
 
     #[qsignal]
-    fn city_count_changed(&self);
+    fn city_count_changed(&mut self);
     #[qsignal]
-    fn problem_name_changed(&self);
+    fn problem_name_changed(&mut self);
     #[qsignal]
-    fn edge_weight_type_changed(&self);
+    fn edge_weight_type_changed(&mut self);
     #[qsignal]
-    fn is_loaded_changed(&self);
+    fn is_loaded_changed(&mut self);
     #[qsignal]
-    fn error_message_changed(&self);
+    fn error_message_changed(&mut self);
     #[qsignal]
-    fn cities_json_changed(&self);
+    fn cities_json_changed(&mut self);
     #[qsignal]
-    fn recent_files_json_changed(&self);
+    fn recent_files_json_changed(&mut self);
     #[qsignal]
-    fn file_path_changed(&self);
+    fn file_path_changed(&mut self);
     #[qsignal]
-    fn has_opt_tour_changed(&self);
+    fn has_opt_tour_changed(&mut self);
     #[qsignal]
-    fn opt_tour_route_json_changed(&self);
+    fn opt_tour_route_json_changed(&mut self);
     #[qsignal]
-    fn opt_tour_cost_changed(&self);
+    fn opt_tour_cost_changed(&mut self);
     #[qsignal]
-    fn opt_tour_file_path_changed(&self);
+    fn opt_tour_file_path_changed(&mut self);
 
     /// Load a TSPLIB file. `path` may be a filesystem path or a file:// URL.
     #[qslot]
@@ -228,7 +232,7 @@ impl FileLoader {
                 {
                     let opt_path = parent.join(format!("{}.opt.tour", stem.to_string_lossy()));
                     if opt_path.exists() {
-                        self.load_opt_tour(opt_path.to_string_lossy().into_owned());
+                        self.try_load_sibling_opt_tour(opt_path.to_string_lossy().into_owned());
                     }
                 }
             }
@@ -239,47 +243,59 @@ impl FileLoader {
         }
     }
 
+    /// Best-effort sibling opt-tour load. A malformed `.opt.tour` beside the problem
+    /// (for example a TSPLIB stub with an empty `TOUR_SECTION`) must not turn a
+    /// successful problem load into an error banner.
+    fn try_load_sibling_opt_tour(&mut self, path: String) {
+        if let Err(error) = self.apply_opt_tour(&path) {
+            eprintln!("[FileLoader] ignoring sibling opt tour {path}: {error}");
+            self.set_has_opt_tour(false);
+            self.set_opt_tour_route_json("[]".to_string());
+            self.set_opt_tour_cost(0.0);
+            self.set_opt_tour_file_path(String::new());
+        }
+    }
+
     /// Load a known-optimal .opt.tour file and compute its cost against the loaded problem.
     #[qslot]
     fn load_opt_tour(&mut self, path: String) {
-        let clean = path.strip_prefix("file://").unwrap_or(&path).to_string();
+        if let Err(error) = self.apply_opt_tour(&path) {
+            self.set_error_message(error);
+        }
+    }
+
+    /// Shared opt-tour loader. Returns the user-facing error without setting the banner.
+    fn apply_opt_tour(&mut self, path: &str) -> Result<(), String> {
+        let clean = path.strip_prefix("file://").unwrap_or(path).to_string();
 
         if self.cached_cities.is_empty() {
-            self.set_error_message("Load a .tsp file before loading an optimal tour".to_string());
-            return;
+            return Err("Load a .tsp file before loading an optimal tour".to_string());
         }
 
-        match opt_tour::read_from_file(Path::new(&clean)) {
-            Ok(opt) => {
-                // Validate: dimension and city IDs must match the loaded problem
-                if opt.route.len() != self.cached_cities.len() {
-                    self.set_error_message(format!(
-                        "opt.tour has {} cities but problem has {}",
-                        opt.route.len(),
-                        self.cached_cities.len()
-                    ));
-                    return;
-                }
-                let valid_ids: std::collections::HashSet<usize> =
-                    self.cached_cities.iter().map(|c| c.id).collect();
-                if opt.route.iter().any(|id| !valid_ids.contains(id)) {
-                    self.set_error_message(
-                        "opt.tour contains city IDs not in the loaded problem".to_string(),
-                    );
-                    return;
-                }
+        let opt =
+            opt_tour::read_from_file(Path::new(&clean)).map_err(|e| format!("opt.tour: {e}"))?;
 
-                let cost = tour_cost(&opt.route, &self.cached_cities);
-                self.set_opt_tour_route_json(route_to_json(&opt.route));
-                self.set_opt_tour_cost(cost);
-                self.set_opt_tour_file_path(clean);
-                self.set_has_opt_tour(true);
-                self.set_error_message(String::new());
-            }
-            Err(e) => {
-                self.set_error_message(format!("opt.tour: {e}"));
-            }
+        // Validate: dimension and city IDs must match the loaded problem
+        if opt.route.len() != self.cached_cities.len() {
+            return Err(format!(
+                "opt.tour has {} cities but problem has {}",
+                opt.route.len(),
+                self.cached_cities.len()
+            ));
         }
+        let valid_ids: std::collections::HashSet<usize> =
+            self.cached_cities.iter().map(|c| c.id).collect();
+        if opt.route.iter().any(|id| !valid_ids.contains(id)) {
+            return Err("opt.tour contains city IDs not in the loaded problem".to_string());
+        }
+
+        let cost = tour_cost(&opt.route, &self.cached_cities);
+        self.set_opt_tour_route_json(route_to_json(&opt.route));
+        self.set_opt_tour_cost(cost);
+        self.set_opt_tour_file_path(clean);
+        self.set_has_opt_tour(true);
+        self.set_error_message(String::new());
+        Ok(())
     }
 }
 

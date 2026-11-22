@@ -6499,6 +6499,7 @@ const _trampoline21 = function(arg0) {
 }
 _trampoline21.fnName = 'wasi:filesystem/preopens@0.2.3#getDirectories';
 let exports3;
+let exports4;
 let realloc1;
 let realloc1Async;
 let postReturn0;
@@ -6513,28 +6514,62 @@ let postReturn4;
 let postReturn4Async;
 let postReturn5;
 let postReturn5Async;
+let postReturn6;
+let postReturn6Async;
+let postReturn7;
+let postReturn7Async;
+let postReturn8;
+let postReturn8Async;
+let postReturn9;
+let postReturn9Async;
 let exports1Solve;
 
 function solve(arg0, arg1, arg2) {
+  var ptr0 = realloc1(0, 0, 4, 100);
   
   var encodeRes = _utf8AllocateAndEncode(arg0, realloc1, memory0);
-  var ptr0= encodeRes.ptr;
-  var len0 = encodeRes.len;
+  var ptr1= encodeRes.ptr;
+  var len1 = encodeRes.len;
   
-  var vec2 = arg1;
-  var len2 = vec2.length;
-  var result2 = realloc1(0, 0, 4, len2 * 12);
-  for (let i = 0; i < vec2.length; i++) {
-    const e = vec2[i];
-    const base = result2 + i * 12;var {id: v1_0, x: v1_1, y: v1_2 } = e;
-    dataView(memory0).setInt32(base + 0, toUint32(v1_0), true);
-    dataView(memory0).setFloat32(base + 4, +v1_1, true);
-    dataView(memory0).setFloat32(base + 8, +v1_2, true);
+  dataView(memory0).setUint32(ptr0 + 4, len1, true);
+  dataView(memory0).setUint32(ptr0 + 0, ptr1, true);
+  var vec3 = arg1;
+  var len3 = vec3.length;
+  var result3 = realloc1(0, 0, 4, len3 * 12);
+  for (let i = 0; i < vec3.length; i++) {
+    const e = vec3[i];
+    const base = result3 + i * 12;var {id: v2_0, x: v2_1, y: v2_2 } = e;
+    dataView(memory0).setInt32(base + 0, toUint32(v2_0), true);
+    dataView(memory0).setFloat32(base + 4, +v2_1, true);
+    dataView(memory0).setFloat32(base + 8, +v2_2, true);
   }
-  var {epochs: v3_0, platooEpochs: v3_1, coolingRate: v3_2, maxTemperature: v3_3, minTemperature: v3_4, mutationProbability: v3_5, nElite: v3_6, nNearest: v3_7, alpha: v3_8, beta: v3_9, evaporationRate: v3_10, numAnts: v3_11 } = arg2;
+  dataView(memory0).setUint32(ptr0 + 12, len3, true);
+  dataView(memory0).setUint32(ptr0 + 8, result3, true);
+  var {epochs: v4_0, platooEpochs: v4_1, coolingRate: v4_2, maxTemperature: v4_3, minTemperature: v4_4, mutationProbability: v4_5, nElite: v4_6, nNearest: v4_7, alpha: v4_8, beta: v4_9, evaporationRate: v4_10, numAnts: v4_11, sfcOrder: v4_12, sfcRotation: v4_13, sfcMirror: v4_14, sfcMultiOrientation: v4_15, eaxPopSize: v4_16, eaxChildrenPerPair: v4_17, eaxStrategy: v4_18, eaxStallEpochs: v4_19, eaxCandidateK: v4_20 } = arg2;
+  dataView(memory0).setInt32(ptr0 + 16, toUint32(v4_0), true);
+  dataView(memory0).setInt32(ptr0 + 20, toUint32(v4_1), true);
+  dataView(memory0).setFloat32(ptr0 + 24, +v4_2, true);
+  dataView(memory0).setFloat32(ptr0 + 28, +v4_3, true);
+  dataView(memory0).setFloat32(ptr0 + 32, +v4_4, true);
+  dataView(memory0).setFloat32(ptr0 + 36, +v4_5, true);
+  dataView(memory0).setInt32(ptr0 + 40, toUint32(v4_6), true);
+  dataView(memory0).setInt32(ptr0 + 44, toUint32(v4_7), true);
+  dataView(memory0).setFloat32(ptr0 + 48, +v4_8, true);
+  dataView(memory0).setFloat32(ptr0 + 52, +v4_9, true);
+  dataView(memory0).setFloat32(ptr0 + 56, +v4_10, true);
+  dataView(memory0).setInt32(ptr0 + 60, toUint32(v4_11), true);
+  dataView(memory0).setInt32(ptr0 + 64, toUint32(v4_12), true);
+  dataView(memory0).setInt32(ptr0 + 68, toUint32(v4_13), true);
+  dataView(memory0).setInt32(ptr0 + 72, toUint32(v4_14), true);
+  dataView(memory0).setInt32(ptr0 + 76, toUint32(v4_15), true);
+  dataView(memory0).setInt32(ptr0 + 80, toUint32(v4_16), true);
+  dataView(memory0).setInt32(ptr0 + 84, toUint32(v4_17), true);
+  dataView(memory0).setInt32(ptr0 + 88, toUint32(v4_18), true);
+  dataView(memory0).setInt32(ptr0 + 92, toUint32(v4_19), true);
+  dataView(memory0).setInt32(ptr0 + 96, toUint32(v4_20), true);
   _debugLog('[iface="solve", function="solve"][Instruction::CallWasm] enter', {
     funcName: 'solve',
-    paramCount: 16,
+    paramCount: 1,
     async: false,
     postReturn: true,
   });
@@ -6565,7 +6600,144 @@ function solve(arg0, arg1, arg2) {
     ret =   _withGlobalCurrentTaskMeta({
       taskID: task.id(),
       componentIdx: task.componentIdx(),
-      fn: () => exports1Solve(ptr0, len0, result2, len2, toUint32(v3_0), toUint32(v3_1), +v3_2, +v3_3, +v3_4, +v3_5, toUint32(v3_6), toUint32(v3_7), +v3_8, +v3_9, +v3_10, toUint32(v3_11)),
+      fn: () => exports1Solve(ptr0),
+    });
+  } catch (err) {
+    
+    task.setErrored(err);
+    task.reject(err);
+    task.exit();
+    throw err;
+    
+  }
+  
+  let variant7;
+  switch (dataView(memory0).getUint8(ret + 0, true)) {
+    case 0: {
+      var ptr5 = dataView(memory0).getUint32(ret + 8, true);
+      var len5 = dataView(memory0).getUint32(ret + 12, true);
+      var result5 = new Uint32Array(memory0.buffer.slice(ptr5, ptr5 + len5 * 4));
+      variant7= {
+        tag: 'ok',
+        val: {
+          total: dataView(memory0).getFloat32(ret + 4, true),
+          route: result5,
+          durationMs: dataView(memory0).getInt32(ret + 16, true) >>> 0,
+        }
+      };
+      break;
+    }
+    case 1: {
+      var ptr6 = dataView(memory0).getUint32(ret + 4, true);
+      var len6 = dataView(memory0).getUint32(ret + 8, true);
+      var result6 = TEXT_DECODER_UTF8.decode(new Uint8Array(memory0.buffer, ptr6, len6));
+      variant7= {
+        tag: 'err',
+        val: result6
+      };
+      break;
+    }
+    default: {
+      throw new TypeError('invalid variant discriminant for expected');
+    }
+  }
+  _debugLog('[iface="solve", function="solve"][Instruction::Return]', {
+    funcName: 'solve',
+    paramCount: 1,
+    async: false,
+    postReturn: true
+  });
+  const retCopy = variant7;
+  task.resolve([retCopy.val]);
+  
+  let cstate = getOrCreateAsyncState(0);
+  cstate.mayLeave = false;
+  postReturn0(ret);
+  cstate.mayLeave = true;
+  task.exit();
+  
+  
+  
+  if (typeof retCopy === 'object' && retCopy.tag === 'err') {
+    throw new ComponentError(retCopy.val);
+  }
+  return retCopy.val;
+  
+}
+let exports1ParseAndSolve;
+
+function parseAndSolve(arg0, arg1, arg2) {
+  var ptr0 = realloc1(0, 0, 4, 100);
+  
+  var encodeRes = _utf8AllocateAndEncode(arg0, realloc1, memory0);
+  var ptr1= encodeRes.ptr;
+  var len1 = encodeRes.len;
+  
+  dataView(memory0).setUint32(ptr0 + 4, len1, true);
+  dataView(memory0).setUint32(ptr0 + 0, ptr1, true);
+  
+  var encodeRes = _utf8AllocateAndEncode(arg1, realloc1, memory0);
+  var ptr2= encodeRes.ptr;
+  var len2 = encodeRes.len;
+  
+  dataView(memory0).setUint32(ptr0 + 12, len2, true);
+  dataView(memory0).setUint32(ptr0 + 8, ptr2, true);
+  var {epochs: v3_0, platooEpochs: v3_1, coolingRate: v3_2, maxTemperature: v3_3, minTemperature: v3_4, mutationProbability: v3_5, nElite: v3_6, nNearest: v3_7, alpha: v3_8, beta: v3_9, evaporationRate: v3_10, numAnts: v3_11, sfcOrder: v3_12, sfcRotation: v3_13, sfcMirror: v3_14, sfcMultiOrientation: v3_15, eaxPopSize: v3_16, eaxChildrenPerPair: v3_17, eaxStrategy: v3_18, eaxStallEpochs: v3_19, eaxCandidateK: v3_20 } = arg2;
+  dataView(memory0).setInt32(ptr0 + 16, toUint32(v3_0), true);
+  dataView(memory0).setInt32(ptr0 + 20, toUint32(v3_1), true);
+  dataView(memory0).setFloat32(ptr0 + 24, +v3_2, true);
+  dataView(memory0).setFloat32(ptr0 + 28, +v3_3, true);
+  dataView(memory0).setFloat32(ptr0 + 32, +v3_4, true);
+  dataView(memory0).setFloat32(ptr0 + 36, +v3_5, true);
+  dataView(memory0).setInt32(ptr0 + 40, toUint32(v3_6), true);
+  dataView(memory0).setInt32(ptr0 + 44, toUint32(v3_7), true);
+  dataView(memory0).setFloat32(ptr0 + 48, +v3_8, true);
+  dataView(memory0).setFloat32(ptr0 + 52, +v3_9, true);
+  dataView(memory0).setFloat32(ptr0 + 56, +v3_10, true);
+  dataView(memory0).setInt32(ptr0 + 60, toUint32(v3_11), true);
+  dataView(memory0).setInt32(ptr0 + 64, toUint32(v3_12), true);
+  dataView(memory0).setInt32(ptr0 + 68, toUint32(v3_13), true);
+  dataView(memory0).setInt32(ptr0 + 72, toUint32(v3_14), true);
+  dataView(memory0).setInt32(ptr0 + 76, toUint32(v3_15), true);
+  dataView(memory0).setInt32(ptr0 + 80, toUint32(v3_16), true);
+  dataView(memory0).setInt32(ptr0 + 84, toUint32(v3_17), true);
+  dataView(memory0).setInt32(ptr0 + 88, toUint32(v3_18), true);
+  dataView(memory0).setInt32(ptr0 + 92, toUint32(v3_19), true);
+  dataView(memory0).setInt32(ptr0 + 96, toUint32(v3_20), true);
+  _debugLog('[iface="parse-and-solve", function="parse-and-solve"][Instruction::CallWasm] enter', {
+    funcName: 'parse-and-solve',
+    paramCount: 1,
+    async: false,
+    postReturn: true,
+  });
+  const hostProvided = false;
+  
+  const [task, _wasm_call_currentTaskID] = createNewCurrentTask({
+    componentIdx: 0,
+    isAsync: false,
+    isManualAsync: false,
+    entryFnName: 'exports1ParseAndSolve',
+    getCallbackFn: () => null,
+    callbackFnName: null,
+    errHandling: 'throw-result-err',
+    callingWasmExport: true,
+  });
+  
+  const started = task.enterSync();
+  
+  if (0!== null) {
+    task.setReturnMemoryIdx(0);
+    task.setReturnMemory(() => memory0());
+  }
+  
+  
+  let ret;
+  
+  try {
+    ret =   _withGlobalCurrentTaskMeta({
+      taskID: task.id(),
+      componentIdx: task.componentIdx(),
+      fn: () => exports1ParseAndSolve(ptr0),
     });
   } catch (err) {
     
@@ -6606,8 +6778,8 @@ function solve(arg0, arg1, arg2) {
       throw new TypeError('invalid variant discriminant for expected');
     }
   }
-  _debugLog('[iface="solve", function="solve"][Instruction::Return]', {
-    funcName: 'solve',
+  _debugLog('[iface="parse-and-solve", function="parse-and-solve"][Instruction::Return]', {
+    funcName: 'parse-and-solve',
     paramCount: 1,
     async: false,
     postReturn: true
@@ -6617,118 +6789,7 @@ function solve(arg0, arg1, arg2) {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn0(ret);
-  cstate.mayLeave = true;
-  task.exit();
-  
-  
-  
-  if (typeof retCopy === 'object' && retCopy.tag === 'err') {
-    throw new ComponentError(retCopy.val);
-  }
-  return retCopy.val;
-  
-}
-let exports1ParseAndSolve;
-
-function parseAndSolve(arg0, arg1, arg2) {
-  
-  var encodeRes = _utf8AllocateAndEncode(arg0, realloc1, memory0);
-  var ptr0= encodeRes.ptr;
-  var len0 = encodeRes.len;
-  
-  
-  var encodeRes = _utf8AllocateAndEncode(arg1, realloc1, memory0);
-  var ptr1= encodeRes.ptr;
-  var len1 = encodeRes.len;
-  
-  var {epochs: v2_0, platooEpochs: v2_1, coolingRate: v2_2, maxTemperature: v2_3, minTemperature: v2_4, mutationProbability: v2_5, nElite: v2_6, nNearest: v2_7, alpha: v2_8, beta: v2_9, evaporationRate: v2_10, numAnts: v2_11 } = arg2;
-  _debugLog('[iface="parse-and-solve", function="parse-and-solve"][Instruction::CallWasm] enter', {
-    funcName: 'parse-and-solve',
-    paramCount: 16,
-    async: false,
-    postReturn: true,
-  });
-  const hostProvided = false;
-  
-  const [task, _wasm_call_currentTaskID] = createNewCurrentTask({
-    componentIdx: 0,
-    isAsync: false,
-    isManualAsync: false,
-    entryFnName: 'exports1ParseAndSolve',
-    getCallbackFn: () => null,
-    callbackFnName: null,
-    errHandling: 'throw-result-err',
-    callingWasmExport: true,
-  });
-  
-  const started = task.enterSync();
-  
-  if (0!== null) {
-    task.setReturnMemoryIdx(0);
-    task.setReturnMemory(() => memory0());
-  }
-  
-  
-  let ret;
-  
-  try {
-    ret =   _withGlobalCurrentTaskMeta({
-      taskID: task.id(),
-      componentIdx: task.componentIdx(),
-      fn: () => exports1ParseAndSolve(ptr0, len0, ptr1, len1, toUint32(v2_0), toUint32(v2_1), +v2_2, +v2_3, +v2_4, +v2_5, toUint32(v2_6), toUint32(v2_7), +v2_8, +v2_9, +v2_10, toUint32(v2_11)),
-    });
-  } catch (err) {
-    
-    task.setErrored(err);
-    task.reject(err);
-    task.exit();
-    throw err;
-    
-  }
-  
-  let variant5;
-  switch (dataView(memory0).getUint8(ret + 0, true)) {
-    case 0: {
-      var ptr3 = dataView(memory0).getUint32(ret + 8, true);
-      var len3 = dataView(memory0).getUint32(ret + 12, true);
-      var result3 = new Uint32Array(memory0.buffer.slice(ptr3, ptr3 + len3 * 4));
-      variant5= {
-        tag: 'ok',
-        val: {
-          total: dataView(memory0).getFloat32(ret + 4, true),
-          route: result3,
-          durationMs: dataView(memory0).getInt32(ret + 16, true) >>> 0,
-        }
-      };
-      break;
-    }
-    case 1: {
-      var ptr4 = dataView(memory0).getUint32(ret + 4, true);
-      var len4 = dataView(memory0).getUint32(ret + 8, true);
-      var result4 = TEXT_DECODER_UTF8.decode(new Uint8Array(memory0.buffer, ptr4, len4));
-      variant5= {
-        tag: 'err',
-        val: result4
-      };
-      break;
-    }
-    default: {
-      throw new TypeError('invalid variant discriminant for expected');
-    }
-  }
-  _debugLog('[iface="parse-and-solve", function="parse-and-solve"][Instruction::Return]', {
-    funcName: 'parse-and-solve',
-    paramCount: 1,
-    async: false,
-    postReturn: true
-  });
-  const retCopy = variant5;
-  task.resolve([retCopy.val]);
-  
-  let cstate = getOrCreateAsyncState(0);
-  cstate.mayLeave = false;
-  postReturn0(ret);
+  postReturn1(ret);
   cstate.mayLeave = true;
   task.exit();
   
@@ -6851,7 +6912,7 @@ function parse(arg0) {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn1(ret);
+  postReturn2(ret);
   cstate.mayLeave = true;
   task.exit();
   
@@ -7019,7 +7080,7 @@ function listAlgorithms() {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn2(ret);
+  postReturn3(ret);
   cstate.mayLeave = true;
   task.exit();
   return retCopy;
@@ -7086,7 +7147,7 @@ function getVersion() {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn3(ret);
+  postReturn4(ret);
   cstate.mayLeave = true;
   task.exit();
   return retCopy;
@@ -7095,28 +7156,54 @@ function getVersion() {
 let exports1Compare;
 
 function compare(arg0, arg1, arg2) {
-  var vec1 = arg0;
-  var len1 = vec1.length;
-  var result1 = realloc1(0, 0, 4, len1 * 8);
-  for (let i = 0; i < vec1.length; i++) {
-    const e = vec1[i];
-    const base = result1 + i * 8;
+  var ptr0 = realloc1(0, 0, 4, 100);
+  var vec2 = arg0;
+  var len2 = vec2.length;
+  var result2 = realloc1(0, 0, 4, len2 * 8);
+  for (let i = 0; i < vec2.length; i++) {
+    const e = vec2[i];
+    const base = result2 + i * 8;
     var encodeRes = _utf8AllocateAndEncode(e, realloc1, memory0);
-    var ptr0= encodeRes.ptr;
-    var len0 = encodeRes.len;
+    var ptr1= encodeRes.ptr;
+    var len1 = encodeRes.len;
     
-    dataView(memory0).setUint32(base + 4, len0, true);
-    dataView(memory0).setUint32(base + 0, ptr0, true);
+    dataView(memory0).setUint32(base + 4, len1, true);
+    dataView(memory0).setUint32(base + 0, ptr1, true);
   }
+  dataView(memory0).setUint32(ptr0 + 4, len2, true);
+  dataView(memory0).setUint32(ptr0 + 0, result2, true);
   
   var encodeRes = _utf8AllocateAndEncode(arg1, realloc1, memory0);
-  var ptr2= encodeRes.ptr;
-  var len2 = encodeRes.len;
+  var ptr3= encodeRes.ptr;
+  var len3 = encodeRes.len;
   
-  var {epochs: v3_0, platooEpochs: v3_1, coolingRate: v3_2, maxTemperature: v3_3, minTemperature: v3_4, mutationProbability: v3_5, nElite: v3_6, nNearest: v3_7, alpha: v3_8, beta: v3_9, evaporationRate: v3_10, numAnts: v3_11 } = arg2;
+  dataView(memory0).setUint32(ptr0 + 12, len3, true);
+  dataView(memory0).setUint32(ptr0 + 8, ptr3, true);
+  var {epochs: v4_0, platooEpochs: v4_1, coolingRate: v4_2, maxTemperature: v4_3, minTemperature: v4_4, mutationProbability: v4_5, nElite: v4_6, nNearest: v4_7, alpha: v4_8, beta: v4_9, evaporationRate: v4_10, numAnts: v4_11, sfcOrder: v4_12, sfcRotation: v4_13, sfcMirror: v4_14, sfcMultiOrientation: v4_15, eaxPopSize: v4_16, eaxChildrenPerPair: v4_17, eaxStrategy: v4_18, eaxStallEpochs: v4_19, eaxCandidateK: v4_20 } = arg2;
+  dataView(memory0).setInt32(ptr0 + 16, toUint32(v4_0), true);
+  dataView(memory0).setInt32(ptr0 + 20, toUint32(v4_1), true);
+  dataView(memory0).setFloat32(ptr0 + 24, +v4_2, true);
+  dataView(memory0).setFloat32(ptr0 + 28, +v4_3, true);
+  dataView(memory0).setFloat32(ptr0 + 32, +v4_4, true);
+  dataView(memory0).setFloat32(ptr0 + 36, +v4_5, true);
+  dataView(memory0).setInt32(ptr0 + 40, toUint32(v4_6), true);
+  dataView(memory0).setInt32(ptr0 + 44, toUint32(v4_7), true);
+  dataView(memory0).setFloat32(ptr0 + 48, +v4_8, true);
+  dataView(memory0).setFloat32(ptr0 + 52, +v4_9, true);
+  dataView(memory0).setFloat32(ptr0 + 56, +v4_10, true);
+  dataView(memory0).setInt32(ptr0 + 60, toUint32(v4_11), true);
+  dataView(memory0).setInt32(ptr0 + 64, toUint32(v4_12), true);
+  dataView(memory0).setInt32(ptr0 + 68, toUint32(v4_13), true);
+  dataView(memory0).setInt32(ptr0 + 72, toUint32(v4_14), true);
+  dataView(memory0).setInt32(ptr0 + 76, toUint32(v4_15), true);
+  dataView(memory0).setInt32(ptr0 + 80, toUint32(v4_16), true);
+  dataView(memory0).setInt32(ptr0 + 84, toUint32(v4_17), true);
+  dataView(memory0).setInt32(ptr0 + 88, toUint32(v4_18), true);
+  dataView(memory0).setInt32(ptr0 + 92, toUint32(v4_19), true);
+  dataView(memory0).setInt32(ptr0 + 96, toUint32(v4_20), true);
   _debugLog('[iface="compare", function="compare"][Instruction::CallWasm] enter', {
     funcName: 'compare',
-    paramCount: 16,
+    paramCount: 1,
     async: false,
     postReturn: true,
   });
@@ -7147,7 +7234,7 @@ function compare(arg0, arg1, arg2) {
     ret =   _withGlobalCurrentTaskMeta({
       taskID: task.id(),
       componentIdx: task.componentIdx(),
-      fn: () => exports1Compare(result1, len1, ptr2, len2, toUint32(v3_0), toUint32(v3_1), +v3_2, +v3_3, +v3_4, +v3_5, toUint32(v3_6), toUint32(v3_7), +v3_8, +v3_9, +v3_10, toUint32(v3_11)),
+      fn: () => exports1Compare(ptr0),
     });
   } catch (err) {
     
@@ -7158,37 +7245,37 @@ function compare(arg0, arg1, arg2) {
     
   }
   
-  var len8 = dataView(memory0).getUint32(ret + 4, true);
-  var base8 = dataView(memory0).getUint32(ret + 0, true);
-  var result8 = [];
-  for (let i = 0; i < len8; i++) {
-    const base = base8 + i * 28;
-    var ptr4 = dataView(memory0).getUint32(base + 0, true);
-    var len4 = dataView(memory0).getUint32(base + 4, true);
-    var result4 = TEXT_DECODER_UTF8.decode(new Uint8Array(memory0.buffer, ptr4, len4));
-    let variant7;
+  var len9 = dataView(memory0).getUint32(ret + 4, true);
+  var base9 = dataView(memory0).getUint32(ret + 0, true);
+  var result9 = [];
+  for (let i = 0; i < len9; i++) {
+    const base = base9 + i * 28;
+    var ptr5 = dataView(memory0).getUint32(base + 0, true);
+    var len5 = dataView(memory0).getUint32(base + 4, true);
+    var result5 = TEXT_DECODER_UTF8.decode(new Uint8Array(memory0.buffer, ptr5, len5));
+    let variant8;
     switch (dataView(memory0).getUint8(base + 8, true)) {
       case 0: {
-        var ptr5 = dataView(memory0).getUint32(base + 16, true);
-        var len5 = dataView(memory0).getUint32(base + 20, true);
-        var result5 = new Uint32Array(memory0.buffer.slice(ptr5, ptr5 + len5 * 4));
-        variant7= {
+        var ptr6 = dataView(memory0).getUint32(base + 16, true);
+        var len6 = dataView(memory0).getUint32(base + 20, true);
+        var result6 = new Uint32Array(memory0.buffer.slice(ptr6, ptr6 + len6 * 4));
+        variant8= {
           tag: 'ok',
           val: {
             total: dataView(memory0).getFloat32(base + 12, true),
-            route: result5,
+            route: result6,
             durationMs: dataView(memory0).getInt32(base + 24, true) >>> 0,
           }
         };
         break;
       }
       case 1: {
-        var ptr6 = dataView(memory0).getUint32(base + 12, true);
-        var len6 = dataView(memory0).getUint32(base + 16, true);
-        var result6 = TEXT_DECODER_UTF8.decode(new Uint8Array(memory0.buffer, ptr6, len6));
-        variant7= {
+        var ptr7 = dataView(memory0).getUint32(base + 12, true);
+        var len7 = dataView(memory0).getUint32(base + 16, true);
+        var result7 = TEXT_DECODER_UTF8.decode(new Uint8Array(memory0.buffer, ptr7, len7));
+        variant8= {
           tag: 'err',
-          val: result6
+          val: result7
         };
         break;
       }
@@ -7196,9 +7283,9 @@ function compare(arg0, arg1, arg2) {
         throw new TypeError('invalid variant discriminant for expected');
       }
     }
-    result8.push({
-      algorithm: result4,
-      solution: variant7,
+    result9.push({
+      algorithm: result5,
+      solution: variant8,
     });
   }
   _debugLog('[iface="compare", function="compare"][Instruction::Return]', {
@@ -7207,12 +7294,12 @@ function compare(arg0, arg1, arg2) {
     async: false,
     postReturn: true
   });
-  task.resolve([result8]);
-  const retCopy = result8;
+  task.resolve([result9]);
+  const retCopy = result9;
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn4(ret);
+  postReturn5(ret);
   cstate.mayLeave = true;
   task.exit();
   return retCopy;
@@ -7360,7 +7447,7 @@ function compareTours(arg0, arg1, arg2) {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn5(ret);
+  postReturn6(ret);
   cstate.mayLeave = true;
   task.exit();
   
@@ -7485,7 +7572,7 @@ function tourDistance(arg0, arg1) {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn5(ret);
+  postReturn7(ret);
   cstate.mayLeave = true;
   task.exit();
   
@@ -7634,7 +7721,7 @@ function compareToursFromInput(arg0, arg1, arg2) {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn5(ret);
+  postReturn8(ret);
   cstate.mayLeave = true;
   task.exit();
   
@@ -7754,7 +7841,7 @@ function tourDistanceFromInput(arg0, arg1) {
   
   let cstate = getOrCreateAsyncState(0);
   cstate.mayLeave = false;
-  postReturn5(ret);
+  postReturn9(ret);
   cstate.mayLeave = true;
   task.exit();
   
@@ -9023,6 +9110,7 @@ const $init = (() => {
     const module1 = fetchCompile(new URL('./teeline_wasm.core2.wasm', import.meta.url));
     const module2 = base64Compile('AGFzbQEAAAABOQpgAn9/AX9gA39+fwF/YAR/f39/AX9gAX8AYAABf2ABfwBgAn9/AGADf35/AGAEf39/fwBgAn5/AAMVFAAAAAECAwQFBQYHBgYGBggGCAkFBAUBcAEUFAdmFQEwAAABMQABATIAAgEzAAMBNAAEATUABQE2AAYBNwAHATgACAE5AAkCMTAACgIxMQALAjEyAAwCMTMADQIxNAAOAjE1AA8CMTYAEAIxNwARAjE4ABICMTkAEwgkaW1wb3J0cwEACvUBFAsAIAAgAUEAEQAACwsAIAAgAUEBEQAACwsAIAAgAUECEQAACw0AIAAgASACQQMRAQALDwAgACABIAIgA0EEEQIACwkAIABBBREDAAsHAEEGEQQACwkAIABBBxEFAAsJACAAQQgRBQALCwAgACABQQkRBgALDQAgACABIAJBChEHAAsLACAAIAFBCxEGAAsLACAAIAFBDBEGAAsLACAAIAFBDREGAAsLACAAIAFBDhEGAAsPACAAIAEgAiADQQ8RCAALCwAgACABQRARBgALDwAgACABIAIgA0EREQgACwsAIAAgAUESEQkACwkAIABBExEFAAsALwlwcm9kdWNlcnMBDHByb2Nlc3NlZC1ieQENd2l0LWNvbXBvbmVudAcwLjIyNy4xAPcIBG5hbWUAExJ3aXQtY29tcG9uZW50OnNoaW0B2ggUACdhZGFwdC13YXNpX3NuYXBzaG90X3ByZXZpZXcxLXJhbmRvbV9nZXQBKGFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtZW52aXJvbl9nZXQCLmFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtZW52aXJvbl9zaXplc19nZXQDK2FkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtY2xvY2tfdGltZV9nZXQEJWFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtZmRfd3JpdGUFJmFkYXB0LXdhc2lfc25hcHNob3RfcHJldmlldzEtcHJvY19leGl0BihhZGFwdC13YXNpX3NuYXBzaG90X3ByZXZpZXcxLXNjaGVkX3lpZWxkBzNpbmRpcmVjdC13YXNpOmNsaS9lbnZpcm9ubWVudEAwLjIuMy1nZXQtZW52aXJvbm1lbnQIKWluZGlyZWN0LXdhc2k6Y2xvY2tzL3dhbGwtY2xvY2tAMC4yLjMtbm93CTppbmRpcmVjdC13YXNpOmZpbGVzeXN0ZW0vdHlwZXNAMC4yLjMtZmlsZXN5c3RlbS1lcnJvci1jb2RlCkhpbmRpcmVjdC13YXNpOmZpbGVzeXN0ZW0vdHlwZXNAMC4yLjMtW21ldGhvZF1kZXNjcmlwdG9yLndyaXRlLXZpYS1zdHJlYW0LSWluZGlyZWN0LXdhc2k6ZmlsZXN5c3RlbS90eXBlc0AwLjIuMy1bbWV0aG9kXWRlc2NyaXB0b3IuYXBwZW5kLXZpYS1zdHJlYW0MQGluZGlyZWN0LXdhc2k6ZmlsZXN5c3RlbS90eXBlc0AwLjIuMy1bbWV0aG9kXWRlc2NyaXB0b3IuZ2V0LXR5cGUNPGluZGlyZWN0LXdhc2k6ZmlsZXN5c3RlbS90eXBlc0AwLjIuMy1bbWV0aG9kXWRlc2NyaXB0b3Iuc3RhdA5AaW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS5jaGVjay13cml0ZQ86aW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS53cml0ZRBDaW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS5ibG9ja2luZy1mbHVzaBFNaW5kaXJlY3Qtd2FzaTppby9zdHJlYW1zQDAuMi4zLVttZXRob2Rdb3V0cHV0LXN0cmVhbS5ibG9ja2luZy13cml0ZS1hbmQtZmx1c2gSMmluZGlyZWN0LXdhc2k6cmFuZG9tL3JhbmRvbUAwLjIuMy1nZXQtcmFuZG9tLWJ5dGVzEzdpbmRpcmVjdC13YXNpOmZpbGVzeXN0ZW0vcHJlb3BlbnNAMC4yLjItZ2V0LWRpcmVjdG9yaWVz');
     const module3 = base64Compile('AGFzbQEAAAABOQpgAn9/AX9gA39+fwF/YAR/f39/AX9gAX8AYAABf2ABfwBgAn9/AGADf35/AGAEf39/fwBgAn5/AAJ+FQABMAAAAAExAAAAATIAAAABMwABAAE0AAIAATUAAwABNgAEAAE3AAUAATgABQABOQAGAAIxMAAHAAIxMQAGAAIxMgAGAAIxMwAGAAIxNAAGAAIxNQAIAAIxNgAGAAIxNwAIAAIxOAAJAAIxOQAFAAgkaW1wb3J0cwFwARQUCRoBAEEACxQAAQIDBAUGBwgJCgsMDQ4PEBESEwAvCXByb2R1Y2VycwEMcHJvY2Vzc2VkLWJ5AQ13aXQtY29tcG9uZW50BzAuMjI3LjEAHARuYW1lABUUd2l0LWNvbXBvbmVudDpmaXh1cHM');
+    const module4 = base64Compile('AGFzbQEAAAABBAFgAAACBQEAAAAACAEA');
     ({ exports: exports0 } = yield instantiateCore(yield module2));
     ({ exports: exports1 } = yield instantiateCore(yield module0, {
       wasi_snapshot_preview1: {
@@ -9123,6 +9211,11 @@ const $init = (() => {
         '9': trampoline11,
       },
     }));
+    ({ exports: exports4 } = yield instantiateCore(yield module4, {
+      '': {
+        '': exports1._initialize,
+      },
+    }));
     realloc1 = exports1.cabi_realloc;
     
     try {
@@ -9131,52 +9224,84 @@ const $init = (() => {
       realloc1Async = exports1.cabi_realloc;
     }
     
-    postReturn0 = exports1['cabi_post_parse-and-solve'];
+    postReturn0 = exports1.cabi_post_solve;
     
     try {
-      postReturn0Async = WebAssembly.promising(exports1['cabi_post_parse-and-solve']);
+      postReturn0Async = WebAssembly.promising(exports1.cabi_post_solve);
     } catch(err) {
-      postReturn0Async = exports1['cabi_post_parse-and-solve'];
+      postReturn0Async = exports1.cabi_post_solve;
     }
     
-    postReturn1 = exports1.cabi_post_parse;
+    postReturn1 = exports1['cabi_post_parse-and-solve'];
     
     try {
-      postReturn1Async = WebAssembly.promising(exports1.cabi_post_parse);
+      postReturn1Async = WebAssembly.promising(exports1['cabi_post_parse-and-solve']);
     } catch(err) {
-      postReturn1Async = exports1.cabi_post_parse;
+      postReturn1Async = exports1['cabi_post_parse-and-solve'];
     }
     
-    postReturn2 = exports1['cabi_post_list-algorithms'];
+    postReturn2 = exports1.cabi_post_parse;
     
     try {
-      postReturn2Async = WebAssembly.promising(exports1['cabi_post_list-algorithms']);
+      postReturn2Async = WebAssembly.promising(exports1.cabi_post_parse);
     } catch(err) {
-      postReturn2Async = exports1['cabi_post_list-algorithms'];
+      postReturn2Async = exports1.cabi_post_parse;
     }
     
-    postReturn3 = exports1['cabi_post_get-version'];
+    postReturn3 = exports1['cabi_post_list-algorithms'];
     
     try {
-      postReturn3Async = WebAssembly.promising(exports1['cabi_post_get-version']);
+      postReturn3Async = WebAssembly.promising(exports1['cabi_post_list-algorithms']);
     } catch(err) {
-      postReturn3Async = exports1['cabi_post_get-version'];
+      postReturn3Async = exports1['cabi_post_list-algorithms'];
     }
     
-    postReturn4 = exports1.cabi_post_compare;
+    postReturn4 = exports1['cabi_post_get-version'];
     
     try {
-      postReturn4Async = WebAssembly.promising(exports1.cabi_post_compare);
+      postReturn4Async = WebAssembly.promising(exports1['cabi_post_get-version']);
     } catch(err) {
-      postReturn4Async = exports1.cabi_post_compare;
+      postReturn4Async = exports1['cabi_post_get-version'];
     }
     
-    postReturn5 = exports1['cabi_post_compare-tours'];
+    postReturn5 = exports1.cabi_post_compare;
     
     try {
-      postReturn5Async = WebAssembly.promising(exports1['cabi_post_compare-tours']);
+      postReturn5Async = WebAssembly.promising(exports1.cabi_post_compare);
     } catch(err) {
-      postReturn5Async = exports1['cabi_post_compare-tours'];
+      postReturn5Async = exports1.cabi_post_compare;
+    }
+    
+    postReturn6 = exports1['cabi_post_compare-tours'];
+    
+    try {
+      postReturn6Async = WebAssembly.promising(exports1['cabi_post_compare-tours']);
+    } catch(err) {
+      postReturn6Async = exports1['cabi_post_compare-tours'];
+    }
+    
+    postReturn7 = exports1['cabi_post_tour-distance'];
+    
+    try {
+      postReturn7Async = WebAssembly.promising(exports1['cabi_post_tour-distance']);
+    } catch(err) {
+      postReturn7Async = exports1['cabi_post_tour-distance'];
+    }
+    
+    postReturn8 = exports1['cabi_post_compare-tours-from-input'];
+    
+    try {
+      postReturn8Async = WebAssembly.promising(exports1['cabi_post_compare-tours-from-input']);
+    } catch(err) {
+      postReturn8Async = exports1['cabi_post_compare-tours-from-input'];
+    }
+    
+    postReturn9 = exports1['cabi_post_tour-distance-from-input'];
+    
+    try {
+      postReturn9Async = WebAssembly.promising(exports1['cabi_post_tour-distance-from-input']);
+    } catch(err) {
+      postReturn9Async = exports1['cabi_post_tour-distance-from-input'];
     }
     
     exports1Solve = exports1.solve;

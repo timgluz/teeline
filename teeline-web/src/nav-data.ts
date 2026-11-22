@@ -47,6 +47,11 @@ export const SOLVER_META: Record<string, SolverMeta> = {
     name: 'Greedy Edge',
     complexity: 'O(n² log n) edge sort + O(n² α(n)) scan',
   },
+  space_filling_curve: {
+    id: 'space_filling_curve',
+    name: 'Space-Filling Curve',
+    complexity: 'O(n log n)',
+  },
   '2opt': { id: '2opt', name: '2-opt', complexity: 'O(n²) / pass' },
   '3opt': { id: '3opt', name: '3-opt', complexity: 'O(n³) / pass' },
   or_opt: { id: 'or_opt', name: 'Or-opt', complexity: 'O(n²) / pass' },
@@ -66,7 +71,7 @@ export const SOLVER_META: Record<string, SolverMeta> = {
   pso: {
     id: 'pso',
     name: 'Particle Swarm',
-    complexity: 'O(epochs · swarm · n)',
+    complexity: 'O(epochs · swarm · n) + 2-opt polish',
   },
   cs: { id: 'cs', name: 'Cuckoo Search', complexity: 'O(epochs · nests · n)' },
   fpa: {
@@ -89,12 +94,20 @@ export const SOLVER_META: Record<string, SolverMeta> = {
     name: 'Ant Colony Optimization',
     complexity: 'O(epochs · ants · n²)',
   },
+  eax: {
+    id: 'eax',
+    name: 'Memetic EAX',
+    complexity: 'O(epochs · pop · children · n²)',
+  },
   savings: {
     id: 'savings',
     name: 'Savings',
     complexity: 'O(n² log n) edge sort + O(n² α(n)) scan',
   },
 }
+
+/** Every algorithm with a docs page and a nav entry; the single source for the count. */
+export const ALGORITHM_COUNT = Object.keys(SOLVER_META).length
 
 export interface SolverGroup {
   label: string
@@ -105,7 +118,15 @@ export const SOLVER_GROUPS: SolverGroup[] = [
   { label: 'Exact', ids: ['bhk', 'branch_bound'] },
   {
     label: 'Constructive',
-    ids: ['nn', 'fourier', 'christofides', 'greedy_edge', 'savings', 'som'],
+    ids: [
+      'nn',
+      'fourier',
+      'christofides',
+      'greedy_edge',
+      'space_filling_curve',
+      'savings',
+      'som',
+    ],
   },
   {
     label: 'Local search',
@@ -113,28 +134,38 @@ export const SOLVER_GROUPS: SolverGroup[] = [
   },
   {
     label: 'Metaheuristic',
-    ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa', 'aco'],
+    ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa', 'aco', 'eax'],
   },
 ]
 
 // Every id in SOLVER_META has a generated doc page under /algorithms/<id>/.
 export const PAGED_SOLVERS = new Set(Object.keys(SOLVER_META))
 
-// The subset of ids with an interactive explainer under /algorithms/<id>/explainer/.
+// The ids with an interactive explainer under /algorithms/<id>/explainer/.
 export const EXPLAINER_SOLVERS = new Set([
-  'pso',
-  'gsa',
-  'tabu',
-  'ga',
-  'cs',
-  'fpa',
+  'bhk',
+  'branch_bound',
+  'nn',
+  'fourier',
+  'christofides',
+  'greedy_edge',
+  'space_filling_curve',
+  'savings',
+  'som',
+  '2opt',
+  '3opt',
+  'or_opt',
+  'stochastic_hill',
   'lk',
   'sa',
-  'som',
-  'fourier',
-  'greedy_edge',
-  'savings',
+  'tabu',
+  'ga',
+  'pso',
+  'cs',
+  'fpa',
+  'gsa',
   'aco',
+  'eax',
 ])
 
 // ── Problem (dataset) navigation ───────────────────────────────────────

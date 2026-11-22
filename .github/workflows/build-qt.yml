@@ -19,7 +19,7 @@ on:
         default: 'qt-prerelease'
 
 env:
-  QT_VERSION: '6.11.0'
+  QT_VERSION: '6.11.1'
 
 jobs:
   build-qt-linux:
@@ -57,7 +57,7 @@ jobs:
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
           mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp target/release/teeline-qt AppDir/usr/bin/
+          cp teeline-qt/target/release/teeline-qt AppDir/usr/bin/
           cat > AppDir/teeline-qt.desktop << 'DESKTOP'
           [Desktop Entry]
           Type=Application
@@ -84,11 +84,33 @@ jobs:
           PYEOF
       - name: Package AppImage
         env:
-          QMLPATHS: ${{ github.workspace }}/teeline-qt/src
+          # linuxdeploy-plugin-qt reads QML_SOURCES_PATHS (not QMLPATHS). Without it the
+          # AppImage ships Qt libraries but no QtQuick modules and fails at QML load.
+          QML_SOURCES_PATHS: ${{ github.workspace }}/teeline-qt/src
+          # Bundle the offscreen platform so CI can smoke-test the bundle headlessly.
+          EXTRA_PLATFORM_PLUGINS: "libqoffscreen.so"
           LD_LIBRARY_PATH: ${{ env.QT_ROOT_DIR }}/lib
         run: |
           ./linuxdeploy-x86_64.AppImage --appdir=AppDir --plugin qt --output appimage
           mv Teeline_Qt-x86_64.AppImage "teeline-qt-${{ inputs.tag }}-linux-x86_64.AppImage"
+      - name: Verify QML modules were bundled
+        run: |
+          test -d AppDir/usr/qml/QtQuick
+          test -d AppDir/usr/qml/QtQuick/Controls
+      - name: Smoke-test the AppImage (offscreen)
+        run: |
+          set +e
+          QT_QPA_PLATFORM=offscreen timeout 8 "./teeline-qt-${{ inputs.tag }}-linux-x86_64.AppImage" > smoke.log 2>&1
+          rc=$?
+          cat smoke.log
+          if grep -q "failed to load component" smoke.log; then
+            echo "AppImage failed to load its QML modules"
+            exit 1
+          fi
+          # 124 means timeout killed a running event loop; 0 means it exited cleanly.
+          if [ "$rc" -ne 0 ] && [ "$rc" -ne 124 ]; then
+            exit "$rc"
+          fi
       - uses: actions/upload-artifact@v7
         with:
           name: qt-linux
@@ -101,6 +123,9 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 6.11.x has no win64_msvc2022_64 desktop package; release.yml pins the
+      # same version for Windows.
+      QT_VERSION: '6.9.1'
     steps:
       - name: Configure long paths
         run: git config --global core.longpaths true
@@ -123,8 +148,8 @@ jobs:
         shell: pwsh
         run: |
           $windeployqt = "${{ env.QT_ROOT_DIR }}\bin\windeployqt.exe"
-          & $windeployqt --release --compiler-runtime --qmldir teeline-qt\src --dir deploy target\release\teeline-qt.exe
-          Copy-Item target\release\teeline-qt.exe deploy\
+          & $windeployqt --release --compiler-runtime --qmldir teeline-qt\src --dir deploy teeline-qt\target\release\teeline-qt.exe
+          Copy-Item teeline-qt\target\release\teeline-qt.exe deploy\
       - name: Package zip
         shell: pwsh
         run: |
@@ -164,7 +189,7 @@ jobs:
         run: |
           mkdir -p TeelineQt.app/Contents/MacOS
           mkdir -p TeelineQt.app/Contents/Resources
-          cp target/release/teeline-qt TeelineQt.app/Contents/MacOS/
+          cp teeline-qt/target/release/teeline-qt TeelineQt.app/Contents/MacOS/
           cat > TeelineQt.app/Contents/Info.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

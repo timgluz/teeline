@@ -6,7 +6,7 @@ resolver = "2"
 
 [package]
 name = "teeline"
-version = "1.0.12"
+version = "1.0.17"
 authors = ["Timo Sulg <timgluz@gmail.com>"]
 edition = "2024"
 repository = "https://github.com/timgluz/teeline"
@@ -42,4 +42,8 @@ lto = "thin"
 
 [[bench]]
 name = "kdtree"
+harness = false
+
+[[bench]]
+name = "distance_matrix"
 harness = false

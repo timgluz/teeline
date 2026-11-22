@@ -184,6 +184,13 @@ export default function ProblemResults({
         {' — cross-family gaps are not like-for-like'}
       </p>
 
+      {shard.layout === 'derived' && (
+        <p class="mt-2 text-sm text-text-dim">
+          The city layout is derived from this instance's distance matrix; tour
+          costs are measured against the published optimum and remain exact.
+        </p>
+      )}
+
       {mismatch && (
         <p class="mt-2 text-sm text-text-dim">
           This page states an optimal tour of{' '}

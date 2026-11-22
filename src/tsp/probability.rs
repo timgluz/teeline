@@ -66,7 +66,7 @@ pub fn sample_without_replacement(rng: &mut impl RngExt, n: usize, excluded: &[u
 /// still get picked whenever it's first in iteration order and `r` happens to land on
 /// `0.0`. The strict comparison correctly requires `acc` to exceed `target`, so a
 /// zero-width bucket can never "contain" the target.
-pub fn roulette_select(weights: &[(usize, f32)], sum: f32, r: f32) -> usize {
+pub fn roulette_select<T: Copy>(weights: &[(T, f32)], sum: f32, r: f32) -> T {
     let target = r * sum;
     let mut acc = 0.0f32;
     for &(id, w) in weights {

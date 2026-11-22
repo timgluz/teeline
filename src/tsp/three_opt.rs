@@ -1,6 +1,6 @@
+use super::DistanceSource;
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
@@ -24,7 +24,7 @@ pub fn solve(
     let n = cities.len();
     if n < 4 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        return Solution::from_parts(&path, cities, distances);
+        return Solution::from_parts(&path, distances.as_ref());
     }
 
     let mut path: Vec<usize> = init_tour
@@ -36,7 +36,7 @@ pub fn solve(
     let mut improved = true;
     while improved {
         improved = false;
-        if let Some((i, j, k, case)) = find_best_move(&path, distances) {
+        if let Some((i, j, k, case)) = find_best_move(&path, distances.as_ref()) {
             tracing::debug!(i, j, k, case, "3-opt: best improvement");
             apply_3opt(&mut path, i, j, k, case);
             send_path(progress_tx, &path);
@@ -47,7 +47,7 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, distances.as_ref())
 }
 
 /// Scans all C(n,3) triples and returns the coordinates of the globally best
@@ -55,7 +55,10 @@ pub fn solve(
 /// locally optimal.
 ///
 /// Pure: no side effects, no progress messages.
-fn find_best_move(path: &[usize], distances: &DistanceMatrix) -> Option<(usize, usize, usize, u8)> {
+fn find_best_move(
+    path: &[usize],
+    distances: &dyn DistanceSource,
+) -> Option<(usize, usize, usize, u8)> {
     let n = path.len();
     let mut best_move: Option<(usize, usize, usize, u8)> = None;
     let mut best_savings = 0.0_f32;
@@ -218,7 +221,7 @@ fn apply_3opt(path: &mut [usize], i: usize, j: usize, k: usize, case: u8) {
 }
 
 #[inline]
-fn d(dm: &DistanceMatrix, a: usize, b: usize) -> f32 {
+fn d(dm: &dyn DistanceSource, a: usize, b: usize) -> f32 {
     dm.distance_between(a, b)
         .expect("three_opt: invalid city pair")
 }
@@ -232,6 +235,7 @@ fn send_path(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::distance_matrix::DistanceMatrix;
     use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn build_dm(cities: &[kdtree::KDPoint]) -> DistanceMatrix {

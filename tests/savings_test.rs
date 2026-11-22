@@ -1,5 +1,6 @@
-/// Integration tests for the Savings constructive TSP solver.
 use std::path::Path;
+/// Integration tests for the Savings constructive TSP solver.
+use teeline::tsp::DistanceSource;
 use teeline::tsp::{
     AppOptions, HeuristicOptions, Solvers, TspProblem, distance_matrix, kdtree, pipeline, savings,
     tsplib,

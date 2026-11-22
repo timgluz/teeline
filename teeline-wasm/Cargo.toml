@@ -2,7 +2,7 @@
 
 [package]
 name = "teeline-wasm"
-version = "0.2.2"
+version = "0.3.3"
 edition = "2024"
 
 [lib]
@@ -23,5 +23,5 @@ wit-bindgen-rt = { version = "0.44.0", features = ["bitflags"] }
 teeline = { path = "..", default-features = false, features = ["json"] }
 
 [dev-dependencies]
-wasmtime = { version = "45", features = ["component-model"] }
-wasmtime-wasi = "45"
+wasmtime = { version = "50", features = ["component-model"] }
+wasmtime-wasi = "50"

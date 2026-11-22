@@ -233,6 +233,7 @@ Rules the harness enforces, each because the alternative is a hole in the publis
     "berlin52": {
       "cities": 52,
       "optimal_cost": 7542,
+      "layout": "real",
       "by_config": {
         "default": {
           "runs": 5,
@@ -292,6 +293,14 @@ Rules:
   communicated this way rather than by a badge: being able to see which version
   produced a number is the requirement (design section 3.8).
 
+### `layout` provenance
+
+`layout` is an additive field on both shards: `"real"` when the instance supplied coordinates,
+`"derived"` when teeline derived a 2D layout from its distance matrix because the file published
+none. It defaults to `"real"` when absent, so shards published before the field existed remain
+valid and do not need a schema bump. Tour costs are exact in both cases; the label tells a reader
+that a geometric solver's ordering came from an approximate layout.
+
 ## `problems/{dataset_id}.json`
 
 The per-instance solver leaderboard, sorted by `gap_pct.median` ascending — or by
@@ -306,6 +315,7 @@ live tree with `scripts/read-benchmarks.sh problem berlin52`.
   "dataset": "berlin52",
   "cities": 52,
   "optimal_cost": 7542,
+  "layout": "real",
   "leaderboard": [
     {
       "solver": "lk",
@@ -440,6 +450,28 @@ licence to publish a tree holding only this run log's solvers.
 run must cover that solver's whole tier — every instance, every config — or the
 instances it omits are lost. The cadence is differential per *algorithm*, not per
 *instance*.
+
+### Single-solver publishing
+
+Between full-suite releases, a newly added or changed solver often has good data before the
+rest of the tree is re-measured. `--solver <id>` (repeatable) publishes only that solver's
+shard so its algorithm page renders, while everything else stays as the last complete sweep
+left it:
+
+```bash
+scripts/bench-matrix.sh bench/matrix/tier-a.toml --solver eax   # appends to tier-a.jsonl
+scripts/publish-benchmarks.sh --tier a --solver eax --dry-run    # inspect
+scripts/publish-benchmarks.sh --tier a --solver eax --only r2    # upload
+```
+
+This uploads `algorithms/eax.json` and `index.json` only. The other solver shards are
+byte-identical and skipped, and the problem leaderboards are **not** rewritten — ranking a
+v1.0.17 result against a v1.0.12 board would be incomparable. Pass `--merge-leaderboards` when
+that mix is deliberate; `--snapshot` requires it, because a snapshot must be a complete tree.
+
+The shard's own `measurement` block states the commit/version that produced it, so a reader can
+see that this algorithm is newer than the rest of the tree. A solver publish never changes
+another solver's provenance.
 
 ## Publishing
 

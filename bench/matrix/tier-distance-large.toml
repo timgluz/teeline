@@ -1,0 +1,77 @@
+# Distance-backend comparison tier for downloaded instances.
+#
+# Optional: run download_data.sh first. The default tier-distance.toml uses only tracked
+# fixtures so a fresh checkout can run it; this tier deliberately cannot.
+#
+# Same budgets and multi-run rule as tier-distance.toml. The matrix for pla33810 is roughly
+# 2.3 GB, so a machine without the RAM records that cell as OOM/not-measured rather than
+# extrapolating it.
+
+tier = "distance-large"
+
+runs = 5
+
+[budgets]
+exact = 60
+local = 300
+meta = 300
+constructive = 30
+utility = 60
+
+[coverage]
+exact = []
+constructive = ["large", "xlarge"]
+local = ["large"]
+meta = ["large"]
+utility = []
+
+[instances]
+dsj1000 = "large"   # CEIL_2D, 1000
+pla7397 = "large"   # EUC_2D, 7397
+pla33810 = "xlarge" # EUC_2D, 33810
+
+[configs.matrix]
+solvers = ["2opt", "or_opt", "nn", "space_filling_curve"]
+instances = ["dsj1000", "pla7397"]
+args = ["--distance-backend", "matrix"]
+
+# LK's iterated passes are the most expensive local search, so keep it on the smaller large
+# instance until the sweep says it fits the budget on pla7397 too.
+[configs.matrix-lk]
+solvers = ["lk"]
+instances = ["dsj1000"]
+args = ["--distance-backend", "matrix"]
+
+[configs.matrix-fixed]
+solvers = ["tabu"]
+instances = ["dsj1000", "pla7397"]
+args = ["--epochs", "1000", "--distance-backend", "matrix"]
+
+# 2-opt/or-opt are O(n^2) per pass at 33k cities; only the constructive solvers are planned
+# for the xlarge instance.
+[configs.matrix-xlarge]
+solvers = ["nn", "space_filling_curve"]
+instances = ["pla33810"]
+args = ["--distance-backend", "matrix"]
+
+# Paired on-the-fly configs: every (solver, dataset) cell must appear under both backends so
+# the comparison checker can score it.
+[configs.on-the-fly]
+solvers = ["2opt", "or_opt", "nn", "space_filling_curve"]
+instances = ["dsj1000", "pla7397"]
+args = ["--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-lk]
+solvers = ["lk"]
+instances = ["dsj1000"]
+args = ["--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-fixed]
+solvers = ["tabu"]
+instances = ["dsj1000", "pla7397"]
+args = ["--epochs", "1000", "--distance-backend", "on-the-fly"]
+
+[configs.on-the-fly-xlarge]
+solvers = ["nn", "space_filling_curve"]
+instances = ["pla33810"]
+args = ["--distance-backend", "on-the-fly"]

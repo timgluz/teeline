@@ -295,6 +295,69 @@ publish() {
     [ "$(jq -r '.measurement.git_commit' "$TMPDIR/prev-tree/v2/algorithms/nn.json")" = "aaaaaaaa" ]
 }
 
+@test "a --solver publish uploads only that shard and leaves the leaderboards alone" {
+    # Previous tree with only nn, so sa is genuinely new to the published tree.
+    {
+        row nn eil51 default 1 0.01 6000 450.0 ok
+        row nn eil51 default 2 0.01 6000 450.0 ok
+        row nn zzz_unknown default 1 0.02 6100 1234.0 ok
+        row nn zzz_unknown default 2 0.02 6100 1234.0 ok
+    } > "$TMPDIR/nn-only.jsonl"
+    publish --runs "$TMPDIR/nn-only.jsonl"
+    cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
+
+    run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage2" \
+        --runs "$TMPDIR/prev.jsonl" --solver sa
+    [ "$status" -eq 0 ]
+
+    # Only the selected solver's shard and the manifest move; nn is byte-identical.
+    [[ "$output" == *"would put bench/v2/algorithms/sa.json"* ]]
+    [[ "$output" != *"would put bench/v2/algorithms/nn.json"* ]]
+    [[ "$output" != *"would put bench/v2/problems/"* ]]
+    [[ "$output" == *"2 object(s) would be uploaded, 1 unchanged"* ]]
+
+    # The shard is staged; the full-suite leaderboard is not rebuilt from one solver.
+    [ -f "$TMPDIR/stage2/v2/algorithms/sa.json" ]
+    [ ! -f "$TMPDIR/stage2/v2/problems/eil51.json" ]
+    # The manifest still lists both solvers and both problems.
+    [ "$(jq -r '[.solvers[].id] | sort | join(",")' "$TMPDIR/stage2/v2/index.json")" = "nn,sa" ]
+    [ "$(jq -r '.problems | length' "$TMPDIR/stage2/v2/index.json")" = "2" ]
+}
+
+@test "a --solver publish can opt into the leaderboards" {
+    {
+        row nn eil51 default 1 0.01 6000 450.0 ok
+        row nn eil51 default 2 0.01 6000 450.0 ok
+        row nn zzz_unknown default 1 0.02 6100 1234.0 ok
+        row nn zzz_unknown default 2 0.02 6100 1234.0 ok
+    } > "$TMPDIR/nn-only.jsonl"
+    publish --runs "$TMPDIR/nn-only.jsonl"
+    cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
+
+    run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage2" \
+        --runs "$TMPDIR/prev.jsonl" --solver sa --merge-leaderboards
+    [ "$status" -eq 0 ]
+    [ "$(jq -r '[.leaderboard[].solver] | sort | join(",")' "$TMPDIR/stage2/v2/problems/eil51.json")" = "nn,sa" ]
+    [[ "$output" == *"would put bench/v2/problems/eil51.json"* ]]
+}
+
+@test "a --solver publish with no matching rows is refused" {
+    publish --runs "$TMPDIR/prev.jsonl"
+    cp -r "$TMPDIR/stage" "$TMPDIR/prev-tree"
+
+    run "$PUBLISH" --dry-run --previous "$TMPDIR/prev-tree" --stage "$TMPDIR/stage2" \
+        --runs "$TMPDIR/prev.jsonl" --solver bhk
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"has no rows for solver(s): bhk"* ]]
+}
+
+@test "a --solver publish refuses a snapshot unless the tree is complete" {
+    run "$PUBLISH" --dry-run --no-fetch-previous --stage "$TMPDIR/stage" \
+        --runs "$TMPDIR/prev.jsonl" --solver sa --snapshot v1.0.0
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--snapshot must be a complete tree"* ]]
+}
+
 @test "a release snapshot is written as a complete immutable copy" {
     run publish --runs "$TMPDIR/prev.jsonl" --snapshot v1.0.0
     [ "$status" -eq 0 ]
@@ -598,4 +661,37 @@ PY
     [ "$status" -eq 0 ]
     [ -f "$TMPDIR/stage/v2/problems/eil51.json" ]
     [ "$(jq -r '.leaderboard[0].solver + " runs=" + (.leaderboard[0].runs|tostring) + " timeouts=" + (.leaderboard[0].timeouts|tostring)' "$TMPDIR/stage/v2/problems/eil51.json")" = "sa runs=0 timeouts=1" ]
+}
+
+@test "layout provenance reaches the algorithm and problem shards" {
+    jq -cn --argjson m "$DEFAULT_MEASUREMENT" \
+        '{solver:"nn",dataset:"eil51",config:"default",run:1,status:"ok",layout:"derived",
+          wall_s:0.01,peak_rss_kb:6000,tour_cost:450.0,measurement:$m}' \
+        > "$TMPDIR/derived.jsonl"
+
+    run publish --runs "$TMPDIR/derived.jsonl"
+    [ "$status" -eq 0 ]
+
+    [ "$(jq -r '.results.eil51.layout' "$TMPDIR/stage/v2/algorithms/nn.json")" = "derived" ]
+    [ "$(jq -r '.layout' "$TMPDIR/stage/v2/problems/eil51.json")" = "derived" ]
+}
+
+@test "layout defaults to real when the row predates the field" {
+    run publish --runs "$TMPDIR/prev.jsonl"
+    [ "$status" -eq 0 ]
+
+    [ "$(jq -r '.results.eil51.layout' "$TMPDIR/stage/v2/algorithms/nn.json")" = "real" ]
+    [ "$(jq -r '.layout' "$TMPDIR/stage/v2/problems/eil51.json")" = "real" ]
+}
+
+@test "layout falls back to the problem doc's minimapDerived" {
+    # gr17 publishes no coordinates, so its problem doc is marked minimapDerived: true. A row
+    # from an older log that predates `layout` still gets the derived provenance.
+    row nn gr17 default 1 0.01 6000 2100.0 ok > "$TMPDIR/gr17.jsonl"
+
+    run publish --runs "$TMPDIR/gr17.jsonl"
+    [ "$status" -eq 0 ]
+
+    [ "$(jq -r '.results.gr17.layout' "$TMPDIR/stage/v2/algorithms/nn.json")" = "derived" ]
+    [ "$(jq -r '.layout' "$TMPDIR/stage/v2/problems/gr17.json")" = "derived" ]
 }

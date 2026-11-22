@@ -93,12 +93,13 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(best_route.route(), cities, distances)
+    Solution::from_parts(best_route.route(), distances.as_ref())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::distance_source::DistanceSource;
     use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree, kdtree::KDPoint};
 
     fn tsp5_cities() -> Vec<KDPoint> {

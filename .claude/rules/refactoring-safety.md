@@ -1,42 +1,33 @@
 # Refactoring Safety
 
-Before making changes that could break callers, always check the blast radius using code intelligence tools.
+Before making changes that could break callers, check the blast radius with the project
+knowledge graph before editing.
 
-## Required Checks
+## Required checks
 
 | Before doing this | Run this first |
-|-------------------|----------------|
-| Changing a function signature | `kb_callers` to find all call sites that need updating |
-| Renaming a public symbol | `kb_callers` to find all references |
-| Modifying an interface or type's fields | `kb_callers` on the type to find all usages |
-| Deleting a symbol | `kb_dead_code` or `kb_callers` to confirm zero callers |
-| Changing a file's public API | `kb_impact` to see transitive dependents |
+| --- | --- |
+| Changing a function signature | `graphify query "<symbol> callers"` |
+| Renaming a public symbol | `graphify query "<symbol>"` |
+| Modifying an interface or type's fields | `graphify query "<type> usages"` |
+| Deleting a symbol | `graphify query "<symbol>"` or `graphify explain "<concept>"` |
+| Changing a file's public API | `graphify query "<file> dependents"` |
 
-## Risk Assessment
+If `graphify-out/graph.json` is missing, fall back to `rg`/`grep` for call sites and run
+`graphify update .` afterwards.
 
-After checking callers, assess the risk level:
+## Risk assessment
 
 | Callers | Risk | Action |
-|---------|------|--------|
-| 0-2 callers, same module | **Low** | Proceed with the change |
-| 3-10 callers, multiple modules | **Medium** | Update all call sites carefully, run tests |
-| 10+ callers or public API | **High** | Confirm with user before proceeding |
+| --- | --- | --- |
+| 0-2 callers, same module | Low | Proceed |
+| 3-10 callers, multiple modules | Medium | Update all call sites, run tests |
+| 10+ callers or public API | High | Confirm with the user before proceeding |
 
 ## Workflow
 
-1. **Check callers**: `kb_callers with symbol: "<symbol>"`
-2. **Check impact**: `kb_impact with file_path: "<file>"`
-3. **Plan updates**: List all files that need changes
-4. **Update leaf callers first**: Start with callers that have no further dependents
-5. **Update tests**: Tests are callers too — update them alongside production code
-6. **Verify**: Run tests after all changes are complete
-
-## Example
-
-Before renaming `processEvent()` to `handleEvent()`:
-
-```text
-kb_callers with symbol: "src/events.ts::processEvent"
-```
-
-If this returns 5 callers across 3 files, that's a **medium** risk refactor. Update all 5 call sites, then verify with tests.
+1. Check callers and dependents with `graphify query`.
+2. List the files that need changes.
+3. Update leaf callers first.
+4. Update tests alongside production code.
+5. Run `cargo test` and `cargo clippy -- -D warnings`.

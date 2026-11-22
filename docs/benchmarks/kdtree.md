@@ -101,7 +101,7 @@ The `[low mean high]` range from criterion; the middle value is the point estima
 
 **Environment caveat**: this second measurement pass ran on the same shared
 dev machine while under active background load (load average 10-11 on 16
-cores from a concurrent editor session, git-kb daemon, and browser). The
+cores from a concurrent editor session, background daemon, and browser). The
 `build` benchmark exercises code that is **completely unchanged** by this PR
 (`from_cities`/`partition_points`/`build_subtree`) and still shows +15-25%
 versus the baseline session — that delta is measurement noise, not a

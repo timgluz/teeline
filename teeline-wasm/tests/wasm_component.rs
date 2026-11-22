@@ -127,6 +127,15 @@ fn default_options() -> crate::teeline::solver::types::SolveOptions {
         beta: 2.0,
         evaporation_rate: 0.5,
         num_ants: 25,
+        sfc_order: 16,
+        sfc_rotation: 0,
+        sfc_mirror: 0,
+        sfc_multi_orientation: 8,
+        eax_pop_size: 100,
+        eax_children_per_pair: 15,
+        eax_strategy: 2,
+        eax_stall_epochs: 50,
+        eax_candidate_k: 20,
     }
 }
 
@@ -333,6 +342,53 @@ fn test_fourier() {
 }
 
 #[test]
+fn test_space_filling_curve() {
+    run_solver("sfc")
+}
+
+#[test]
+fn test_solve_memetic_eax_returns_a_valid_tour() {
+    run_solver("eax")
+}
+
+#[test]
+fn test_space_filling_curve_alias() {
+    run_solver("hilbert")
+}
+
+#[test]
+fn test_space_filling_curve_non_default_options() {
+    let (mut store, instance) = make_instance();
+    let mut opts = default_options();
+    opts.sfc_order = 8;
+    opts.sfc_rotation = 90;
+    opts.sfc_mirror = 1;
+    opts.sfc_multi_orientation = 4;
+    let sol = instance
+        .call_solve(&mut store, "sfc", &five_cities(), opts)
+        .unwrap()
+        .unwrap();
+    assert_valid_tour(&sol, 5);
+}
+
+#[test]
+fn test_space_filling_curve_invalid_options_return_err() {
+    for (field, value) in [("order", 255u32), ("rotation", 65535u32), ("multi", 255u32)] {
+        let (mut store, instance) = make_instance();
+        let mut opts = default_options();
+        match field {
+            "order" => opts.sfc_order = value,
+            "rotation" => opts.sfc_rotation = value,
+            _ => opts.sfc_multi_orientation = value,
+        }
+        let result = instance
+            .call_solve(&mut store, "sfc", &five_cities(), opts)
+            .unwrap();
+        assert!(result.is_err(), "sfc {field}={value} must be rejected");
+    }
+}
+
+#[test]
 fn unknown_solver_returns_err() {
     let (mut store, instance) = make_instance();
     let result = instance
@@ -391,6 +447,20 @@ fn test_parse_and_solve_one_city_json_returns_err() {
 }
 
 #[test]
+fn test_parse_and_solve_duplicate_city_ids_returns_err() {
+    let (mut store, instance) = make_instance();
+    let input = r#"[{"id":1,"x":0.0,"y":0.0},{"id":1,"x":1.0,"y":0.0},{"id":2,"x":0.5,"y":1.0}]"#;
+    let result = instance
+        .call_parse_and_solve(&mut store, "nn", input, default_options())
+        .unwrap();
+    let err = result.expect_err("duplicate city ids must return Err");
+    assert!(
+        err.contains("city ids must be unique"),
+        "expected the duplicate-id error, got: {err}"
+    );
+}
+
+#[test]
 fn test_parse_and_solve_bad_solver_returns_err() {
     let (mut store, instance) = make_instance();
     let result = instance
@@ -445,7 +515,7 @@ EOF\n";
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 22, "expected 22 solvers");
+    assert_eq!(algorithms.len(), 24, "expected 24 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "aco",
@@ -470,6 +540,8 @@ fn test_list_algorithms_returns_all_solvers() {
         "som",
         "gec",
         "sav",
+        "sfc",
+        "eax",
     ] {
         assert!(
             ids.contains(expected_id),
@@ -821,6 +893,15 @@ const VALID_SOLVE_OPTIONS_KEYS: &[&str] = &[
     "beta",
     "evaporationRate",
     "numAnts",
+    "sfcOrder",
+    "sfcRotation",
+    "sfcMirror",
+    "sfcMultiOrientation",
+    "eaxPopSize",
+    "eaxChildrenPerPair",
+    "eaxStrategy",
+    "eaxStallEpochs",
+    "eaxCandidateK",
 ];
 
 #[test]
@@ -883,6 +964,76 @@ fn test_list_algorithms_fourier_kind_and_params() {
         f.recommendation.len() > 20,
         "fourier recommendation must be a real description; got: '{}'",
         f.recommendation
+    );
+}
+
+#[test]
+fn test_list_algorithms_sfc_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let sfc = algorithms
+        .iter()
+        .find(|a| a.id == "sfc")
+        .expect("sfc missing");
+    assert_eq!(sfc.kind, "constructive", "sfc must be 'constructive'");
+    let keys: Vec<&str> = sfc.params.iter().map(|p| p.key.as_str()).collect();
+    for expected in [
+        "sfcOrder",
+        "sfcRotation",
+        "sfcMirror",
+        "sfcMultiOrientation",
+    ] {
+        assert!(keys.contains(&expected), "sfc must have {expected}");
+    }
+    let rotation = sfc
+        .params
+        .iter()
+        .find(|p| p.key == "sfcRotation")
+        .expect("sfcRotation param");
+    assert_eq!(rotation.step, Some(90.0), "rotation must step by 90");
+    assert!(
+        sfc.recommendation.len() > 20,
+        "sfc recommendation must be a real description; got: '{}'",
+        sfc.recommendation
+    );
+}
+
+#[test]
+fn test_solve_rejects_an_invalid_eax_strategy() {
+    let (mut store, instance) = make_instance();
+    let mut opts = default_options();
+    opts.eax_strategy = 3;
+    let result = instance
+        .call_solve(&mut store, "eax", &five_cities(), opts)
+        .unwrap();
+    assert!(
+        result.is_err(),
+        "eaxStrategy 3 must be rejected, not silently clamped"
+    );
+}
+
+#[test]
+fn test_list_algorithms_memetic_eax_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let eax = algorithms
+        .iter()
+        .find(|a| a.id == "eax")
+        .expect("eax missing");
+    assert_eq!(eax.kind, "metaheuristic");
+    let keys: Vec<&str> = eax.params.iter().map(|p| p.key.as_str()).collect();
+    for expected in [
+        "epochs",
+        "eaxPopSize",
+        "eaxChildrenPerPair",
+        "eaxStrategy",
+        "eaxStallEpochs",
+        "eaxCandidateK",
+    ] {
+        assert!(keys.contains(&expected), "eax must have {expected}");
+    }
+    assert!(
+        eax.recommendation.len() > 20,
+        "eax recommendation must be a real description; got: '{}'",
+        eax.recommendation
     );
 }
 
@@ -1001,7 +1152,10 @@ fn test_parse_and_solve_explicit_matrix_uses_matrix_distances() {
     // gr17 has EXPLICIT distances. The Euclidean NN tour on the grid
     // placeholder coordinates would be wildly different from the explicit
     // matrix tour. Ensure the result is positive and finite.
-    assert!(solution.total > 0.0, "tour distance must be positive for gr17");
+    assert!(
+        solution.total > 0.0,
+        "tour distance must be positive for gr17"
+    );
     assert!(solution.total.is_finite(), "tour distance must be finite");
 }
 
@@ -1017,17 +1171,20 @@ fn test_parse_and_solve_geo_uses_geo_distances() {
     // For burma14 (GEO), the total should be different from a Euclidean NN.
     // We can't assert an exact value, but we can verify it's positive and
     // not the same as a Euclidean computation would produce.
-    assert!(solution.total > 100.0, "GEO distance should be substantial, got {}", solution.total);
+    assert!(
+        solution.total > 100.0,
+        "GEO distance should be substantial, got {}",
+        solution.total
+    );
 }
 
 #[test]
 fn test_compare_tours_from_input_explicit_self_is_zero_gap() {
-    let input =
-        std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../tests/fixtures/ring6_explicit.tsp"
-        ))
-        .expect("ring6_explicit.tsp missing");
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/ring6_explicit.tsp"
+    ))
+    .expect("ring6_explicit.tsp missing");
     let route = vec![1u32, 2, 3, 4, 5, 6];
     let stats = run_compare_tours_from_input(&route, &route, &input)
         .expect("compare_tours_from_input must succeed");
@@ -1039,27 +1196,28 @@ fn test_compare_tours_from_input_explicit_self_is_zero_gap() {
 
 #[test]
 fn test_tour_distance_from_input_ring6_explicit() {
-    let input =
-        std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../tests/fixtures/ring6_explicit.tsp"
-        ))
-        .expect("ring6_explicit.tsp missing");
+    let input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/ring6_explicit.tsp"
+    ))
+    .expect("ring6_explicit.tsp missing");
     let route = vec![1u32, 2, 3, 4, 5, 6];
     let distance = run_tour_distance_from_input(&route, &input)
         .expect("tour_distance_from_input must succeed");
     // Ring6 optimal is 60 (6 edges at distance 10 each)
-    assert!((distance - 60.0).abs() < 0.01, "expected 60, got {distance}");
+    assert!(
+        (distance - 60.0).abs() < 0.01,
+        "expected 60, got {distance}"
+    );
 }
 
 #[test]
 fn test_tour_distance_from_input_geo_is_different_from_euc() {
-    let burma14_input =
-        std::fs::read_to_string(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../tests/fixtures/burma14.tsp"
-        ))
-        .expect("burma14.tsp missing");
+    let burma14_input = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../tests/fixtures/burma14.tsp"
+    ))
+    .expect("burma14.tsp missing");
     let route: Vec<u32> = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
     let geo_dist = run_tour_distance_from_input(&route, &burma14_input)
         .expect("GEO tour_distance_from_input must succeed");

@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::tsp::{
-    AcoOptions, AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    LKOptions, SAOptions, SOMOptions, Solvers,
+    AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, FourierOptions, GAOptions,
+    HeuristicOptions, LKOptions, MemeticEaxOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -13,7 +13,7 @@ pub trait AppOptionsProvider {
 }
 
 /// Applies recognised sub-tables from a `toml::Table` to the base `AppOptions`.
-/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `lk`, `som`, `aco`, and `heuristic`
+/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `sfc`, `lk`, `som`, `aco`, and `heuristic`
 /// are valid top-level keys.
 /// Returns `Err` on unknown keys or mis-typed sub-tables.
 pub struct TomlTableProvider<'a>(pub &'a toml::Table);
@@ -45,9 +45,19 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                         .ok_or("config: `fourier` must be a table")?;
                     base.fourier = Some(FourierOptions::from_toml(t)?);
                 }
+                "sfc" => {
+                    let t = value.as_table().ok_or("config: `sfc` must be a table")?;
+                    base.sfc = Some(SfcOptions::from_toml(t)?);
+                }
                 "lk" => {
                     let t = value.as_table().ok_or("config: `lk` must be a table")?;
                     base.lk = Some(LKOptions::from_toml(t)?);
+                }
+                "memetic_eax" => {
+                    let t = value
+                        .as_table()
+                        .ok_or("config: `memetic_eax` must be a table")?;
+                    base.memetic_eax = Some(MemeticEaxOptions::from_toml(t)?);
                 }
                 "som" => {
                     let t = value.as_table().ok_or("config: `som` must be a table")?;
@@ -65,7 +75,7 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, lk, som, aco, heuristic"
+                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, sfc, lk, memetic_eax, som, aco, heuristic"
                     ));
                 }
             }
@@ -74,17 +84,43 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
     }
 }
 
+/// A parsed pipeline: its stages plus the top-level distance-backend policy.
+pub struct PipelineConfig {
+    pub stages: Vec<(Solvers, AppOptions)>,
+    pub distance_backend: DistanceBackend,
+}
+
 /// Parse a TOML string into a list of `(Solvers, AppOptions)` pairs.
 ///
-/// `base` is the starting `AppOptions` (usually `AppOptions::default()`).
-/// Per-stage `[stage.sa]`, `[stage.ga]`, etc. are merged on top of `base`.
-/// Returns `Err` on parse errors, unknown keys, or wrong sub-table for a solver.
+/// Kept for callers that only need the stages; use
+/// [`load_pipeline_config_with_backend`] for the top-level backend key.
 pub fn load_pipeline_config(
     source: &str,
     base: AppOptions,
 ) -> Result<Vec<(Solvers, AppOptions)>, String> {
+    load_pipeline_config_with_backend(source, base).map(|config| config.stages)
+}
+
+/// Parse a TOML string into stages plus the top-level `distance_backend` policy.
+///
+/// `base` is the starting `AppOptions` (usually `AppOptions::default()`).
+/// Per-stage `[stage.sa]`, `[stage.ga]`, etc. are merged on top of `base`.
+/// Returns `Err` on parse errors, unknown keys, an invalid backend value, or a wrong
+/// sub-table for a solver.
+pub fn load_pipeline_config_with_backend(
+    source: &str,
+    base: AppOptions,
+) -> Result<PipelineConfig, String> {
     let root: toml::Table =
         toml::from_str(source).map_err(|e| format!("config: TOML parse error: {e}"))?;
+
+    let distance_backend = match root.get("distance_backend") {
+        Some(value) => value
+            .as_str()
+            .ok_or("config: `distance_backend` must be a string")?
+            .parse::<DistanceBackend>()?,
+        None => DistanceBackend::Auto,
+    };
 
     let stage_array = root
         .get("stage")
@@ -121,7 +157,9 @@ pub fn load_pipeline_config(
             ("cs", matches!(solver, Solvers::CuckooSearch)),
             ("fpa", matches!(solver, Solvers::FlowerPollination)),
             ("fourier", matches!(solver, Solvers::Fourier)),
+            ("sfc", matches!(solver, Solvers::SpaceFillingCurve)),
             ("lk", matches!(solver, Solvers::LinKernighan)),
+            ("memetic_eax", matches!(solver, Solvers::MemeticEax)),
             ("som", matches!(solver, Solvers::KohonenSom)),
             ("aco", matches!(solver, Solvers::AntColony)),
             (
@@ -133,7 +171,9 @@ pub fn load_pipeline_config(
                         | Solvers::CuckooSearch
                         | Solvers::FlowerPollination
                         | Solvers::Fourier
+                        | Solvers::SpaceFillingCurve
                         | Solvers::LinKernighan
+                        | Solvers::MemeticEax
                         | Solvers::KohonenSom
                         | Solvers::AntColony
                 ),
@@ -149,7 +189,10 @@ pub fn load_pipeline_config(
         stages.push((solver, stage_options));
     }
 
-    Ok(stages)
+    Ok(PipelineConfig {
+        stages,
+        distance_backend,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -199,16 +242,37 @@ impl AppOptionsProvider for IdentityProvider {
 }
 
 /// Reads a pipeline config file and returns fully-resolved `(Solvers, AppOptions)` pairs.
-/// The `overrides` provider applies to the base before per-stage TOML keys are merged.
+///
+/// Kept for callers that only need the stages; use [`resolve_pipeline_config`] for the
+/// top-level backend policy.
 pub fn resolve_config_file<P: AppOptionsProvider>(
     path: &Path,
     overrides: &P,
 ) -> Result<Vec<(Solvers, AppOptions)>, String> {
+    resolve_pipeline_config(path, overrides).map(|config| config.stages)
+}
+
+/// Reads a pipeline config file and returns its stages plus the backend policy.
+pub fn resolve_pipeline_config<P: AppOptionsProvider>(
+    path: &Path,
+    overrides: &P,
+) -> Result<PipelineConfig, String> {
     let source = std::fs::read_to_string(path)
         .map_err(|e| format!("cannot read config file '{}': {e}", path.display()))?;
 
     let base = overrides.provide(AppOptions::default())?;
-    load_pipeline_config(&source, base)
+    load_pipeline_config_with_backend(&source, base)
+}
+
+/// CLI value wins over the config value; `None` keeps the config.
+pub fn resolve_distance_backend(
+    cli_value: Option<&str>,
+    config_backend: DistanceBackend,
+) -> Result<DistanceBackend, String> {
+    match cli_value {
+        Some(value) => value.parse::<DistanceBackend>(),
+        None => Ok(config_backend),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +319,23 @@ mod tests {
         let fourier = opts.fourier.unwrap();
         assert_eq!(fourier.k_max, 32);
         assert_eq!(fourier.m, 1120);
+    }
+
+    #[test]
+    fn test_toml_provider_sfc_sub_table_works() {
+        use crate::tsp::SfcCurveType;
+
+        let table: toml::Table = toml::from_str(
+            "solver = \"sfc\"\n[sfc]\ncurve_type = \"morton\"\norder = 8\nrotation = 90",
+        )
+        .unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.curve_type, SfcCurveType::Morton);
+        assert_eq!(sfc.order, 8);
+        assert_eq!(sfc.rotation, 90);
     }
 
     #[test]
@@ -396,6 +477,20 @@ mod tests {
     }
 
     #[test]
+    fn test_load_pipeline_config_sfc_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.sfc]\norder = 8\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("sfc"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_sfc_errors() {
+        let toml = "[[stage]]\nsolver = \"sfc\"\n\n[stage.sfc]\norder = 8\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
     fn test_load_pipeline_config_heuristic_sub_table_on_lk_errors() {
         // LK reads only opts.lk at solve time, never opts.heuristic —
         // [stage.heuristic] on an lk stage is a silent no-op unless rejected here.
@@ -503,6 +598,43 @@ mod tests {
         let aco = opts.aco.unwrap();
         assert_eq!(aco.num_ants, 10);
         assert!((aco.beta - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_toml_provider_memetic_eax_sub_table_works() {
+        let table: toml::Table = toml::from_str(
+            "solver = \"memetic_eax\"\n[memetic_eax]\npop_size = 30\nstrategy = \"rand\"\nseed = 5",
+        )
+        .unwrap();
+        let opts = TomlTableProvider(&table)
+            .provide(AppOptions::default())
+            .unwrap();
+        let eax = opts.memetic_eax.unwrap();
+        assert_eq!(eax.pop_size, 30);
+        assert_eq!(eax.strategy, crate::tsp::EaxStrategy::Rand);
+        assert_eq!(eax.seed, Some(5));
+    }
+
+    #[test]
+    fn test_load_pipeline_config_memetic_eax_sub_table_on_nn_errors() {
+        let toml = "[[stage]]\nsolver = \"nn\"\n\n[stage.memetic_eax]\npop_size = 30\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("memetic_eax"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_heuristic_sub_table_on_eax_errors() {
+        // EAX reads only opts.memetic_eax at solve time, never opts.heuristic.
+        let toml = "[[stage]]\nsolver = \"eax\"\n\n[stage.memetic_eax]\npop_size = 30\n\n[stage.heuristic]\nepochs = 500\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("heuristic"), "got: {err}");
+    }
+
+    #[test]
+    fn test_load_pipeline_config_memetic_eax_invalid_pop_size_errors() {
+        let toml = "[[stage]]\nsolver = \"memetic_eax\"\n\n[stage.memetic_eax]\npop_size = 1\n";
+        let err = load_pipeline_config(toml, AppOptions::default()).unwrap_err();
+        assert!(err.contains("pop_size"), "got: {err}");
     }
 
     #[test]

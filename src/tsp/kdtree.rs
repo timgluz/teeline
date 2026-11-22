@@ -294,6 +294,8 @@ impl KDNode {
 
 #[derive(Debug, Clone, Copy)]
 pub struct KDPoint {
+    /// External city ID (TSPLIB 1-based or API-supplied), or a local auxiliary index for
+    /// geometry-only consumers such as the Fourier sampler. Never a dense city position.
     pub id: usize,
     pub coords: [f32; 2],
 }

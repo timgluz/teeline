@@ -323,6 +323,18 @@ is_positive_number() {
   [[ "$1" =~ ^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$ ]] && awk -v v="$1" 'BEGIN{exit !(v > 0)}'
 }
 
+# A coordinate-less EXPLICIT instance is published as a derived-layout row: its city geometry
+# comes from MDS, not from the file. A file with a coordinate or display section keeps `real`.
+instance_layout() {
+  local file="$1"
+  if grep -qiE '^[[:space:]]*EDGE_WEIGHT_TYPE[[:space:]]*:[[:space:]]*EXPLICIT' "$file" \
+    && ! grep -qiE '^[[:space:]]*(NODE_COORD_SECTION|DISPLAY_DATA_SECTION)[[:space:]]*$' "$file"; then
+    printf 'derived'
+  else
+    printf 'real'
+  fi
+}
+
 # 137 is SIGKILL, which `timeout -k` sends — but also what the OOM killer and any external kill
 # produce. Only a run that actually reached its budget counts as a timeout; anything else is a
 # failure that would otherwise be misreported as the family's budget being exhausted.
@@ -341,6 +353,7 @@ for cell in "${CELLS[@]}"; do
   instance="$(jq -r .instance <<<"$cell")"
   path="$(jq -r .path <<<"$cell")"
   config="$(jq -r .config <<<"$cell")"
+  layout="$(instance_layout "$path")"
   run_no="$(jq -r .run <<<"$cell")"
   timeout_s="$(jq -r .timeout_s <<<"$cell")"
   extra_args=()
@@ -385,17 +398,17 @@ for cell in "${CELLS[@]}"; do
       --arg solver "$solver" --arg dataset "$instance" --arg config "$config" \
       --argjson run "$run_no" --arg status "$status" \
       --argjson wall "$wall" --argjson rss "$rss" --argjson tour "$tour" \
-      --argjson m "$MEASUREMENT" \
+      --arg layout "$layout" --argjson m "$MEASUREMENT" \
       '{solver:$solver, dataset:$dataset, config:$config, run:$run, status:$status,
-        wall_s:$wall, peak_rss_kb:$rss, tour_cost:$tour, measurement:$m}')"
+        layout:$layout, wall_s:$wall, peak_rss_kb:$rss, tour_cost:$tour, measurement:$m}')"
   else
     row="$(jq -cn \
       --arg solver "$solver" --arg dataset "$instance" --arg config "$config" \
       --argjson run "$run_no" --arg status "$status" \
       --argjson wall "$wall" --argjson rss "${rss:-null}" \
-      --argjson m "$MEASUREMENT" \
+      --arg layout "$layout" --argjson m "$MEASUREMENT" \
       '{solver:$solver, dataset:$dataset, config:$config, run:$run, status:$status,
-        wall_s:$wall, peak_rss_kb:$rss, measurement:$m}')"
+        layout:$layout, wall_s:$wall, peak_rss_kb:$rss, measurement:$m}')"
   fi
   printf '%s\n' "$row" >> "$OUT"
 

@@ -6,11 +6,11 @@ use std::thread;
 use serde_json::json;
 use teeline::DistanceType;
 use teeline::config::{
-    AppOptionsProvider, IdentityProvider, PipelineSource, resolve_config_file,
-    select_pipeline_source,
+    AppOptionsProvider, IdentityProvider, PipelineSource, resolve_distance_backend,
+    resolve_pipeline_config, select_pipeline_source,
 };
 use teeline::tsp::{
-    self, AppOptions, SOMOptions, Solution, SolverKind, Solvers, TspProblem, distance_matrix,
+    self, AppOptions, DistanceBackend, DistanceSource, SOMOptions, Solution, SolverKind, Solvers,
     list_solvers,
     pipeline::{PipelineStage, run_pipeline, stage_warnings},
     tsplib,
@@ -37,7 +37,7 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         use teeline::tsp::{
             AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-            LKOptions, SAOptions,
+            LKOptions, MemeticEaxOptions, SAOptions, SfcOptions,
         };
         match self.solver {
             Solvers::AntColony => {
@@ -63,6 +63,12 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
             }
             Solvers::Fourier => {
                 base.fourier = Some(FourierOptions::from_cli(self.args)?);
+            }
+            Solvers::SpaceFillingCurve => {
+                base.sfc = Some(SfcOptions::from_cli(self.args)?);
+            }
+            Solvers::MemeticEax => {
+                base.memetic_eax = Some(MemeticEaxOptions::from_cli(self.args)?);
             }
             _ => {
                 base.heuristic = Some(HeuristicOptions::from_cli(self.args)?);
@@ -249,6 +255,41 @@ fn tuning_args() -> Vec<Arg> {
             .long("n_nearest")
             .help("nearest neighbours to look for")
             .required(false),
+        Arg::new("pop_size")
+            .long("pop-size")
+            .value_name("N")
+            .help("Memetic EAX: population size (default 100, minimum 2)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("children_per_pair")
+            .long("children-per-pair")
+            .value_name("N")
+            .help("Memetic EAX: offspring considered per parent (default 15)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("strategy")
+            .long("strategy")
+            .value_name("NAME")
+            .help("Memetic EAX: E-set strategy: single_ab, rand, or hybrid (default hybrid)")
+            .value_parser(["single_ab", "rand", "hybrid"])
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("stall_epochs")
+            .long("stall-epochs")
+            .value_name("N")
+            .help(
+                "Memetic EAX: stagnant generations before hybrid switches to single_ab; \
+                 the solver stops at twice this count (default 50; falls back to \
+                 --stagnation_epochs when omitted, where 0 keeps the default)",
+            )
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("candidate_k")
+            .long("candidate-k")
+            .value_name("N")
+            .help("Memetic EAX: nearest-neighbour list size for patching and local search (default 20; falls back to --n_nearest when omitted)")
+            .action(ArgAction::Set)
+            .required(false),
         Arg::new("n_elite")
             .long("n_elite")
             .help("strongest individuals to pass directly to next generation")
@@ -290,9 +331,20 @@ fn tuning_args() -> Vec<Arg> {
             .long("distance-type")
             .help("override distance formula: euc_2d, geo (default: from file header)")
             .required(false),
+        Arg::new("distance_backend")
+            .long("distance-backend")
+            .help("distance backend: auto (default), matrix, or on-the-fly")
+            .value_parser(["auto", "matrix", "on-the-fly"])
+            .required(false),
         Arg::new("max_depth")
             .long("max-depth")
             .help("LK: max sequential-search chain depth (default 5; depth-1 = 2-opt, depth-5 = full LK quality)")
+            .value_name("N")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("seed")
+            .long("seed")
+            .help("LK / Memetic EAX: fixed RNG seed for reproducible runs (default: system entropy)")
             .value_name("N")
             .action(ArgAction::Set)
             .required(false),
@@ -353,6 +405,55 @@ fn tuning_args() -> Vec<Arg> {
             .long("num-ants")
             .value_name("N")
             .help("ACO: colony size — number of ants constructing tours per epoch (default 25)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("curve_type")
+            .long("curve-type")
+            .value_name("TYPE")
+            .value_parser(["hilbert", "morton"])
+            .help("SFC: curve type, `hilbert` (default) or `morton`")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("sfc_order")
+            .long("sfc-order")
+            .value_name("P")
+            .value_parser(clap::value_parser!(u8).range(1..=16))
+            .help("SFC: grid order p in 1..=16 (default 16); the grid is 2^p × 2^p")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("aspect_scaling")
+            .long("aspect-scaling")
+            .value_name("MODE")
+            .value_parser(["uniform", "stretch_to_square"])
+            .help("SFC: `uniform` (default) or `stretch_to_square`")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("sfc_rotation")
+            .long("sfc-rotation")
+            .value_name("DEG")
+            .value_parser(["0", "90", "180", "270"])
+            .help("SFC: rotation 0, 90, 180 or 270 (default 0)")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("sfc_mirror")
+            .long("sfc-mirror")
+            .help("SFC: mirror the grid before indexing")
+            .action(ArgAction::SetTrue)
+            .required(false),
+        Arg::new("multi_orientation")
+            .long("multi-orientation")
+            .value_name("N")
+            .num_args(0..=1)
+            .require_equals(true)
+            .default_missing_value("8")
+            .help("SFC: best-of-N orientations (0..=8, default 8; 0 disables); omit N for 8")
+            .action(ArgAction::Set)
+            .required(false),
+        Arg::new("tie_breaker")
+            .long("tie-breaker")
+            .value_name("MODE")
+            .value_parser(["input_order", "lexicographic", "nearest_prev"])
+            .help("SFC: `input_order` (default), `lexicographic` or `nearest_prev`")
             .action(ArgAction::Set)
             .required(false),
     ]
@@ -420,14 +521,14 @@ fn run_pipeline_cmd(args: &ArgMatches) {
             std::process::exit(1);
         }
         Ok(PipelineSource::Config(path)) => {
-            let stage_configs = match resolve_config_file(&path, &IdentityProvider) {
-                Ok(r) => r,
+            let config = match resolve_pipeline_config(&path, &IdentityProvider) {
+                Ok(config) => config,
                 Err(e) => {
                     eprintln!("error: {e}");
                     std::process::exit(1);
                 }
             };
-            run_as_pipeline_stages(stage_configs, args, false);
+            run_as_pipeline_stages(config.stages, args, false, config.distance_backend);
         }
         Ok(PipelineSource::Steps(solvers)) => {
             run_as_pipeline(&solvers, args, false);
@@ -440,13 +541,14 @@ fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches, json_mode: bool) {
         .iter()
         .map(|&s| (s, solver_options_from_args(args, s)))
         .collect();
-    run_as_pipeline_stages(stage_configs, args, json_mode);
+    run_as_pipeline_stages(stage_configs, args, json_mode, DistanceBackend::Auto);
 }
 
 fn run_as_pipeline_stages(
     stage_configs: Vec<(Solvers, AppOptions)>,
     args: &ArgMatches,
     json_mode: bool,
+    config_backend: DistanceBackend,
 ) {
     let verbose = args.get_flag("verbose");
     let default_level = if verbose { "debug" } else { "info" };
@@ -484,11 +586,22 @@ fn run_as_pipeline_stages(
     tracing::info!(name = %tsp_data.name, comment = %tsp_data.comment,
                    cities = tsp_data.len(), "problem loaded");
 
-    let cities = tsp_data.cities().to_vec();
-    let distances = match tsp_data.distance_matrix() {
-        Ok(dm) => dm,
+    let backend = match resolve_distance_backend(
+        args.get_one::<String>("distance_backend")
+            .map(String::as_str),
+        config_backend,
+    ) {
+        Ok(backend) => backend,
         Err(e) => {
-            eprintln!("Error building distance matrix: {e}");
+            eprintln!("error: --distance-backend: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    let problem = match tsp_data.into_problem(backend) {
+        Ok(problem) => problem,
+        Err(e) => {
+            eprintln!("Error building the distance source: {e}");
             std::process::exit(1);
         }
     };
@@ -505,14 +618,7 @@ fn run_as_pipeline_stages(
 
     let stages: Vec<PipelineStage> = stage_configs
         .into_iter()
-        .map(|(solver, options)| {
-            PipelineStage::new(
-                solver,
-                options,
-                TspProblem::new(cities.clone(), distances.clone()),
-                None,
-            )
-        })
+        .map(|(solver, options)| PipelineStage::new(solver, options, problem.clone(), None))
         .collect();
 
     let n_stages = stages.len();
@@ -529,9 +635,14 @@ fn run_as_pipeline_stages(
     .join()
     .expect("Solver thread failed");
 
-    let opt_cmp = opt_tour
-        .as_ref()
-        .and_then(|ot| compute_optimal_comparison(tour.total, &distances, tsp_data.len(), ot));
+    let opt_cmp = opt_tour.as_ref().and_then(|ot| {
+        compute_optimal_comparison(
+            tour.total,
+            problem.distances.as_ref(),
+            problem.cities.len(),
+            ot,
+        )
+    });
 
     if json_mode {
         print_solution_json(&tour, false, opt_cmp.as_ref());
@@ -670,7 +781,7 @@ struct OptimalComparison {
 
 fn compute_optimal_comparison(
     solver_cost: f32,
-    distances: &distance_matrix::DistanceMatrix,
+    distances: &dyn DistanceSource,
     n_cities: usize,
     opt_tour: &teeline::tsp::opt_tour::OptTour,
 ) -> Option<OptimalComparison> {
@@ -868,6 +979,110 @@ mod tests {
         let args = options_cmd().get_matches_from(["test", "fourier", "--k-max", "32"]);
         let opts = solver_options_from_args(&args, Solvers::Fourier);
         assert_eq!(opts.fourier.unwrap().k_max, 32);
+    }
+
+    #[test]
+    fn test_solver_options_eax_flags_parsed() {
+        let args = options_cmd().get_matches_from([
+            "test",
+            "eax",
+            "--epochs",
+            "12",
+            "--pop-size",
+            "20",
+            "--children-per-pair",
+            "5",
+            "--strategy",
+            "rand",
+            "--stall-epochs",
+            "9",
+            "--candidate-k",
+            "11",
+            "--seed",
+            "77",
+        ]);
+        let opts = solver_options_from_args(&args, Solvers::MemeticEax);
+        let eax = opts.memetic_eax.unwrap();
+        assert_eq!(eax.epochs, 12);
+        assert_eq!(eax.pop_size, 20);
+        assert_eq!(eax.children_per_pair, 5);
+        assert_eq!(eax.strategy, teeline::tsp::EaxStrategy::Rand);
+        assert_eq!(eax.stall_epochs, 9);
+        assert_eq!(eax.candidate_k, 11);
+        assert_eq!(eax.seed, Some(77));
+    }
+
+    #[test]
+    fn test_solver_options_sfc_flags_parsed() {
+        // Exercises the CliArgsProvider::provide arm for Solvers::SpaceFillingCurve
+        // and every SFC flag.
+        let args = options_cmd().get_matches_from([
+            "test",
+            "sfc",
+            "--curve-type",
+            "morton",
+            "--sfc-order",
+            "8",
+            "--aspect-scaling",
+            "stretch_to_square",
+            "--sfc-rotation",
+            "90",
+            "--sfc-mirror",
+            "--multi-orientation=4",
+            "--tie-breaker",
+            "nearest_prev",
+        ]);
+        let opts = solver_options_from_args(&args, Solvers::SpaceFillingCurve);
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.curve_type, teeline::tsp::SfcCurveType::Morton);
+        assert_eq!(sfc.order, 8);
+        assert_eq!(
+            sfc.aspect_scaling,
+            teeline::tsp::AspectScaling::StretchToSquare
+        );
+        assert_eq!(sfc.rotation, 90);
+        assert!(sfc.mirror);
+        assert_eq!(sfc.multi_orientation, 4);
+        assert_eq!(sfc.tie_breaker, teeline::tsp::TieBreaker::NearestPrev);
+    }
+
+    #[test]
+    fn test_solver_options_sfc_multi_orientation_without_value_defaults_to_eight() {
+        let args = options_cmd().get_matches_from(["test", "sfc", "--multi-orientation"]);
+        let opts = solver_options_from_args(&args, Solvers::SpaceFillingCurve);
+        assert_eq!(opts.sfc.unwrap().multi_orientation, 8);
+    }
+
+    #[test]
+    fn test_solver_options_sfc_multi_orientation_before_positional_is_accepted() {
+        // `require_equals(true)` keeps the optional value from consuming the solver name.
+        let args = options_cmd().get_matches_from(["test", "--multi-orientation", "sfc"]);
+        let opts = solver_options_from_args(&args, Solvers::SpaceFillingCurve);
+        assert_eq!(opts.sfc.unwrap().multi_orientation, 8);
+    }
+
+    #[test]
+    fn test_sfc_flags_reject_invalid_values_at_the_cli_boundary() {
+        for argv in [
+            vec!["test", "sfc", "--curve-type", "bogus"],
+            vec!["test", "sfc", "--sfc-order", "0"],
+            vec!["test", "sfc", "--sfc-order", "20"],
+            vec!["test", "sfc", "--sfc-rotation", "45"],
+            vec!["test", "sfc", "--tie-breaker", "bogus"],
+        ] {
+            assert!(
+                options_cmd().try_get_matches_from(argv.clone()).is_err(),
+                "expected clap to reject {argv:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sfc_multi_orientation_out_of_range_errors() {
+        let args = options_cmd().get_matches_from(["test", "sfc", "--multi-orientation=9"]);
+        let result =
+            CliArgsProvider::new(&args, Solvers::SpaceFillingCurve).provide(AppOptions::default());
+        assert!(result.is_err(), "expected Err for --multi-orientation=9");
     }
 
     #[test]

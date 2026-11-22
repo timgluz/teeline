@@ -8,13 +8,14 @@ use bindings::teeline::solver::types::{
 };
 use teeline::tsp::comparison;
 use teeline::tsp::{
-    AppOptions, AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    SAOptions, Solvers, TspProblem, distance_matrix::DistanceMatrix, kdtree::KDPoint,
+    AcoOptions, AppOptions, CSOptions, DistanceBackend, DistanceType, EaxStrategy, FPAOptions,
+    FourierOptions, GAOptions, HeuristicOptions, MemeticEaxOptions, SAOptions, SfcOptions, Solvers,
+    TspProblem, kdtree::KDPoint,
 };
 
 struct Component;
 
-fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
+fn build_opts(solver: Solvers, o: &SolveOptions) -> Result<AppOptions, String> {
     let heuristic = HeuristicOptions {
         epochs: o.epochs as usize,
         // Not exposed through the WASM interface yet; 0 keeps the plateau stop off, matching the
@@ -24,7 +25,17 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
         n_nearest: o.n_nearest as usize,
         verbose: false,
     };
-    match solver {
+    let eax_strategy = match (solver, o.eax_strategy) {
+        (Solvers::MemeticEax, 0) => EaxStrategy::SingleAb,
+        (Solvers::MemeticEax, 1) => EaxStrategy::Rand,
+        (Solvers::MemeticEax, 2) => EaxStrategy::Hybrid,
+        (Solvers::MemeticEax, other) => {
+            return Err(format!("eaxStrategy must be 0, 1, or 2 (got {other})"));
+        }
+        _ => EaxStrategy::Hybrid,
+    };
+
+    Ok(match solver {
         Solvers::SimulatedAnnealing => AppOptions {
             sa: Some(SAOptions {
                 heuristic,
@@ -63,6 +74,18 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::SpaceFillingCurve => AppOptions {
+            sfc: Some(SfcOptions {
+                // Saturate rather than truncate: a host value like 272 must fail
+                // `SfcOptions::validate()`, not wrap into a different valid config.
+                order: u8::try_from(o.sfc_order).unwrap_or(u8::MAX),
+                rotation: u16::try_from(o.sfc_rotation).unwrap_or(u16::MAX),
+                mirror: o.sfc_mirror != 0,
+                multi_orientation: u8::try_from(o.sfc_multi_orientation).unwrap_or(u8::MAX),
+                ..SfcOptions::default()
+            }),
+            ..AppOptions::default()
+        },
         Solvers::KohonenSom => AppOptions {
             som: Some(teeline::tsp::SOMOptions {
                 epochs: o.epochs as usize,
@@ -80,11 +103,24 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> AppOptions {
             }),
             ..AppOptions::default()
         },
+        Solvers::MemeticEax => AppOptions {
+            memetic_eax: Some(MemeticEaxOptions {
+                epochs: heuristic.epochs,
+                pop_size: o.eax_pop_size as usize,
+                children_per_pair: o.eax_children_per_pair as usize,
+                strategy: eax_strategy,
+                stall_epochs: o.eax_stall_epochs as usize,
+                candidate_k: o.eax_candidate_k as usize,
+                // Browsers use system entropy; the CLI/API expose `seed` for benchmarks.
+                seed: None,
+            }),
+            ..AppOptions::default()
+        },
         _ => AppOptions {
             heuristic: Some(heuristic),
             ..AppOptions::default()
         },
-    }
+    })
 }
 
 fn kd_to_city(c: &KDPoint) -> City {
@@ -98,16 +134,10 @@ fn kd_to_city(c: &KDPoint) -> City {
 fn parse_to_tsp_problem(input: &str) -> Result<TspProblem, String> {
     if input.trim_start().starts_with('[') {
         let kd_cities = teeline::tsp::tsplib::parse_json_cities(input)?;
-        let distances = DistanceMatrix::from_cities(&kd_cities)
-            .map_err(|e| format!("distance matrix: {e}"))?;
-        Ok(TspProblem::new(kd_cities, distances))
+        TspProblem::from_points(kd_cities, DistanceType::Euc2D, DistanceBackend::Auto)
     } else {
         let data = teeline::tsp::tsplib::read_from_str(input)?;
-        let kd_cities = data.cities().to_vec();
-        let distances = data
-            .distance_matrix()
-            .map_err(|e| format!("distance matrix: {e}"))?;
-        Ok(TspProblem::new(kd_cities, distances))
+        data.into_problem(DistanceBackend::Auto)
     }
 }
 
@@ -130,9 +160,11 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "shuffle"         => "Baseline only; never produces good tours on its own",
         "christofides"    => "Only solver with a proven \u{2264}1.5\u{00d7} bound; ideal warm-start for pipeline(christofides,lk)",
         "fourier"         => "Constructive Fourier-basis solver; best as warm-start: pipeline(fourier,2opt)",
+        "sfc"             => "Space-filling curve construction; fast O(n log n) warm-start: pipeline(sfc,2opt) or pipeline(sfc,lk)",
         "som"             => "Topology-preserving constructive solver; best piped: pipeline(som,2opt) or pipeline(som,sa)",
         "gec"             => "Deterministic edge-by-edge construction; usually beats nn as a warm-start: pipeline(greedy_edge,2opt) or pipeline(greedy_edge,lk)",
         "sav"             => "Savings-based construction; strong warm-start: pipeline(savings,2opt) or pipeline(savings,lk)",
+        "eax"             => "Memetic EAX: population crossover + local search; strong quality on small/medium instances, heavier per epoch than lk or 2opt",
         "aco"             => "Pheromone-trail metaheuristic; tune beta (heuristic weight) and evaporation-rate. Slow per epoch — lower epochs on large datasets",
         _                 => info.category,
     }
@@ -147,7 +179,8 @@ fn kind_for(solver: Solvers) -> String {
         | Solvers::Savings
         | Solvers::Fourier
         | Solvers::KohonenSom
-        | Solvers::GreedyEdge => "constructive",
+        | Solvers::GreedyEdge
+        | Solvers::SpaceFillingCurve => "constructive",
         Solvers::TwoOpt | Solvers::ThreeOpt => "local-search",
         Solvers::RandomShuffle => "utility",
         _ => "metaheuristic",
@@ -187,6 +220,22 @@ fn pi(key: &str, label: &str, min: f32) -> ParamSpec {
         min: Some(min),
         max: None,
         step: None,
+        description: String::new(),
+    }
+}
+
+fn pi_max(key: &str, label: &str, min: f32, max: f32) -> ParamSpec {
+    pi_step(key, label, min, max, 1.0)
+}
+
+fn pi_step(key: &str, label: &str, min: f32, max: f32, step: f32) -> ParamSpec {
+    ParamSpec {
+        key: key.to_string(),
+        label: label.to_string(),
+        value_type: "int".to_string(),
+        min: Some(min),
+        max: Some(max),
+        step: Some(step),
         description: String::new(),
     }
 }
@@ -249,8 +298,40 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         | Solvers::ParticleSwarmOptimization
         | Solvers::TabuSearch
         | Solvers::StochasticHill => shared_heuristic_params(),
+        Solvers::MemeticEax => {
+            let mut v = vec![pi("epochs", "Epochs", 1.0)];
+            v.push(pi("eaxPopSize", "Population size", 2.0));
+            v.push(pi("eaxChildrenPerPair", "Children per pair", 1.0));
+            v.push(pi_step(
+                "eaxStrategy",
+                "E-strategy (0 single_ab, 1 rand, 2 hybrid)",
+                0.0,
+                2.0,
+                1.0,
+            ));
+            v.push(pi("eaxStallEpochs", "Stall epochs", 1.0));
+            v.push(pi("eaxCandidateK", "Candidate K", 1.0));
+            v
+        }
         Solvers::Fourier => vec![pi("epochs", "Gradient steps per stage", 1.0)],
         Solvers::KohonenSom => vec![pi("epochs", "Training iterations", 1.0)],
+        Solvers::SpaceFillingCurve => vec![
+            pi_max("sfcOrder", "Grid order p (1..=16)", 1.0, 16.0),
+            pi_step(
+                "sfcRotation",
+                "Rotation (0, 90, 180 or 270)",
+                0.0,
+                270.0,
+                90.0,
+            ),
+            pi_max("sfcMirror", "Mirror the grid (0 = no, 1 = yes)", 0.0, 1.0),
+            pi_max(
+                "sfcMultiOrientation",
+                "Best-of orientations (0..=8)",
+                0.0,
+                8.0,
+            ),
+        ],
         _ => vec![],
     }
 }
@@ -264,10 +345,8 @@ fn solve_with_cities(
     if kd_cities.len() < 2 {
         return Err("need at least 2 cities".into());
     }
-    let distances =
-        DistanceMatrix::from_cities(&kd_cities).map_err(|e| format!("distance matrix: {e}"))?;
-    let problem = TspProblem::new(kd_cities, distances);
-    let opts = build_opts(solver_id, options);
+    let problem = TspProblem::from_points(kd_cities, DistanceType::Euc2D, DistanceBackend::Auto)?;
+    let opts = build_opts(solver_id, options)?;
     let start = std::time::Instant::now();
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         teeline::tsp::solve_problem(solver_id, &problem, &opts)
@@ -341,7 +420,7 @@ impl Guest for Component {
     ) -> Result<Solution, String> {
         let problem = parse_to_tsp_problem(&input)?;
         let solver_id = teeline::tsp::find_solver(&solver)?;
-        let opts = build_opts(solver_id, &options);
+        let opts = build_opts(solver_id, &options)?;
         let start = std::time::Instant::now();
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             teeline::tsp::solve_problem(solver_id, &problem, &opts)
@@ -384,7 +463,15 @@ impl Guest for Component {
                         };
                     }
                 };
-                let opts = build_opts(solver_id, &options);
+                let opts = match build_opts(solver_id, &options) {
+                    Ok(opts) => opts,
+                    Err(e) => {
+                        return CompareResult {
+                            algorithm: algo,
+                            solution: Err(e),
+                        };
+                    }
+                };
                 let start = std::time::Instant::now();
                 let sol = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     teeline::tsp::solve_problem(solver_id, &problem, &opts)
@@ -499,12 +586,18 @@ impl Guest for Component {
             ));
         }
         let data = teeline::tsp::tsplib::read_from_str(&input)?;
-        let dm = data.distance_matrix()?;
+        let backend = if data.has_explicit_weights() {
+            DistanceBackend::Matrix
+        } else {
+            DistanceBackend::OnTheFly
+        };
+        let problem = data.into_problem(backend)?;
 
         let solver: Vec<usize> = solver_route.iter().map(|&x| x as usize).collect();
         let opt: Vec<usize> = opt_route.iter().map(|&x| x as usize).collect();
 
-        let stats = comparison::compare_tours_from_matrix(&solver, &opt, &dm);
+        let stats =
+            comparison::compare_tours_from_source(&solver, &opt, problem.distances.as_ref());
         Ok(ComparisonStats {
             optimal_cost: stats.optimal_cost,
             solver_cost: stats.solver_cost,
@@ -520,9 +613,14 @@ impl Guest for Component {
             return Err("route must contain at least 2 city ids".to_string());
         }
         let data = teeline::tsp::tsplib::read_from_str(&input)?;
-        let dm = data.distance_matrix()?;
+        let backend = if data.has_explicit_weights() {
+            DistanceBackend::Matrix
+        } else {
+            DistanceBackend::OnTheFly
+        };
+        let problem = data.into_problem(backend)?;
         let route: Vec<usize> = route.iter().map(|&x| x as usize).collect();
-        Ok(dm.tour_length(&route))
+        Ok(problem.distances.tour_length(&route))
     }
 }
 

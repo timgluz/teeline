@@ -28,6 +28,7 @@ import SomExplainer from '../../../../explainers/som'
 import FourierExplainer from '../../../../explainers/fourier'
 import GreedyEdgeExplainer from '../../../../explainers/greedy-edge'
 import SavingsExplainer from '../../../../explainers/savings'
+import SfcExplainer from '../../../../explainers/sfc'
 import AcoExplainer from '../../../../explainers/aco'
 import StochasticHillExplainer from '../../../../explainers/stochastic-hill'
 import OrOptExplainer from '../../../../explainers/or-opt'
@@ -37,6 +38,7 @@ import BranchBoundExplainer from '../../../../explainers/branch-bound'
 import BhkExplainer from '../../../../explainers/bhk'
 import TwoOptExplainer from '../../../../explainers/two-opt'
 import NNExplainer from '../../../../explainers/nearest-neighbor'
+import EaxExplainer from '../../../../explainers/eax'
 
 export function getStaticPaths() {
   return EXPLAINER_IDS.map((id) => ({ params: { id } }))
@@ -81,6 +83,7 @@ const jsonLd = {
       {id === 'fourier' && <FourierExplainer client:visible />}
       {id === 'greedy_edge' && <GreedyEdgeExplainer client:visible />}
       {id === 'savings' && <SavingsExplainer client:visible />}
+      {id === 'space_filling_curve' && <SfcExplainer client:visible />}
       {id === 'aco' && <AcoExplainer client:visible />}
       {id === 'stochastic_hill' && <StochasticHillExplainer client:visible />}
       {id === 'or_opt' && <OrOptExplainer client:visible />}
@@ -90,6 +93,7 @@ const jsonLd = {
       {id === 'bhk' && <BhkExplainer client:visible />}
       {id === '2opt' && <TwoOptExplainer client:visible />}
       {id === 'nn' && <NNExplainer client:visible />}
+      {id === 'eax' && <EaxExplainer client:visible />}
     </main>
   </div>
 </BaseLayout>

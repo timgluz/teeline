@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { solve } from './teeline_wasm.js';
 
 const cities = [
@@ -15,20 +16,20 @@ const options = {
 };
 
 const result = solve('sa', cities, options);
-console.assert(typeof result.total === 'number' && result.total > 0, 'positive tour distance');
-console.assert(result.route.length === 5, 'visits all 5 cities');
+assert(typeof result.total === 'number' && result.total > 0, 'positive tour distance');
+assert(result.route.length === 5, 'visits all 5 cities');
 const sorted = [...result.route].sort((a, b) => a - b);
-console.assert(JSON.stringify(sorted) === '[0,1,2,3,4]', 'each city once');
+assert(JSON.stringify(sorted) === '[0,1,2,3,4]', 'each city once');
 console.log('solve smoke PASSED — route:', result.route, 'distance:', result.total.toFixed(2));
 
 // parseAndSolve — JSON input
 import { parseAndSolve } from './teeline_wasm.js';
 const jsonInput = JSON.stringify(cities);
 const jsonResult = parseAndSolve('nn', jsonInput, options);
-console.assert(typeof jsonResult.total === 'number' && jsonResult.total > 0, 'JSON: positive distance');
-console.assert(jsonResult.route.length === 5, 'JSON: visits all 5 cities');
+assert(typeof jsonResult.total === 'number' && jsonResult.total > 0, 'JSON: positive distance');
+assert(jsonResult.route.length === 5, 'JSON: visits all 5 cities');
 const jsonSorted = [...jsonResult.route].sort((a, b) => a - b);
-console.assert(new Set(jsonSorted).size === 5, 'JSON: each city visited exactly once');
+assert(new Set(jsonSorted).size === 5, 'JSON: each city visited exactly once');
 console.log('parseAndSolve(JSON) smoke PASSED — route:', jsonResult.route);
 
 // parseAndSolve — TSPLIB input (note: TSPLIB IDs are 1-based)
@@ -42,7 +43,7 @@ NODE_COORD_SECTION
 EOF
 `;
 const tsplibResult = parseAndSolve('nn', tsplibInput, options);
-console.assert(typeof tsplibResult.total === 'number' && tsplibResult.total > 0, 'TSPLIB: positive distance');
-console.assert(tsplibResult.route.length === 5, 'TSPLIB: visits all 5 cities');
-console.assert(new Set([...tsplibResult.route]).size === 5, 'TSPLIB: each city visited exactly once');
+assert(typeof tsplibResult.total === 'number' && tsplibResult.total > 0, 'TSPLIB: positive distance');
+assert(tsplibResult.route.length === 5, 'TSPLIB: visits all 5 cities');
+assert(new Set([...tsplibResult.route]).size === 5, 'TSPLIB: each city visited exactly once');
 console.log('parseAndSolve(TSPLIB) smoke PASSED — route:', tsplibResult.route);

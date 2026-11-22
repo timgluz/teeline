@@ -1,34 +1,29 @@
+use super::DistanceSource;
+use super::candidate_list::CandidateList;
 use crate::tsp::progress::ProgressMessage;
 use crate::tsp::{
-    HeuristicOptions, LKOptions, Solution, TspProblem,
-    distance_matrix::{self, DistanceMatrix},
-    kdtree::{self, KDPoint},
-    nearest_neighbor,
+    HeuristicOptions, LKOptions, Position, Solution, TspProblem, kdtree::KDPoint, nearest_neighbor,
     route::Route,
 };
-use rand::RngExt;
+use rand::{RngExt, SeedableRng};
 use std::sync::mpsc;
 
-pub(crate) fn build_candidates(cities: &[KDPoint], k: usize) -> Vec<Vec<usize>> {
-    let n = cities.len();
-    let k = k.min(n.saturating_sub(1));
-    let max_id = cities.iter().map(|c| c.id).max().unwrap_or(0);
-    let mut candidates = vec![Vec::new(); max_id + 1];
-    let tree = kdtree::from_cities(cities);
-    for city in cities {
-        candidates[city.id] = tree
-            .nearest(city, k)
-            .nearest()
-            .iter()
-            .map(|item| item.point.id)
-            .collect();
-    }
-    candidates
+pub(crate) fn build_candidates(
+    cities: &[KDPoint],
+    k: usize,
+) -> Result<CandidateList, &'static str> {
+    super::candidate_list::CandidateList::build(cities, k)
 }
 
-fn send_progress(tx: Option<&mpsc::Sender<ProgressMessage>>, path: &[usize], dist: f32) {
+fn send_progress(
+    tx: Option<&mpsc::Sender<ProgressMessage>>,
+    positions: &[usize],
+    dm: &dyn DistanceSource,
+    dist: f32,
+) {
     if let Some(tx) = tx {
-        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(path), dist));
+        let path = positions_to_ids(positions, dm);
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), dist));
     }
 }
 
@@ -38,56 +33,72 @@ pub fn solve(
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
 ) -> Solution {
-    let dm = distance_matrix::from_cities(&problem.cities);
+    let dm = problem.distances.as_ref();
     let k = opts.heuristic.n_nearest;
-    let candidates = build_candidates(&problem.cities, k);
-
-    let mut best_tour: Vec<usize> = if let Some(t) = init_tour {
-        t.to_vec()
-    } else {
-        let nn_opts = HeuristicOptions {
-            epochs: 1,
-            ..HeuristicOptions::default()
-        };
-        nearest_neighbor::solve(problem, &nn_opts, None, None)
-            .route()
-            .to_vec()
+    let n = dm.num_cities();
+    let mut best_positions: Vec<usize> = match init_tour {
+        Some(t) => match t
+            .iter()
+            .map(|&id| dm.city_id2pos(id).map(Position::into_inner))
+            .collect()
+        {
+            Some(positions) => positions,
+            None => return Solution::new(t, problem),
+        },
+        None => nearest_neighbor_positions(problem, dm),
     };
 
-    if best_tour.len() < 4 {
-        return Solution::new(&best_tour, problem);
+    if n < 4 || !is_permutation(&best_positions, n) {
+        let ids = positions_to_ids(&best_positions, dm);
+        return Solution::new(&ids, problem);
     }
 
-    let mut init_pos = make_pos(&best_tour);
+    let candidates = if dm.is_coordinate_metric() {
+        build_candidates(&problem.cities, k)
+    } else {
+        CandidateList::build_from_distances(dm, &problem.cities, k)
+    };
+    let candidates = match candidates {
+        Ok(candidates) => candidates,
+        Err(e) => {
+            tracing::warn!(
+                error = e,
+                "LK candidate list unavailable; returning the seed tour"
+            );
+            return Solution::new(&positions_to_ids(&best_positions, dm), problem);
+        }
+    };
+
+    let mut init_pos = make_pos(&best_positions, n);
     lk_pass(
-        &mut best_tour,
+        &mut best_positions,
         &mut init_pos,
         &candidates,
-        &dm,
+        dm,
         opts.max_depth,
     );
     drop(init_pos);
-    let mut best_dist = tour_distance(&best_tour, &dm);
-    send_progress(progress_tx, &best_tour, best_dist);
+    let mut best_dist = tour_distance(&best_positions, dm);
+    send_progress(progress_tx, &best_positions, dm, best_dist);
 
-    let mut rng = rand::rng();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(opts.seed.unwrap_or_else(rand::random::<u64>));
     let mut platoo = 0usize;
     for _ in 0..opts.heuristic.epochs {
-        let mut candidate = double_bridge(&best_tour, &mut rng);
-        let mut cand_pos = make_pos(&candidate);
+        let mut candidate = double_bridge(&best_positions, &mut rng);
+        let mut cand_pos = make_pos(&candidate, n);
         lk_pass(
             &mut candidate,
             &mut cand_pos,
             &candidates,
-            &dm,
+            dm,
             opts.max_depth,
         );
-        let dist = tour_distance(&candidate, &dm);
+        let dist = tour_distance(&candidate, dm);
         if dist < best_dist {
-            best_tour = candidate;
+            best_positions = candidate;
             best_dist = dist;
             platoo = 0;
-            send_progress(progress_tx, &best_tour, best_dist);
+            send_progress(progress_tx, &best_positions, dm, best_dist);
         } else {
             platoo += 1;
             if platoo >= opts.heuristic.platoo_epochs {
@@ -96,27 +107,71 @@ pub fn solve(
         }
     }
 
-    Solution::new(&best_tour, problem)
+    Solution::new(&positions_to_ids(&best_positions, dm), problem)
+}
+
+fn nearest_neighbor_positions(problem: &TspProblem, dm: &dyn DistanceSource) -> Vec<usize> {
+    let nn_opts = HeuristicOptions {
+        epochs: 1,
+        ..HeuristicOptions::default()
+    };
+    nearest_neighbor::solve(problem, &nn_opts, None, None)
+        .route()
+        .iter()
+        .map(|&id| {
+            dm.city_id2pos(id)
+                .expect("NN tour city is in the index")
+                .into_inner()
+        })
+        .collect()
+}
+
+fn positions_to_ids(positions: &[usize], dm: &dyn DistanceSource) -> Vec<usize> {
+    positions
+        .iter()
+        .map(|&pos| {
+            dm.pos2city_id(Position::new(pos))
+                .expect("position came from the index")
+        })
+        .collect()
 }
 
 // ── Distance shorthand ────────────────────────────────────────────────────────
 
-fn d(dm: &DistanceMatrix, a: usize, b: usize) -> f32 {
-    dm.distance_between(a, b).unwrap_or(f32::MAX)
+fn d(dm: &dyn DistanceSource, a: usize, b: usize) -> f32 {
+    dm.distance_by_pos(Position::new(a), Position::new(b))
+        .unwrap_or(f32::MAX)
 }
 
 // ── Flat-tour helpers (kept for solve() and tests) ────────────────────────────
 
-fn make_pos(tour: &[usize]) -> Vec<usize> {
-    let max_id = *tour.iter().max().unwrap_or(&0);
-    let mut pos = vec![0usize; max_id + 1];
-    for (rank, &city) in tour.iter().enumerate() {
-        pos[city] = rank;
+fn make_pos(tour: &[usize], n: usize) -> Vec<usize> {
+    debug_assert!(
+        is_permutation(tour, n),
+        "tour must be a permutation of 0..n"
+    );
+    let mut pos = vec![0usize; n];
+    for (rank, &city_pos) in tour.iter().enumerate() {
+        pos[city_pos] = rank;
     }
     pos
 }
 
-fn tour_distance(tour: &[usize], dm: &DistanceMatrix) -> f32 {
+fn is_permutation(positions: &[usize], n: usize) -> bool {
+    if positions.len() != n {
+        return false;
+    }
+    let mut seen = vec![false; n];
+    for &p in positions {
+        if p >= n || seen[p] {
+            return false;
+        }
+        seen[p] = true;
+    }
+    true
+}
+
+fn tour_distance(tour: &[usize], dm: &dyn DistanceSource) -> f32 {
     let n = tour.len();
     (0..n).map(|i| d(dm, tour[i], tour[(i + 1) % n])).sum()
 }
@@ -131,10 +186,10 @@ fn apply_2opt_at(tour: &mut [usize], pos: &mut [usize], i: usize, j: usize) {
 
 // ── Next/prev adjacency representation ───────────────────────────────────────
 
-fn flat_to_next_prev(tour: &[usize], max_id: usize) -> (Vec<usize>, Vec<usize>) {
+fn flat_to_next_prev(tour: &[usize]) -> (Vec<usize>, Vec<usize>) {
     let n = tour.len();
-    let mut next = vec![0usize; max_id + 1];
-    let mut prev = vec![0usize; max_id + 1];
+    let mut next = vec![0usize; n];
+    let mut prev = vec![0usize; n];
     for i in 0..n {
         let a = tour[i];
         let b = tour[(i + 1) % n];
@@ -178,23 +233,22 @@ fn is_tour_edge(a: usize, b: usize, next: &[usize], prev: &[usize]) -> bool {
 
 // O(n) check: does applying this chain produce a single Hamiltonian cycle?
 // Returns false if the chain would create a subtour (disconnected cycles).
-fn chain_is_valid_tour(chain: &[usize], next: &[usize], city_ids: &[usize]) -> bool {
-    let n = city_ids.len();
+fn chain_is_valid_tour(chain: &[usize], next: &[usize], positions: &[usize]) -> bool {
+    let n = positions.len();
     if chain.len() < 4 {
         return false;
     }
-    let max_id = next.len().saturating_sub(1);
     let k = chain.len() / 2;
 
     // Build prev from next.
-    let mut prev_map = vec![0usize; max_id + 1];
-    for &c in city_ids {
+    let mut prev_map = vec![0usize; n];
+    for &c in positions {
         prev_map[next[c]] = c;
     }
 
     // Build mutable adjacency (2 neighbors per city).
-    let mut adj: Vec<Vec<usize>> = vec![Vec::with_capacity(2); max_id + 1];
-    for &c in city_ids {
+    let mut adj: Vec<Vec<usize>> = vec![Vec::with_capacity(2); n];
+    for &c in positions {
         adj[c].push(prev_map[c]);
         adj[c].push(next[c]);
     }
@@ -222,7 +276,7 @@ fn chain_is_valid_tour(chain: &[usize], next: &[usize], city_ids: &[usize]) -> b
     adj[b].push(a);
 
     // Every city must have exactly 2 neighbors.
-    for &c in city_ids {
+    for &c in positions {
         if adj[c].len() != 2 {
             return false;
         }
@@ -272,8 +326,8 @@ fn find_lk_chain(
     used: &mut Vec<bool>,
     next: &[usize],
     prev: &[usize],
-    dm: &DistanceMatrix,
-    candidates: &[Vec<usize>],
+    dm: &dyn DistanceSource,
+    candidates: &CandidateList,
 ) -> bool {
     // After at least one add-remove pair, try closing with edge (t_open, t1).
     if depth >= 1 {
@@ -287,7 +341,8 @@ fn find_lk_chain(
         return false;
     }
 
-    for &t_next in &candidates[t_open] {
+    for &t_next in candidates.neighbours_by_pos(Position::new(t_open)) {
+        let t_next = t_next.into_inner();
         // LK positive-gain bound: candidates sorted by distance, so break (not continue).
         let g1 = gain - d(dm, t_open, t_next);
         if g1 <= EPS {
@@ -345,16 +400,16 @@ fn find_lk_chain(
 fn find_lk_move(
     next: &[usize],
     prev: &[usize],
-    dm: &DistanceMatrix,
-    candidates: &[Vec<usize>],
+    dm: &dyn DistanceSource,
+    candidates: &CandidateList,
     max_depth: usize,
-    city_ids: &[usize],
+    positions: &[usize],
 ) -> Option<Vec<usize>> {
-    let max_id = next.len().saturating_sub(1);
-    let mut used = vec![false; max_id + 1];
+    let n = next.len();
+    let mut used = vec![false; n];
     let mut chain = Vec::new();
 
-    for &t1 in city_ids {
+    for &t1 in positions {
         // Try both orientations of the first broken edge.
         for &t2 in &[next[t1], prev[t1]] {
             let g0 = d(dm, t1, t2);
@@ -370,7 +425,7 @@ fn find_lk_move(
             );
 
             if found {
-                if chain_is_valid_tour(&chain, next, city_ids) {
+                if chain_is_valid_tour(&chain, next, positions) {
                     return Some(chain);
                 }
                 // Invalid (subtour): clear all marked cities before continuing.
@@ -397,10 +452,9 @@ fn find_lk_move(
 fn apply_lk_chain(chain: &[usize], tour: &mut [usize], pos: &mut [usize]) {
     let n = tour.len();
     let k = chain.len() / 2;
-    let max_id = *tour.iter().max().unwrap_or(&0);
 
     // Build undirected adjacency from current tour (each city has exactly 2 neighbours).
-    let mut adj: Vec<Vec<usize>> = vec![Vec::with_capacity(2); max_id + 1];
+    let mut adj: Vec<Vec<usize>> = vec![Vec::with_capacity(2); n];
     for i in 0..n {
         let a = tour[i];
         let b = tour[(i + 1) % n];
@@ -454,21 +508,20 @@ fn apply_lk_chain(chain: &[usize], tour: &mut [usize], pos: &mut [usize]) {
 fn lk_pass(
     tour: &mut [usize],
     pos: &mut [usize],
-    candidates: &[Vec<usize>],
-    dm: &DistanceMatrix,
+    candidates: &CandidateList,
+    dm: &dyn DistanceSource,
     max_depth: usize,
 ) -> bool {
     let n = tour.len();
     if n < 4 {
         return false;
     }
-    let max_id = *tour.iter().max().unwrap_or(&0);
-    let city_ids: Vec<usize> = tour.to_vec();
+    let positions: Vec<usize> = tour.to_vec();
     let mut improved = false;
 
     loop {
-        let (next, prev) = flat_to_next_prev(tour, max_id);
-        match find_lk_move(&next, &prev, dm, candidates, max_depth, &city_ids) {
+        let (next, prev) = flat_to_next_prev(tour);
+        match find_lk_move(&next, &prev, dm, candidates, max_depth, &positions) {
             None => break,
             Some(chain) => {
                 apply_lk_chain(&chain, tour, pos);
@@ -519,11 +572,15 @@ mod tests {
     #[test]
     fn build_candidates_returns_k_nearest_for_each_city() {
         let pts = build_points(6);
-        let cands = build_candidates(&pts, 3);
-        assert_eq!(cands.len(), 6);
-        for (i, row) in cands.iter().enumerate() {
+        let cands = build_candidates(&pts, 3).expect("unique city ids");
+        assert_eq!(cands.num_cities(), 6);
+        for i in 0..cands.num_cities() {
+            let row = cands.neighbours_by_pos(Position::new(i));
             assert_eq!(row.len(), 3, "city {i} must have 3 candidates");
-            assert!(!row.contains(&i), "city {i} must not be its own candidate");
+            assert!(
+                !row.contains(&Position::new(i)),
+                "city {i} must not be its own candidate"
+            );
         }
     }
 
@@ -531,11 +588,12 @@ mod tests {
     fn build_candidates_neighbors_are_sorted_by_distance() {
         let pts = build_points(6);
         let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, 4);
-        for (i, row) in cands.iter().enumerate() {
+        let cands = build_candidates(&pts, 4).expect("unique city ids");
+        for i in 0..cands.num_cities() {
+            let row = cands.neighbours_by_pos(Position::new(i));
             let dists: Vec<f32> = row
                 .iter()
-                .map(|&j| dm.distance_between(i, j).unwrap_or(f32::MAX))
+                .map(|&j| dm.distance_by_pos(Position::new(i), j).unwrap_or(f32::MAX))
                 .collect();
             let mut sorted = dists.clone();
             sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -546,9 +604,9 @@ mod tests {
     #[test]
     fn build_candidates_k_clamps_to_n_minus_1() {
         let pts = build_points(4);
-        let cands = build_candidates(&pts, 10);
-        for row in &cands {
-            assert!(row.len() <= 3);
+        let cands = build_candidates(&pts, 10).expect("unique city ids");
+        for i in 0..cands.num_cities() {
+            assert!(cands.neighbours_by_pos(Position::new(i)).len() <= 3);
         }
     }
 
@@ -557,7 +615,7 @@ mod tests {
     #[test]
     fn make_pos_round_trips_with_tour() {
         let tour = vec![3usize, 1, 4, 0, 2];
-        let pos = make_pos(&tour);
+        let pos = make_pos(&tour, 5);
         for (rank, &city) in tour.iter().enumerate() {
             assert_eq!(pos[city], rank, "pos[{city}] should be {rank}");
         }
@@ -582,7 +640,7 @@ mod tests {
     #[test]
     fn apply_2opt_at_reverses_segment() {
         let mut tour = vec![0usize, 1, 2, 3, 4];
-        let mut pos = make_pos(&tour);
+        let mut pos = make_pos(&tour, 5);
         apply_2opt_at(&mut tour, &mut pos, 1, 3);
         assert_eq!(tour, vec![0, 3, 2, 1, 4]);
         for (rank, &city) in tour.iter().enumerate() {
@@ -595,8 +653,7 @@ mod tests {
     #[test]
     fn flat_to_next_prev_round_trips() {
         let tour = vec![0usize, 1, 2, 3, 4];
-        let max_id = 4;
-        let (next, prev) = flat_to_next_prev(&tour, max_id);
+        let (next, prev) = flat_to_next_prev(&tour);
         // next[0]=1, next[4]=0
         assert_eq!(next[0], 1);
         assert_eq!(next[4], 0);
@@ -608,11 +665,10 @@ mod tests {
     }
 
     #[test]
-    fn flat_to_next_prev_sparse_ids() {
-        // IDs: 0,1,3,4,2 — non-contiguous, max_id=4
+    fn flat_to_next_prev_handles_non_identity_order() {
+        // The tour is a permutation of positions 0..5, not in identity order.
         let tour = vec![3usize, 1, 4, 0, 2];
-        let max_id = *tour.iter().max().unwrap();
-        let (next, prev) = flat_to_next_prev(&tour, max_id);
+        let (next, prev) = flat_to_next_prev(&tour);
         for i in 0..tour.len() {
             let a = tour[i];
             let b = tour[(i + 1) % tour.len()];
@@ -624,8 +680,7 @@ mod tests {
     #[test]
     fn next_prev_to_flat_has_all_cities() {
         let tour = vec![2usize, 0, 4, 1, 3];
-        let max_id = *tour.iter().max().unwrap();
-        let (next, _) = flat_to_next_prev(&tour, max_id);
+        let (next, _) = flat_to_next_prev(&tour);
         let rebuilt = next_prev_to_flat(tour[0], &next, tour.len());
         assert_eq!(rebuilt.len(), tour.len());
         let mut sorted = rebuilt.clone();
@@ -638,7 +693,7 @@ mod tests {
     #[test]
     fn is_single_cycle_valid_and_invalid() {
         let tour = vec![0usize, 1, 2, 3];
-        let (next, _) = flat_to_next_prev(&tour, 3);
+        let (next, _) = flat_to_next_prev(&tour);
         assert!(
             is_single_cycle(0, &next, 4),
             "valid tour must be a single cycle"
@@ -676,12 +731,11 @@ mod tests {
         // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
         // property under test — that LK removes the crossing — would be untestable.
         let dm = distance_matrix::from_cities_unrounded(&pts);
-        let candidates = build_candidates(&pts, 3);
+        let candidates = build_candidates(&pts, 3).expect("unique city ids");
         let tour = vec![0usize, 1, 3, 2]; // crossed
-        let max_id = 3;
-        let (next, prev) = flat_to_next_prev(&tour, max_id);
-        let city_ids: Vec<usize> = tour.clone();
-        let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &city_ids);
+        let (next, prev) = flat_to_next_prev(&tour);
+        let positions: Vec<usize> = tour.clone();
+        let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &positions);
         assert!(
             chain.is_some(),
             "must find an improvement in a crossed tour"
@@ -697,12 +751,11 @@ mod tests {
             })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
-        let candidates = build_candidates(&pts, 3);
+        let candidates = build_candidates(&pts, 3).expect("unique city ids");
         let tour = vec![0usize, 1, 2, 3];
-        let max_id = 3;
-        let (next, prev) = flat_to_next_prev(&tour, max_id);
-        let city_ids: Vec<usize> = tour.clone();
-        let chain = find_lk_move(&next, &prev, &dm, &candidates, 5, &city_ids);
+        let (next, prev) = flat_to_next_prev(&tour);
+        let positions: Vec<usize> = tour.clone();
+        let chain = find_lk_move(&next, &prev, &dm, &candidates, 5, &positions);
         assert!(chain.is_none(), "optimal linear tour must not improve");
     }
 
@@ -733,13 +786,13 @@ mod tests {
         // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
         // property under test — that LK removes the crossing — would be untestable.
         let dm = distance_matrix::from_cities_unrounded(&pts);
-        let candidates = build_candidates(&pts, 3);
+        let candidates = build_candidates(&pts, 3).expect("unique city ids");
         let mut tour = vec![0usize, 1, 3, 2];
-        let mut pos = make_pos(&tour);
+        let mut pos = make_pos(&tour, 4);
         let before = tour_distance(&tour, &dm);
-        let (next, prev) = flat_to_next_prev(&tour, 3);
-        let city_ids: Vec<usize> = tour.clone();
-        let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &city_ids)
+        let (next, prev) = flat_to_next_prev(&tour);
+        let positions: Vec<usize> = tour.clone();
+        let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &positions)
             .expect("must find improvement");
         apply_lk_chain(&chain, &mut tour, &mut pos);
         let after = tour_distance(&tour, &dm);
@@ -752,7 +805,7 @@ mod tests {
             assert_eq!(pos[city], rank, "pos[{city}] must equal {rank}");
         }
         // single-cycle check
-        let (new_next, _) = flat_to_next_prev(&tour, 3);
+        let (new_next, _) = flat_to_next_prev(&tour);
         assert!(is_single_cycle(tour[0], &new_next, 4));
     }
 
@@ -789,13 +842,12 @@ mod tests {
     fn find_lk_move_depth1_finds_nothing_on_a_two_opt_optimal_tour() {
         let pts = hexagon_pts();
         let dm = distance_matrix::from_cities_unrounded(&pts);
-        let candidates = build_candidates(&pts, 5);
+        let candidates = build_candidates(&pts, 5).expect("unique city ids");
         let tour = vec![0usize, 1, 2, 3, 4, 5];
-        let max_id = 5;
-        let (next, prev) = flat_to_next_prev(&tour, max_id);
-        let city_ids: Vec<usize> = tour.clone();
+        let (next, prev) = flat_to_next_prev(&tour);
+        let positions: Vec<usize> = tour.clone();
 
-        let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &city_ids);
+        let chain = find_lk_move(&next, &prev, &dm, &candidates, 1, &positions);
 
         assert!(
             chain.is_none(),
@@ -807,16 +859,15 @@ mod tests {
     fn find_lk_move_finds_an_improving_chain_that_stays_a_single_cycle() {
         let pts = hexagon_pts();
         let dm = distance_matrix::from_cities_unrounded(&pts);
-        let candidates = build_candidates(&pts, 5);
+        let candidates = build_candidates(&pts, 5).expect("unique city ids");
         let tour = vec![0usize, 2, 4, 1, 3, 5];
-        let max_id = 5;
         let before = tour_distance(&tour, &dm);
         let mut tour_mut = tour.clone();
-        let mut pos = make_pos(&tour_mut);
-        let (next, prev) = flat_to_next_prev(&tour_mut, max_id);
-        let city_ids: Vec<usize> = tour_mut.clone();
+        let mut pos = make_pos(&tour_mut, 6);
+        let (next, prev) = flat_to_next_prev(&tour_mut);
+        let positions: Vec<usize> = tour_mut.clone();
         // Try depth-2; if it finds a move, verify improvement
-        let chain = find_lk_move(&next, &prev, &dm, &candidates, 2, &city_ids)
+        let chain = find_lk_move(&next, &prev, &dm, &candidates, 2, &positions)
             .expect("this tour is not 2-opt-optimal, so an improving move must exist");
         apply_lk_chain(&chain, &mut tour_mut, &mut pos);
         let after = tour_distance(&tour_mut, &dm);
@@ -824,7 +875,7 @@ mod tests {
             after < before,
             "depth-2 move must improve tour: before={before} after={after}"
         );
-        let (new_next, _) = flat_to_next_prev(&tour_mut, max_id);
+        let (new_next, _) = flat_to_next_prev(&tour_mut);
         assert!(
             is_single_cycle(tour_mut[0], &new_next, 6),
             "result must be a single cycle"
@@ -857,9 +908,9 @@ mod tests {
         // TSPLIB's EUC_2D, so the crossed tour would cost the same as the perimeter and the
         // property under test — that LK removes the crossing — would be untestable.
         let dm = distance_matrix::from_cities_unrounded(&pts);
-        let cands = build_candidates(&pts, 3);
+        let cands = build_candidates(&pts, 3).expect("unique city ids");
         let mut tour = vec![0usize, 1, 3, 2];
-        let mut pos = make_pos(&tour);
+        let mut pos = make_pos(&tour, 4);
         let before = tour_distance(&tour, &dm);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm, 1);
         let after = tour_distance(&tour, &dm);
@@ -879,9 +930,9 @@ mod tests {
             })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, 3);
+        let cands = build_candidates(&pts, 3).expect("unique city ids");
         let mut tour = vec![0usize, 1, 2, 3];
-        let mut pos = make_pos(&tour);
+        let mut pos = make_pos(&tour, 4);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm, 5);
         assert!(
             !improved,
@@ -898,9 +949,9 @@ mod tests {
             })
             .collect();
         let dm = distance_matrix::from_cities(&pts);
-        let cands = build_candidates(&pts, 2);
+        let cands = build_candidates(&pts, 2).expect("unique city ids");
         let mut tour = vec![0usize, 1, 2];
-        let mut pos = make_pos(&tour);
+        let mut pos = make_pos(&tour, 3);
         let improved = lk_pass(&mut tour, &mut pos, &cands, &dm, 5);
         assert!(!improved, "tiny tour (n=3) must not improve");
     }
@@ -957,6 +1008,44 @@ mod tests {
         assert_eq!(sol.route().len(), 52);
     }
 
+    #[test]
+    fn huge_sparse_ids_do_not_allocate_by_max_id() {
+        // Pre-fix, make_pos/flat_to_next_prev size their arrays by max_id + 1, so these
+        // IDs would force an ~8 TB allocation and abort the process.
+        let base = 1_000_000_000_000usize;
+        let pts = vec![
+            KDPoint::new_with_id(base, &[0.0, 0.0]),
+            KDPoint::new_with_id(base + 1, &[1.0, 0.0]),
+            KDPoint::new_with_id(base + 2, &[1.0, 1.0]),
+            KDPoint::new_with_id(base + 3, &[0.0, 1.0]),
+        ];
+        let dm = distance_matrix::from_cities(&pts);
+        let problem = crate::tsp::TspProblem::new(pts, dm);
+        let mut opts = LKOptions::default();
+        opts.heuristic.epochs = 1;
+
+        let sol = solve(&problem, &opts, None, None);
+
+        assert_eq!(sol.route().len(), 4);
+        let mut ids = sol.route().to_vec();
+        ids.sort();
+        assert_eq!(ids, vec![base, base + 1, base + 2, base + 3]);
+    }
+
+    #[test]
+    fn duplicate_ids_in_init_tour_are_returned_unoptimized() {
+        let pts = hexagon_pts();
+        let dm = distance_matrix::from_cities_unrounded(&pts);
+        let problem = crate::tsp::TspProblem::new(pts, dm);
+        let mut opts = LKOptions::default();
+        opts.heuristic.epochs = 1;
+        let init = vec![0usize, 2, 4, 1, 3, 3]; // duplicate 3, missing 5
+
+        let sol = solve(&problem, &opts, None, Some(&init));
+
+        assert_eq!(sol.route(), init.as_slice());
+    }
+
     // ── build_candidates timing (see docs/algorithms/lin-kernighan.md "Notes") ──
 
     fn random_points(n: usize, seed: u64) -> Vec<KDPoint> {
@@ -986,9 +1075,9 @@ mod tests {
         for &n in &[52usize, 280, 1002, 5000] {
             let pts = random_points(n, n as u64);
             let start = Instant::now();
-            let candidates = build_candidates(&pts, 5);
+            let candidates = build_candidates(&pts, 5).expect("unique city ids");
             let elapsed = start.elapsed();
-            assert_eq!(candidates.len(), n);
+            assert_eq!(candidates.num_cities(), n);
             println!("build_candidates n={n} k=5: {elapsed:?}");
         }
     }

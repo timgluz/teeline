@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { niceTicks, placeLabels, type LabelRequest } from './chart-layout'
+import {
+  axisTop,
+  niceTicks,
+  placeLabels,
+  tailCap,
+  type LabelRequest,
+} from './chart-layout'
 
 const BOUNDS = { width: 720, height: 340 }
 
@@ -23,6 +29,61 @@ describe('niceTicks', () => {
   it('falls back to a sane axis for a degenerate range', () => {
     expect(niceTicks(0)).toEqual([0, 1])
     expect(niceTicks(Number.NaN)).toEqual([0, 1])
+  })
+})
+
+describe('tailCap', () => {
+  // The live berlin52 gaps: fifteen comparable solvers, then four that leave a gap several
+  // times larger and would otherwise flatten the chart.
+  const BERLIN52_GAPS = [
+    0, 2.1612, 2.6386, 7.372, 7.6637, 8.4991, 8.8173, 11.0581, 11.1774, 13.3254,
+    14.943, 15.4071, 17.2898, 18.4964, 19.0666, 31.9411, 110.1565, 129.3556,
+    198.7271, 301.3126,
+  ]
+
+  it('cuts above the comparable solvers, not at the largest value', () => {
+    expect(tailCap(BERLIN52_GAPS)).toBe(31.9411)
+  })
+
+  it('cuts when the tail is a single point', () => {
+    expect(tailCap([0, 0.52, 2, 3.2, 4.89, 11.16, 282.5])).toBe(11.16)
+  })
+
+  it('leaves a smooth series uncapped', () => {
+    expect(tailCap([1, 2, 3, 4, 5])).toBeNull()
+    expect(tailCap([7544, 7682, 7743, 8097, 8107, 8318, 8379, 8384])).toBeNull()
+  })
+
+  it('ignores a large jump when most of the series sits above it', () => {
+    // 1 -> 10 is a 10x jump, but it is the series, not a tail.
+    expect(tailCap([1, 10, 11, 12, 13, 14])).toBeNull()
+  })
+
+  it('has no opinion on a series too short to have a tail', () => {
+    expect(tailCap([1, 2, 100])).toBeNull()
+    expect(tailCap([])).toBeNull()
+  })
+})
+
+describe('axisTop', () => {
+  it('rounds the cap up so a point just past it still fits', () => {
+    expect(
+      axisTop([
+        0, 2.1612, 2.6386, 7.372, 7.6637, 8.4991, 8.8173, 11.0581, 11.1774,
+        13.3254, 14.943, 15.4071, 17.2898, 18.4964, 19.0666, 31.9411, 110.1565,
+        129.3556, 198.7271, 301.3126,
+      ]),
+    ).toBe(40)
+  })
+
+  it('uses the data maximum when no tail needs cutting', () => {
+    expect(axisTop([7544, 7682, 7743, 8097, 8107, 8318, 8379, 8384])).toBe(
+      10000,
+    )
+  })
+
+  it('falls back to a sane axis for no data', () => {
+    expect(axisTop([])).toBe(1)
   })
 })
 

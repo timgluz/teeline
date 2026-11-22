@@ -1,12 +1,12 @@
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use std::sync::mpsc;
-
-use super::distance_matrix::DistanceMatrix;
+use super::DistanceSource;
 use super::kdtree::{self, KDPoint, KDTree};
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Solution, TspProblem};
+use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::mpsc;
 
 // NOTE: build_points() assigns 0-indexed city IDs, so this sentinel collides
 // with city ID 0 in unit tests. Currently harmless because the algorithm uses
@@ -63,7 +63,7 @@ pub fn solve(
     let fitness_fn = build_evaluator(distances);
     let (best_path, best_distance) = backtrack(
         &fitness_fn,
-        distances,
+        distances.as_ref(),
         &city_map,
         &mut open_path,
         &unvisited_cities,
@@ -88,11 +88,11 @@ pub fn solve(
     } else {
         best_path
     };
-    Solution::from_parts(&result_path, cities, distances)
+    Solution::from_parts(&result_path, distances.as_ref())
 }
 
-fn build_evaluator(distances: &DistanceMatrix) -> PathEvaluator {
-    let dm = Rc::new(distances.clone());
+fn build_evaluator(distances: &Arc<dyn DistanceSource>) -> PathEvaluator {
+    let dm = Arc::clone(distances);
 
     Rc::new(move |path: &Path| dm.tour_length(path))
 }
@@ -100,7 +100,7 @@ fn build_evaluator(distances: &DistanceMatrix) -> PathEvaluator {
 #[allow(clippy::only_used_in_recursion, clippy::too_many_arguments)]
 fn backtrack(
     evaluate_fn: &PathEvaluator,
-    distances: &DistanceMatrix,
+    distances: &dyn DistanceSource,
     city_map: &HashMap<usize, KDPoint>,
     path: &mut Path,
     unvisited_cities: &UniqSet,
@@ -141,15 +141,9 @@ fn backtrack(
     for candidate in candidates.iter() {
         make_move(path, k, *candidate, progress_tx);
 
-        let visited_path: Vec<usize> = path
-            .to_vec()
-            .iter()
-            .filter(|&&x| x != UNVISITED_NODE)
-            .copied()
-            .collect();
         if let Some(tx) = progress_tx {
             let _ = tx.send(ProgressMessage::PathUpdate(
-                Route::new(&visited_path),
+                Route::new(&path[..=k]),
                 best_distance,
             ));
         }
@@ -200,7 +194,7 @@ fn construct_candidates(
     unvisited_cities: &UniqSet,
     running_cost: f32,
     best_distance: f32,
-    distances: &DistanceMatrix,
+    distances: &dyn DistanceSource,
     city_map: &HashMap<usize, KDPoint>,
     kd: Option<&KDTree>,
     n_nearest: usize,
@@ -267,7 +261,7 @@ fn construct_candidates(
     scored.into_iter().map(|(_, id)| id).collect()
 }
 
-fn prim_mst(city_ids: &[usize], distances: &DistanceMatrix) -> f32 {
+fn prim_mst(city_ids: &[usize], distances: &dyn DistanceSource) -> f32 {
     let n = city_ids.len();
     if n <= 1 {
         return 0.0;
@@ -530,6 +524,34 @@ mod tests {
             "n_nearest=4 gap {:.1}% should be < 10% vs exact {:.3}",
             gap * 100.0,
             exact.total,
+        );
+    }
+
+    #[test]
+    fn progress_path_includes_city_zero() {
+        let problem = tsp5_problem();
+        let (tx, rx) = mpsc::channel();
+        let opts = HeuristicOptions {
+            n_nearest: 0,
+            ..Default::default()
+        };
+
+        let _ = solve(&problem, &opts, Some(&tx), None);
+        drop(tx);
+
+        let updates: Vec<Vec<usize>> = rx
+            .iter()
+            .filter_map(|msg| match msg {
+                ProgressMessage::PathUpdate(route, _) => Some(route.route().to_vec()),
+                _ => None,
+            })
+            .collect();
+
+        // The first update is the sorted seed tour; the next comes from backtracking.
+        let visited = updates.get(1).expect("B&B must emit a visited-path update");
+        assert!(
+            visited.contains(&0),
+            "the first backtracking progress path must include city 0, got {visited:?}"
         );
     }
 }

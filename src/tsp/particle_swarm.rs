@@ -1,23 +1,27 @@
 use rand::RngExt;
+use std::collections::HashSet;
 use std::sync::mpsc;
 
 use super::budget::Budget;
+use super::nearest_neighbor::seed_population;
 use super::progress::ProgressMessage;
-use super::route::{Route, apply_swaps, swap_sequence};
+use super::route::{Route, move_toward, random_reversal};
 use super::{HeuristicOptions, Solution, TspProblem};
-
-type Swap = (usize, usize);
-type Velocity = Vec<Swap>;
 
 const W_MAX: f64 = 0.9;
 const W_MIN: f64 = 0.4;
-const C1: f64 = 1.5;
-const C2: f64 = 1.5;
+/// Segment fraction of the cognitive move (toward the particle's own best).
+const C1: f64 = 0.5;
+/// Segment fraction of the social move (toward the swarm's best).
+const C2: f64 = 0.5;
 const DEFAULT_N_PARTICLES: usize = 30;
-const V_MAX_FACTOR: f64 = 0.35;
 
-fn trim_velocity(v: &[Swap], keep: usize) -> Velocity {
-    v.iter().take(keep).copied().collect()
+/// Explore with one or two random 2-opt reversals; `w` decays from `W_MAX` to `W_MIN`.
+fn perturb(tour: &mut [usize], w: f64, rng: &mut impl RngExt) {
+    let moves = if w > 0.6 { 2 } else { 1 };
+    for _ in 0..moves {
+        random_reversal(tour, rng);
+    }
 }
 
 pub fn solve(
@@ -30,36 +34,11 @@ pub fn solve(
     let distances = &problem.distances;
     let n_cities = cities.len();
     let n_particles = opts.n_nearest.max(DEFAULT_N_PARTICLES);
-    #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-    let v_max = ((n_cities as f64 * V_MAX_FACTOR).ceil() as usize).max(1);
 
     let mut rng = rand::rng();
-    let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
+    let mut tours = seed_population(distances.as_ref(), cities, n_particles, init_tour, &mut rng);
 
-    let mut positions: Vec<Vec<usize>> = (0..n_particles)
-        .map(|idx| {
-            if idx == 0 {
-                init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
-                    let mut p = city_ids.clone();
-                    for i in (1..n_cities).rev() {
-                        let j = rng.random_range(0..=i);
-                        p.swap(i, j);
-                    }
-                    p
-                })
-            } else {
-                let mut p = city_ids.clone();
-                for i in (1..n_cities).rev() {
-                    let j = rng.random_range(0..=i);
-                    p.swap(i, j);
-                }
-                p
-            }
-        })
-        .collect();
-
-    let mut velocities: Vec<Velocity> = vec![Vec::new(); n_particles];
-    let mut pbest: Vec<Vec<usize>> = positions.clone();
+    let mut pbest: Vec<Vec<usize>> = tours.clone();
     let mut pbest_cost: Vec<f32> = pbest.iter().map(|p| distances.tour_length(p)).collect();
 
     let (best_idx, _) = pbest_cost
@@ -77,9 +56,9 @@ pub fn solve(
     let epochs = opts.epochs;
     let mut budget = Budget::new(epochs, opts.stagnation_epochs);
     // The inertia is interpolated across a horizon, and an uncapped run has none of its own.
-    // Leaving the zero in place makes the denominator `max(1)`, so `w` goes negative within two
-    // epochs and the velocity trim saturates — the run would continue indefinitely at a
-    // degenerate setting. The default horizon keeps the anneal's shape and only drops the cap.
+    // Leaving the zero in place makes the denominator `max(1)`, so `w` collapses immediately
+    // and the exploration term degenerates. The default horizon keeps the anneal's shape and
+    // only drops the cap.
     let horizon = if epochs == 0 {
         HeuristicOptions::default().epochs
     } else {
@@ -88,6 +67,9 @@ pub fn solve(
     // Starts true so the first epoch runs, then carries the previous epoch's result into the
     // budget — one decision point for both the cap and the convergence threshold.
     let mut improved = true;
+    // Reused by every move; the set's capacity survives across epochs, so the hot loop does
+    // not allocate one per crossover.
+    let mut used = HashSet::with_capacity(n_cities);
 
     while budget.record(improved) {
         let epoch = budget.index();
@@ -99,34 +81,22 @@ pub fn solve(
             let r1: f64 = rng.random();
             let r2: f64 = rng.random();
 
-            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-            let inertia_keep = (w * velocities[i].len() as f64).round() as usize;
+            // Cognitive, then social. Each move is recomputed from the current tour: a swap
+            // list computed against the pre-cognitive tour would be applied at ranks the
+            // first move had already shifted.
+            let cog = move_toward(&tours[i], &pbest[i], C1 * r1, &mut rng, &mut used);
+            let mut next = move_toward(&cog, &gbest, C2 * r2, &mut rng, &mut used);
+            perturb(&mut next, w, &mut rng);
+            tours[i] = next;
 
-            let cog_diff = swap_sequence(&positions[i], &pbest[i]);
-            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-            let cog_keep = (C1 * r1 * cog_diff.len() as f64).round() as usize;
-
-            let soc_diff = swap_sequence(&positions[i], &gbest);
-            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
-            let soc_keep = (C2 * r2 * soc_diff.len() as f64).round() as usize;
-
-            let mut new_vel = trim_velocity(&velocities[i], inertia_keep);
-            new_vel.extend(trim_velocity(&cog_diff, cog_keep));
-            new_vel.extend(trim_velocity(&soc_diff, soc_keep));
-            new_vel.truncate(v_max);
-
-            let new_pos = apply_swaps(&positions[i], &new_vel);
-            positions[i] = new_pos;
-            velocities[i] = new_vel;
-
-            let cost = distances.tour_length(&positions[i]);
+            let cost = distances.tour_length(&tours[i]);
 
             if cost < pbest_cost[i] {
-                pbest[i] = positions[i].clone();
+                pbest[i] = tours[i].clone();
                 pbest_cost[i] = cost;
             }
             if cost < gbest_cost {
-                gbest = positions[i].clone();
+                gbest = tours[i].clone();
                 gbest_cost = cost;
                 if let Some(tx) = progress_tx {
                     let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
@@ -151,15 +121,25 @@ pub fn solve(
         );
     }
 
+    // The swarm gets close, then a full 2-opt pass turns the best tour into a locally
+    // optimal one. This is the memetic half: the PSO explores, the polish exploits.
+    let polished = super::two_opt::solve(problem, opts, None, Some(&gbest));
+
     if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(
+            Route::new(polished.route()),
+            polished.total,
+        ));
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&gbest, cities, distances)
+
+    polished
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tsp::distance_source::DistanceSource;
     use std::sync::mpsc;
 
     use crate::tsp::progress::ProgressMessage;
@@ -209,11 +189,28 @@ mod tests {
     }
 
     #[test]
-    fn test_trim_velocity_truncates_and_clamps() {
-        let v: Velocity = vec![(0, 1), (1, 2), (2, 3)];
-        assert_eq!(trim_velocity(&v, 2), vec![(0, 1), (1, 2)]);
-        assert_eq!(trim_velocity(&v, 0), vec![]);
-        assert_eq!(trim_velocity(&v, 10), v);
+    fn test_pso_never_returns_worse_than_its_seed() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![1.0, 1.0],
+            vec![0.0, 1.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let seed: Vec<usize> = vec![0, 2, 1, 3];
+        let seed_cost = dm.tour_length(&seed);
+        let opts = HeuristicOptions {
+            epochs: 20,
+            ..HeuristicOptions::default()
+        };
+        let problem = TspProblem::new(cities, dm);
+        let sol = solve(&problem, &opts, None, Some(&seed));
+
+        assert!(
+            sol.total <= seed_cost + 1e-4,
+            "the elitist gbest must not return worse than the seed: {} > {seed_cost}",
+            sol.total
+        );
     }
 
     #[test]

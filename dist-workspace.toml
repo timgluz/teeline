@@ -10,7 +10,13 @@ ci = "github"
 # The installers to generate for each app
 installers = ["shell"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = [
+  "aarch64-apple-darwin",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-pc-windows-msvc",
+]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Whether to install an updater program
@@ -18,3 +24,9 @@ install-updater = false
 # Allow the release workflow to have custom jobs (e.g. build-wasm-artifact)
 # without dist complaining that the file is "out of date"
 allow-dirty = ["ci"]
+
+# macOS 14 was retired on 2026-11-02. cargo-dist's default runner for
+# aarch64-apple-darwin still points at it, which cancels the release job before
+# it starts. Pin the Apple Silicon build to a supported image.
+[dist.github-custom-runners]
+aarch64-apple-darwin = "macos-15"

@@ -2,12 +2,17 @@ pub mod ant_colony;
 pub mod bellman_karp;
 pub mod branch_bound;
 pub(crate) mod budget;
+pub(crate) mod candidate_list;
 pub mod christofides;
 pub mod comparison;
+pub(crate) mod id_index;
 pub use comparison::{ComparisonStats, compare_tours, tour_cost};
 pub mod convert;
 pub mod cuckoo_search;
 pub mod distance_matrix;
+pub mod distance_source;
+pub use distance_source::DistanceSource;
+pub(crate) mod embedding;
 pub mod flower_pollination;
 pub mod fourier;
 pub mod genetic_algorithm;
@@ -16,28 +21,39 @@ pub mod gravitational_search;
 pub mod greedy_edge;
 pub mod kdtree;
 pub mod lin_kernighan;
+pub mod memetic_eax;
 pub mod nearest_neighbor;
+pub mod on_the_fly;
+pub(crate) mod tour_graph;
+pub(crate) mod two_opt_move;
+pub use on_the_fly::OnTheFly;
 pub mod opt_tour;
 pub mod or_opt;
 pub mod particle_swarm;
 pub mod pipeline;
+pub mod position;
+pub use position::Position;
 pub mod probability;
 pub mod progress;
 pub mod random_shuffle;
 pub mod route;
 pub mod savings;
+pub use memetic_eax::{EaxStrategy, MemeticEaxOptions};
 pub mod simulated_annealing;
 pub mod som;
+pub mod space_filling_curve;
+pub use space_filling_curve::{AspectScaling, SfcCurveType, SfcOptions, TieBreaker};
 pub mod stochastic_hill;
 pub mod tabu_search;
 pub mod three_opt;
 pub mod tsplib;
+pub use tsplib::LayoutPolicy;
 pub mod two_opt;
 
 use crate::tsp::distance_matrix::DistanceMatrix;
 use crate::tsp::kdtree::KDPoint;
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::mpsc;
 
 pub const VERSION: &str = "1.0.1";
@@ -56,10 +72,12 @@ pub enum Solvers {
     FlowerPollination,
     Fourier,
     LinKernighan,
+    MemeticEax,
     NearestNeighbor,
     GeneticAlgorithm,
     GravitationalSearch,
     GreedyEdge,
+    SpaceFillingCurve,
     OrOpt,
     ParticleSwarmOptimization,
     RandomShuffle,
@@ -93,12 +111,18 @@ impl Solvers {
             "lin_kernighan",
             "nearest_neighbor",
             "nn",
+            "memetic_eax",
+            "memetic",
+            "eax",
             "genetic_algorithm",
             "ga",
             "gravitational_search",
             "gsa",
             "greedy_edge",
             "gec",
+            "space_filling_curve",
+            "sfc",
+            "hilbert",
             "particle_swarm",
             "pso",
             "random_shuffle",
@@ -237,6 +261,126 @@ impl FromStr for DistanceType {
 }
 
 // ---------------------------------------------------------------------------
+// Distance backend selection
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DistanceBackend {
+    /// Matrix at or below the threshold, on-the-fly above it.
+    #[default]
+    Auto,
+    Matrix,
+    OnTheFly,
+}
+
+impl DistanceBackend {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DistanceBackend::Auto => "auto",
+            DistanceBackend::Matrix => "matrix",
+            DistanceBackend::OnTheFly => "on-the-fly",
+        }
+    }
+}
+
+impl FromStr for DistanceBackend {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "auto" => Ok(DistanceBackend::Auto),
+            "matrix" => Ok(DistanceBackend::Matrix),
+            "on-the-fly" | "on_the_fly" | "onthefly" => Ok(DistanceBackend::OnTheFly),
+            other => Err(format!("unsupported distance backend: {other}")),
+        }
+    }
+}
+
+/// Above this city count, `Auto` switches coordinate input to the on-the-fly backend.
+/// The value is a starting hypothesis; the benchmark report must confirm it before `Auto`
+/// becomes the documented default behavior.
+pub const AUTO_ON_THE_FLY_THRESHOLD: usize = 20_000;
+
+/// Pure selection rule, split out so the threshold boundary is testable without building a
+/// 20k-city matrix.
+pub(crate) fn selects_on_the_fly(n: usize, backend: DistanceBackend) -> bool {
+    match backend {
+        DistanceBackend::Matrix => false,
+        DistanceBackend::OnTheFly => true,
+        DistanceBackend::Auto => n > AUTO_ON_THE_FLY_THRESHOLD,
+    }
+}
+
+/// Build the distance source selected by `backend` for coordinate input.
+///
+/// EXPLICIT is rejected: the parser supplies only placeholder coordinates for those files, so
+/// a coordinate-computed source would silently optimize the wrong objective.
+pub(crate) fn build_distance_source(
+    cities: &[KDPoint],
+    dt: DistanceType,
+    backend: DistanceBackend,
+) -> Result<Arc<dyn DistanceSource>, String> {
+    if dt == DistanceType::Explicit {
+        return Err(
+            "EXPLICIT distances cannot be computed from coordinates; provide edge weights"
+                .to_string(),
+        );
+    }
+
+    let use_on_the_fly = selects_on_the_fly(cities.len(), backend);
+
+    if use_on_the_fly {
+        Ok(Arc::new(OnTheFly::new(cities, dt)?))
+    } else {
+        Ok(Arc::new(
+            DistanceMatrix::build(cities, dt).map_err(|e| e.to_string())?,
+        ))
+    }
+}
+
+#[cfg(test)]
+mod distance_backend_tests {
+    use super::*;
+
+    #[test]
+    fn backend_names_round_trip() {
+        for backend in [
+            DistanceBackend::Auto,
+            DistanceBackend::Matrix,
+            DistanceBackend::OnTheFly,
+        ] {
+            assert_eq!(
+                backend.as_str().parse::<DistanceBackend>().unwrap(),
+                backend
+            );
+        }
+        assert_eq!(
+            "on_the_fly".parse::<DistanceBackend>().unwrap(),
+            DistanceBackend::OnTheFly
+        );
+        assert!("unknown".parse::<DistanceBackend>().is_err());
+    }
+
+    #[test]
+    fn auto_threshold_switches_to_on_the_fly() {
+        assert!(!selects_on_the_fly(
+            AUTO_ON_THE_FLY_THRESHOLD - 1,
+            DistanceBackend::Auto
+        ));
+        assert!(!selects_on_the_fly(
+            AUTO_ON_THE_FLY_THRESHOLD,
+            DistanceBackend::Auto
+        ));
+        assert!(selects_on_the_fly(
+            AUTO_ON_THE_FLY_THRESHOLD + 1,
+            DistanceBackend::Auto
+        ));
+        assert!(!selects_on_the_fly(usize::MAX, DistanceBackend::Matrix));
+        assert!(selects_on_the_fly(2, DistanceBackend::OnTheFly));
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Solver catalogue — single source of truth for the `solvers` subcommand
 // ---------------------------------------------------------------------------
 
@@ -336,6 +480,11 @@ impl Solvers {
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
+                name: "space_filling_curve",
+                alias: Some("sfc"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
                 name: "tabu_search",
                 alias: Some("tabu"),
                 kind: SolverKind::Heuristic,
@@ -363,6 +512,11 @@ impl Solvers {
             SolverMeta {
                 name: "lin_kernighan",
                 alias: Some("lk"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
+                name: "memetic_eax",
+                alias: Some("eax"),
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
@@ -403,7 +557,7 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 22] = [
+static SOLVER_LIST: [SolverInfo; 24] = [
     SolverInfo {
         name: "Ant Colony",
         alias: "aco",
@@ -466,6 +620,16 @@ static SOLVER_LIST: [SolverInfo; 22] = [
                accepts each unless it creates degree 3+ or a premature sub-cycle.",
         complexity: "O(n\u{00b2} log n) time, O(n\u{00b2}) memory",
         has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Space-Filling Curve",
+        alias: "sfc",
+        category: "Constructive",
+        desc: "Orders cities along a Hilbert or Morton space-filling curve over a normalized \
+               grid; O(n log n) geometric warm start for local search.",
+        complexity: "O(n log n)",
+        has_options: true,
         exact: false,
     },
     SolverInfo {
@@ -597,6 +761,17 @@ static SOLVER_LIST: [SolverInfo; 22] = [
         exact: false,
     },
     SolverInfo {
+        name: "Memetic EAX",
+        alias: "eax",
+        category: "Metaheuristic",
+        desc: "Memetic Edge Assembly Crossover: maintains a population of locally optimized \
+               tours, recombines them through alternating A/B edge cycles, patches subtours, \
+               and polishes offspring.",
+        complexity: "O(epochs \u{00b7} pop \u{00b7} children\u{00b7}n\u{00b2})",
+        has_options: true,
+        exact: false,
+    },
+    SolverInfo {
         name: "Random Shuffle",
         alias: "shuffle",
         category: "Utility",
@@ -625,10 +800,12 @@ impl FromStr for Solvers {
             "fpa" | "flower_pollination" => Ok(Solvers::FlowerPollination),
             "fourier" => Ok(Solvers::Fourier),
             "lk" | "lin_kernighan" => Ok(Solvers::LinKernighan),
+            "eax" | "memetic" | "memetic_eax" => Ok(Solvers::MemeticEax),
             "nn" | "nearest_neighbor" => Ok(Solvers::NearestNeighbor),
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "gsa" | "gravitational_search" => Ok(Solvers::GravitationalSearch),
             "gec" | "greedy_edge" => Ok(Solvers::GreedyEdge),
+            "sfc" | "hilbert" | "space_filling_curve" => Ok(Solvers::SpaceFillingCurve),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
             "shuffle" | "random_shuffle" => Ok(Solvers::RandomShuffle),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
@@ -1359,6 +1536,8 @@ impl AcoOptions {
 pub struct LKOptions {
     pub heuristic: HeuristicOptions,
     pub max_depth: usize,
+    /// Fixed RNG seed for reproducible runs; `None` uses system entropy.
+    pub seed: Option<u64>,
 }
 
 impl Default for LKOptions {
@@ -1372,6 +1551,7 @@ impl Default for LKOptions {
                 verbose: false,
             },
             max_depth: 5,
+            seed: None,
         }
     }
 }
@@ -1420,9 +1600,17 @@ impl LKOptions {
                         .ok_or_else(|| format!("config: `max_depth` must be an integer, got {v}"))?
                         as usize;
                 }
+                "seed" => {
+                    let value = v
+                        .as_integer()
+                        .ok_or_else(|| format!("config: `seed` must be an integer, got {v}"))?;
+                    lk.seed = Some(u64::try_from(value).map_err(|_| {
+                        format!("config: `seed` must be non-negative, got {value}")
+                    })?);
+                }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` in [lk] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, max_depth"
+                        "config: unknown field `{other}` in [lk] — valid: epochs, stagnation_epochs, plateau_epochs, n_nearest, verbose, max_depth, seed"
                     ));
                 }
             }
@@ -1440,6 +1628,12 @@ impl LKOptions {
             lk.max_depth = v
                 .parse::<usize>()
                 .map_err(|_| format!("--max-depth: invalid integer `{v}`"))?;
+        }
+        if let Some(v) = args.get_one::<String>("seed") {
+            lk.seed = Some(
+                v.parse::<u64>()
+                    .map_err(|_| format!("--seed: invalid integer `{v}`"))?,
+            );
         }
         lk.validate()?;
         Ok(lk)
@@ -1731,7 +1925,9 @@ pub struct AppOptions {
     pub cs: Option<CSOptions>,
     pub fpa: Option<FPAOptions>,
     pub lk: Option<LKOptions>,
+    pub memetic_eax: Option<MemeticEaxOptions>,
     pub fourier: Option<FourierOptions>,
+    pub sfc: Option<SfcOptions>,
     pub som: Option<SOMOptions>,
     pub aco: Option<AcoOptions>,
     pub heuristic: Option<HeuristicOptions>,
@@ -1752,13 +1948,14 @@ fn parse_f32(v: &toml::Value, name: &str) -> Result<f32, String> {
 /// the raw signed `i64` with no range enforcement, so a bare `as usize` cast on a negative
 /// value would silently wrap into a huge positive number (e.g. `-5i64 as usize` is over
 /// 1.8*10^19) instead of erroring — `usize::try_from` rejects negatives cleanly instead.
-fn parse_nonneg_usize(v: &toml::Value, name: &str) -> Result<usize, String> {
+pub(crate) fn parse_nonneg_usize(v: &toml::Value, name: &str) -> Result<usize, String> {
     let n = v
         .as_integer()
         .ok_or_else(|| format!("config: `{name}` must be an integer, got {v}"))?;
     usize::try_from(n).map_err(|_| format!("config: `{name}` must be >= 0, got {n}"))
 }
 
+/// Validates that `tour` is a permutation of the city IDs in `cities`.
 pub fn validate_tour(tour: &[usize], cities: &[KDPoint]) -> Result<(), String> {
     if tour.len() != cities.len() {
         return Err(format!(
@@ -1834,6 +2031,11 @@ pub fn solve_with_context(
             lk.validate()?;
             lin_kernighan::solve(problem, &lk, tx, init_tour)
         }
+        Solvers::MemeticEax => {
+            let eax = opts.memetic_eax.as_ref().cloned().unwrap_or_default();
+            eax.validate()?;
+            memetic_eax::solve(problem, &eax, tx, init_tour)
+        }
         Solvers::NearestNeighbor => nearest_neighbor::solve(problem, &h, tx, init_tour),
         Solvers::GeneticAlgorithm => {
             let ga = opts.ga.as_ref().cloned().unwrap_or_default();
@@ -1842,6 +2044,11 @@ pub fn solve_with_context(
         }
         Solvers::GravitationalSearch => gravitational_search::solve(problem, &h, tx, init_tour),
         Solvers::GreedyEdge => greedy_edge::solve(problem, &h, tx, init_tour),
+        Solvers::SpaceFillingCurve => {
+            let sfc = opts.sfc.as_ref().cloned().unwrap_or_default();
+            sfc.validate()?;
+            space_filling_curve::solve(problem, &sfc, tx, init_tour)
+        }
         Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
         Solvers::RandomShuffle => random_shuffle::solve(problem, &h, tx, init_tour),
         Solvers::KohonenSom => {
@@ -1873,12 +2080,75 @@ pub fn solve_with_context(
 #[derive(Clone)]
 pub struct TspProblem {
     pub cities: Vec<KDPoint>,
-    pub distances: DistanceMatrix,
+    pub distances: Arc<dyn DistanceSource>,
 }
 
 impl TspProblem {
-    pub fn new(cities: Vec<KDPoint>, distances: DistanceMatrix) -> Self {
-        TspProblem { cities, distances }
+    /// Wraps a concrete source, so existing `TspProblem::new(cities, dm)` call sites keep
+    /// compiling when the field became a trait object.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cities` and `distances` disagree (city count or position→id mapping) or
+    /// if the city IDs are not unique. Use [`Self::try_new`] for untrusted input.
+    pub fn new(cities: Vec<KDPoint>, distances: impl DistanceSource + 'static) -> Self {
+        Self::from_source(cities, Arc::new(distances))
+    }
+
+    /// Fallible [`Self::new`] for callers holding untrusted city IDs.
+    pub fn try_new(
+        cities: Vec<KDPoint>,
+        distances: impl DistanceSource + 'static,
+    ) -> Result<Self, String> {
+        Self::try_from_source(cities, Arc::new(distances))
+    }
+
+    /// Shares an already-constructed source, as the selection policy returns.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `cities` and `distances` disagree (city count or position→id mapping) or
+    /// if the city IDs are not unique. Use [`Self::try_from_source`] for untrusted input.
+    pub fn from_source(cities: Vec<KDPoint>, distances: Arc<dyn DistanceSource>) -> Self {
+        Self::try_from_source(cities, distances)
+            .unwrap_or_else(|e| panic!("invalid TspProblem: {e}"))
+    }
+
+    /// Fallible [`Self::from_source`]: rejects a city/source mismatch or duplicate city IDs.
+    pub fn try_from_source(
+        cities: Vec<KDPoint>,
+        distances: Arc<dyn DistanceSource>,
+    ) -> Result<Self, String> {
+        if distances.num_cities() != cities.len() {
+            return Err(format!(
+                "distance source has {} cities, problem has {}",
+                distances.num_cities(),
+                cities.len()
+            ));
+        }
+        let mut seen = std::collections::HashSet::with_capacity(cities.len());
+        for (pos, city) in cities.iter().enumerate() {
+            if distances.pos2city_id(Position::new(pos)) != Some(city.id) {
+                return Err(format!(
+                    "distance source position {pos} does not map to city id {}",
+                    city.id
+                ));
+            }
+            if !seen.insert(city.id) {
+                return Err("city ids must be unique".to_string());
+            }
+        }
+        Ok(TspProblem { cities, distances })
+    }
+
+    /// Build a coordinate source according to the selection policy.
+    pub fn from_points(
+        cities: Vec<KDPoint>,
+        dt: DistanceType,
+        backend: DistanceBackend,
+    ) -> Result<Self, String> {
+        let source = build_distance_source(&cities, dt, backend)?;
+        Self::try_from_source(cities, source)
     }
 }
 
@@ -1886,47 +2156,25 @@ impl TspProblem {
 // Solution
 // ---------------------------------------------------------------------------
 
-pub type CityTable = HashMap<usize, KDPoint>;
-
-pub fn city_table_from_vec(cities: &[kdtree::KDPoint]) -> CityTable {
-    cities.iter().map(|c| (c.id, *c)).collect()
-}
-
 pub struct Solution {
     pub total: f32,
     route: Vec<usize>,
-    cities: Vec<KDPoint>,
-    cities_idx: HashMap<usize, usize>,
 }
 
 impl Solution {
     pub fn new(route: &[usize], problem: &TspProblem) -> Self {
-        let cities = &problem.cities;
-        let distances = &problem.distances;
-        let cities_idx = cities.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
-
         Solution {
-            total: distances.tour_length(route),
+            total: problem.distances.tour_length(route),
             route: route.to_vec(),
-            cities: cities.to_vec(),
-            cities_idx,
         }
     }
 
-    /// Convenience constructor for solver functions that already hold separate `cities`
-    /// and `distances` slices and do not need to construct a full [`TspProblem`].
-    pub(crate) fn from_parts(
-        route: &[usize],
-        cities: &[kdtree::KDPoint],
-        distances: &DistanceMatrix,
-    ) -> Self {
-        let cities_idx = cities.iter().enumerate().map(|(i, c)| (c.id, i)).collect();
-
+    /// Convenience constructor for solver functions that already hold a distance source and
+    /// do not need to construct a full [`TspProblem`].
+    pub(crate) fn from_parts(route: &[usize], distances: &dyn DistanceSource) -> Self {
         Solution {
             total: distances.tour_length(route),
             route: route.to_vec(),
-            cities: cities.to_vec(),
-            cities_idx,
         }
     }
 
@@ -1938,20 +2186,9 @@ impl Solution {
         self.route.is_empty()
     }
 
+    /// Route of city IDs in visit order (never dense positions).
     pub fn route(&self) -> &[usize] {
         self.route[..].as_ref()
-    }
-
-    pub fn cities(&self) -> &[kdtree::KDPoint] {
-        &self.cities[..]
-    }
-
-    pub fn get_by_city_id(&self, city_id: usize) -> Option<&KDPoint> {
-        if let Some(vec_pos) = self.cities_idx.get(&city_id) {
-            self.cities.get(*vec_pos)
-        } else {
-            None
-        }
     }
 }
 
@@ -1978,7 +2215,7 @@ impl NearestResult {
         }
     }
 
-    fn add(&mut self, pt: KDPoint, new_distance: f32) {
+    pub(crate) fn add(&mut self, pt: KDPoint, new_distance: f32) {
         if self.n == 0 || pt.id == self.target.id {
             return;
         }
@@ -2088,7 +2325,9 @@ mod tests {
             cs: None,
             fpa: None,
             lk: None,
+            memetic_eax: None,
             fourier: None,
+            sfc: None,
             som: None,
             aco: None,
             heuristic: None,
@@ -2468,6 +2707,7 @@ mod tests {
         assert!(!Solvers::FlowerPollination.auto_expand_with_nn());
         assert!(!Solvers::NearestNeighbor.auto_expand_with_nn());
         assert!(!Solvers::BellmanKarp.auto_expand_with_nn());
+        assert!(!Solvers::MemeticEax.auto_expand_with_nn());
         assert!(!Solvers::Unspecified.auto_expand_with_nn());
     }
 
@@ -2487,6 +2727,8 @@ mod tests {
         assert!(Solvers::CuckooSearch.auto_expand_with_shuffle());
         assert!(Solvers::FlowerPollination.auto_expand_with_shuffle());
         assert!(Solvers::Fourier.auto_expand_with_shuffle());
+        assert!(!Solvers::SpaceFillingCurve.auto_expand_with_nn());
+        assert!(!Solvers::SpaceFillingCurve.auto_expand_with_shuffle());
         assert!(Solvers::GravitationalSearch.auto_expand_with_shuffle());
         assert!(Solvers::AntColony.auto_expand_with_shuffle());
     }
@@ -2499,6 +2741,7 @@ mod tests {
         assert!(!Solvers::NearestNeighbor.auto_expand_with_shuffle());
         assert!(!Solvers::BellmanKarp.auto_expand_with_shuffle());
         assert!(!Solvers::RandomShuffle.auto_expand_with_shuffle());
+        assert!(!Solvers::MemeticEax.auto_expand_with_shuffle());
     }
 
     #[test]
@@ -2560,6 +2803,18 @@ mod tests {
     }
 
     #[test]
+    fn sfc_aliases_resolve_to_the_same_solver() {
+        use std::str::FromStr;
+        for alias in ["sfc", "hilbert", "space_filling_curve"] {
+            assert_eq!(
+                Solvers::from_str(alias).unwrap(),
+                Solvers::SpaceFillingCurve,
+                "alias {alias:?} must resolve to SpaceFillingCurve"
+            );
+        }
+    }
+
+    #[test]
     fn variants_all_round_trip_through_fromstr_except_presets() {
         use std::str::FromStr;
         let presets = ["classic", "fast", "thorough"];
@@ -2596,6 +2851,7 @@ mod tests {
                 ..HeuristicOptions::default()
             },
             max_depth: 5,
+            seed: None,
         };
         assert!(opts.validate().is_err(), "n_nearest=0 must be rejected");
     }
@@ -2647,7 +2903,8 @@ mod tests {
                 Arg::new("max_depth")
                     .long("max-depth")
                     .action(ArgAction::Set),
-            ); // hyphen matches production CLI
+            ) // hyphen matches production CLI
+            .arg(Arg::new("seed").long("seed").action(ArgAction::Set));
         let args = cmd.get_matches_from(["t", "--max-depth", "3"]); // hyphen matches production CLI
         let opts = LKOptions::from_cli(&args).unwrap();
         assert_eq!(opts.max_depth, 3);

@@ -76,6 +76,27 @@ pub struct LkConfig {
     pub max_depth: Option<usize>,
 }
 
+/// Memetic EAX. Mirrors `MemeticEaxOptions`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct MemeticEaxConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub epochs: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pop_size: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children_per_pair: Option<usize>,
+    /// `single_ab`, `rand`, or `hybrid`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "hybrid")]
+    pub strategy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stall_epochs: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub candidate_k: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub seed: Option<u64>,
+}
+
 /// Simulated Annealing. Mirrors `SAOptions`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct SaConfig {
@@ -170,6 +191,34 @@ pub struct FourierConfig {
     pub stagnation_epochs: Option<usize>,
 }
 
+/// Space-filling curve constructive solver. Mirrors `SfcOptions`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct SfcConfig {
+    /// `hilbert` (default) or `morton`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "hilbert")]
+    pub curve_type: Option<String>,
+    /// Grid order `p` in `1..=16` (default 16).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<u8>,
+    /// `uniform` (default) or `stretch_to_square`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "uniform")]
+    pub aspect_scaling: Option<String>,
+    /// 0, 90, 180 or 270 (default 0).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rotation: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mirror: Option<bool>,
+    /// 0 disables the ensemble; 1..=8 evaluates that many orientations.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub multi_orientation: Option<u8>,
+    /// `input_order` (default), `lexicographic` or `nearest_prev`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "input_order")]
+    pub tie_breaker: Option<String>,
+}
+
 /// Per-solver optional configuration. Pass only the field matching your chosen solver.
 /// BHK, branch_bound, and Christofides have no tunable parameters and are absent.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -193,6 +242,8 @@ pub struct SolverConfigs {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub lk: Option<LkConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub memetic_eax: Option<MemeticEaxConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub sa: Option<SaConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ga: Option<GaConfig>,
@@ -206,6 +257,8 @@ pub struct SolverConfigs {
     pub som: Option<SomConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fourier: Option<FourierConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sfc: Option<SfcConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -341,6 +394,47 @@ mod tests {
         let back: SolverConfigs = serde_json::from_str(&json).unwrap();
         assert_eq!(back.sa.as_ref().unwrap().cooling_rate, Some(0.0005));
         assert_eq!(back.sa.as_ref().unwrap().min_temperature, None);
+    }
+
+    #[test]
+    fn solver_configs_memetic_eax_round_trip() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(MemeticEaxConfig {
+                epochs: Some(42),
+                pop_size: Some(20),
+                children_per_pair: Some(5),
+                strategy: Some("rand".to_string()),
+                stall_epochs: Some(9),
+                candidate_k: Some(11),
+                seed: Some(7),
+            }),
+            ..SolverConfigs::default()
+        };
+        let json = serde_json::to_string(&configs).unwrap();
+        let back: SolverConfigs = serde_json::from_str(&json).unwrap();
+        let eax = back.memetic_eax.unwrap();
+        assert_eq!(eax.epochs, Some(42));
+        assert_eq!(eax.strategy.as_deref(), Some("rand"));
+        assert_eq!(eax.seed, Some(7));
+    }
+
+    #[test]
+    fn solver_configs_sfc_round_trip() {
+        let configs = SolverConfigs {
+            sfc: Some(SfcConfig {
+                curve_type: Some("morton".into()),
+                order: Some(8),
+                aspect_scaling: Some("stretch_to_square".into()),
+                rotation: Some(90),
+                mirror: Some(true),
+                multi_orientation: Some(4),
+                tie_breaker: Some("nearest_prev".into()),
+            }),
+            ..SolverConfigs::default()
+        };
+        let json = serde_json::to_string(&configs).unwrap();
+        let back: SolverConfigs = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.sfc, configs.sfc);
     }
 
     #[test]

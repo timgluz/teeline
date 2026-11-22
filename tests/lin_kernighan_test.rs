@@ -1,9 +1,10 @@
+use std::path::Path;
 /// Integration tests for the Lin-Kernighan TSP solver.
 ///
 /// Fast tests use berlin52 with epochs=5 for quick structural validation.
 /// The quality test is marked #[ignore] and can be run with:
 ///   cargo test --test lin_kernighan_test -- --include-ignored
-use std::path::Path;
+use teeline::tsp::DistanceSource;
 use teeline::tsp::{
     HeuristicOptions, LKOptions, TspProblem, distance_matrix, kdtree, lin_kernighan,
     nearest_neighbor, tsplib,
@@ -39,11 +40,49 @@ fn lk_opts_fast() -> LKOptions {
             verbose: false,
         },
         max_depth: 5,
+        seed: None,
     }
 }
 
 fn nn_tour_cost(problem: &TspProblem) -> f32 {
     nearest_neighbor::solve(problem, &HeuristicOptions::default(), None, None).total
+}
+
+#[test]
+fn lk_seed_is_reproducible() {
+    let cities = load_tsp("berlin52.tsp").cities().to_vec();
+    let problem = make_problem(cities);
+    let opts = LKOptions {
+        seed: Some(1234),
+        ..lk_opts_fast()
+    };
+    let first = lin_kernighan::solve(&problem, &opts, None, None);
+    let second = lin_kernighan::solve(&problem, &opts, None, None);
+    assert_eq!(
+        first.route(),
+        second.route(),
+        "the same seed must reproduce the tour"
+    );
+    assert_eq!(first.total, second.total);
+}
+
+#[test]
+fn lk_uses_the_problem_metric_on_geo_and_att() {
+    for fixture in ["ulysses16.tsp", "att48.tsp"] {
+        let data = load_tsp(fixture);
+        let problem = TspProblem::new(data.cities().to_vec(), data.distance_matrix().unwrap());
+        let opts = LKOptions {
+            seed: Some(7),
+            ..lk_opts_fast()
+        };
+        let solution = lin_kernighan::solve(&problem, &opts, None, None);
+        assert_eq!(
+            solution.total,
+            problem.distances.tour_length(solution.route()),
+            "{fixture}: the reported cost must come from the problem's distance source"
+        );
+        assert!(solution.total > 0.0);
+    }
 }
 
 // ─── fast structural tests (berlin52, 52 cities, epochs=5) ───────────────────
@@ -121,6 +160,7 @@ fn lk_solve_quality_berlin52() {
             verbose: false,
         },
         max_depth: 5,
+        seed: None,
     };
     let sol = lin_kernighan::solve(&problem, &opts, None, None);
     // Known optimal for berlin52 is 7542; this ILS-2opt achieves ~8-9% gap (~8100-8300).

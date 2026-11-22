@@ -2,13 +2,13 @@ mod file_loader;
 mod solver_engine;
 
 use file_loader::FileLoader;
-use qtbridge::{QApp, qobject_impl};
+use qtbridge::{QApp, qobject};
 use solver_engine::SolverEngine;
 
 #[derive(Default)]
 pub struct AppBackend {}
 
-#[qobject_impl(Singleton)]
+#[qobject(Singleton, ConvertToCamelCase)]
 impl AppBackend {}
 
 fn main() {

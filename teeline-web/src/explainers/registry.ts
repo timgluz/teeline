@@ -1,4 +1,4 @@
-// Metadata registry for the 15 interactive explainer pages. Only metadata
+// Metadata registry for the 23 interactive explainer pages. Only metadata
 // lives here — the components themselves must be statically imported
 // directly in [id]/explainer/index.astro, because Astro's client:* hydration
 // directives require the compiler to see a literal top-level `import`
@@ -85,6 +85,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
       'Interactive walkthrough of Savings Construction: watch every pairwise edge scan highest-savings-first, ranked by the Clarke-Wright savings formula s(i,j) = d(hub,i) + d(hub,j) − d(i,j), with a centroid-nearest hub city bias and the same Kruskal-style accept/reject guards as Greedy Edge.',
     backLabel: 'Savings',
   },
+  space_filling_curve: {
+    title: 'Space-Filling Curve — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of the Space-Filling Curve construction: project cities onto a 2^p × 2^p grid, watch the curve assign 1D indices, sort the cities, and connect them into a tour. See the seam and preview the 2-opt fix.',
+    backLabel: 'SFC',
+  },
   aco: {
     title: 'Ant Colony Optimization — Interactive Explainer — Teeline',
     description:
@@ -138,6 +144,12 @@ export const EXPLAINER_META: Record<string, ExplainerMeta> = {
     description:
       'Interactive walkthrough of the Nearest Neighbor constructive TSP heuristic: watch the tour grow one city at a time as the algorithm greedily picks the closest unvisited city. Step through each decision and see how early choices shape the final tour.',
     backLabel: 'NN',
+  },
+  eax: {
+    title: 'Memetic EAX — Interactive Explainer — Teeline',
+    description:
+      'Interactive walkthrough of Memetic Edge Assembly Crossover: watch two tours decompose into alternating AB-cycles, apply an edge-set exchange, and patch the resulting subtours into a child that beats both parents.',
+    backLabel: 'EAX',
   },
 }
 

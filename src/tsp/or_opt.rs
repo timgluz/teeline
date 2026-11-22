@@ -1,9 +1,10 @@
+use super::DistanceSource;
+use super::candidate_list::{self, CandidateList};
 use std::sync::mpsc;
 
-use super::distance_matrix::DistanceMatrix;
 use super::progress::ProgressMessage;
 use super::route::Route;
-use super::{HeuristicOptions, Solution, TspProblem};
+use super::{HeuristicOptions, Solution, TspProblem, kdtree::KDPoint};
 
 /// Or-opt local search: relocates segments of 1, 2, or 3 consecutive cities.
 ///
@@ -18,7 +19,7 @@ use super::{HeuristicOptions, Solution, TspProblem};
 /// Complexity: O(n²) per pass (three segment sizes × n × n insertion positions).
 pub fn solve(
     problem: &TspProblem,
-    _opts: &HeuristicOptions,
+    opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     init_tour: Option<&[usize]>,
 ) -> Solution {
@@ -30,7 +31,7 @@ pub fn solve(
 
     if n < 4 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
-        return Solution::from_parts(&path, cities, distances);
+        return Solution::from_parts(&path, distances.as_ref());
     }
 
     let mut path: Vec<usize> = init_tour
@@ -41,7 +42,13 @@ pub fn solve(
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&path), 0.0));
     }
 
-    while let Some(best) = find_best_move(&path, distances) {
+    // A candidate list is a pruning heuristic: every relocation is still scored with the exact
+    // distance source. EXPLICIT inputs keep the full scan instead of building a list from a
+    // layout, and when k covers every city there is nothing to prune.
+    let k = opts.n_nearest.max(candidate_list::MIN_CANDIDATE_K);
+    let candidates = candidates_for(distances.as_ref(), cities, k);
+
+    while let Some(best) = find_best_move(&path, distances.as_ref(), candidates.as_ref()) {
         let (_, i, j, seg_len, reversed) = best;
 
         #[cfg(debug_assertions)]
@@ -70,18 +77,39 @@ pub fn solve(
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&path, cities, distances)
+    Solution::from_parts(&path, distances.as_ref())
 }
 
 /// Scan all Or-1/2/3 relocations and return the best improving move, or `None`.
 ///
 /// Returns `(delta, seg_start, insert_after_j, seg_len, reversed)`.
 /// `delta` is the change in total tour length (negative = improvement).
+fn candidates_for(
+    distances: &dyn DistanceSource,
+    cities: &[KDPoint],
+    k: usize,
+) -> Option<CandidateList> {
+    if distances.is_coordinate_metric() && k < cities.len().saturating_sub(1) {
+        match CandidateList::build(cities, k) {
+            Ok(candidates) => Some(candidates),
+            Err(e) => {
+                tracing::warn!(error = e, "candidate list unavailable; using the full scan");
+                None
+            }
+        }
+    } else {
+        None
+    }
+}
+
 fn find_best_move(
     path: &[usize],
-    distances: &DistanceMatrix,
+    distances: &dyn DistanceSource,
+    candidates: Option<&CandidateList>,
 ) -> Option<(f32, usize, usize, usize, bool)> {
     let n = path.len();
+    let route_positions = candidates.map(|candidates| candidates.route_positions(path));
+    let mut js = Vec::new();
     // -1e-3 threshold avoids infinite loops from f32 rounding at large coordinate scales.
     let mut best_delta = -1e-3_f32;
     let mut best: Option<(f32, usize, usize, usize, bool)> = None;
@@ -116,13 +144,10 @@ fn find_best_move(
                 + distances.distance_between(last_seg, d).unwrap_or(f32::MAX)
                 - distances.distance_between(a, d).unwrap_or(f32::MAX);
 
-            // Try inserting the segment after every valid position j.
-            // Forbidden: j == prev (no-op reinsertion) and j in [i, i+seg_len-1]
-            // (overlaps with segment). This gives seg_len+1 forbidden positions.
-            for j in 0..n {
+            let mut consider = |j: usize| {
                 // Forbidden window: {prev, i, i+1, ..., i+seg_len-1}
                 if j == prev || (j >= i && j < i + seg_len) {
-                    continue;
+                    return;
                 }
                 // For non-wrapping forbidden window (prev < i), also OK:
                 // j < prev or j >= i+seg_len are both valid.
@@ -156,6 +181,30 @@ fn find_best_move(
                         best = Some((rev_delta, i, j, seg_len, true));
                     }
                 }
+            };
+
+            // With a candidate list, only positions adjacent to the segment endpoints are
+            // considered; exact distances still score every move. EXPLICIT inputs take the
+            // full scan, reusing the same closure and scratch buffer.
+            match (candidates, route_positions.as_deref()) {
+                (Some(candidates), Some(route_positions)) => {
+                    candidate_list::candidate_positions_into(
+                        candidates,
+                        route_positions,
+                        n,
+                        first_seg,
+                        last_seg,
+                        &mut js,
+                    );
+                    for &j in &js {
+                        consider(j);
+                    }
+                }
+                _ => {
+                    for j in 0..n {
+                        consider(j);
+                    }
+                }
             }
         }
     }
@@ -186,7 +235,7 @@ fn apply_relocation(tour: &mut Vec<usize>, i: usize, seg_len: usize, j: usize, r
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
+    use crate::tsp::{DistanceSource, HeuristicOptions, TspProblem, distance_matrix, kdtree};
 
     fn make_problem(coords: &[[f32; 2]]) -> TspProblem {
         let cities =
@@ -250,7 +299,7 @@ mod tests {
         // Moving city 2 elsewhere should be profitable.
         let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [5.0, 5.0], [2.0, 0.0], [3.0, 0.0]]);
         let path: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
-        let result = find_best_move(&path, &problem.distances);
+        let result = find_best_move(&path, problem.distances.as_ref(), None);
         assert!(result.is_some(), "expected an improving move");
         let (delta, _, _, _, _) = result.unwrap();
         assert!(
@@ -264,11 +313,58 @@ mod tests {
         // Square: [0,1,2,3] is already optimal (perimeter tour).
         let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]]);
         let path = vec![0, 1, 2, 3];
-        let result = find_best_move(&path, &problem.distances);
+        let result = find_best_move(&path, problem.distances.as_ref(), None);
         assert!(
             result.is_none(),
             "expected no improvement on optimal square tour, got {result:?}"
         );
+    }
+
+    #[test]
+    fn find_best_move_with_candidates_matches_full_scan() {
+        let problem = make_problem(&[[0.0, 0.0], [1.0, 0.0], [5.0, 5.0], [2.0, 0.0], [3.0, 0.0]]);
+        let path: Vec<usize> = problem.cities.iter().map(|c| c.id).collect();
+        let full = find_best_move(&path, problem.distances.as_ref(), None);
+
+        // k = n - 1 makes every other city a candidate, so the pruned scan must find the
+        // same move as the full scan.
+        let candidates = CandidateList::build(&problem.cities, 4).expect("unique city ids");
+        let pruned = find_best_move(&path, problem.distances.as_ref(), Some(&candidates));
+        assert_eq!(full, pruned);
+    }
+
+    #[test]
+    fn explicit_input_keeps_the_full_scan_and_improves() {
+        let n = 20;
+        let cities = kdtree::build_points(&(0..n).map(|i| vec![i as f32, 0.0]).collect::<Vec<_>>());
+        // Ring metric: moving one step costs 1, wrapping costs 1.
+        let mut packed = Vec::with_capacity(n * (n - 1) / 2);
+        for i in 1..n {
+            for j in 0..i {
+                let delta = i - j;
+                packed.push(delta.min(n - delta) as f32);
+            }
+        }
+        let dm = distance_matrix::DistanceMatrix::new(n, packed, cities.clone()).unwrap();
+        assert!(
+            !dm.is_coordinate_metric(),
+            "EXPLICIT matrices must not advertise coordinates"
+        );
+
+        let problem = TspProblem::new(cities, dm);
+        let mut start: Vec<usize> = (0..n).collect();
+        start.swap(1, 2); // identity with 1 and 2 swapped: one Or-1 move from the ring order
+        let start_cost = problem.distances.tour_length(&start);
+
+        let result = solve(&problem, &HeuristicOptions::default(), None, Some(&start));
+        assert!(
+            result.total < start_cost,
+            "or-opt must improve the bad start ({start_cost}), got {}",
+            result.total
+        );
+        let mut ids = result.route().to_vec();
+        ids.sort_unstable();
+        assert_eq!(ids, (0..n).collect::<Vec<_>>());
     }
 
     // ------------------------------------------------------------------
@@ -332,5 +428,18 @@ mod tests {
         visited.sort_unstable();
         let expected: Vec<usize> = (0..problem.cities.len()).collect();
         assert_eq!(visited, expected, "each city must appear exactly once");
+    }
+
+    #[test]
+    fn explicit_input_skips_the_candidate_list() {
+        let n = 6;
+        let cities: Vec<kdtree::KDPoint> = (0..n)
+            .map(|i| kdtree::KDPoint::new_with_id(i + 1, &[i as f32, 0.0]))
+            .collect();
+        let matrix =
+            distance_matrix::DistanceMatrix::new(n, vec![1.0; n * (n - 1) / 2], cities.clone())
+                .unwrap();
+
+        assert!(candidates_for(&matrix, &cities, 2).is_none());
     }
 }

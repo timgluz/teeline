@@ -12,6 +12,19 @@ export interface SolveOptions {
   beta: number
   evaporationRate: number
   numAnts: number
+  // SFC tunables (ignored by non-SFC solvers).
+  sfcOrder: number
+  sfcRotation: number
+  sfcMirror: number
+  sfcMultiOrientation: number
+  // Memetic EAX tunables (ignored by non-EAX solvers). These are required fields in
+  // the WIT `solve-options` record; outside JS callers that omit them get 0, which the
+  // WASM bridge clamps to the smallest valid configuration.
+  eaxPopSize: number
+  eaxChildrenPerPair: number
+  eaxStrategy: number
+  eaxStallEpochs: number
+  eaxCandidateK: number
 }
 
 export function defaultSolveOptions(): SolveOptions {
@@ -28,5 +41,14 @@ export function defaultSolveOptions(): SolveOptions {
     beta: 2.0,
     evaporationRate: 0.5,
     numAnts: 25,
+    sfcOrder: 16,
+    sfcRotation: 0,
+    sfcMirror: 0,
+    sfcMultiOrientation: 8,
+    eaxPopSize: 100,
+    eaxChildrenPerPair: 15,
+    eaxStrategy: 2,
+    eaxStallEpochs: 50,
+    eaxCandidateK: 20,
   }
 }

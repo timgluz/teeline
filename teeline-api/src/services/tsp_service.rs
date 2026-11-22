@@ -1,13 +1,14 @@
 use std::time::Instant;
 
 use async_trait::async_trait;
-use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
 use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings};
 use teeline::tsp::tsplib;
 use teeline::tsp::{
-    AcoOptions, AppOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-    LKOptions, SAOptions, SOMOptions, Solvers, TspProblem, find_solver, solve_problem,
+    AcoOptions, AppOptions, AspectScaling, CSOptions, DistanceBackend, DistanceType, FPAOptions,
+    FourierOptions, GAOptions, HeuristicOptions, LKOptions, MemeticEaxOptions, SAOptions,
+    SOMOptions, SfcCurveType, SfcOptions, Solvers, TieBreaker, TspProblem, find_solver,
+    solve_problem,
 };
 
 use super::TspSolverService;
@@ -40,16 +41,14 @@ fn map_heuristic_onto(h: &HeuristicConfig, base: HeuristicOptions) -> HeuristicO
 fn input_to_problem(input: &TspInput) -> Result<TspProblem, String> {
     if let Some(tsplib_str) = &input.tsplib {
         let data = tsplib::read_from_str(tsplib_str)?;
-        let dm = data.distance_matrix()?;
-        Ok(TspProblem::new(data.cities().to_vec(), dm))
+        data.into_problem(DistanceBackend::Auto)
     } else if let Some(cities) = &input.cities {
         let pts: Vec<KDPoint> = cities
             .iter()
             .enumerate()
             .map(|(i, c)| KDPoint::new_with_id(c.id.unwrap_or(i + 1), &[c.x, c.y]))
             .collect();
-        let dm = DistanceMatrix::from_cities(&pts).map_err(|e| e.to_string())?;
-        Ok(TspProblem::new(pts, dm))
+        TspProblem::from_points(pts, DistanceType::Euc2D, DistanceBackend::Auto)
     } else {
         Err("input must contain either `cities` or `tsplib`".to_string())
     }
@@ -180,6 +179,7 @@ fn make_app_options(
                 .map(|h| map_heuristic_onto(h, d.heuristic.clone()))
                 .unwrap_or(d.heuristic),
             max_depth: c.max_depth.unwrap_or(d.max_depth),
+            seed: None,
         }
     });
     if let Some(ref l) = lk {
@@ -216,13 +216,84 @@ fn make_app_options(
         sm.validate()?;
     }
 
+    let sfc = match cfg.sfc.as_ref() {
+        Some(c) => {
+            let d = SfcOptions::default();
+            let options = SfcOptions {
+                curve_type: match c.curve_type.as_deref() {
+                    Some(v) => SfcCurveType::parse(v)?,
+                    None => d.curve_type,
+                },
+                order: c.order.unwrap_or(d.order),
+                aspect_scaling: match c.aspect_scaling.as_deref() {
+                    Some(v) => AspectScaling::parse(v)?,
+                    None => d.aspect_scaling,
+                },
+                rotation: c.rotation.unwrap_or(d.rotation),
+                mirror: c.mirror.unwrap_or(d.mirror),
+                multi_orientation: c.multi_orientation.unwrap_or(d.multi_orientation),
+                tie_breaker: match c.tie_breaker.as_deref() {
+                    Some(v) => TieBreaker::parse(v)?,
+                    None => d.tie_breaker,
+                },
+            };
+            options.validate()?;
+            Some(options)
+        }
+        None => None,
+    };
+
+    let memetic_eax = match cfg.memetic_eax.as_ref() {
+        Some(c) => {
+            let d = MemeticEaxOptions::default();
+            let options = MemeticEaxOptions {
+                epochs: c.epochs.unwrap_or(d.epochs),
+                pop_size: c.pop_size.unwrap_or(d.pop_size),
+                children_per_pair: c.children_per_pair.unwrap_or(d.children_per_pair),
+                strategy: match c.strategy.as_deref() {
+                    Some(v) => v.parse()?,
+                    None => d.strategy,
+                },
+                stall_epochs: c.stall_epochs.unwrap_or(d.stall_epochs),
+                candidate_k: c.candidate_k.unwrap_or(d.candidate_k),
+                seed: c.seed,
+            };
+            // Client-supplied, and the API has no solve timeout: bound the cost here.
+            const MAX_EPOCHS: usize = 100_000;
+            const MAX_POP: usize = 1_000;
+            const MAX_CHILDREN: usize = 100;
+            const MAX_STALL: usize = 10_000;
+            const MAX_K: usize = 100;
+            if options.epochs == 0 || options.epochs > MAX_EPOCHS {
+                return Err(format!(
+                    "memetic_eax.epochs must be in 1..={MAX_EPOCHS} (got {})",
+                    options.epochs
+                ));
+            }
+            if options.pop_size > MAX_POP
+                || options.children_per_pair > MAX_CHILDREN
+                || options.stall_epochs > MAX_STALL
+                || options.candidate_k > MAX_K
+            {
+                return Err(format!(
+                    "memetic_eax: pop_size <= {MAX_POP}, children_per_pair <= {MAX_CHILDREN},                      stall_epochs <= {MAX_STALL}, candidate_k <= {MAX_K}"
+                ));
+            }
+            options.validate()?;
+            Some(options)
+        }
+        None => None,
+    };
+
     Ok(AppOptions {
         sa,
         ga,
         cs,
         fpa,
         lk,
+        memetic_eax,
         fourier,
+        sfc,
         som,
         aco,
         heuristic,
@@ -818,6 +889,157 @@ EOF
             err.contains("mutation_probability"),
             "expected mutation error, got: {err}"
         );
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_maps_config() {
+        let configs = SolverConfigs {
+            sfc: Some(crate::models::request::SfcConfig {
+                curve_type: Some("morton".into()),
+                order: Some(8),
+                aspect_scaling: Some("stretch_to_square".into()),
+                rotation: Some(90),
+                mirror: Some(true),
+                multi_orientation: Some(4),
+                tie_breaker: Some("nearest_prev".into()),
+            }),
+            ..SolverConfigs::default()
+        };
+        let opts = make_app_options("sfc", Some(&configs)).unwrap();
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.curve_type, SfcCurveType::Morton);
+        assert_eq!(sfc.order, 8);
+        assert_eq!(sfc.aspect_scaling, AspectScaling::StretchToSquare);
+        assert_eq!(sfc.rotation, 90);
+        assert!(sfc.mirror);
+        assert_eq!(sfc.multi_orientation, 4);
+        assert_eq!(sfc.tie_breaker, TieBreaker::NearestPrev);
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_maps_config() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                epochs: Some(12),
+                pop_size: Some(20),
+                children_per_pair: Some(5),
+                strategy: Some("rand".into()),
+                stall_epochs: Some(9),
+                candidate_k: Some(11),
+                seed: Some(7),
+            }),
+            ..SolverConfigs::default()
+        };
+        let opts = make_app_options("memetic_eax", Some(&configs)).unwrap();
+        let eax = opts.memetic_eax.unwrap();
+        assert_eq!(eax.epochs, 12);
+        assert_eq!(eax.pop_size, 20);
+        assert_eq!(eax.children_per_pair, 5);
+        assert_eq!(eax.strategy, teeline::tsp::EaxStrategy::Rand);
+        assert_eq!(eax.stall_epochs, 9);
+        assert_eq!(eax.candidate_k, 11);
+        assert_eq!(eax.seed, Some(7));
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_rejects_zero_epochs() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                epochs: Some(0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("memetic_eax", Some(&configs)).unwrap_err();
+        assert!(err.contains("epochs"), "got: {err}");
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_rejects_oversized_population() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                pop_size: Some(100_000),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("memetic_eax", Some(&configs)).unwrap_err();
+        assert!(err.contains("pop_size"), "got: {err}");
+    }
+
+    #[test]
+    fn test_make_app_options_memetic_eax_rejects_invalid_strategy() {
+        let configs = SolverConfigs {
+            memetic_eax: Some(crate::models::request::MemeticEaxConfig {
+                strategy: Some("turbo".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let err = make_app_options("memetic_eax", Some(&configs)).unwrap_err();
+        assert!(err.contains("turbo"), "got: {err}");
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_rejects_invalid_curve_type() {
+        let configs = SolverConfigs {
+            sfc: Some(crate::models::request::SfcConfig {
+                curve_type: Some("bogus".into()),
+                ..Default::default()
+            }),
+            ..SolverConfigs::default()
+        };
+        let err = make_app_options("sfc", Some(&configs)).unwrap_err();
+        assert!(err.contains("curve_type"), "got: {err}");
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_rejects_out_of_range_numbers() {
+        for config in [
+            crate::models::request::SfcConfig {
+                order: Some(0),
+                ..Default::default()
+            },
+            crate::models::request::SfcConfig {
+                order: Some(17),
+                ..Default::default()
+            },
+            crate::models::request::SfcConfig {
+                rotation: Some(45),
+                ..Default::default()
+            },
+            crate::models::request::SfcConfig {
+                multi_orientation: Some(9),
+                ..Default::default()
+            },
+        ] {
+            let configs = SolverConfigs {
+                sfc: Some(config),
+                ..SolverConfigs::default()
+            };
+            assert!(
+                make_app_options("sfc", Some(&configs)).is_err(),
+                "out-of-range SFC value must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_make_app_options_sfc_partial_config_falls_back_to_defaults() {
+        let configs = SolverConfigs {
+            sfc: Some(crate::models::request::SfcConfig {
+                order: Some(8),
+                ..Default::default()
+            }),
+            ..SolverConfigs::default()
+        };
+        let opts = make_app_options("sfc", Some(&configs)).unwrap();
+        let sfc = opts.sfc.unwrap();
+        assert_eq!(sfc.order, 8);
+        assert_eq!(sfc.curve_type, SfcCurveType::Hilbert);
+        assert_eq!(sfc.aspect_scaling, AspectScaling::Uniform);
+        assert_eq!(sfc.tie_breaker, TieBreaker::InputOrder);
+        assert_eq!(sfc.multi_orientation, 8);
     }
 
     #[test]
