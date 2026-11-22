@@ -66,17 +66,20 @@ pub trait DistanceSource: Send + Sync {
         let Some(last) = self.city_id2pos(*path.last().unwrap()) else {
             return 0.0;
         };
-        let mut total = self.distance_by_pos(last, first).unwrap_or(0.0);
+        // f64 accumulation: the f32 sum of ~1e3 edge lengths loses the last bits at
+        // large-instance costs (the dsj1000 sum drifted by ~10), which makes a reported
+        // cost or gap disagree with the same tour re-summed in a different order.
+        let mut total = f64::from(self.distance_by_pos(last, first).unwrap_or(0.0));
         let mut prev = first;
         for &id in &path[1..path.len() - 1] {
             let Some(next) = self.city_id2pos(id) else {
                 return 0.0;
             };
-            total += self.distance_by_pos(prev, next).unwrap_or(0.0);
+            total += f64::from(self.distance_by_pos(prev, next).unwrap_or(0.0));
             prev = next;
         }
-        total += self.distance_by_pos(prev, last).unwrap_or(0.0);
-        total
+        total += f64::from(self.distance_by_pos(prev, last).unwrap_or(0.0));
+        total as f32
     }
 
     /// Position-based tour length — no id lookup per edge.
@@ -85,11 +88,11 @@ pub trait DistanceSource: Send + Sync {
             return 0.0;
         }
         let last = *path.last().unwrap();
-        let mut total = self.distance_by_pos(last, path[0]).unwrap_or(0.0);
+        let mut total = f64::from(self.distance_by_pos(last, path[0]).unwrap_or(0.0));
         for w in path.windows(2) {
-            total += self.distance_by_pos(w[0], w[1]).unwrap_or(0.0);
+            total += f64::from(self.distance_by_pos(w[0], w[1]).unwrap_or(0.0));
         }
-        total
+        total as f32
     }
 
     fn nearest(&self, target: &KDPoint, n: usize) -> NearestResult {
@@ -183,6 +186,47 @@ mod tests {
                 .nearest_unvisited(&target, &|id| id != target.id)
                 .is_some()
         );
+    }
+
+    /// A source where every edge has the same cost, so a tour's exact length is
+    /// `n * distance` and any drift comes purely from accumulation.
+    struct ConstantDistance {
+        n: usize,
+        distance: f32,
+    }
+
+    impl DistanceSource for ConstantDistance {
+        fn num_cities(&self) -> usize {
+            self.n
+        }
+        fn distance_by_pos(&self, _: Position, _: Position) -> Result<f32, &'static str> {
+            Ok(self.distance)
+        }
+        fn pos2city_id(&self, pos: Position) -> Option<usize> {
+            (pos.into_inner() < self.n).then_some(pos.into_inner())
+        }
+        fn city_id2pos(&self, id: usize) -> Option<Position> {
+            (id < self.n).then_some(Position::new(id))
+        }
+        fn point_at(&self, _: Position) -> Option<KDPoint> {
+            Some(KDPoint::new_with_id(0, &[0.0, 0.0]))
+        }
+    }
+
+    /// The f32 sum of 1,000 large edges drifts by ~10 from the exact f64 sum, which is what
+    /// made dsj1000 report 18,660,178 instead of its exact 18,660,188.
+    #[test]
+    fn tour_length_accumulates_in_f64() {
+        let source = ConstantDistance {
+            n: 1_000,
+            distance: 18_660.188,
+        };
+        let path: Vec<usize> = (0..source.n).collect();
+        let expected = (source.n as f64 * f64::from(source.distance)) as f32;
+        assert_eq!(source.tour_length(&path), expected);
+
+        let positions: Vec<Position> = (0..source.n).map(Position::new).collect();
+        assert_eq!(source.tour_length_by_pos(&positions), expected);
     }
 
     #[test]
