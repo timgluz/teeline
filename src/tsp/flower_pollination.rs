@@ -26,8 +26,11 @@ fn global_pollination(
     used: &mut HashSet<usize>,
 ) -> Vec<usize> {
     let levy = levy_step(rng).abs();
+    if flower.len() < 4 {
+        return gbest.to_vec();
+    }
     #[allow(clippy::cast_precision_loss)]
-    let min_fraction = 1.0 / flower.len().max(1) as f64;
+    let min_fraction = 1.0 / flower.len() as f64;
     let fraction = (LEVY_GAMMA * levy).clamp(min_fraction, MAX_GLOBAL_FRACTION);
     move_toward(flower, gbest, fraction, rng, used)
 }
@@ -226,6 +229,15 @@ mod tests {
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
         expected.sort();
         assert_eq!(visited, expected);
+    }
+
+    #[test]
+    fn test_global_pollination_handles_a_one_city_tour() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+        let mut used = HashSet::new();
+        let out = global_pollination(&[0], &[0], &mut rng, &mut used);
+        assert_eq!(out, vec![0]);
     }
 
     #[test]
