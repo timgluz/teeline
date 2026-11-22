@@ -80,4 +80,4 @@ teeline solve gsa -i ./data/tsplib/berlin52.tsp --n_nearest=50
 
 | Version | Date | Change |
 | --- | --- | --- |
-| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Replaced the summed swap-list force with a mass-weighted order crossover toward a sampled Kbest attractor, added greedy acceptance, a 2-opt reversal, a Kbest schedule shrinking N → 1, half-NN seeding, and a final 2-opt polish. Tier A median gap: **190.52% → 2.59%**; `dsj1000`: **2503.87% → 10.13%**. |
+| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Replaced the summed swap-list force with a mass-weighted order crossover toward a sampled Kbest attractor, added greedy acceptance, a 2-opt reversal, a Kbest schedule shrinking N → 1, half-NN seeding, and a final 2-opt polish. Tier A median gap: **190.52% → 3.24%**; `dsj1000`: **2503.87% → 11.98%**. |
