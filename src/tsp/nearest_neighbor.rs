@@ -5,9 +5,10 @@ use rand::RngExt;
 
 use super::DistanceSource;
 use super::Position;
-use super::candidate_list::CandidateList;
+use super::candidate_list::{CandidateList, MIN_CANDIDATE_K};
+use super::kdtree::KDPoint;
 use super::progress::ProgressMessage;
-use super::route::Route;
+use super::route::{Route, random_tour};
 use super::tour_graph::distance;
 use super::{HeuristicOptions, Solution, TspProblem};
 
@@ -122,6 +123,56 @@ pub(crate) fn randomized_tour(
     tour
 }
 
+/// Seed a population for a population-based solver: entry 0 is the pipeline seed (or a
+/// random tour), the first half are diverse nearest-neighbour tours, and the rest random.
+///
+/// `init_tour` is the pipeline warm start and is only used for entry 0, preserving the
+/// contract that a caller's seed becomes the solver's initial best.
+pub(crate) fn seed_population(
+    distances: &dyn DistanceSource,
+    cities: &[KDPoint],
+    n_individuals: usize,
+    init_tour: Option<&[usize]>,
+    rng: &mut impl RngExt,
+) -> Vec<Vec<usize>> {
+    let n_cities = cities.len();
+    let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
+
+    // One candidate list for all constructive seeds. Coordinate metrics rank by the
+    // KD-tree; EXPLICIT inputs rank by the exact distance source, because their layout is
+    // a display aid (or a derived embedding), not the objective.
+    let candidates = if distances.is_coordinate_metric() {
+        CandidateList::build(cities, MIN_CANDIDATE_K)
+    } else {
+        CandidateList::build_from_distances(distances, cities, MIN_CANDIDATE_K)
+    }
+    .ok();
+
+    let mut population = Vec::with_capacity(n_individuals);
+    for idx in 0..n_individuals {
+        let tour = if idx == 0 {
+            init_tour
+                .map(|t| t.to_vec())
+                .unwrap_or_else(|| random_tour(&city_ids, rng))
+        } else if idx < n_individuals / 2 {
+            match &candidates {
+                Some(cands) if n_cities >= 4 => {
+                    let start = rng.random_range(0..n_cities);
+                    randomized_tour(distances, cands, start, 2, rng)
+                        .into_iter()
+                        .map(|pos| cities[pos].id)
+                        .collect()
+                }
+                _ => random_tour(&city_ids, rng),
+            }
+        } else {
+            random_tour(&city_ids, rng)
+        };
+        population.push(tour);
+    }
+    population
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -232,5 +283,62 @@ mod tests {
         let mut sorted = route.clone();
         sorted.sort();
         assert_eq!(sorted, vec![0, 1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn test_seed_population_keeps_the_seed_and_valid_tours() {
+        let problem = tsp5_problem();
+        let cities = &problem.cities;
+        let seed: Vec<usize> = cities.iter().map(|c| c.id).rev().collect();
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+
+        let population =
+            seed_population(problem.distances.as_ref(), cities, 6, Some(&seed), &mut rng);
+
+        assert_eq!(population.len(), 6);
+        assert_eq!(population[0], seed);
+
+        let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        expected.sort();
+        for tour in &population {
+            let mut sorted = tour.clone();
+            sorted.sort();
+            assert_eq!(sorted, expected);
+        }
+    }
+
+    #[test]
+    fn test_seed_population_handles_an_explicit_matrix() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![1.0, 1.0],
+            vec![0.0, 1.0],
+            vec![0.5, 0.5],
+            vec![0.2, 0.8],
+        ]);
+        let n = cities.len();
+        let weights: Vec<f32> = (0..n * (n - 1) / 2).map(|i| (i + 1) as f32).collect();
+        let dm = distance_matrix::DistanceMatrix::new(n, weights, cities.clone())
+            .expect("a complete lower triangle");
+        let problem = TspProblem::new(cities.clone(), dm);
+        let mut rng = rand::rngs::StdRng::seed_from_u64(7);
+
+        let population = seed_population(
+            problem.distances.as_ref(),
+            &problem.cities,
+            6,
+            None,
+            &mut rng,
+        );
+
+        assert_eq!(population.len(), 6);
+        let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        expected.sort();
+        for tour in &population {
+            let mut sorted = tour.clone();
+            sorted.sort();
+            assert_eq!(sorted, expected);
+        }
     }
 }

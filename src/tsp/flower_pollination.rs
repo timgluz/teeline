@@ -1,28 +1,35 @@
+use rand::RngExt;
+use std::collections::HashSet;
 use std::sync::mpsc;
 
-use rand::RngExt;
-
 use super::budget::Budget;
-use super::probability::{bernoulli, levy_step, sample_without_replacement};
+use super::nearest_neighbor::seed_population;
+use super::probability::{bernoulli, levy_step};
 use super::progress::ProgressMessage;
-use super::route::{Route, apply_swaps, swap_sequence};
+use super::route::{Route, move_toward, random_reversal};
 use super::{FPAOptions, Solution, TspProblem};
 
 const DEFAULT_N_FLOWERS: usize = 25;
+/// Yang's gamma on the global step. The raw Lévy median (~0.6) would otherwise saturate
+/// the segment cap on most draws, turning global pollination into a fixed half-best
+/// copy and collapsing the population within a few hundred epochs.
+const LEVY_GAMMA: f64 = 0.1;
+/// A global move never borrows more than half of the best tour.
+const MAX_GLOBAL_FRACTION: f64 = 0.5;
+/// Local pollination borrows at most 30% of a neighbour before the reversal.
+const LOCAL_EPS_SCALE: f64 = 0.3;
 
-fn global_pollination(flower: &[usize], gbest: &[usize], rng: &mut impl RngExt) -> Vec<usize> {
-    let seq = swap_sequence(flower, gbest);
-    if seq.is_empty() {
-        return flower.to_vec();
-    }
+fn global_pollination(
+    flower: &[usize],
+    gbest: &[usize],
+    rng: &mut impl RngExt,
+    used: &mut HashSet<usize>,
+) -> Vec<usize> {
     let levy = levy_step(rng).abs();
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        clippy::cast_precision_loss
-    )]
-    let n_swaps = ((levy * seq.len() as f64 * 0.5).ceil() as usize).clamp(1, seq.len());
-    apply_swaps(flower, &seq[..n_swaps])
+    #[allow(clippy::cast_precision_loss)]
+    let min_fraction = 1.0 / flower.len().max(1) as f64;
+    let fraction = (LEVY_GAMMA * levy).clamp(min_fraction, MAX_GLOBAL_FRACTION);
+    move_toward(flower, gbest, fraction, rng, used)
 }
 
 fn local_pollination(
@@ -30,25 +37,21 @@ fn local_pollination(
     flowers: &[Vec<usize>],
     flower_idx: usize,
     rng: &mut impl RngExt,
+    used: &mut HashSet<usize>,
 ) -> Vec<usize> {
     let n_flowers = flowers.len();
-    if n_flowers < 3 {
+    if n_flowers < 2 {
         return flower.to_vec();
     }
-    let j = sample_without_replacement(rng, n_flowers, &[flower_idx]);
-    let k = sample_without_replacement(rng, n_flowers, &[flower_idx, j]);
-    let seq = swap_sequence(&flowers[j], &flowers[k]);
-    if seq.is_empty() {
-        return flower.to_vec();
-    }
+    // A uniformly sampled offset keeps the neighbour distinct without a rejection loop.
+    let j = (flower_idx + 1 + rng.random_range(0..n_flowers - 1)) % n_flowers;
     let epsilon: f64 = rng.random();
-    #[allow(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        clippy::cast_precision_loss
-    )]
-    let n_swaps = ((epsilon * seq.len() as f64).ceil() as usize).clamp(1, seq.len());
-    apply_swaps(flower, &seq[..n_swaps])
+
+    let mut candidate = move_toward(flower, &flowers[j], epsilon * LOCAL_EPS_SCALE, rng, used);
+    // Always reverse, even when the crossover reproduced the current tour: once the
+    // population collapses, the reversal is the only move still exploring.
+    random_reversal(&mut candidate, rng);
+    candidate
 }
 
 pub fn solve(
@@ -59,8 +62,8 @@ pub fn solve(
 ) -> Solution {
     let cities = &problem.cities;
     let distances = &problem.distances;
-    let n_flowers = opts.heuristic.n_nearest.max(DEFAULT_N_FLOWERS);
     let n_cities = cities.len();
+    let n_flowers = opts.heuristic.n_nearest.max(DEFAULT_N_FLOWERS);
     // default mutation_probability 0.001 → 99.9% local, which defeats global search;
     // floor to 0.8 so a bare `bin fpa` run is meaningful without extra flags.
     let switch_prob = if opts.mutation_probability < 0.01 {
@@ -77,29 +80,7 @@ pub fn solve(
     );
 
     let mut rng = rand::rng();
-    let city_ids: Vec<usize> = cities.iter().map(|c| c.id).collect();
-
-    let mut flowers: Vec<Vec<usize>> = (0..n_flowers)
-        .map(|idx| {
-            if idx == 0 {
-                init_tour.map(|t| t.to_vec()).unwrap_or_else(|| {
-                    let mut t = city_ids.clone();
-                    for i in (1..n_cities).rev() {
-                        let j = rng.random_range(0..=i);
-                        t.swap(i, j);
-                    }
-                    t
-                })
-            } else {
-                let mut t = city_ids.clone();
-                for i in (1..n_cities).rev() {
-                    let j = rng.random_range(0..=i);
-                    t.swap(i, j);
-                }
-                t
-            }
-        })
-        .collect();
+    let mut flowers = seed_population(distances.as_ref(), cities, n_flowers, init_tour, &mut rng);
 
     let mut costs: Vec<f32> = flowers.iter().map(|t| distances.tour_length(t)).collect();
 
@@ -110,6 +91,8 @@ pub fn solve(
         .unwrap();
     let mut gbest: Vec<usize> = flowers[best_idx].clone();
     let mut gbest_cost: f32 = costs[best_idx];
+    let start_gbest_cost = gbest_cost;
+    tracing::info!(start_gbest = start_gbest_cost, "FPA: seeded population");
 
     if let Some(tx) = progress_tx {
         let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&gbest), gbest_cost));
@@ -119,16 +102,21 @@ pub fn solve(
     // Starts true so the first epoch runs, then carries the previous epoch's result into the
     // budget — one decision point for both the cap and the convergence threshold.
     let mut improved = true;
+    let mut used = HashSet::with_capacity(n_cities);
 
     while budget.record(improved) {
         let epoch = budget.index();
         let best_at_epoch_start = gbest_cost;
         for i in 0..n_flowers {
             let new_x = if bernoulli(&mut rng, switch_prob) {
-                global_pollination(&flowers[i], &gbest, &mut rng)
+                global_pollination(&flowers[i], &gbest, &mut rng, &mut used)
             } else {
-                local_pollination(&flowers[i], &flowers, i, &mut rng)
+                local_pollination(&flowers[i], &flowers, i, &mut rng, &mut used)
             };
+
+            if new_x == flowers[i] {
+                continue;
+            }
 
             let new_cost = distances.tour_length(&new_x);
             if new_cost < costs[i] {
@@ -164,10 +152,25 @@ pub fn solve(
         );
     }
 
+    tracing::info!(
+        start_gbest = start_gbest_cost,
+        pre_polish_gbest = gbest_cost,
+        "FPA: loop finished"
+    );
+
+    // The swarm explores; the polish exploits. This is the memetic half, and it is what
+    // turns the population's best tour into a locally optimal one.
+    let polished = super::two_opt::solve(problem, &opts.heuristic, None, Some(&gbest));
+
     if let Some(tx) = progress_tx {
+        let _ = tx.send(ProgressMessage::PathUpdate(
+            Route::new(polished.route()),
+            polished.total,
+        ));
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&gbest, distances.as_ref())
+
+    polished
 }
 
 #[cfg(test)]
@@ -223,6 +226,34 @@ mod tests {
         let mut expected: Vec<usize> = cities.iter().map(|c| c.id).collect();
         expected.sort();
         assert_eq!(visited, expected);
+    }
+
+    #[test]
+    fn test_fpa_never_returns_worse_than_its_seed() {
+        let cities = kdtree::build_points(&[
+            vec![0.0, 0.0],
+            vec![1.0, 0.0],
+            vec![1.0, 1.0],
+            vec![0.0, 1.0],
+        ]);
+        let dm = distance_matrix::from_cities(&cities);
+        let seed: Vec<usize> = vec![0, 2, 1, 3];
+        let seed_cost = dm.tour_length(&seed);
+        let opts = FPAOptions {
+            heuristic: HeuristicOptions {
+                epochs: 20,
+                ..HeuristicOptions::default()
+            },
+            mutation_probability: 0.8,
+        };
+        let problem = TspProblem::new(cities, dm);
+        let sol = solve(&problem, &opts, None, Some(&seed));
+
+        assert!(
+            sol.total <= seed_cost + 1e-4,
+            "the elitist gbest must not return worse than the seed: {} > {seed_cost}",
+            sol.total
+        );
     }
 
     fn four_city_setup() -> TspProblem {
