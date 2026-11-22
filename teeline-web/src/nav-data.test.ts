@@ -1,15 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ALGORITHM_COUNT,
   SOLVER_META,
   SOLVER_GROUPS,
   PAGED_SOLVERS,
   EXPLAINER_SOLVERS,
 } from './nav-data'
+import { SOLVER_INDEX } from './lib/solver-index'
 import { EXPLAINER_IDS } from './explainers/registry'
 
 describe('SOLVER_META', () => {
-  it('contains exactly 23 solvers', () => {
-    expect(Object.keys(SOLVER_META)).toHaveLength(23)
+  it('contains exactly ALGORITHM_COUNT solvers', () => {
+    expect(Object.keys(SOLVER_META)).toHaveLength(ALGORITHM_COUNT)
+  })
+
+  it('matches the benchmark solvers that publish a docs page', () => {
+    expect(ALGORITHM_COUNT).toBe(
+      SOLVER_INDEX.filter((solver) => solver.doc !== null).length,
+    )
   })
 
   it('every entry has id and name', () => {
@@ -77,7 +85,7 @@ describe('complexity', () => {
       )
       checked++
     }
-    expect(checked).toBe(Object.keys(SOLVER_META).length)
+    expect(checked).toBe(ALGORITHM_COUNT)
   })
 })
 

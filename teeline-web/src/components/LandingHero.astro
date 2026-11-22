@@ -1,5 +1,6 @@
 ---
 import { berlin52 } from '../lib/hero-cities'
+import { ALGORITHM_COUNT } from '../nav-data'
 ---
 
 <header class="relative overflow-hidden">
@@ -28,7 +29,7 @@ import { berlin52 } from '../lib/hero-cities'
         Solve the Traveling Salesman Problem, in your browser.
       </h1>
       <p class="mt-5 max-w-lg text-base text-text-dim">
-        20 algorithms from Held-Karp to Ant Colony, compiled to WebAssembly.
+        {ALGORITHM_COUNT} algorithms from Held-Karp to Ant Colony, compiled to WebAssembly.
         Nothing leaves your machine — watch 2-opt untangle a fresh random tour.
       </p>
       <div class="mt-8 flex flex-wrap gap-4">
@@ -47,7 +48,7 @@ import { berlin52 } from '../lib/hero-cities'
         </div>
         <div>
           <dt class="font-mono text-xs uppercase tracking-wider text-text-dim">Algorithms</dt>
-          <dd class="mt-1 font-mono text-sm text-text">20</dd>
+          <dd class="mt-1 font-mono text-sm text-text">{ALGORITHM_COUNT}</dd>
         </div>
         <div>
           <dt class="font-mono text-xs uppercase tracking-wider text-text-dim">Runtime</dt>
