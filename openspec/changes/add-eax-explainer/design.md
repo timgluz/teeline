@@ -47,29 +47,29 @@ below are the source of truth, so implementation needs no fixture generation or 
 - **Coordinates** (SVG units; each city index is its position in this list):
 
   ```text
-  0:(179.7, 55.1)   1:(141.3, 97.7)   2:(123.3, 43.5)   3:(85.9, 85.7)
+  0:(179.7, 55.1)   1:(141.3, 97.7)   2:(123.3, 55.0)   3:(76.4, 88.9)
   4:(102.2,140.4)   5:(65.6, 30.0)    6:(30.0, 74.1)    7:(79.2,194.5)
   8:(61.3,248.2)    9:(119.5,234.6)  10:(172.5,214.3)  11:(211.1,255.9)
   12:(248.7,212.8)  13:(270.0,160.2) 14:(223.9,126.8)  15:(171.2,148.3)
   ```
 
-- **Parent A:** `[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]` (cost ≈ 1082.231)
-- **Parent B:** `[0,5,6,2,1,4,3,8,7,9,10,11,12,13,14,15]` (cost ≈ 1156.468)
+- **Parent A:** `[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]` (cost ≈ 1073.464)
+- **Parent B:** `[0,5,6,2,1,4,3,8,7,9,10,11,12,13,14,15]` (cost ≈ 1138.928)
 - **Shared edges (11 = 68.75%):** `1-2, 3-4, 5-6, 7-8, 9-10, 10-11, 11-12, 12-13, 13-14,
   14-15, 15-0`; **A-only (5):** `0-1, 2-3, 4-5, 6-7, 8-9`; **B-only (5):** `0-5, 1-4, 2-6,
   3-8, 7-9`.
 - **AB-cycle C1 (length 4):** `[0,1,4,5]`. Applying it alone yields two subtours
-  `[0,5,6,7,8,9,10,11,12,13,14,15]` (≈854.822) and `[1,4,3,2]` (≈228.473).
-- **AB-cycle C2 (length 6):** `[2,3,8,9,7,6]`. Applying it alone yields one tour (≈1155.403).
+  `[0,5,6,7,8,9,10,11,12,13,14,15]` (≈854.822) and `[1,4,3,2]` (≈219.706).
+- **AB-cycle C2 (length 6):** `[2,3,8,9,7,6]`. Applying it alone yields one tour (≈1137.863).
 - **Both cycles:** exactly Parent B.
 - Every city in the difference has **difference degree 2** (one A-only and one B-only edge), so
   the AB-cycle decomposition is unique (no degree-4 pairing ambiguity). Cities 0–9 each have one
   shared edge (union degree 3); cities 10–15 have two shared edges each (union degree 2). There
   is **no degree-4 city**, so the union graph exercises degrees 2 and 3 only.
 - The default patch merges C1's small subtour by removing `3-4` and `6-7`, adding `3-6` and
-  `4-7` (Δ ≈ −71.265); the child is `[0,5,6,3,2,1,4,7,8,9,10,11,12,13,14,15]` at cost
-  ≈1012.031 — cheaper than both parents. Best 2-opt move on the child: Δ ≈ −57.328 (remove
-  `0-5` and `1-2`, add `0-1` and `5-2`).
+  `4-7` (Δ ≈ −80.176); the child is `[0,5,6,3,2,1,4,7,8,9,10,11,12,13,14,15]` at cost
+  ≈994.352 — cheaper than both parents. Best 2-opt move on the child: Δ ≈ −5.210 (remove
+  `0-5` and `1-2`, add `0-2` and `1-5`).
 
 Both parents are crossing-free (0 crossings each). Strict 2-opt local-optimality of the parents
 is **not** asserted: searches could not find a pair satisfying it together with the cycle

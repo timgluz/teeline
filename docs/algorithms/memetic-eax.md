@@ -3,7 +3,7 @@ id: "eax"
 name: "Memetic EAX"
 typeBadge: "Heuristic — memetic evolutionary search"
 description: "Memetic Edge Assembly Crossover: a population of locally optimised tours recombined through alternating A/B edge cycles, with subtour patching and 2-opt polish."
-hasExplainer: false
+hasExplainer: true
 ---
 
 # Memetic EAX
