@@ -43,15 +43,15 @@ This is a **memetic adaptation**, not a new published algorithm: a population me
 
 ## The numbers
 
-![A dumbbell chart of median gap before and after: PSO 150.4% to 6.9%, FPA 253.9% to 4.1%, GSA 190.5% to 2.6%.](/blog/swarm-retrospective.svg)
+![A dumbbell chart of median gap before and after: PSO 150.4% to 7.1%, FPA 253.9% to 5.3%, GSA 190.5% to 3.2%.](/blog/swarm-retrospective.svg)
 
 | Solver | Median gap before | After | dsj1000 before → after (5 runs) |
 | --- | ---: | ---: | ---: |
-| PSO | 150.35% | **6.88%** | 2,340.27% → 11.17% |
-| FPA | 253.94% | **4.07%** | 2,654.97% → 9.18% |
-| GSA | 190.52% | **2.59%** | 2,503.87% → 10.13% |
+| PSO | 150.35% | **7.08%** | 2,340.27% → 10.35% |
+| FPA | 253.94% | **5.31%** | 2,654.97% → 9.25% |
+| GSA | 190.52% | **3.24%** | 2,503.87% → 11.98% |
 
-Median of 60 runs — 12 maps, five runs each. The landing chart plots berlin52 alone, one of the smaller maps; across all 12 the gaps were worse. The headline median is helped by the small maps, where all three reach or nearly reach the optimum; on the larger maps they land at roughly 5–11%, in the same range as SA, GA and ACO.
+Median of the 12 per-instance medians, each over five runs. The landing chart plots berlin52 alone, one of the smaller maps; across all 12 the before gaps were worse. The headline median is helped by the small maps, where all three reach or nearly reach the optimum; on the larger maps they land at roughly 6–12%, in the same range as SA, GA and ACO.
 
 ## Who does the work on big maps
 

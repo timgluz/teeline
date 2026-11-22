@@ -89,4 +89,4 @@ teeline solve fpa -i ./data/tsplib/berlin52.tsp --n_nearest=50 --mutation_probab
 
 | Version | Date | Change |
 | --- | --- | --- |
-| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Replaced the swap-prefix moves with a Lévy-scaled order crossover toward gbest, an ε-scaled crossover toward a neighbour plus a 2-opt reversal, half-NN seeding, and a final 2-opt polish. Tier A median gap: **253.94% → 4.07%**; `dsj1000`: **2654.97% → 9.18%**. |
+| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Replaced the swap-prefix moves with a Lévy-scaled order crossover toward gbest, an ε-scaled crossover toward a neighbour plus a 2-opt reversal, half-NN seeding, and a final 2-opt polish. Tier A median gap: **253.94% → 5.31%**; `dsj1000`: **2654.97% → 9.25%**. |

@@ -80,4 +80,4 @@ teeline solve pso -i ./data/tsplib/berlin52.tsp --n_nearest=50
 
 | Version | Date | Change |
 | --- | --- | --- |
-| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Replaced the swap-list velocity with edge-preserving order-crossover moves, a 2-opt reversal perturbation, and a final 2-opt polish. Tier A median gap: **150.35% → 6.88%**; `dsj1000`: **2340.27% → 11.17%**. |
+| 2.0.0 | 22&nbsp;Nov&nbsp;2026 | Replaced the swap-list velocity with edge-preserving order-crossover moves, a 2-opt reversal perturbation, and a final 2-opt polish. Tier A median gap: **150.35% → 7.08%**; `dsj1000`: **2340.27% → 10.35%**. |

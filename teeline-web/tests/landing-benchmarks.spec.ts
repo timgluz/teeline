@@ -76,6 +76,26 @@ test.describe('landing benchmark chart', () => {
     await expect(section).toContainText('Local search 300 s (provisional)')
   })
 
+  test('shades each family cluster and hides it with the family filter', async ({
+    page,
+  }) => {
+    await openLanding(page, fixture('problem-berlin52.json'))
+
+    const section = page.locator('#benchmarks')
+    await expect(section).toBeVisible()
+    const hulls = section.locator('svg[role="img"] path[data-family-cluster]')
+    // Local search and Metaheuristic each have three or more points in this fixture;
+    // Constructive has one, so it gets no hull rather than a fake area.
+    await expect(hulls).toHaveCount(2)
+    await expect(hulls.first()).toHaveAttribute('data-family-cluster', 'local')
+    await expect(hulls.nth(1)).toHaveAttribute('data-family-cluster', 'meta')
+    await expect(section).toContainText('Shaded areas group solvers by family.')
+
+    await section.getByRole('button', { name: 'Local search' }).click()
+    await expect(hulls).toHaveCount(1)
+    await expect(hulls.first()).toHaveAttribute('data-family-cluster', 'meta')
+  })
+
   test('says so when the axis is tour length, and claims no budget for it', async ({
     page,
   }) => {
