@@ -6,6 +6,10 @@ open items; completed tasks are recorded in git history and pull requests, not h
 Pick an item directly, or open a GitHub issue when it needs discussion or assignment.
 Nothing here is a commitment — the list exists so ideas are not lost.
 
+Algorithm research candidates are tracked separately in
+[algorithm-candidates.md](algorithm-candidates.md); check there before investigating a new
+solver.
+
 | # | Item | Area | Priority | Status |
 | --- | --- | --- | --- | --- |
 | 1 | [Pipeline solver](#1-pipeline-solver) | solver | high | likely complete — verify |

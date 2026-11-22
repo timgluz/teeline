@@ -187,6 +187,7 @@ After adding a new WIT export:
 - `openspec/` — capability specs and proposed changes (`openspec list`, `openspec new change`).
 - `docs/adr/` — dated architecture decisions.
 - `docs/backlog.md` — pending work not tracked as a GitHub issue.
+- `docs/algorithm-candidates.md` — shared algorithm research backlog (state + references); check it before researching a new solver.
 - GitHub issues — use `gh issue` / `gh issue create` for new tracked work.
 
 ## Cloudflare

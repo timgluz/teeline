@@ -265,7 +265,9 @@ done
 | Flower Pollination | `fpa` | heuristic — nature-inspired | [→](docs/algorithms/flower-pollination.md) |
 | Ant Colony Optimization | `ant_colony`, `aco` | heuristic — nature-inspired | [→](docs/algorithms/ant-colony.md) |
 
-Exact algorithms find the provably optimal tour but have exponential complexity — do not use on more than ~20 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics. (`savings`/`sav` is implemented but not yet documented.)
+Exact algorithms find the provably optimal tour but have exponential complexity — the dispatcher rejects inputs above 24 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics. (`savings`/`sav` is implemented but not yet documented.)
+
+New algorithm candidates and their status are tracked in [docs/algorithm-candidates.md](docs/algorithm-candidates.md).
 
 ### Large coordinate instances
 
