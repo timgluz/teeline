@@ -8,7 +8,10 @@ const docs = defineCollection({
     name: z.string(),
     // Per-algorithm semver, independent of the teeline release version. Algorithms that
     // predate versioning start at 1.0.0; a behaviour-changing rewrite bumps the major.
-    version: z.string().default('1.0.0'),
+    version: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, 'version must be semver (e.g. 1.0.0)')
+      .default('1.0.0'),
     typeBadge: z.string(),
     description: z.string(),
     hasExplainer: z.boolean().default(false),

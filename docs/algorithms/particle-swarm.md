@@ -69,9 +69,12 @@ teeline solve pso -i ./data/tsplib/berlin52.tsp --n_nearest=50
 
 ## References
 
-- [Particle swarm optimisation (Wikipedia)](https://en.wikipedia.org/wiki/Particle_swarm_optimization)
 - Kennedy, J. & Eberhart, R. (1995) — "Particle Swarm Optimization", *Proc. IEEE ICNN'95*, Vol. 4, pp. 1942–1948. DOI: 10.1109/ICNN.1995.488968
-- Clerc, M. (2004) — "Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem", in *New Optimization Techniques in Engineering*, Springer, pp. 219–239
+- Clerc, M. (2004) — "Discrete Particle Swarm Optimization, illustrated by the Traveling Salesman Problem", in *New Optimization Techniques in Engineering*, Springer, pp. 219–239. DOI: 10.1007/978-3-540-39930-8_8
+- Davis, L. (1985) — "Applying Adaptive Algorithms to Epistatic Domains", *Proc. 9th International Joint Conference on Artificial Intelligence (IJCAI)*, pp. 162–163. [ijcai.org](https://ijcai.org/proceedings/1985/29)
+- Croes, G. A. (1958) — "A Method for Solving Traveling-Salesman Problems", *Operations Research*, **6**(6), 791–812. DOI: 10.1287/opre.6.6.791
+- Li, X., Tian, P., Hua, J. & Zhong, N. (2006) — "A Hybrid Discrete Particle Swarm Optimization for the Traveling Salesman Problem", *Simulated Evolution and Learning (SEAL 2006)*, LNCS 4247, 181–188. DOI: 10.1007/11903697_24
+- [Particle swarm optimisation (Wikipedia)](https://en.wikipedia.org/wiki/Particle_swarm_optimization) — general overview
 
 ## Changelog
 

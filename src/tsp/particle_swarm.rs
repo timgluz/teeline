@@ -162,7 +162,7 @@ pub fn solve(
     let mut improved = true;
     // Reused by every move; the set's capacity survives across epochs, so the hot loop does
     // not allocate one per crossover.
-    let mut used = HashSet::with_capacity(MIN_CANDIDATE_K.max(8));
+    let mut used = HashSet::with_capacity(n_cities);
 
     while budget.record(improved) {
         let epoch = budget.index();
