@@ -162,6 +162,7 @@ export const EXPLAINER_SOLVERS = new Set([
   'fpa',
   'gsa',
   'aco',
+  'eax',
 ])
 
 // ── Problem (dataset) navigation ───────────────────────────────────────

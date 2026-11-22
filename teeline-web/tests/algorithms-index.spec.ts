@@ -20,10 +20,10 @@ test.describe('algorithms index & topbar nav', () => {
     page,
   }) => {
     await page.goto('/algorithms/')
-    // one "▶ interactive" link per explainer (22 at the time of writing)
+    // one "▶ interactive" link per explainer (23 at the time of writing)
     await expect(
       page.getByRole('link', { name: /Open interactive explainer for/ }),
-    ).toHaveCount(22)
+    ).toHaveCount(23)
     // a known solver doc link is present
     await expect(
       page.getByRole('link', { name: 'Christofides', exact: true }),

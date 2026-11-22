@@ -68,8 +68,8 @@ below are the source of truth, so implementation needs no fixture generation or 
   is **no degree-4 city**, so the union graph exercises degrees 2 and 3 only.
 - The default patch merges C1's small subtour by removing `3-4` and `6-7`, adding `3-6` and
   `4-7` (Δ ≈ −71.265); the child is `[0,5,6,3,2,1,4,7,8,9,10,11,12,13,14,15]` at cost
-  ≈1012.031 — cheaper than both parents. Best 2-opt move on the child: Δ ≈ −57.328 (remove
-  `0-5` and `1-2`, add `0-1` and `5-2`).
+  ≈1012.031 — cheaper than both parents. Best 2-opt move on the child: Δ ≈ −15.293 (remove
+  `0-5` and `2-3`, add `0-3` and `2-5`).
 
 Both parents are crossing-free (0 crossings each). Strict 2-opt local-optimality of the parents
 is **not** asserted: searches could not find a pair satisfying it together with the cycle
