@@ -34,7 +34,7 @@ jobs:
       - name: Run tests
         run: cargo test -p teeline-api --verbose
       - name: Install mise tools (hurl)
-        uses: jdx/mise-action@v5.2.8
+        uses: jdx/mise-action@v5.2.10
       - name: Install hurl runtime dependencies
         run: sudo apt-get update && sudo apt-get install -y libxml2
       - name: Run hurl e2e tests (teeline-api)
