@@ -38,7 +38,7 @@
     "@playwright/test": "^1.65.1",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.5",
-    "better-sqlite3": "13.1.1",
+    "better-sqlite3": "13.2.0",
     "prettier": "^3.10.1",
     "typescript": "6.0.3",
     "vitest": "5.1.1",
