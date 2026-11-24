@@ -94,6 +94,121 @@ impl Ord for Candidate {
     }
 }
 
+struct InsertionState<'a> {
+    problem: &'a TspProblem,
+    strategy: InsertionStrategy,
+    visited: Vec<bool>,
+    closest: Vec<f64>,
+    next: Vec<usize>,
+    heap: BinaryHeap<Candidate>,
+}
+
+impl<'a> InsertionState<'a> {
+    fn new(problem: &'a TspProblem, strategy: InsertionStrategy, seed: (usize, usize)) -> Self {
+        let n = problem.cities.len();
+        let mut state = Self {
+            problem,
+            strategy,
+            visited: vec![false; n],
+            closest: (0..n)
+                .map(|city| {
+                    Self::distance(problem, city, seed.0).min(Self::distance(problem, city, seed.1))
+                })
+                .collect(),
+            next: vec![usize::MAX; n],
+            heap: BinaryHeap::new(),
+        };
+        state.visited[seed.0] = true;
+        state.visited[seed.1] = true;
+        state.next[seed.0] = seed.1;
+        state.next[seed.1] = seed.0;
+        if strategy == InsertionStrategy::Cheapest {
+            for city in 0..n {
+                if !state.visited[city] {
+                    state.heap.push(state.candidate(city, seed.0, seed.1));
+                    state.heap.push(state.candidate(city, seed.1, seed.0));
+                }
+            }
+        }
+        state
+    }
+
+    fn distance(problem: &TspProblem, a: usize, b: usize) -> f64 {
+        f64::from(
+            problem
+                .distances
+                .distance_by_pos(Position::new(a), Position::new(b))
+                .expect("valid city positions"),
+        )
+    }
+
+    fn candidate(&self, city: usize, from: usize, to: usize) -> Candidate {
+        let distance = |a, b| Self::distance(self.problem, a, b);
+        let cities = &self.problem.cities;
+        Candidate {
+            cost: distance(from, city) + distance(city, to) - distance(from, to),
+            city,
+            from,
+            to,
+            ids: (cities[city].id, cities[from].id, cities[to].id),
+        }
+    }
+
+    fn best_candidate(&mut self, tour: &[usize]) -> Candidate {
+        match self.strategy {
+            InsertionStrategy::Cheapest => self.cheapest_candidate(),
+            InsertionStrategy::Nearest | InsertionStrategy::Farthest => {
+                self.distance_candidate(tour)
+            }
+        }
+    }
+
+    fn cheapest_candidate(&mut self) -> Candidate {
+        loop {
+            let candidate = self.heap.pop().expect("an insertion candidate exists");
+            if !self.visited[candidate.city] && self.next[candidate.from] == candidate.to {
+                return candidate;
+            }
+        }
+    }
+
+    fn distance_candidate(&self, tour: &[usize]) -> Candidate {
+        let city = (0..self.visited.len())
+            .filter(|&city| !self.visited[city])
+            .min_by(|&a, &b| {
+                let order = self.closest[a].total_cmp(&self.closest[b]);
+                (if self.strategy == InsertionStrategy::Farthest {
+                    order.reverse()
+                } else {
+                    order
+                })
+                .then_with(|| self.problem.cities[a].id.cmp(&self.problem.cities[b].id))
+            })
+            .expect("an unvisited city exists");
+        (0..tour.len())
+            .map(|i| self.candidate(city, tour[i], tour[(i + 1) % tour.len()]))
+            .max()
+            .expect("a tour edge exists")
+    }
+
+    fn record_insertion(&mut self, best: &Candidate) {
+        self.visited[best.city] = true;
+        self.next[best.from] = best.city;
+        self.next[best.city] = best.to;
+        for city in 0..self.visited.len() {
+            if !self.visited[city] {
+                if self.strategy == InsertionStrategy::Cheapest {
+                    self.heap.push(self.candidate(city, best.from, best.city));
+                    self.heap.push(self.candidate(city, best.city, best.to));
+                } else {
+                    self.closest[city] =
+                        self.closest[city].min(Self::distance(self.problem, city, best.city));
+                }
+            }
+        }
+    }
+}
+
 fn build_insertion_tour(problem: &TspProblem, strategy: InsertionStrategy) -> Vec<usize> {
     let cities = &problem.cities;
     let n = cities.len();
@@ -101,14 +216,7 @@ fn build_insertion_tour(problem: &TspProblem, strategy: InsertionStrategy) -> Ve
         return (0..n).collect();
     }
 
-    let distance = |a: usize, b: usize| {
-        f64::from(
-            problem
-                .distances
-                .distance_by_pos(Position::new(a), Position::new(b))
-                .expect("valid city positions"),
-        )
-    };
+    let distance = |a, b| InsertionState::distance(problem, a, b);
     let mut tour = Vec::with_capacity(n);
     let mut seed = (0, 1);
     let mut seed_distance = distance(0, 1);
@@ -135,72 +243,12 @@ fn build_insertion_tour(problem: &TspProblem, strategy: InsertionStrategy) -> Ve
         seed = (seed.1, seed.0);
     }
     tour.extend([seed.0, seed.1]);
-    let mut visited = vec![false; n];
-    visited[seed.0] = true;
-    visited[seed.1] = true;
-    let mut closest: Vec<f64> = (0..n)
-        .map(|city| distance(city, seed.0).min(distance(city, seed.1)))
-        .collect();
-    let candidate = |city: usize, from: usize, to: usize| Candidate {
-        cost: distance(from, city) + distance(city, to) - distance(from, to),
-        city,
-        from,
-        to,
-        ids: (cities[city].id, cities[from].id, cities[to].id),
-    };
-    let mut next = vec![usize::MAX; n];
-    next[seed.0] = seed.1;
-    next[seed.1] = seed.0;
-    let mut heap = BinaryHeap::new();
-    if strategy == InsertionStrategy::Cheapest {
-        for (city, &is_visited) in visited.iter().enumerate() {
-            if !is_visited {
-                heap.push(candidate(city, seed.0, seed.1));
-                heap.push(candidate(city, seed.1, seed.0));
-            }
-        }
-    }
+    let mut state = InsertionState::new(problem, strategy, seed);
     while tour.len() < n {
-        let best = if strategy == InsertionStrategy::Cheapest {
-            loop {
-                let c = heap.pop().expect("an insertion candidate exists");
-                if !visited[c.city] && next[c.from] == c.to {
-                    break c;
-                }
-            }
-        } else {
-            let city = (0..n)
-                .filter(|&c| !visited[c])
-                .min_by(|&a, &b| {
-                    let order = closest[a].total_cmp(&closest[b]);
-                    (if strategy == InsertionStrategy::Farthest {
-                        order.reverse()
-                    } else {
-                        order
-                    })
-                    .then_with(|| cities[a].id.cmp(&cities[b].id))
-                })
-                .expect("an unvisited city exists");
-            (0..tour.len())
-                .map(|i| candidate(city, tour[i], tour[(i + 1) % tour.len()]))
-                .max()
-                .expect("a tour edge exists")
-        };
+        let best = state.best_candidate(&tour);
         let index = tour.iter().position(|&city| city == best.from).unwrap();
         tour.insert(index + 1, best.city);
-        visited[best.city] = true;
-        next[best.from] = best.city;
-        next[best.city] = best.to;
-        for city in 0..n {
-            if !visited[city] {
-                if strategy == InsertionStrategy::Cheapest {
-                    heap.push(candidate(city, best.from, best.city));
-                    heap.push(candidate(city, best.city, best.to));
-                } else {
-                    closest[city] = closest[city].min(distance(city, best.city));
-                }
-            }
-        }
+        state.record_insertion(&best);
     }
     tour
 }
