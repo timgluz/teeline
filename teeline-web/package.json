@@ -34,14 +34,14 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@cloudflare/workers-types": "5.20261113.1",
-    "@playwright/test": "^1.65.0",
+    "@cloudflare/workers-types": "5.20261121.1",
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.5",
     "better-sqlite3": "13.1.1",
     "prettier": "^3.10.1",
     "typescript": "6.0.3",
-    "vitest": "5.1.0",
+    "vitest": "5.1.1",
     "wrangler": "4.161.0"
   },
   "overrides": {
