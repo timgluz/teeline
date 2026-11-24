@@ -209,6 +209,20 @@ impl<'a> InsertionState<'a> {
     }
 }
 
+fn is_better_seed(
+    strategy: InsertionStrategy,
+    order: std::cmp::Ordering,
+    candidate_ids: (usize, usize),
+    current_ids: (usize, usize),
+) -> bool {
+    let preferred = if strategy == InsertionStrategy::Farthest {
+        order.is_gt()
+    } else {
+        order.is_lt()
+    };
+    preferred || (order.is_eq() && candidate_ids < current_ids)
+}
+
 fn build_insertion_tour(problem: &TspProblem, strategy: InsertionStrategy) -> Vec<usize> {
     let cities = &problem.cities;
     let n = cities.len();
@@ -227,13 +241,12 @@ fn build_insertion_tour(problem: &TspProblem, strategy: InsertionStrategy) -> Ve
     for a in 0..n {
         for b in a + 1..n {
             let d = distance(a, b);
-            let order = d.total_cmp(&seed_distance);
-            if (if strategy == InsertionStrategy::Farthest {
-                order.is_gt()
-            } else {
-                order.is_lt()
-            }) || (order.is_eq() && edge_ids(a, b) < edge_ids(seed.0, seed.1))
-            {
+            if is_better_seed(
+                strategy,
+                d.total_cmp(&seed_distance),
+                edge_ids(a, b),
+                edge_ids(seed.0, seed.1),
+            ) {
                 seed = (a, b);
                 seed_distance = d;
             }
