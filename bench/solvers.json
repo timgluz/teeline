@@ -104,7 +104,7 @@
       "determinism_evidence": {
         "instance": "a280",
         "runs": 5,
-        "outcome": "identical for each of nearest, farthest, and cheapest"
+        "outcome": "identical"
       },
       "default_configs": [
         "nearest",
