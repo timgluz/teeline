@@ -20,7 +20,7 @@
     "@astrojs/preact": "^6.1.6",
     "@astrojs/rss": "^4.0.19",
     "@astrojs/sitemap": "^3.7.6",
-    "@bytecodealliance/preview2-shim": "^0.17.9",
+    "@bytecodealliance/preview2-shim": "^0.31.1",
     "@fontsource/inter": "^5.3.0",
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@sentry/browser": "^11.12.0",
