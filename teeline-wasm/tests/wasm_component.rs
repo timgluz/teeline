@@ -516,7 +516,7 @@ EOF\n";
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 24, "expected 24 solvers");
+    assert_eq!(algorithms.len(), 25, "expected 25 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "aco",
@@ -543,6 +543,7 @@ fn test_list_algorithms_returns_all_solvers() {
         "sav",
         "sfc",
         "eax",
+        "ins",
     ] {
         assert!(
             ids.contains(expected_id),
