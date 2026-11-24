@@ -185,6 +185,7 @@ burma14 = "upto24"
 berlin52 = "all"
 
 [configs.budget]               # the budget-limited run: no args, the family timeout is the limit
+exclude_solvers = ["insertion"] # measured under its named strategy configs instead
 
 [configs.exact]                # illustrative: a named set of extra CLI args
                                # (branch_bound is exact by default and needs no such config)
@@ -197,6 +198,8 @@ Rules the harness enforces, each because the alternative is a hole in the publis
 
 - **A config name is a label, not a keyword.** The publisher falls back to `"default"` only when a
   row omits the field, so a tier may name its configs anything; the tier must declare at least one.
+- **Config solver filters accept IDs or CLI names.** `solvers` restricts a config to the listed
+  solvers; `exclude_solvers` removes those solvers from it. Exclusions also apply when both are set.
 - **Every family must appear in `[coverage]`**, even if measured nowhere. A family that is
   simply absent is indistinguishable from one somebody forgot, so it is refused; `local = []`
   is how a tier says "deliberately not measured here".

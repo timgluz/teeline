@@ -9,8 +9,8 @@ use bindings::teeline::solver::types::{
 use teeline::tsp::comparison;
 use teeline::tsp::{
     AcoOptions, AppOptions, CSOptions, DistanceBackend, DistanceType, EaxStrategy, FPAOptions,
-    FourierOptions, GAOptions, HeuristicOptions, MemeticEaxOptions, SAOptions, SfcOptions, Solvers,
-    TspProblem, kdtree::KDPoint,
+    FourierOptions, GAOptions, HeuristicOptions, InsertionOptions, InsertionStrategy,
+    MemeticEaxOptions, SAOptions, SfcOptions, Solvers, TspProblem, kdtree::KDPoint,
 };
 
 struct Component;
@@ -83,6 +83,21 @@ fn build_opts(solver: Solvers, o: &SolveOptions) -> Result<AppOptions, String> {
                 mirror: o.sfc_mirror != 0,
                 multi_orientation: u8::try_from(o.sfc_multi_orientation).unwrap_or(u8::MAX),
                 ..SfcOptions::default()
+            }),
+            ..AppOptions::default()
+        },
+        Solvers::Insertion => AppOptions {
+            insertion: Some(InsertionOptions {
+                strategy: match o.insertion_strategy {
+                    0 => InsertionStrategy::Nearest,
+                    1 => InsertionStrategy::Farthest,
+                    2 => InsertionStrategy::Cheapest,
+                    other => {
+                        return Err(format!(
+                            "insertionStrategy must be 0, 1, or 2 (got {other})"
+                        ));
+                    }
+                },
             }),
             ..AppOptions::default()
         },
@@ -177,6 +192,7 @@ fn kind_for(solver: Solvers) -> String {
         Solvers::NearestNeighbor
         | Solvers::Christofides
         | Solvers::Savings
+        | Solvers::Insertion
         | Solvers::Fourier
         | Solvers::KohonenSom
         | Solvers::GreedyEdge
@@ -315,6 +331,12 @@ fn params_for_solver(solver: Solvers) -> Vec<ParamSpec> {
         }
         Solvers::Fourier => vec![pi("epochs", "Gradient steps per stage", 1.0)],
         Solvers::KohonenSom => vec![pi("epochs", "Training iterations", 1.0)],
+        Solvers::Insertion => vec![pi_max(
+            "insertionStrategy",
+            "Strategy (0 nearest, 1 farthest, 2 cheapest)",
+            0.0,
+            2.0,
+        )],
         Solvers::SpaceFillingCurve => vec![
             pi_max("sfcOrder", "Grid order p (1..=16)", 1.0, 16.0),
             pi_step(

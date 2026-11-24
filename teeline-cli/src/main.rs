@@ -37,7 +37,7 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
     fn provide(&self, mut base: AppOptions) -> Result<AppOptions, String> {
         use teeline::tsp::{
             AcoOptions, CSOptions, FPAOptions, FourierOptions, GAOptions, HeuristicOptions,
-            LKOptions, MemeticEaxOptions, SAOptions, SfcOptions,
+            InsertionOptions, LKOptions, MemeticEaxOptions, SAOptions, SfcOptions,
         };
         match self.solver {
             Solvers::AntColony => {
@@ -66,6 +66,9 @@ impl AppOptionsProvider for CliArgsProvider<'_> {
             }
             Solvers::SpaceFillingCurve => {
                 base.sfc = Some(SfcOptions::from_cli(self.args)?);
+            }
+            Solvers::Insertion => {
+                base.insertion = Some(InsertionOptions::from_cli(self.args)?);
             }
             Solvers::MemeticEax => {
                 base.memetic_eax = Some(MemeticEaxOptions::from_cli(self.args)?);
@@ -270,8 +273,8 @@ fn tuning_args() -> Vec<Arg> {
         Arg::new("strategy")
             .long("strategy")
             .value_name("NAME")
-            .help("Memetic EAX: E-set strategy: single_ab, rand, or hybrid (default hybrid)")
-            .value_parser(["single_ab", "rand", "hybrid"])
+            .help("Insertion: nearest, farthest (default), cheapest; EAX: single_ab, rand, hybrid (default)")
+            .value_parser(["single_ab", "rand", "hybrid", "nearest", "farthest", "cheapest"])
             .action(ArgAction::Set)
             .required(false),
         Arg::new("stall_epochs")
@@ -539,9 +542,26 @@ fn run_pipeline_cmd(args: &ArgMatches) {
 fn run_as_pipeline(steps: &[Solvers], args: &ArgMatches, json_mode: bool) {
     let stage_configs: Vec<(Solvers, AppOptions)> = steps
         .iter()
-        .map(|&s| (s, solver_options_from_args(args, s)))
+        .map(|&s| {
+            let stage_args = pipeline_stage_args(args, steps, s);
+            (s, solver_options_from_args(&stage_args, s))
+        })
         .collect();
     run_as_pipeline_stages(stage_configs, args, json_mode, DistanceBackend::Auto);
+}
+
+fn pipeline_stage_args(args: &ArgMatches, steps: &[Solvers], solver: Solvers) -> ArgMatches {
+    let mut stage_args = args.clone();
+    if steps.contains(&Solvers::Insertion)
+        && steps.contains(&Solvers::MemeticEax)
+        && let Some(strategy) = args.get_one::<String>("strategy")
+        && ((solver == Solvers::Insertion && strategy.parse::<teeline::tsp::EaxStrategy>().is_ok())
+            || (solver == Solvers::MemeticEax
+                && teeline::tsp::InsertionStrategy::parse(strategy).is_ok()))
+    {
+        stage_args.remove_one::<String>("strategy");
+    }
+    stage_args
 }
 
 fn run_as_pipeline_stages(
@@ -877,6 +897,75 @@ mod tests {
                     .action(ArgAction::SetTrue),
             )
             .args(tuning_args())
+    }
+
+    #[test]
+    fn insertion_strategy_cli_validation() {
+        use teeline::tsp::InsertionStrategy;
+        for (name, expected) in [
+            ("nearest", InsertionStrategy::Nearest),
+            ("farthest", InsertionStrategy::Farthest),
+            ("cheapest", InsertionStrategy::Cheapest),
+        ] {
+            let args = options_cmd().get_matches_from(["test", "ins", "--strategy", name]);
+            let opts = CliArgsProvider::new(&args, Solvers::Insertion)
+                .provide(AppOptions::default())
+                .unwrap();
+            assert_eq!(opts.insertion.unwrap().strategy, expected);
+        }
+        assert!(
+            options_cmd()
+                .try_get_matches_from(["test", "ins", "--strategy", "invalid"])
+                .is_err()
+        );
+        let args = options_cmd().get_matches_from(["test", "ins", "--strategy", "rand"]);
+        assert!(
+            CliArgsProvider::new(&args, Solvers::Insertion)
+                .provide(AppOptions::default())
+                .is_err()
+        );
+        let args = options_cmd().get_matches_from(["test", "eax", "--strategy", "nearest"]);
+        assert!(
+            CliArgsProvider::new(&args, Solvers::MemeticEax)
+                .provide(AppOptions::default())
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn insertion_and_eax_pipeline_share_strategy_flag() {
+        let steps = [Solvers::Insertion, Solvers::MemeticEax];
+        for value in ["nearest", "rand"] {
+            let args = options_cmd().get_matches_from(["test", "ins", "--strategy", value]);
+            let insertion_args = pipeline_stage_args(&args, &steps, Solvers::Insertion);
+            let insertion = CliArgsProvider::new(&insertion_args, Solvers::Insertion)
+                .provide(AppOptions::default())
+                .unwrap()
+                .insertion
+                .unwrap();
+            let eax_args = pipeline_stage_args(&args, &steps, Solvers::MemeticEax);
+            let eax = CliArgsProvider::new(&eax_args, Solvers::MemeticEax)
+                .provide(AppOptions::default())
+                .unwrap()
+                .memetic_eax
+                .unwrap();
+            assert_eq!(
+                insertion.strategy,
+                if value == "nearest" {
+                    teeline::tsp::InsertionStrategy::Nearest
+                } else {
+                    teeline::tsp::InsertionStrategy::Farthest
+                }
+            );
+            assert_eq!(
+                eax.strategy,
+                if value == "rand" {
+                    teeline::tsp::EaxStrategy::Rand
+                } else {
+                    teeline::tsp::EaxStrategy::Hybrid
+                }
+            );
+        }
     }
 
     #[test]

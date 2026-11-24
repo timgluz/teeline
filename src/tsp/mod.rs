@@ -19,6 +19,8 @@ pub mod genetic_algorithm;
 pub(crate) mod graph;
 pub mod gravitational_search;
 pub mod greedy_edge;
+pub mod insertion;
+pub use insertion::{InsertionOptions, InsertionStrategy};
 pub mod kdtree;
 pub mod lin_kernighan;
 pub mod memetic_eax;
@@ -85,6 +87,7 @@ pub enum Solvers {
     GeneticAlgorithm,
     GravitationalSearch,
     GreedyEdge,
+    Insertion,
     SpaceFillingCurve,
     OrOpt,
     ParticleSwarmOptimization,
@@ -128,6 +131,8 @@ impl Solvers {
             "gsa",
             "greedy_edge",
             "gec",
+            "insertion",
+            "ins",
             "space_filling_curve",
             "sfc",
             "hilbert",
@@ -488,6 +493,11 @@ impl Solvers {
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
+                name: "insertion",
+                alias: Some("ins"),
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
                 name: "space_filling_curve",
                 alias: Some("sfc"),
                 kind: SolverKind::Heuristic,
@@ -565,7 +575,7 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 24] = [
+static SOLVER_LIST: [SolverInfo; 25] = [
     SolverInfo {
         name: "Ant Colony",
         alias: "aco",
@@ -649,6 +659,15 @@ static SOLVER_LIST: [SolverInfo; 24] = [
                Inspired by Clarke-Wright but mechanically a savings-ordered greedy-edge builder.",
         complexity: "O(n\u{00b2} log n) time, O(n\u{00b2}) memory",
         has_options: false,
+        exact: false,
+    },
+    SolverInfo {
+        name: "Insertion",
+        alias: "ins",
+        category: "Constructive",
+        desc: "Nearest, farthest, or cheapest insertion from a two-city seed.",
+        complexity: "O(n²) nearest/farthest; O(n² log n) cheapest",
+        has_options: true,
         exact: false,
     },
     SolverInfo {
@@ -813,6 +832,7 @@ impl FromStr for Solvers {
             "ga" | "genetic_algorithm" => Ok(Solvers::GeneticAlgorithm),
             "gsa" | "gravitational_search" => Ok(Solvers::GravitationalSearch),
             "gec" | "greedy_edge" => Ok(Solvers::GreedyEdge),
+            "ins" | "insertion" => Ok(Solvers::Insertion),
             "sfc" | "hilbert" | "space_filling_curve" => Ok(Solvers::SpaceFillingCurve),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
             "shuffle" | "random_shuffle" => Ok(Solvers::RandomShuffle),
@@ -1936,6 +1956,7 @@ pub struct AppOptions {
     pub memetic_eax: Option<MemeticEaxOptions>,
     pub fourier: Option<FourierOptions>,
     pub sfc: Option<SfcOptions>,
+    pub insertion: Option<InsertionOptions>,
     pub som: Option<SOMOptions>,
     pub aco: Option<AcoOptions>,
     pub heuristic: Option<HeuristicOptions>,
@@ -2061,6 +2082,11 @@ pub fn solve_with_context(
         }
         Solvers::GravitationalSearch => gravitational_search::solve(problem, &h, tx, init_tour),
         Solvers::GreedyEdge => greedy_edge::solve(problem, &h, tx, init_tour),
+        Solvers::Insertion => {
+            let insertion = opts.insertion.as_ref().cloned().unwrap_or_default();
+            insertion.validate()?;
+            insertion::solve(problem, &insertion, tx, init_tour)
+        }
         Solvers::SpaceFillingCurve => {
             let sfc = opts.sfc.as_ref().cloned().unwrap_or_default();
             sfc.validate()?;
@@ -2345,6 +2371,7 @@ mod tests {
             memetic_eax: None,
             fourier: None,
             sfc: None,
+            insertion: None,
             som: None,
             aco: None,
             heuristic: None,

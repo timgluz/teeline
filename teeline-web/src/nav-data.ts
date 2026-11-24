@@ -47,6 +47,12 @@ export const SOLVER_META: Record<string, SolverMeta> = {
     name: 'Greedy Edge',
     complexity: 'O(n² log n) edge sort + O(n² α(n)) scan',
   },
+  insertion: {
+    id: 'insertion',
+    name: 'Insertion',
+    complexity:
+      'Nearest/farthest: O(n²) time, O(n) auxiliary space; cheapest: O(n² log n) time, O(n²) auxiliary space',
+  },
   space_filling_curve: {
     id: 'space_filling_curve',
     name: 'Space-Filling Curve',
@@ -123,6 +129,7 @@ export const SOLVER_GROUPS: SolverGroup[] = [
       'fourier',
       'christofides',
       'greedy_edge',
+      'insertion',
       'space_filling_curve',
       'savings',
       'som',

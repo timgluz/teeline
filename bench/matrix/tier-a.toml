@@ -60,8 +60,8 @@ ch150 = "all"     # EUC_2D, 150
 a280 = "all"      # EUC_2D, 280
 dsj1000 = "all"   # CEIL_2D, 1000
 
-# Configs are named sets of extra CLI arguments. A config with no `solvers`/`instances` applies to
-# everything; one that names them applies only there.
+# Configs are named sets of extra CLI arguments. `solvers` and `instances` restrict where a config
+# applies; `exclude_solvers` removes named solvers without restricting the others.
 #
 # `budget` is the budget-limited run decision 1 asks for: the solver as configured, with the
 # family's wall-clock budget as the only limit. It carries no arguments because the allowance is
@@ -72,6 +72,20 @@ dsj1000 = "all"   # CEIL_2D, 1000
 # `--epochs 0` it needs — so a "to convergence" column would be missing for 7 of 22 solvers, and a
 # column that is absent for a third of the table is worse than one that is not published yet.
 [configs.budget]
+exclude_solvers = ["insertion"]
+
+# Insertion has one explicitly named config per strategy.
+[configs.nearest]
+solvers = ["insertion"]
+args = ["--strategy", "nearest"]
+
+[configs.farthest]
+solvers = ["insertion"]
+args = ["--strategy", "farthest"]
+
+[configs.cheapest]
+solvers = ["insertion"]
+args = ["--strategy", "cheapest"]
 
 # `branch_bound` is exact by default and ignores `--n_nearest`, so it needs no separate
 # config: the `budget` run is already the exact run.

@@ -42,6 +42,20 @@ eil76 = "small"     # EUC_2D, 76
 # The budget-limited run: the solver as configured, with the family's wall-clock budget as the
 # only limit.
 [configs.budget]
+exclude_solvers = ["insertion"]
+
+# Insertion has one explicitly named config per strategy.
+[configs.nearest]
+solvers = ["insertion"]
+args = ["--strategy", "nearest"]
+
+[configs.farthest]
+solvers = ["insertion"]
+args = ["--strategy", "farthest"]
+
+[configs.cheapest]
+solvers = ["insertion"]
+args = ["--strategy", "cheapest"]
 
 # Historical: `branch_bound` is exact by default now and ignores `--n_nearest`, so this
 # config is redundant. Kept so this archived preliminary tier remains reproducible.

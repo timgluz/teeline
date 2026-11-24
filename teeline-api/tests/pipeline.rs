@@ -41,6 +41,23 @@ const SQUARE_CITIES: &str =
     r#"{"cities":[{"x":0.0,"y":0.0},{"x":1.0,"y":0.0},{"x":1.0,"y":1.0},{"x":0.0,"y":1.0}]}"#;
 
 #[tokio::test]
+async fn pipeline_accepts_insertion_strategy_and_rejects_invalid() {
+    for (strategy, status) in [
+        ("farthest", StatusCode::OK),
+        ("invalid", StatusCode::BAD_REQUEST),
+    ] {
+        let body = format!(
+            r#"{{"input":{SQUARE_CITIES},"stages":[{{"solver":"insertion","configs":{{"insertion":{{"strategy":"{strategy}"}}}}}},{{"solver":"2opt"}}]}}"#
+        );
+        let resp = make_app()
+            .oneshot(post("/api/v1/pipeline", json_body(&body)))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), status, "strategy {strategy}");
+    }
+}
+
+#[tokio::test]
 async fn pipeline_two_stages_returns_ok() {
     let body =
         format!(r#"{{"input":{SQUARE_CITIES},"stages":[{{"solver":"nn"}},{{"solver":"2opt"}}]}}"#);

@@ -219,6 +219,14 @@ pub struct SfcConfig {
     pub tie_breaker: Option<String>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
+pub struct InsertionConfig {
+    /// `nearest`, `farthest`, or `cheapest`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(example = "nearest")]
+    pub strategy: Option<String>,
+}
+
 /// Per-solver optional configuration. Pass only the field matching your chosen solver.
 /// BHK, branch_bound, and Christofides have no tunable parameters and are absent.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, ToSchema)]
@@ -259,6 +267,8 @@ pub struct SolverConfigs {
     pub fourier: Option<FourierConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sfc: Option<SfcConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub insertion: Option<InsertionConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]

@@ -202,6 +202,40 @@ TOML
     [ "$(printf '%s\n' "$output" | grep -c 'bhk.*exact')" -eq 0 ]
 }
 
+@test "excluded solver gets only its named configs; CLI names are accepted in filters" {
+    cat >> "$TMPDIR/tier.toml" <<'TOML'
+exclude_solvers = ["insertion", "nearest_neighbor"]
+
+[configs.nearest]
+solvers = ["insertion", "nearest_neighbor"]
+args = ["--strategy", "nearest"]
+
+[configs.farthest]
+solvers = ["insertion"]
+args = ["--strategy", "farthest"]
+
+[configs.cheapest]
+solvers = ["insertion"]
+args = ["--strategy", "cheapest"]
+TOML
+    run bench --dry-run --solver insertion --solver nn --solver greedy_edge
+    [ "$status" -eq 0 ]
+    ! printf '%s\n' "$output" | grep -Eq '^ +insertion +[^ ]+ +default '
+    ! printf '%s\n' "$output" | grep -Eq '^ +nn +[^ ]+ +default '
+    printf '%s\n' "$output" | grep -Eq '^ +greedy_edge +[^ ]+ +default '
+    printf '%s\n' "$output" | grep -Eq '^ +insertion +[^ ]+ +nearest '
+    printf '%s\n' "$output" | grep -Eq '^ +insertion +[^ ]+ +farthest '
+    printf '%s\n' "$output" | grep -Eq '^ +insertion +[^ ]+ +cheapest '
+    printf '%s\n' "$output" | grep -Eq '^ +nn +[^ ]+ +nearest '
+}
+
+@test "a config excluding an unknown solver is refused" {
+    printf 'exclude_solvers = ["not_a_solver"]\n' >> "$TMPDIR/tier.toml"
+    run bench --dry-run --solver nn
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"not_a_solver"* ]]
+}
+
 @test "a missing instance fails loudly and writes nothing" {
     cat > "$TMPDIR/tier-missing.toml" <<'TOML'
 tier = "test"

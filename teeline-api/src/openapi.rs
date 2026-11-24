@@ -65,6 +65,7 @@ impl Modify for SecurityAddon {
         request::SomConfig,
         request::FourierConfig,
         request::SfcConfig,
+        request::InsertionConfig,
         request::SolverConfigs,
         request::CityInput,
         request::TspInput,

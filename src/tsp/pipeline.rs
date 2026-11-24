@@ -106,6 +106,10 @@ pub fn stage_warnings(solvers: &[Solvers]) -> Vec<String> {
                     "savings at stage {i} discards the warm-start seed from the previous \
                      stage (it always rebuilds from scratch)"
                 )),
+                Solvers::Insertion => warnings.push(format!(
+                    "insertion at stage {i} discards the warm-start seed from the previous \
+                     stage (it always rebuilds from scratch)"
+                )),
                 Solvers::SpaceFillingCurve => warnings.push(format!(
                     "sfc at stage {i} discards the warm-start seed from the previous \
                      stage (it always rebuilds from scratch)"
