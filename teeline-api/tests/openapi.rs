@@ -106,6 +106,13 @@ async fn openapi_json_has_schemas_in_components() {
         schemas.contains_key("ParseResponse"),
         "missing ParseResponse schema"
     );
+    assert!(schemas.contains_key("InsertionConfig"));
+    assert!(
+        schemas["SolverConfigs"]["properties"]
+            .as_object()
+            .unwrap()
+            .contains_key("insertion")
+    );
 }
 
 #[tokio::test]

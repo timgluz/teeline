@@ -136,6 +136,7 @@ fn default_options() -> crate::teeline::solver::types::SolveOptions {
         eax_strategy: 2,
         eax_stall_epochs: 50,
         eax_candidate_k: 20,
+        insertion_strategy: 1,
     }
 }
 
@@ -515,7 +516,7 @@ EOF\n";
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 24, "expected 24 solvers");
+    assert_eq!(algorithms.len(), 25, "expected 25 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "aco",
@@ -542,6 +543,7 @@ fn test_list_algorithms_returns_all_solvers() {
         "sav",
         "sfc",
         "eax",
+        "ins",
     ] {
         assert!(
             ids.contains(expected_id),
@@ -902,7 +904,51 @@ const VALID_SOLVE_OPTIONS_KEYS: &[&str] = &[
     "eaxStrategy",
     "eaxStallEpochs",
     "eaxCandidateK",
+    "insertionStrategy",
 ];
+
+#[test]
+fn test_insertion_strategy_options_and_metadata() {
+    let (mut store, instance) = make_instance();
+    for strategy in 0..=2 {
+        let mut opts = default_options();
+        opts.insertion_strategy = strategy;
+        let solution = instance
+            .call_solve(&mut store, "insertion", &five_cities(), opts)
+            .unwrap()
+            .unwrap();
+        assert_valid_tour(&solution, 5);
+    }
+    let mut invalid = default_options();
+    invalid.insertion_strategy = 3;
+    assert!(
+        instance
+            .call_solve(&mut store, "insertion", &five_cities(), invalid.clone())
+            .unwrap()
+            .is_err()
+    );
+    assert!(
+        instance
+            .call_solve(&mut store, "nn", &five_cities(), invalid)
+            .unwrap()
+            .is_ok()
+    );
+    let algorithms = run_list_algorithms();
+    let insertion = algorithms
+        .iter()
+        .find(|a| a.id == "ins")
+        .expect("ins missing");
+    assert_eq!(insertion.kind, "constructive");
+    let param = insertion
+        .params
+        .iter()
+        .find(|p| p.key == "insertionStrategy")
+        .unwrap();
+    assert_eq!(
+        (param.min, param.max, param.step),
+        (Some(0.0), Some(2.0), Some(1.0))
+    );
+}
 
 #[test]
 fn test_list_algorithms_all_param_keys_are_valid_solve_options_fields() {

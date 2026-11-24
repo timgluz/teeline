@@ -126,12 +126,19 @@ def validate_groups(coverage: dict, instances: dict) -> None:
 def validate_configs(configs: dict, by_id: dict, by_cli: dict, instances: dict) -> None:
     """A config naming an unknown solver or instance matches nothing and is silently ignored."""
     for name, cfg in configs.items():
-        for raw in (cfg or {}).get("solvers", []) or []:
-            if raw not in by_id and raw not in by_cli:
-                fail(
-                    f"[configs.{name}] names solver '{raw}', which is not in bench/solvers.json "
-                    f"as either an id or a CLI name"
-                )
+        for field in ("solvers", "exclude_solvers"):
+            if field not in (cfg or {}):
+                continue
+            canonical = []
+            for raw in cfg[field]:
+                sid = raw if raw in by_id else by_cli.get(raw)
+                if sid is None:
+                    fail(
+                        f"[configs.{name}] names solver '{raw}', which is not in bench/solvers.json "
+                        f"as either an id or a CLI name"
+                    )
+                canonical.append(sid)
+            cfg[field] = canonical
         for raw in (cfg or {}).get("instances", []) or []:
             if raw not in instances:
                 fail(f"[configs.{name}] names instance '{raw}', which [instances] does not declare")
@@ -144,6 +151,8 @@ def config_applies(cfg: dict, solver_id: str, instance: str) -> bool:
     """
     solvers = (cfg or {}).get("solvers")
     if solvers is not None and solver_id not in solvers:
+        return False
+    if solver_id in (cfg or {}).get("exclude_solvers", []):
         return False
     instances = (cfg or {}).get("instances")
     if instances is not None and instance not in instances:

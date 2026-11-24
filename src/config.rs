@@ -3,7 +3,8 @@ use std::str::FromStr;
 
 use crate::tsp::{
     AcoOptions, AppOptions, CSOptions, DistanceBackend, FPAOptions, FourierOptions, GAOptions,
-    HeuristicOptions, LKOptions, MemeticEaxOptions, SAOptions, SOMOptions, SfcOptions, Solvers,
+    HeuristicOptions, InsertionOptions, LKOptions, MemeticEaxOptions, SAOptions, SOMOptions,
+    SfcOptions, Solvers,
 };
 
 /// Unifies CLI args and TOML tables as the same kind of options source.
@@ -13,7 +14,7 @@ pub trait AppOptionsProvider {
 }
 
 /// Applies recognised sub-tables from a `toml::Table` to the base `AppOptions`.
-/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `sfc`, `lk`, `som`, `aco`, and `heuristic`
+/// Only `solver`, `sa`, `ga`, `cs`, `fpa`, `fourier`, `sfc`, `insertion`, `lk`, `som`, `aco`, and `heuristic`
 /// are valid top-level keys.
 /// Returns `Err` on unknown keys or mis-typed sub-tables.
 pub struct TomlTableProvider<'a>(pub &'a toml::Table);
@@ -49,6 +50,12 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                     let t = value.as_table().ok_or("config: `sfc` must be a table")?;
                     base.sfc = Some(SfcOptions::from_toml(t)?);
                 }
+                "insertion" => {
+                    let t = value
+                        .as_table()
+                        .ok_or("config: `insertion` must be a table")?;
+                    base.insertion = Some(InsertionOptions::from_toml(t)?);
+                }
                 "lk" => {
                     let t = value.as_table().ok_or("config: `lk` must be a table")?;
                     base.lk = Some(LKOptions::from_toml(t)?);
@@ -75,7 +82,7 @@ impl AppOptionsProvider for TomlTableProvider<'_> {
                 }
                 other => {
                     return Err(format!(
-                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, sfc, lk, memetic_eax, som, aco, heuristic"
+                        "config: unknown field `{other}` — valid stage fields: solver, sa, ga, cs, fpa, fourier, sfc, insertion, lk, memetic_eax, som, aco, heuristic"
                     ));
                 }
             }
@@ -158,6 +165,7 @@ pub fn load_pipeline_config_with_backend(
             ("fpa", matches!(solver, Solvers::FlowerPollination)),
             ("fourier", matches!(solver, Solvers::Fourier)),
             ("sfc", matches!(solver, Solvers::SpaceFillingCurve)),
+            ("insertion", matches!(solver, Solvers::Insertion)),
             ("lk", matches!(solver, Solvers::LinKernighan)),
             ("memetic_eax", matches!(solver, Solvers::MemeticEax)),
             ("som", matches!(solver, Solvers::KohonenSom)),
@@ -172,6 +180,7 @@ pub fn load_pipeline_config_with_backend(
                         | Solvers::FlowerPollination
                         | Solvers::Fourier
                         | Solvers::SpaceFillingCurve
+                        | Solvers::Insertion
                         | Solvers::LinKernighan
                         | Solvers::MemeticEax
                         | Solvers::KohonenSom

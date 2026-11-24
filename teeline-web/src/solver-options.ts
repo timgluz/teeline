@@ -25,6 +25,8 @@ export interface SolveOptions {
   eaxStrategy: number
   eaxStallEpochs: number
   eaxCandidateK: number
+  // 0 = nearest, 1 = farthest, 2 = cheapest.
+  insertionStrategy: number
 }
 
 export function defaultSolveOptions(): SolveOptions {
@@ -50,5 +52,6 @@ export function defaultSolveOptions(): SolveOptions {
     eaxStrategy: 2,
     eaxStallEpochs: 50,
     eaxCandidateK: 20,
+    insertionStrategy: 1,
   }
 }

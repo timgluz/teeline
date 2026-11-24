@@ -93,6 +93,26 @@
       ]
     },
     {
+      "id": "insertion",
+      "cli": "insertion",
+      "name": "Insertion",
+      "family": "constructive",
+      "deterministic": true,
+      "doc": "insertion",
+      "notes": "Nearest, farthest and cheapest insertion; each produced identical tours across five release CLI invocations on a280.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280",
+        "runs": 5,
+        "outcome": "identical"
+      },
+      "default_configs": [
+        "nearest",
+        "farthest",
+        "cheapest"
+      ]
+    },
+    {
       "id": "space_filling_curve",
       "cli": "space_filling_curve",
       "name": "Space-Filling Curve",

@@ -26,6 +26,7 @@ declare module 'teeline-wasm' {
     eaxStrategy: number
     eaxStallEpochs: number
     eaxCandidateK: number
+    insertionStrategy: number
   }
   export interface Solution {
     total: number

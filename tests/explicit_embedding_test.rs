@@ -229,6 +229,7 @@ fn every_registered_solver_returns_a_valid_tour_on_gr17() {
             ..Default::default()
         }),
         heuristic: Some(heuristic),
+        ..Default::default()
     };
 
     for meta in Solvers::all_meta() {

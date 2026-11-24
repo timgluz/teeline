@@ -6,9 +6,9 @@ use teeline::tsp::pipeline::{PipelineStage, run_pipeline_stages, stage_warnings}
 use teeline::tsp::tsplib;
 use teeline::tsp::{
     AcoOptions, AppOptions, AspectScaling, CSOptions, DistanceBackend, DistanceType, FPAOptions,
-    FourierOptions, GAOptions, HeuristicOptions, LKOptions, MemeticEaxOptions, SAOptions,
-    SOMOptions, SfcCurveType, SfcOptions, Solvers, TieBreaker, TspProblem, find_solver,
-    solve_problem,
+    FourierOptions, GAOptions, HeuristicOptions, InsertionOptions, InsertionStrategy, LKOptions,
+    MemeticEaxOptions, SAOptions, SOMOptions, SfcCurveType, SfcOptions, Solvers, TieBreaker,
+    TspProblem, find_solver, solve_problem,
 };
 
 use super::TspSolverService;
@@ -243,6 +243,20 @@ fn make_app_options(
         None => None,
     };
 
+    let insertion = cfg
+        .insertion
+        .as_ref()
+        .map(|c| {
+            let d = InsertionOptions::default();
+            Ok::<_, String>(InsertionOptions {
+                strategy: match c.strategy.as_deref() {
+                    Some(v) => InsertionStrategy::parse(v)?,
+                    None => d.strategy,
+                },
+            })
+        })
+        .transpose()?;
+
     let memetic_eax = match cfg.memetic_eax.as_ref() {
         Some(c) => {
             let d = MemeticEaxOptions::default();
@@ -294,6 +308,7 @@ fn make_app_options(
         memetic_eax,
         fourier,
         sfc,
+        insertion,
         som,
         aco,
         heuristic,
@@ -425,6 +440,57 @@ impl TspSolverService for TspService {
 mod tests {
     use super::*;
     use crate::models::request::{CityInput, PipelineStageRequest, TspInput};
+
+    #[test]
+    fn insertion_config_maps_and_validates_strategy() {
+        use crate::models::request::InsertionConfig;
+
+        assert!(
+            make_app_options("insertion", None)
+                .unwrap()
+                .insertion
+                .is_none()
+        );
+        let empty = SolverConfigs {
+            insertion: Some(InsertionConfig::default()),
+            ..Default::default()
+        };
+        assert_eq!(
+            make_app_options("insertion", Some(&empty))
+                .unwrap()
+                .insertion
+                .unwrap()
+                .strategy,
+            InsertionOptions::default().strategy
+        );
+        for (name, expected) in [
+            ("nearest", InsertionStrategy::Nearest),
+            ("farthest", InsertionStrategy::Farthest),
+            ("cheapest", InsertionStrategy::Cheapest),
+        ] {
+            let configs = SolverConfigs {
+                insertion: Some(InsertionConfig {
+                    strategy: Some(name.to_string()),
+                }),
+                ..Default::default()
+            };
+            assert_eq!(
+                make_app_options("insertion", Some(&configs))
+                    .unwrap()
+                    .insertion
+                    .unwrap()
+                    .strategy,
+                expected
+            );
+        }
+        let invalid = SolverConfigs {
+            insertion: Some(InsertionConfig {
+                strategy: Some("invalid".to_string()),
+            }),
+            ..Default::default()
+        };
+        assert!(make_app_options("insertion", Some(&invalid)).is_err());
+    }
 
     const TINY_TSPLIB: &str = "\
 NAME: test

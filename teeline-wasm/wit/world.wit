@@ -33,6 +33,8 @@ interface types {
         eax-strategy: u32,
         eax-stall-epochs: u32,
         eax-candidate-k: u32,
+        // 0 = nearest, 1 = farthest, 2 = cheapest (ignored by non-insertion solvers).
+        insertion-strategy: u32,
     }
 
     record solution {

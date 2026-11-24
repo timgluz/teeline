@@ -40,6 +40,25 @@ async fn body_json(response: axum::response::Response) -> serde_json::Value {
 const TINY_CITIES: &str = r#"{"cities":[{"x":0.0,"y":0.0},{"x":1.0,"y":0.0},{"x":0.5,"y":1.0}]}"#;
 
 #[tokio::test]
+async fn insertion_strategy_is_accepted_and_invalid_strategy_is_rejected() {
+    for (strategy, status) in [
+        ("nearest", StatusCode::OK),
+        ("farthest", StatusCode::OK),
+        ("cheapest", StatusCode::OK),
+        ("invalid", StatusCode::BAD_REQUEST),
+    ] {
+        let body = format!(
+            r#"{{"solver":"insertion","input":{TINY_CITIES},"configs":{{"insertion":{{"strategy":"{strategy}"}}}}}}"#
+        );
+        let resp = make_app()
+            .oneshot(post("/api/v1/solve", json_body(&body)))
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), status, "strategy {strategy}");
+    }
+}
+
+#[tokio::test]
 async fn solve_nn_returns_ok() {
     let body = format!(r#"{{"solver":"nn","input":{TINY_CITIES}}}"#);
     let resp = make_app()
