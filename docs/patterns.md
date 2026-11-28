@@ -83,3 +83,39 @@ Solvers take `Option<&mpsc::Sender<ProgressMessage>>` and send updates without b
 the solver. `ProgressMessage` lives in the library because it is the transport-agnostic
 contract; the Qt GUI, the API and tests are the consumers (see
 [ADR-008](adr/008-qt-gui.md)).
+
+## Code comments
+
+Comments explain **why**, not **what**. A comment earns its place only by adding a
+non-obvious invariant, a deliberate trade-off, a workaround with its cause, why a constant
+has its value, why an approach was rejected, or a surprising edge case. Do not restate the
+line below, narrate a sequence, describe a signature, or repeat what a well-named function
+or test already says. Prefer naming and structure over prose. Historical narrative belongs in
+the task, PR description, or commit message, not in source comments.
+
+## Algorithm pages
+
+A solver's page under `docs/algorithms/` is part of its contract. Any change that alters
+observable behaviour (default parameters, search semantics, output quality, determinism,
+registration, or a guard that rejects inputs) must update that page in the same PR:
+
+- Bump the `version` in the frontmatter. A behaviour-changing rewrite bumps the major;
+  smaller corrections use minor or patch.
+- Add a `## Changelog` row with the date and the user-visible change, including new benchmark
+  numbers when the change affects them.
+- Keep the description, options, usage, and benchmark notes consistent. Removed or ignored
+  flags must be documented as such.
+
+## Distance source semantics
+
+`DistanceSource::is_coordinate_metric()` is true only when the distances are computed from
+the coordinates. It is false for every EXPLICIT matrix, even when the file supplies a
+`DISPLAY_DATA_SECTION`. `TspLibData.has_real_coordinates` is the separate "the file supplied
+coordinates" flag. `two_opt` and `or_opt` use `is_coordinate_metric()` to stay on the exact
+full scan.
+
+## Fixtures
+
+Fixtures must live in `tests/fixtures/`. The `data/` tree is git-ignored, so a test that
+reads `data/tsplib/<instance>.tsp` passes locally and fails in CI. Copy the instance into
+`tests/fixtures/` and reference it from there (for example `tests/fixtures/kroA100.tsp`).

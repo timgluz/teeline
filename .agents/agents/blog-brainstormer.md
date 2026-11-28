@@ -20,7 +20,7 @@ description: |
   Turning a raw change into a set of reader-facing angles is a brainstorming task, not a writing one.
   </commentary>
   </example>
-model: opus
+model: google/gemini-4-hydrogen
 color: magenta
 ---
 

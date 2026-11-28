@@ -6,6 +6,11 @@ Environment and workflow lessons that keep recurring. Read this before a long
 
 ## Environment gotchas
 
+### `target/release/bin` is stale
+
+The CLI binary is `target/release/teeline` (built by `teeline-cli`). `target/release/bin` is
+an old artifact from before the workspace split; ignore it.
+
 ### SSH to GitHub is broken on this machine
 
 `/usr/etc/ssh/ssh_config.d/50-suse.conf` is owned by `nobody`, so every `git push`,
@@ -69,6 +74,28 @@ resolution, use `git rebase --skip`.
 Playwright's `webServer` lifecycle (`Process from config.webServer exited early`). Fix:
 set `env: { ASTRO_DEV_BACKGROUND: 'false' }` in `playwright.config.ts` — any truthy value
 suppresses the daemonize heuristic.
+
+## Git & PR workflow
+
+- Branch off `master` as `type/short-description` (`fix/web-opt-tour-url`,
+  `feat/algorithms-index`, `docs/agent-git-pr-workflow`).
+- Use Conventional Commits scoped by area, e.g. `fix(web): ...`, `build(deps): ...`.
+- Open pull requests with `gh pr create` (the CLI is authenticated as `timgluz`).
+- The `.githooks/pre-commit` hook runs cargo fmt/clippy, markdownlint, `tsc`, and Prettier on
+  staged files. Let it run and fix failures before committing.
+- After opening a PR, ask `open-code-review` (`ocr`) for a review.
+
+### Stacked PRs
+
+When a task splits into pieces that can be reviewed and shipped separately, use a stack
+instead of one large PR. Use the `gh stack` CLI to create, update, and rebase it:
+`gh stack init`, `gh stack add <branch>`, `gh stack submit`, `gh stack checkout <pr>`,
+`gh stack rebase`, `gh stack push`. Stacked PRs are rebased onto the base branch, never
+merged; after the base merges, rebase the next branch onto `master`.
+
+Do not split changes that CI requires to land together: an algorithm page, its
+`nav-data.ts` entry, and the benchmark index are one unit; a solver and its tests are one
+unit. Keep every PR in the stack independently green and reviewable.
 
 ## Git workflow gotchas
 

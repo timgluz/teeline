@@ -95,6 +95,13 @@ Inspect the component's exported interface:
 wasm-tools component wit target/wasm32-wasip1/debug/teeline_wasm.wasm
 ```
 
+## Web client type declarations
+
+`teeline-web/src/teeline-wasm.d.ts` is an ambient module declaration and the sole source of
+truth for `'teeline-wasm'` imports; it shadows `node_modules/teeline-wasm/teeline_wasm.d.ts`.
+Any new WIT export must be added there, or `tsc` fails with "Module 'teeline-wasm' has no
+exported member '...'".
+
 ## Release and web deployment
 
 - The `/solve/` page downloads `teeline-solver.wasm` from the **latest GitHub Release**, not
