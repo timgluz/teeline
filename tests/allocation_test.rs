@@ -6,12 +6,13 @@
 //! allocator and asserts those loops stay allocation-free on both `IdIndex` branches and
 //! both backends.
 //!
-//! **Keep exactly one `#[test]` in this file.** The counting switch is process-wide, so a
-//! second test running in parallel could allocate inside the measured window.
+//! **Keep exactly one `#[test]` in this file.** The counting switch is
+//! thread-local, so the libtest harness's main thread cannot pollute the measured
+//! window; one test keeps the measured segment unambiguous.
 
 use std::alloc::{GlobalAlloc, Layout, System};
+use std::cell::Cell;
 use std::hint::black_box;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use teeline::tsp::distance_matrix::DistanceMatrix;
 use teeline::tsp::kdtree::KDPoint;
@@ -21,24 +22,34 @@ use teeline::tsp::{DistanceSource, DistanceType, OnTheFly, Position};
 ///
 /// `GlobalAlloc` is an unsafe trait, but this is the only way to observe allocations
 /// without an external dependency. Every method forwards to `System` unchanged; the
-/// atomics are lock-free, so the counting path cannot itself allocate or recurse.
+/// thread-local cells are lock-free, so the counting path cannot itself allocate or
+/// recurse.
 struct CountingAllocator;
 
-static COUNTING: AtomicBool = AtomicBool::new(false);
-static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    static COUNTING: Cell<bool> = const { Cell::new(false) };
+    static ALLOCATIONS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[inline]
+fn count_if_enabled() {
+    // `try_with` avoids a panic when the allocator runs during TLS teardown.
+    if COUNTING
+        .try_with(|counting| counting.get())
+        .unwrap_or(false)
+    {
+        let _ = ALLOCATIONS.try_with(|count| count.set(count.get() + 1));
+    }
+}
 
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if COUNTING.load(Ordering::Relaxed) {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
+        count_if_enabled();
         unsafe { System.alloc(layout) }
     }
 
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
-        if COUNTING.load(Ordering::Relaxed) {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
+        count_if_enabled();
         unsafe { System.alloc_zeroed(layout) }
     }
 
@@ -47,9 +58,7 @@ unsafe impl GlobalAlloc for CountingAllocator {
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        if COUNTING.load(Ordering::Relaxed) {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
+        count_if_enabled();
         unsafe { System.realloc(ptr, layout, new_size) }
     }
 }
@@ -75,8 +84,8 @@ fn assert_hot_loops_allocate_nothing(source: &dyn DistanceSource, label: &str) {
     let _ = source.tour_length(&tour_ids);
     let _ = source.tour_length_by_pos(&tour_positions);
 
-    ALLOCATIONS.store(0, Ordering::SeqCst);
-    COUNTING.store(true, Ordering::SeqCst);
+    ALLOCATIONS.with(|count| count.set(0));
+    COUNTING.with(|counting| counting.set(true));
 
     let mut checksum = 0.0f32;
     for i in 0..10_000 {
@@ -99,9 +108,9 @@ fn assert_hot_loops_allocate_nothing(source: &dyn DistanceSource, label: &str) {
         checksum += black_box(source.tour_length_by_pos(&tour_positions));
     }
 
-    COUNTING.store(false, Ordering::SeqCst);
+    COUNTING.with(|counting| counting.set(false));
 
-    let allocations = ALLOCATIONS.load(Ordering::SeqCst);
+    let allocations = ALLOCATIONS.with(|count| count.get());
     assert_eq!(
         allocations, 0,
         "{label}: hot-loop lookups allocated {allocations} time(s)"
