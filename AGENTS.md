@@ -168,6 +168,26 @@ to say what failed. Avoid the markers that make prose read as generated:
 Prefer numbers, names, and short sentences. If a sentence needs a dash to hold it together,
 it probably needs to be two sentences.
 
+## Agents
+
+The project defines Claude Code subagents in `.claude/agents/` and shared skills in
+`.agents/skills/` (linked from `.claude/skills/`). Use the narrowest agent that matches the
+job:
+
+- **`blog-writer`** (`.claude/agents/blog-writer.md`) — draft a new `teeline-web` blog post
+  or substantially rewrite an existing draft. It reads the established posts, the algorithm
+  docs/code/benchmark data, writes in the project voice, verifies claims, and validates the
+  build.
+- **`blog-editor`** (`.claude/agents/blog-editor.md`) — independent editorial pass on a
+  finished draft. Fact-checks code, numbers, and links against the repo; evaluates voice,
+  structure, and pacing; reports prioritized issues without editing.
+- **`readability-checker`** (`.claude/agents/readability-checker.md`) — quantitative
+  readability metrics only (Flesch-Kincaid and friends); no editorial opinion.
+
+For a new post, run `blog-writer` first, then `blog-editor` before publishing. The prose
+rules are in `## Prose & blog posts` above. The OpenSpec workflow and the benchmark publish
+step are skills under `.agents/skills/` (`openspec-*`, `benchmark-solver`).
+
 ## teeline-web WASM Development Gotcha
 
 `teeline-web/src/teeline-wasm.d.ts` is an **ambient module declaration** that TypeScript uses as the sole source of truth for `'teeline-wasm'` imports — it completely shadows `node_modules/teeline-wasm/teeline_wasm.d.ts`. **Any new WIT export must be added to this ambient file**, or tsc will fail with "Module 'teeline-wasm' has no exported member '...'".
