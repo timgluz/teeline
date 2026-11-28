@@ -26,6 +26,12 @@ pub fn solve(
     if n_cities == 0 {
         return Ok(Solution::from_parts(&[], distances.as_ref()));
     }
+    if n_cities > super::EXACT_MAX_CITIES {
+        return Err(format!(
+            "Bellman-Held-Karp: {n_cities} cities exceeds the exact-solver limit of {}",
+            super::EXACT_MAX_CITIES
+        ));
+    }
 
     let n_others = n_cities - 1;
     let anchor = Position::new(n_others);
@@ -248,6 +254,21 @@ mod tests {
         let solution = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
         assert_eq!(solution.route().len(), 1);
         assert_eq!(solution.total, 0.0);
+    }
+
+    #[test]
+    fn test_solve_rejects_more_than_the_exact_city_limit() {
+        let n = crate::tsp::EXACT_MAX_CITIES + 1;
+        let cities: Vec<kdtree::KDPoint> = (0..n)
+            .map(|i| kdtree::KDPoint::new_with_id(i, &[i as f32, 0.0]))
+            .collect();
+        let weights = vec![1.0f32; n * (n - 1) / 2];
+        let dm = distance_matrix::DistanceMatrix::new(n, weights, cities.clone()).unwrap();
+        let problem = TspProblem::new(cities, dm);
+        assert!(
+            solve(&problem, &HeuristicOptions::default(), None, None).is_err(),
+            "a direct caller above the exact cap must get Err, not a panic"
+        );
     }
 
     #[test]

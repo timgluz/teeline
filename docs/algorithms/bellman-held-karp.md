@@ -23,6 +23,9 @@ hasExplainer: true
 Dynamic programming algorithm that solves TSP exactly. It builds up solutions for subsets of cities, combining the optimal sub-tour results to find the globally optimal tour. Returns the provably shortest Hamiltonian circuit.
 
 **Do not use on more than ~20 cities** — memory and runtime grow exponentially with city count.
+The DP table is stored in `f64` so its cost comparisons use the same accumulation as the
+reported tour length; at the dispatcher's 24-city cap that is about 1.5 GB, roughly double a
+32-bit table.
 
 ```text
 procedure BellmanHeldKarp(cities):
@@ -53,4 +56,4 @@ teeline solve bellman_karp -i ./data/discopt/tsp_5_1.tsp
 
 | Date | Version | Change |
 | --- | --- | --- |
-| 2026-11-28 | 1.1.0 | Moved the DP onto the shared Held–Karp path primitive also used by POPMUSIC. Tours are now reported in forward DP order, equal-cost ties may resolve to a different optimal cycle, and the `--verbose` DP-table dump was removed. The optimal cost is unchanged. |
+| 2026-11-28 | 1.1.0 | Moved the DP onto the shared Held–Karp path primitive also used by POPMUSIC. The DP table is now `f64` (about 1.5 GB at the 24-city cap) so its comparisons match the reported `f64` tour length. Tours are reported in forward DP order, equal-cost ties may resolve to a different optimal cycle, and the `--verbose` DP-table dump was removed. The optimal cost is unchanged. |

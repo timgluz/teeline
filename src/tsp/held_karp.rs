@@ -4,10 +4,11 @@
 //! cheapest open path through a small set of interior nodes with fixed endpoints. Keeping
 //! one implementation means the two cannot drift in reconstruction or tie-breaking.
 
-/// Hard cap on the interior-node count. `m` interior nodes need `m · 2^m` f64 cells; above
-/// this the table is no longer a realistic allocation and a caller has almost certainly
-/// passed the wrong node set.
-pub(crate) const MAX_INTERIOR: usize = 26;
+/// Hard cap on the interior-node count. `m` interior nodes need `m · 2^m` f64 cells; the
+/// exact solver's 24-city cap produces `m = 23`, which is already about 1.5 GB, so this is
+/// deliberately the largest set that cap can produce rather than a comfortable allocation
+/// target.
+pub(crate) const MAX_INTERIOR: usize = 23;
 
 /// Cheapest open path from `start` through exactly the `m` interior nodes (each once, any
 /// order), ending at `end`.
@@ -51,7 +52,11 @@ pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f64, Vec<usize
     let states = 1usize << m;
     // dp[mask * m + last] = cheapest path from `start` through exactly `mask`, ending at
     // `interior[last]`. INFINITY (not f32::MAX) because MAX + d stays MAX under rounding.
-    let mut dp = vec![f64::INFINITY; states * m];
+    // Reserve fallibly: the f64 table is about 1.5 GB at the exact solver's cap, and an
+    // allocation failure should reach the caller as `None`, not abort the process.
+    let mut dp = Vec::new();
+    dp.try_reserve_exact(states * m).ok()?;
+    dp.resize(states * m, f64::INFINITY);
     for i in 0..m {
         dp[(1 << i) * m + i] = d(m, i);
     }
