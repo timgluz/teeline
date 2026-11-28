@@ -8,6 +8,14 @@ name: Rust
       - 'teeline-api/**'
       - 'teeline-qt/**'
       - 'teeline-wasm/**'
+      - 'docs/algorithms/**'
+      - 'openspec/**'
+      - 'AGENTS.md'
+      - 'README.md'
+      - 'constitution.md'
+      - '.claude/**'
+      - '.agents/**'
+      - 'graphify-out/**'
   pull_request:
     branches: [master]
     paths-ignore:
@@ -15,6 +23,14 @@ name: Rust
       - 'teeline-api/**'
       - 'teeline-qt/**'
       - 'teeline-wasm/**'
+      - 'docs/algorithms/**'
+      - 'openspec/**'
+      - 'AGENTS.md'
+      - 'README.md'
+      - 'constitution.md'
+      - '.claude/**'
+      - '.agents/**'
+      - 'graphify-out/**'
 
 env:
   CARGO_TERM_COLOR: always

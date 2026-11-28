@@ -29,11 +29,13 @@ concurrency:
     branches: [master]
     paths:
       - 'teeline-web/**'
+      - '!teeline-web/src/content/**'
       - '.github/workflows/web-e2e.yml'
   pull_request:
     branches: [master]
     paths:
       - 'teeline-web/**'
+      - '!teeline-web/src/content/**'
       - '.github/workflows/web-e2e.yml'
 
 jobs:
