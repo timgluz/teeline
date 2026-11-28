@@ -1,7 +1,7 @@
 ---
 id: "popmusic"
 name: "POPMUSIC"
-version: "1.0.0"
+version: "1.0.1"
 typeBadge: "Heuristic — decomposition"
 description: "Decomposition template that re-optimizes short contiguous tour windows with fixed endpoints using an exact Held–Karp path DP, splicing improvements until a pass stops improving."
 hasExplainer: false
@@ -66,7 +66,8 @@ reads pairwise distances; the derived display layout is never used as the object
 
 Standalone runs consume the pipeline warm start when one exists and otherwise start from a
 nearest-neighbour tour. The CLI auto-expands a standalone run to
-`pipeline(nn, popmusic)`; `--no-seed` starts from the input city order instead.
+`pipeline(nn, popmusic)`; `--no-seed` skips that automatic prefix, but with no warm start
+the solver still builds its own nearest-neighbour tour.
 
 ## Options
 
@@ -104,3 +105,4 @@ teeline pipeline --steps=nn,popmusic,2opt -i ./data/tsplib/berlin52.tsp
 | Date | Version | Change |
 | --- | --- | --- |
 | 2026-11-28 | 1.0.0 | Initial POPMUSIC decomposition solver: two-offset cyclic window scan, exact fixed-endpoint window DP, deterministic output, `nn` auto-seed and pipeline warm start. |
+| 2026-11-28 | 1.0.1 | Corrected the `--no-seed` description: it skips the automatic `nn` pipeline stage, but the solver still builds its own nearest-neighbour seed when no warm start is supplied. |
