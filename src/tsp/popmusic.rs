@@ -39,6 +39,13 @@ pub fn solve(
     // Fewer than four cities have no interior to reorder: every order is the same cycle.
     if n <= 2 || window < 4 {
         let path: Vec<usize> = cities.iter().map(|c| c.id).collect();
+        if let Some(tx) = progress_tx {
+            let _ = tx.send(ProgressMessage::PathUpdate(
+                Route::new(&path),
+                distances.tour_length(&path),
+            ));
+            let _ = tx.send(ProgressMessage::Done);
+        }
         return Solution::from_parts(&path, distances.as_ref());
     }
 
@@ -324,5 +331,27 @@ mod tests {
         }
         assert!(updates >= 1, "expected at least one path update");
         assert_eq!(done, 1, "expected exactly one done signal");
+    }
+
+    #[test]
+    fn progress_reports_done_for_tiny_inputs() {
+        for n in 0..=3 {
+            let problem = tiny_problem(n);
+            let (tx, rx) = mpsc::channel();
+            let _ = solve(&problem, &HeuristicOptions::default(), Some(&tx), None);
+            drop(tx);
+
+            let mut updates = 0;
+            let mut done = 0;
+            for message in rx.iter() {
+                match message {
+                    ProgressMessage::PathUpdate(..) => updates += 1,
+                    ProgressMessage::Done => done += 1,
+                    _ => {}
+                }
+            }
+            assert!(updates >= 1, "n={n}: expected a path update");
+            assert_eq!(done, 1, "n={n}: expected exactly one done signal");
+        }
     }
 }
