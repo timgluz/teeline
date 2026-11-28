@@ -150,6 +150,24 @@ registration, or a guard that rejects inputs — must update that page in the sa
 The changelog is where behavioural history belongs; source comments carry only the
 non-obvious *why* (see Code Comments).
 
+## Prose & blog posts
+
+Write like a person who has done the work, not like a model imitating one. The posts in
+`teeline-web/src/content/blog/` set the voice: first person, concrete, specific, and willing
+to say what failed. Avoid the markers that make prose read as generated:
+
+- **Em-dashes.** Use them sparingly. Prefer a comma, colon, parentheses, or a full stop.
+  Several in one paragraph is a tell.
+- **The "not X, but Y" tic** ("It isn't a bug. It's a feature.") and its variants.
+- **Stock phrases**: "delve", "tapestry", "landscape", "realm", "navigate the complexities",
+  "in today's fast-paced world", "it's worth noting", "let's dive in".
+- **Mechanical tricolons** and lists of three adjectives for rhythm rather than meaning.
+- **Empty intensifiers** ("very", "extremely", "incredibly") and hedges that add nothing.
+- **A "Conclusion" section** that only restates the introduction.
+
+Prefer numbers, names, and short sentences. If a sentence needs a dash to hold it together,
+it probably needs to be two sentences.
+
 ## teeline-web WASM Development Gotcha
 
 `teeline-web/src/teeline-wasm.d.ts` is an **ambient module declaration** that TypeScript uses as the sole source of truth for `'teeline-wasm'` imports — it completely shadows `node_modules/teeline-wasm/teeline_wasm.d.ts`. **Any new WIT export must be added to this ambient file**, or tsc will fail with "Module 'teeline-wasm' has no exported member '...'".
