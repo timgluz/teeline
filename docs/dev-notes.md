@@ -84,7 +84,18 @@ suppresses the daemonize heuristic.
 - The `.githooks/pre-commit` hook runs cargo fmt/clippy, markdownlint, `tsc`, and Prettier on
   staged files. Let it run and fix failures before committing.
 - After opening a PR, ask `open-code-review` (`ocr`) for a review.
-- Stacked PRs are rebased onto the base branch, not merged. See the gotchas below.
+
+### Stacked PRs
+
+When a task splits into pieces that can be reviewed and shipped separately, use a stack
+instead of one large PR. Use the `gh stack` CLI to create, update, and rebase it:
+`gh stack init`, `gh stack add <branch>`, `gh stack submit`, `gh stack checkout <pr>`,
+`gh stack rebase`, `gh stack push`. Stacked PRs are rebased onto the base branch, never
+merged; after the base merges, rebase the next branch onto `master`.
+
+Do not split changes that CI requires to land together: an algorithm page, its
+`nav-data.ts` entry, and the benchmark index are one unit; a solver and its tests are one
+unit. Keep every PR in the stack independently green and reviewable.
 
 ## Git workflow gotchas
 

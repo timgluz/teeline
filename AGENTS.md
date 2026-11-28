@@ -42,7 +42,9 @@ CLI, API, WASM component, Qt GUI, and Astro site. The authoritative algorithm ca
 - **Code comments explain why, not what.**
 - **Prose uses no em-dashes** and avoids the anti-slop markers in `docs/writing-style.md`.
 - **One PR per change**, branched from `master` as `type/short-description`, conventional
-  commits, opened with `gh pr create`. The pre-commit hook runs fmt/clippy/markdownlint/tsc.
+  commits, opened with `gh pr create`. When a task splits into separately shippable pieces,
+  use a stacked PR (`gh stack`) rather than one large PR; see `docs/dev-notes.md`. The
+  pre-commit hook runs fmt/clippy/markdownlint/tsc.
 - **After opening a PR, ask `open-code-review` (`ocr`) for a review.** Blog posts also get
   `blog-editor`; explainers get `explainer-build-reviewer` (see `docs/agents.md`).
 
