@@ -376,10 +376,15 @@
       "cli": "popmusic",
       "name": "POPMUSIC",
       "family": "meta",
-      "deterministic": false,
+      "deterministic": true,
       "doc": "popmusic",
-      "notes": "Decomposition template; windows are optimized with the shared exact Held-Karp path DP. The CLI auto-expands to pipeline(nn, popmusic), so the benchmark harness measures that pipeline. Window R=14, up to 4 passes; no options in v1.",
-      "determinism_evidence": null,
+      "notes": "Decomposition template; windows are optimized with the shared exact Held-Karp path DP. The CLI auto-expands to pipeline(nn, popmusic), so the benchmark harness measures that pipeline. Window R=14, up to 4 passes; no options in v1. Tier A: 60/60 ok, 0 timeouts, max 0.51 s; berlin52 8098 vs nn 8980, a280 3064 vs nn 3157.",
+      "deterministic_method": "measured",
+      "determinism_evidence": {
+        "instance": "a280/berlin52",
+        "runs": 3,
+        "outcome": "identical"
+      },
       "default_configs": [
         "default"
       ]
