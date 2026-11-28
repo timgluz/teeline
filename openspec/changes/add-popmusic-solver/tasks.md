@@ -41,7 +41,7 @@
 ## 8. Benchmark measurement and publication
 
 - [x] 8.1 Build release and run `scripts/bench-matrix.sh bench/matrix/tier-a.toml --solver popmusic`; record the chosen `R` and window/pass timings. Verify: every Tier A instance returns a valid tour, no run times out, and the meta 300-second budget holds.
-- [ ] 8.2 Measure determinism over repeated runs and set `deterministic: true` with `determinism_evidence` in `bench/solvers.json`; publish via the benchmark-solver skill. Verify: the recorded evidence matches the measurement and the published gap data is consistent with the tier.
+- [x] 8.2 Measure determinism over repeated runs and set `deterministic: true` with `determinism_evidence` in `bench/solvers.json`; publish via the benchmark-solver skill. Verify: the recorded evidence matches the measurement and the published gap data is consistent with the tier.
 
 ## 9. Integration verification
 
