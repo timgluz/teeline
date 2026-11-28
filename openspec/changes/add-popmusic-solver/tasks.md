@@ -14,39 +14,39 @@
 
 ## 3. POPMUSIC window and splice
 
-- [ ] 3.1 Add `src/tsp/popmusic.rs` with `DEFAULT_WINDOW = 14`, `MAX_PASSES = 4`, the standard `solve(problem, _opts, progress_tx, init_tour)` signature, the `n <= 2` return, `R = min(14, n)`, the `m < 2` guard, warm-start consumption or an internal `nearest_neighbor::solve` seed (with `None` progress), and `PathUpdate`/`Done` output. Verify: unit tests for `n = 0..4` return valid tours without panicking, a supplied warm start is used, and the channel receives path updates plus exactly one `Done`.
-- [ ] 3.2 Implement window extraction with modular indexing, the per-window local matrix, the `held_karp_path` call, the same-order `f32` current-cost sum with the `eps = 1e-6 · max(cur, 1)` improvement guard and identity skip, and the write-back into the same slots. Verify: unit tests assert the result is a permutation, the window endpoints are unchanged, the tour cost never increases, a wrap-around window across index 0 is handled, and a deliberately bad seed improves at `n = 5` and `n = 6`.
+- [x] 3.1 Add `src/tsp/popmusic.rs` with `DEFAULT_WINDOW = 14`, `MAX_PASSES = 4`, the standard `solve(problem, _opts, progress_tx, init_tour)` signature, the `n <= 2` return, `R = min(14, n)`, the `m < 2` guard, warm-start consumption or an internal `nearest_neighbor::solve` seed (with `None` progress), and `PathUpdate`/`Done` output. Verify: unit tests for `n = 0..4` return valid tours without panicking, a supplied warm start is used, and the channel receives path updates plus exactly one `Done`.
+- [x] 3.2 Implement window extraction with modular indexing, the per-window local matrix, the `held_karp_path` call, the same-order `f32` current-cost sum with the `eps = 1e-6 · max(cur, 1)` improvement guard and identity skip, and the write-back into the same slots. Verify: unit tests assert the result is a permutation, the window endpoints are unchanged, the tour cost never increases, a wrap-around window across index 0 is handled, and a deliberately bad seed improves at `n = 5` and `n = 6`.
 
 ## 4. POPMUSIC scan and termination
 
-- [ ] 4.1 Implement the two-offset scan (`0` and `R / 2`, stride `R`), one pass per pair of offsets, the `MAX_PASSES` cap, and the early stop when a pass splices nothing. Verify: unit tests assert the early stop fires after a non-improving pass, the pass cap is respected, and running the solver on its own output makes zero splices and returns the same tour.
-- [ ] 4.2 Add determinism and degenerate-case unit tests (already-optimal small tour, repeated runs). Verify: `cargo test -p teeline popmusic` passes and two runs on `berlin52` return the same route.
+- [x] 4.1 Implement the two-offset scan (`0` and `R / 2`, stride `R`), one pass per pair of offsets, the `MAX_PASSES` cap, and the early stop when a pass splices nothing. Verify: unit tests assert the early stop fires after a non-improving pass, the pass cap is respected, and running the solver on its own output makes zero splices and returns the same tour.
+- [x] 4.2 Add determinism and degenerate-case unit tests (already-optimal small tour, repeated runs). Verify: `cargo test -p teeline popmusic` passes and two runs on `berlin52` return the same route.
 
 ## 5. Seeding and pipeline integration
 
-- [ ] 5.1 Add `tests/popmusic_test.rs` with fixture loading for `berlin52`, `gr17` (EXPLICIT) and `a280`. Verify: each run returns a valid permutation, a finite cost, and a cost equal to the recomputed `tour_length`; `cargo test --test popmusic_test` passes.
-- [ ] 5.2 Add pipeline tests. Verify: `pipeline(nn, popmusic)` is no worse than `nn` on `berlin52` and `a280`, and a distinct warm-start tour is the one POPMUSIC starts from.
+- [x] 5.1 Add `tests/popmusic_test.rs` with fixture loading for `berlin52`, `gr17` (EXPLICIT) and `a280`. Verify: each run returns a valid permutation, a finite cost, and a cost equal to the recomputed `tour_length`; `cargo test --test popmusic_test` passes.
+- [x] 5.2 Add pipeline tests. Verify: `pipeline(nn, popmusic)` is no worse than `nn` on `berlin52` and `a280`, and a distinct warm-start tour is the one POPMUSIC starts from.
 
 ## 6. Core registration
 
-- [ ] 6.1 Register `Solvers::Popmusic` in the module declarations, enum, `variants()`, `FromStr`, `all_meta()`, `SOLVER_LIST` (25 → 26), `solve_with_context`, and `auto_expand_with_nn`. Verify: `popmusic`/`pop-music` resolve to the same solver; `teeline solve popmusic -i tests/fixtures/berlin52.tsp` returns a valid tour; the auto-expand tests cover popmusic and assert it is not shuffle-seeded.
-- [ ] 6.2 Add the solver row to `README.md` and `AGENTS.md` (file, algorithm, aliases). Verify: both tables list the solver and link the new algorithm page.
+- [x] 6.1 Register `Solvers::Popmusic` in the module declarations, enum, `variants()`, `FromStr`, `all_meta()`, `SOLVER_LIST` (25 → 26), `solve_with_context`, and `auto_expand_with_nn`. Verify: `popmusic`/`pop-music` resolve to the same solver; `teeline solve popmusic -i tests/fixtures/berlin52.tsp` returns a valid tour; the auto-expand tests cover popmusic and assert it is not shuffle-seeded.
+- [x] 6.2 Add the solver row to `README.md` and `AGENTS.md` (file, algorithm, aliases). Verify: both tables list the solver and link the new algorithm page.
 
 ## 7. Web, metadata and documentation
 
-- [ ] 7.1 Add `docs/algorithms/popmusic.md` (frontmatter with `id: "popmusic"`, `version: "1.0.0"`, `hasExplainer: false`; description, complexity `O(passes · n · R · 2^R)`, options "none", usage, references, changelog). Verify: markdownlint passes and the Complexity row matches the nav entry.
-- [ ] 7.2 Add the `bench/solvers.json` entry (`family: "meta"`, `cli: "popmusic"`, `doc: "popmusic"`) and `teeline-web/src/nav-data.ts` (`SOLVER_META.popmusic` plus the Metaheuristic group), leaving `EXPLAINER_SOLVERS` untouched. Verify: the web `nav-data.test.ts` and `solver-index.test.ts` pass and `tsc --noEmit` is clean.
-- [ ] 7.3 Add a `recommendation_for` hint for `popmusic` in `teeline-wasm/src/lib.rs`. Verify: the WASM tests pass and the algorithm list includes the solver as a metaheuristic with no parameters.
+- [x] 7.1 Add `docs/algorithms/popmusic.md` (frontmatter with `id: "popmusic"`, `version: "1.0.0"`, `hasExplainer: false`; description, complexity `O(passes · n · R · 2^R)`, options "none", usage, references, changelog). Verify: markdownlint passes and the Complexity row matches the nav entry.
+- [x] 7.2 Add the `bench/solvers.json` entry (`family: "meta"`, `cli: "popmusic"`, `doc: "popmusic"`) and `teeline-web/src/nav-data.ts` (`SOLVER_META.popmusic` plus the Metaheuristic group), leaving `EXPLAINER_SOLVERS` untouched. Verify: the web `nav-data.test.ts` and `solver-index.test.ts` pass and `tsc --noEmit` is clean.
+- [x] 7.3 Add a `recommendation_for` hint for `popmusic` in `teeline-wasm/src/lib.rs`. Verify: the WASM tests pass and the algorithm list includes the solver as a metaheuristic with no parameters.
 
 ## 8. Benchmark measurement and publication
 
-- [ ] 8.1 Build release and run `scripts/bench-matrix.sh bench/matrix/tier-a.toml --solver popmusic`; record the chosen `R` and window/pass timings. Verify: every Tier A instance returns a valid tour, no run times out, and the meta 300-second budget holds.
-- [ ] 8.2 Measure determinism over repeated runs and set `deterministic: true` with `determinism_evidence` in `bench/solvers.json`; publish via the benchmark-solver skill. Verify: the recorded evidence matches the measurement and the published gap data is consistent with the tier.
+- [x] 8.1 Build release and run `scripts/bench-matrix.sh bench/matrix/tier-a.toml --solver popmusic`; record the chosen `R` and window/pass timings. Verify: every Tier A instance returns a valid tour, no run times out, and the meta 300-second budget holds.
+- [x] 8.2 Measure determinism over repeated runs and set `deterministic: true` with `determinism_evidence` in `bench/solvers.json`; publish via the benchmark-solver skill. Verify: the recorded evidence matches the measurement and the published gap data is consistent with the tier.
 
 ## 9. Integration verification
 
-- [ ] 9.1 Run `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, the full `cargo test` suite, and the web tests/typecheck. Verify: all pass.
-- [ ] 9.2 Run `openspec validate add-popmusic-solver --strict`. Verify: validation passes with no warnings.
+- [x] 9.1 Run `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, the full `cargo test` suite, and the web tests/typecheck. Verify: all pass.
+- [x] 9.2 Run `openspec validate add-popmusic-solver --strict`. Verify: validation passes with no warnings.
 
 ## Workflow follow-up
 

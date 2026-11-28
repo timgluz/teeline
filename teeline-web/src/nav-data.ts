@@ -105,6 +105,11 @@ export const SOLVER_META: Record<string, SolverMeta> = {
     name: 'Memetic EAX',
     complexity: 'O(epochs · pop · children · n²)',
   },
+  popmusic: {
+    id: 'popmusic',
+    name: 'POPMUSIC',
+    complexity: 'O(passes · n · R · 2^R)',
+  },
   savings: {
     id: 'savings',
     name: 'Savings',
@@ -141,7 +146,18 @@ export const SOLVER_GROUPS: SolverGroup[] = [
   },
   {
     label: 'Metaheuristic',
-    ids: ['sa', 'tabu', 'ga', 'pso', 'cs', 'fpa', 'gsa', 'aco', 'eax'],
+    ids: [
+      'sa',
+      'tabu',
+      'ga',
+      'pso',
+      'cs',
+      'fpa',
+      'gsa',
+      'aco',
+      'eax',
+      'popmusic',
+    ],
   },
 ]
 
