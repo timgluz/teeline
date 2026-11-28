@@ -174,6 +174,9 @@ The project defines Claude Code subagents in `.claude/agents/` and shared skills
 `.agents/skills/` (linked from `.claude/skills/`). Use the narrowest agent that matches the
 job:
 
+- **`blog-brainstormer`** (`.claude/agents/blog-brainstormer.md`) — generate 5–7 distinct
+  post angles with outlines, target readers, evidence, and risks. It reads the algorithm
+  page, source, benchmarks, and existing posts; it does not draft or edit.
 - **`blog-writer`** (`.claude/agents/blog-writer.md`) — draft a new `teeline-web` blog post
   or substantially rewrite an existing draft. It reads the established posts, the algorithm
   docs/code/benchmark data, writes in the project voice, verifies claims, and validates the
@@ -184,9 +187,10 @@ job:
 - **`readability-checker`** (`.claude/agents/readability-checker.md`) — quantitative
   readability metrics only (Flesch-Kincaid and friends); no editorial opinion.
 
-For a new post, run `blog-writer` first, then `blog-editor` before publishing. The prose
-rules are in `## Prose & blog posts` above. The OpenSpec workflow and the benchmark publish
-step are skills under `.agents/skills/` (`openspec-*`, `benchmark-solver`).
+For a new post, run `blog-brainstormer` first, pick an angle, then `blog-writer`, then
+`blog-editor` before publishing. The prose rules are in `## Prose & blog posts` above. The
+OpenSpec workflow and the benchmark publish step are skills under `.agents/skills/`
+(`openspec-*`, `benchmark-solver`).
 
 ## teeline-web WASM Development Gotcha
 
