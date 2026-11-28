@@ -40,13 +40,13 @@
 
 ## 8. Benchmark measurement and publication
 
-- [ ] 8.1 Build release and run `scripts/bench-matrix.sh bench/matrix/tier-a.toml --solver popmusic`; record the chosen `R` and window/pass timings. Verify: every Tier A instance returns a valid tour, no run times out, and the meta 300-second budget holds.
+- [x] 8.1 Build release and run `scripts/bench-matrix.sh bench/matrix/tier-a.toml --solver popmusic`; record the chosen `R` and window/pass timings. Verify: every Tier A instance returns a valid tour, no run times out, and the meta 300-second budget holds.
 - [ ] 8.2 Measure determinism over repeated runs and set `deterministic: true` with `determinism_evidence` in `bench/solvers.json`; publish via the benchmark-solver skill. Verify: the recorded evidence matches the measurement and the published gap data is consistent with the tier.
 
 ## 9. Integration verification
 
-- [ ] 9.1 Run `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, the full `cargo test` suite, and the web tests/typecheck. Verify: all pass.
-- [ ] 9.2 Run `openspec validate add-popmusic-solver --strict`. Verify: validation passes with no warnings.
+- [x] 9.1 Run `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, the full `cargo test` suite, and the web tests/typecheck. Verify: all pass.
+- [x] 9.2 Run `openspec validate add-popmusic-solver --strict`. Verify: validation passes with no warnings.
 
 ## Workflow follow-up
 
