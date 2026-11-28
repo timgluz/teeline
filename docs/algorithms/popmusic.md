@@ -55,7 +55,7 @@ procedure POPMUSIC(tour):
 ```
 
 An improvement is accepted only when the candidate's open-path cost is lower by more than
-a relative tolerance (`1e-6`). Two different interior orders can differ by one `f32` ulp
+a relative tolerance (`1e-6`). Two different interior orders can differ by one rounding ulp
 even when their true costs tie; without the tolerance, overlapping windows would trade
 those ulps back and forth and the pass would never stop.
 
@@ -96,8 +96,8 @@ teeline pipeline --steps=nn,popmusic,2opt -i ./data/tsplib/berlin52.tsp
 
 - Taillard, É. D. & Helsgaun, K. (2019) — "POPMUSIC for the travelling salesman problem", *European Journal of Operational Research*, 272(2), 420–429. <https://doi.org/10.1016/j.ejor.2018.06.039>
 - Taillard, É. D. (2019) — "An n log n Heuristic for the TSP", *MIC 2019*. [PDF](https://arodes.hes-so.ch/nanna/record/8174/files/Published%20version.pdf)
-- Taillard, É. D., Alvim, A. C. S. & Voß, S. (2015) — "A template for low-complexity implementation of POPMUSIC", *MIC 2015*. [PDF](http://mistic.heig-vd.ch/taillard/articles.dir/TaillardAlvimVoss2015.pdf)
-- Held, M. & Karp, R. M. (1962) — "A Dynamic Programming Approach to Sequencing Problems", *Journal of the Society for Industrial and Applied Mathematics*, 10(1), 196–210 (the fixed-endpoint path DP).
+- Taillard, É. D., Alvim, A. C. F. & Voß, S. (2015) — "A template for low-complexity implementation of POPMUSIC", *MIC 2015: The XI Metaheuristics International Conference*. [PDF](https://web.archive.org/web/20240415231454/http://mistic.heig-vd.ch/taillard/articles.dir/TaillardAlvimVoss2015.pdf)
+- Held, M. & Karp, R. M. (1962) — "A Dynamic Programming Approach to Sequencing Problems", *Journal of the Society for Industrial and Applied Mathematics*, 10(1), 196–210 (the fixed-endpoint path DP). <https://doi.org/10.1137/0110015>
 
 ## Changelog
 
