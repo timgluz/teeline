@@ -34,6 +34,7 @@ pub mod opt_tour;
 pub mod or_opt;
 pub mod particle_swarm;
 pub mod pipeline;
+pub mod popmusic;
 pub mod position;
 pub use position::Position;
 pub mod probability;
@@ -92,6 +93,7 @@ pub enum Solvers {
     SpaceFillingCurve,
     OrOpt,
     ParticleSwarmOptimization,
+    Popmusic,
     RandomShuffle,
     SimulatedAnnealing,
     KohonenSom,
@@ -139,6 +141,8 @@ impl Solvers {
             "hilbert",
             "particle_swarm",
             "pso",
+            "popmusic",
+            "pop-music",
             "random_shuffle",
             "shuffle",
             "simulated_annealing",
@@ -174,6 +178,7 @@ impl Solvers {
                 | Solvers::BranchBound
                 | Solvers::LinKernighan
                 | Solvers::OrOpt
+                | Solvers::Popmusic
         )
     }
 
@@ -514,6 +519,11 @@ impl Solvers {
                 kind: SolverKind::Heuristic,
             },
             SolverMeta {
+                name: "popmusic",
+                alias: None,
+                kind: SolverKind::Heuristic,
+            },
+            SolverMeta {
                 name: "cuckoo_search",
                 alias: Some("cs"),
                 kind: SolverKind::Heuristic,
@@ -576,7 +586,7 @@ pub struct SolverInfo {
     pub exact: bool,
 }
 
-static SOLVER_LIST: [SolverInfo; 25] = [
+static SOLVER_LIST: [SolverInfo; 26] = [
     SolverInfo {
         name: "Ant Colony",
         alias: "aco",
@@ -800,6 +810,17 @@ static SOLVER_LIST: [SolverInfo; 25] = [
         exact: false,
     },
     SolverInfo {
+        name: "POPMUSIC",
+        alias: "popmusic",
+        category: "Metaheuristic",
+        desc: "Decomposition template: re-optimizes short contiguous tour windows with \
+               fixed endpoints using an exact path DP, splicing each improvement until a \
+               full pass stops improving.",
+        complexity: "O(passes \u{00b7} n \u{00b7} R \u{00b7} 2^R)",
+        has_options: false,
+        exact: false,
+    },
+    SolverInfo {
         name: "Random Shuffle",
         alias: "shuffle",
         category: "Utility",
@@ -836,6 +857,7 @@ impl FromStr for Solvers {
             "ins" | "insertion" => Ok(Solvers::Insertion),
             "sfc" | "hilbert" | "space_filling_curve" => Ok(Solvers::SpaceFillingCurve),
             "pso" | "particle_swarm" => Ok(Solvers::ParticleSwarmOptimization),
+            "popmusic" | "pop-music" => Ok(Solvers::Popmusic),
             "shuffle" | "random_shuffle" => Ok(Solvers::RandomShuffle),
             "sa" | "simulated_annealing" => Ok(Solvers::SimulatedAnnealing),
             "som" | "kohonen" | "kohonen_som" => Ok(Solvers::KohonenSom),
@@ -2094,6 +2116,7 @@ pub fn solve_with_context(
             space_filling_curve::solve(problem, &sfc, tx, init_tour)
         }
         Solvers::ParticleSwarmOptimization => particle_swarm::solve(problem, &h, tx, init_tour),
+        Solvers::Popmusic => popmusic::solve(problem, &h, tx, init_tour),
         Solvers::RandomShuffle => random_shuffle::solve(problem, &h, tx, init_tour),
         Solvers::KohonenSom => {
             let s = opts.som.as_ref().cloned().unwrap_or_default();
@@ -2740,6 +2763,7 @@ mod tests {
         assert!(Solvers::ThreeOpt.auto_expand_with_nn());
         assert!(Solvers::TabuSearch.auto_expand_with_nn());
         assert!(Solvers::OrOpt.auto_expand_with_nn());
+        assert!(Solvers::Popmusic.auto_expand_with_nn());
     }
 
     #[test]
@@ -2787,6 +2811,7 @@ mod tests {
         assert!(!Solvers::BellmanKarp.auto_expand_with_shuffle());
         assert!(!Solvers::RandomShuffle.auto_expand_with_shuffle());
         assert!(!Solvers::MemeticEax.auto_expand_with_shuffle());
+        assert!(!Solvers::Popmusic.auto_expand_with_shuffle());
     }
 
     #[test]

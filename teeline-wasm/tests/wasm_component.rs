@@ -516,7 +516,7 @@ EOF\n";
 #[test]
 fn test_list_algorithms_returns_all_solvers() {
     let algorithms = run_list_algorithms();
-    assert_eq!(algorithms.len(), 25, "expected 25 solvers");
+    assert_eq!(algorithms.len(), 26, "expected 26 solvers");
     let ids: Vec<&str> = algorithms.iter().map(|a| a.id.as_str()).collect();
     for expected_id in &[
         "aco",
@@ -544,6 +544,7 @@ fn test_list_algorithms_returns_all_solvers() {
         "sfc",
         "eax",
         "ins",
+        "popmusic",
     ] {
         assert!(
             ids.contains(expected_id),
@@ -869,6 +870,20 @@ fn test_list_algorithms_two_opt_kind() {
     assert!(
         !two_opt.params.is_empty(),
         "2opt must have heuristic params"
+    );
+}
+
+#[test]
+fn test_list_algorithms_popmusic_kind_and_params() {
+    let algorithms = run_list_algorithms();
+    let popmusic = algorithms
+        .iter()
+        .find(|a| a.id == "popmusic")
+        .expect("popmusic missing");
+    assert_eq!(popmusic.kind, "metaheuristic");
+    assert!(
+        popmusic.params.is_empty(),
+        "popmusic must have no configurable params in v1"
     );
 }
 

@@ -181,6 +181,7 @@ fn recommendation_for(info: &teeline::tsp::SolverInfo) -> String {
         "sav"             => "Savings-based construction; strong warm-start: pipeline(savings,2opt) or pipeline(savings,lk)",
         "eax"             => "Memetic EAX: population crossover + local search; strong quality on small/medium instances, heavier per epoch than lk or 2opt",
         "aco"             => "Pheromone-trail metaheuristic; tune beta (heuristic weight) and evaporation-rate. Slow per epoch — lower epochs on large datasets",
+        "popmusic"        => "Exact window re-optimization; best piped: pipeline(nn,popmusic) or pipeline(sfc,popmusic)",
         _                 => info.category,
     }
     .to_string()

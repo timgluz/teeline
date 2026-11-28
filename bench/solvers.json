@@ -372,6 +372,19 @@
       ]
     },
     {
+      "id": "popmusic",
+      "cli": "popmusic",
+      "name": "POPMUSIC",
+      "family": "meta",
+      "deterministic": false,
+      "doc": "popmusic",
+      "notes": "Decomposition template; windows are optimized with the shared exact Held-Karp path DP. The CLI auto-expands to pipeline(nn, popmusic), so the benchmark harness measures that pipeline. Window R=14, up to 4 passes; no options in v1.",
+      "determinism_evidence": null,
+      "default_configs": [
+        "default"
+      ]
+    },
+    {
       "id": "shuffle",
       "cli": "random_shuffle",
       "name": "Random Shuffle",
