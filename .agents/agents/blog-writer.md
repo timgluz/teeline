@@ -40,7 +40,7 @@ Before drafting, read at least two recent posts, preferring the closest in topic
 specific. It says what failed and shows the measurement that changed the author's mind. It
 does not tour every feature of the solver.
 
-Follow `AGENTS.md` under `## Prose & blog posts`. In particular:
+Follow `docs/writing-style.md` (adapted from Zinsser's *On Writing Well*). In particular:
 
 - **No em-dashes in prose.** Use commas, colons, parentheses, or a full stop. The only
   exceptions are a verbatim quote (never altered to fit style) and the bibliographic
