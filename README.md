@@ -265,6 +265,7 @@ done
 | Cuckoo Search | `cs` | heuristic — nature-inspired | [→](docs/algorithms/cuckoo-search.md) |
 | Flower Pollination | `fpa` | heuristic — nature-inspired | [→](docs/algorithms/flower-pollination.md) |
 | Ant Colony Optimization | `ant_colony`, `aco` | heuristic — nature-inspired | [→](docs/algorithms/ant-colony.md) |
+| POPMUSIC | `popmusic`, `pop-music` | heuristic — decomposition | [→](docs/algorithms/popmusic.md) |
 
 Exact algorithms find the provably optimal tour but have exponential complexity — the dispatcher rejects inputs above 24 cities. See [docs/benchmarks.md](docs/benchmarks.md) for a quality and speed comparison of all heuristics. (`savings`/`sav` is implemented but not yet documented.)
 
@@ -287,6 +288,7 @@ Auto-expansion strategy depends on the solver type:
 | Solver type | Auto-expands to | Why |
 | --- | --- | --- |
 | **Deterministic local search** (2opt, 3opt, tabu, or_opt, lk, branch_bound) | `pipeline(nn, solver)` | Monotone hill-climbers (and B&B's upper bound) benefit from a good start |
+| **Deterministic decomposition** (popmusic) | `pipeline(nn, popmusic)` | Its exact window DP only improves an existing tour; NN supplies the starting tour |
 | **Stochastic** (sa, stochastic_hill, ga, pso, cs, fpa, gsa, fourier, aco) | `pipeline(shuffle, solver)` | Temperature/diversity schedules are calibrated for cold starts; NN start constrains early exploration |
 | **Constructive** (nn, christofides, greedy_edge, insertion, sfc, bhk) | no expansion | They build a tour from scratch |
 | **Self-seeding population** (eax) | no expansion | It builds its own diverse population; a single seed would reduce diversity |

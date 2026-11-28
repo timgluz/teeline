@@ -31,6 +31,18 @@ pub(crate) const MAX_INTERIOR: usize = 23;
 ///
 /// Panics when `m > [`MAX_INTERIOR`]` or `matrix` is not exactly `(m + 2)²` entries.
 pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f64, Vec<usize>)> {
+    let mut dp = Vec::new();
+    held_karp_path_with_scratch(matrix, m, &mut dp)
+}
+
+/// [`held_karp_path`] with a caller-owned `dp` buffer, so a solver that runs the DP once
+/// per window (POPMUSIC) reuses one allocation instead of allocating `m · 2^m` cells per
+/// window.
+pub(crate) fn held_karp_path_with_scratch(
+    matrix: &[f32],
+    m: usize,
+    dp: &mut Vec<f64>,
+) -> Option<(f64, Vec<usize>)> {
     assert!(
         m <= MAX_INTERIOR,
         "held_karp_path: {m} interior nodes exceeds MAX_INTERIOR={MAX_INTERIOR}"
@@ -54,7 +66,7 @@ pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f64, Vec<usize
     // `interior[last]`. INFINITY (not f32::MAX) because MAX + d stays MAX under rounding.
     // Reserve fallibly: the f64 table is about 1.5 GB at the exact solver's cap, and an
     // allocation failure should reach the caller as `None`, not abort the process.
-    let mut dp = Vec::new();
+    dp.clear();
     dp.try_reserve_exact(states * m).ok()?;
     dp.resize(states * m, f64::INFINITY);
     for i in 0..m {
@@ -280,6 +292,19 @@ mod tests {
         assert_eq!(cost, 67_108_866.0);
         assert_eq!(order, vec![1, 0, 2]);
         assert_eq!(path_cost(&matrix, 3, &order), cost);
+    }
+
+    #[test]
+    fn scratch_buffer_matches_the_allocating_wrapper() {
+        let mut rng = rand::rngs::StdRng::seed_from_u64(19);
+        let m = 6;
+        let matrix = packed_matrix(m, |_, _| rng.random_range(1.0f32..20.0));
+        let expected = held_karp_path(&matrix, m).unwrap();
+        let mut dp = Vec::new();
+        let first = held_karp_path_with_scratch(&matrix, m, &mut dp).unwrap();
+        let second = held_karp_path_with_scratch(&matrix, m, &mut dp).unwrap();
+        assert_eq!(expected, first);
+        assert_eq!(first, second);
     }
 
     #[test]
