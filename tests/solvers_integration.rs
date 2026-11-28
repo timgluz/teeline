@@ -276,7 +276,8 @@ fn bellman_karp_optimal_tour_tsp5() {
         &HeuristicOptions::default(),
         None,
         None,
-    );
+    )
+    .expect("BHK solves the 5-city instance");
 
     assert!(
         is_valid_tour(tour.route(), &cities),
@@ -419,7 +420,8 @@ fn bellman_karp_optimal_ring6_explicit() {
     let cities = data.cities().to_vec();
     let dm = data.distance_matrix().expect("ring6 distance matrix");
     let problem = TspProblem::new(cities.clone(), dm);
-    let tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+    let tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None)
+        .expect("BHK solves ring6");
 
     assert!(
         is_valid_tour(tour.route(), &cities),
@@ -438,7 +440,8 @@ fn bellman_karp_optimal_gr17() {
     let cities = data.cities().to_vec();
     let dm = data.distance_matrix().expect("gr17 distance matrix");
     let problem = TspProblem::new(cities.clone(), dm);
-    let tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+    let tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None)
+        .expect("BHK solves gr17");
 
     assert!(
         is_valid_tour(tour.route(), &cities),

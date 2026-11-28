@@ -11,15 +11,22 @@ use super::route::Route;
 use super::{HeuristicOptions, Position, Solution, TspProblem};
 use std::sync::mpsc;
 
+/// Returns `Err` when the instance has no finite Hamiltonian path, so the dispatcher can
+/// report an unsolvable input instead of panicking.
 pub fn solve(
     problem: &TspProblem,
     _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _init_tour: Option<&[usize]>,
-) -> Solution {
+) -> Result<Solution, String> {
     let cities = &problem.cities;
     let distances = &problem.distances;
     let n_cities = cities.len();
+
+    if n_cities == 0 {
+        return Ok(Solution::from_parts(&[], distances.as_ref()));
+    }
+
     let n_others = n_cities - 1;
     let anchor = Position::new(n_others);
     let stride = n_others + 2;
@@ -46,15 +53,25 @@ pub fn solve(
     };
     let mut matrix = vec![0.0f32; stride * stride];
     for a in 0..stride {
+        let pa = local_position(a);
         for b in 0..stride {
-            matrix[a * stride + b] = distances
-                .distance_by_pos(local_position(a), local_position(b))
-                .unwrap_or(f32::INFINITY);
+            let pb = local_position(b);
+            matrix[a * stride + b] = if pa == pb {
+                // A tour never traverses a self-edge, and the two anchor aliases are the
+                // same city. `tour_length` likewise defines a singleton tour as zero
+                // without querying an edge; do not ask a custom source for `d(p, p)`.
+                0.0
+            } else {
+                distances.distance_by_pos(pa, pb).unwrap_or(f32::INFINITY)
+            };
         }
     }
 
-    let (cost, interior) = held_karp_path(&matrix, n_others)
-        .expect("a complete distance source must admit a finite Hamiltonian path");
+    let Some((cost, interior)) = held_karp_path(&matrix, n_others) else {
+        return Err(
+            "Bellman-Held-Karp: the distance source has no finite Hamiltonian path".to_string(),
+        );
+    };
     tracing::info!(cost, "BHK: optimal tour found");
 
     let mut route: Vec<usize> = Vec::with_capacity(n_cities);
@@ -72,10 +89,10 @@ pub fn solve(
     }
 
     if let Some(tx) = progress_tx {
-        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&route), cost));
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&route), cost as f32));
         let _ = tx.send(ProgressMessage::Done);
     }
-    Solution::from_parts(&route, distances.as_ref())
+    Ok(Solution::from_parts(&route, distances.as_ref()))
 }
 
 #[cfg(test)]
@@ -98,7 +115,7 @@ mod tests {
     #[test]
     fn test_solve_returns_all_cities() {
         let problem = tsp_5_1_problem();
-        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();
@@ -112,7 +129,7 @@ mod tests {
     #[test]
     fn test_solve_finds_optimal_tour_length() {
         let problem = tsp_5_1_problem();
-        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
 
         assert!(
             (solution.total - 4.0).abs() < 1e-3,
@@ -144,7 +161,7 @@ mod tests {
         let dm = distance_matrix::from_cities_unrounded(&cities);
         let problem = TspProblem::new(cities, dm);
 
-        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
 
         let mut route = solution.route().to_vec();
         route.sort();
@@ -161,7 +178,7 @@ mod tests {
         let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![3.0, 0.0], vec![0.0, 4.0]]);
         let dm = distance_matrix::from_cities(&cities);
         let problem = TspProblem::new(cities, dm);
-        let solution = solve(&problem, &HeuristicOptions::default(), None, None);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
 
         let mut visited: Vec<usize> = solution.route().to_vec();
         visited.sort();
@@ -177,9 +194,35 @@ mod tests {
     #[test]
     fn test_solve_is_deterministic() {
         let problem = tsp_5_1_problem();
-        let first = solve(&problem, &HeuristicOptions::default(), None, None);
-        let second = solve(&problem, &HeuristicOptions::default(), None, None);
+        let first = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
+        let second = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
         assert_eq!(first.route(), second.route());
         assert_eq!(first.total, second.total);
+    }
+
+    #[test]
+    fn test_singleton_tour_costs_zero_without_a_self_edge_query() {
+        // A source that refuses a self-distance would panic the matrix build if BHK asked.
+        let cities = kdtree::build_points(&[vec![0.0, 0.0]]);
+        let dm = distance_matrix::DistanceMatrix::new(1, Vec::new(), cities.clone()).unwrap();
+        let problem = TspProblem::new(cities, dm);
+        let solution = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
+        assert_eq!(solution.route().len(), 1);
+        assert_eq!(solution.total, 0.0);
+    }
+
+    #[test]
+    fn test_solve_rejects_a_non_finite_edge() {
+        let cities = kdtree::build_points(&[vec![0.0, 0.0], vec![1.0, 0.0], vec![0.0, 1.0]]);
+        // Packed lower triangle: (1,0), (2,0), (2,1).
+        let weights = vec![1.0, f32::INFINITY, 1.0];
+        let dm = distance_matrix::DistanceMatrix::new(3, weights, cities.clone()).unwrap();
+        let problem = TspProblem::new(cities, dm);
+
+        let result = solve(&problem, &HeuristicOptions::default(), None, None);
+        assert!(
+            result.is_err(),
+            "an infinite edge must be reported, not panic"
+        );
     }
 }

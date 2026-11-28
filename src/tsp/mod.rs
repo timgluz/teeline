@@ -2046,7 +2046,7 @@ pub fn solve_with_context(
             aco.validate()?;
             ant_colony::solve(problem, &aco, tx, init_tour)
         }
-        Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour),
+        Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour)?,
         Solvers::BranchBound => branch_bound::solve(problem, &h, tx, init_tour),
         Solvers::Christofides => christofides::solve(problem, &h, tx, init_tour),
         Solvers::Savings => savings::solve(problem, &h, tx, init_tour),

@@ -322,7 +322,8 @@ mod tests {
     fn test_solve_matches_bellman_karp_on_tsp5() {
         let problem = tsp5_problem();
         let bb_tour = solve(&problem, &HeuristicOptions::default(), None, None);
-        let bhk_tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+        let bhk_tour = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None)
+            .expect("BHK solves the 5-city instance");
 
         assert!(
             (bb_tour.total - bhk_tour.total).abs() < 1e-3,
@@ -336,7 +337,8 @@ mod tests {
     fn test_solve_matches_bhk_on_tsp8() {
         let problem = tsp8_problem();
         let bb = solve(&problem, &HeuristicOptions::default(), None, None);
-        let bhk = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+        let bhk = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None)
+            .expect("BHK solves the 8-city instance");
 
         assert!(
             (bb.total - bhk.total).abs() < 1e-3,
@@ -396,7 +398,8 @@ mod tests {
 
         for problem in [tsp5_problem(), tsp8_problem()] {
             let exact = solve(&problem, &opts, None, None);
-            let bhk = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None);
+            let bhk = bellman_karp::solve(&problem, &HeuristicOptions::default(), None, None)
+                .expect("BHK solves the test instance");
             assert!(
                 (exact.total - bhk.total).abs() < 1e-3,
                 "branch_bound with n_nearest=1 returned {:.3}, expected BHK optimum {:.3}",

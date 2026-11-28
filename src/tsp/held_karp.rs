@@ -4,7 +4,7 @@
 //! cheapest open path through a small set of interior nodes with fixed endpoints. Keeping
 //! one implementation means the two cannot drift in reconstruction or tie-breaking.
 
-/// Hard cap on the interior-node count. `m` interior nodes need `m · 2^m` f32 cells; above
+/// Hard cap on the interior-node count. `m` interior nodes need `m · 2^m` f64 cells; above
 /// this the table is no longer a realistic allocation and a caller has almost certainly
 /// passed the wrong node set.
 pub(crate) const MAX_INTERIOR: usize = 26;
@@ -16,6 +16,12 @@ pub(crate) const MAX_INTERIOR: usize = 26;
 /// the interior nodes, `m` is the start and `m + 1` is the end. It is the only source of
 /// distances, so the DP's hot loop performs array reads instead of dynamic queries.
 ///
+/// Distances are widened to `f64` before they are summed, matching
+/// [`DistanceSource::tour_length`](crate::tsp::DistanceSource::tour_length), which also
+/// accumulates in `f64`. An `f32` recurrence ranks tours by their rounded running sums; at
+/// the edge lengths of large TSPLIB instances (near `2^24`) rounding can make it pick a
+/// tour whose exact cost is not the minimum.
+///
 /// Returns `(open-path cost, interior visit order as local indices)`, or `None` when no
 /// finite path exists. Ties are broken by first scan order, so the result is deterministic
 /// for a given matrix.
@@ -23,7 +29,7 @@ pub(crate) const MAX_INTERIOR: usize = 26;
 /// # Panics
 ///
 /// Panics when `m > [`MAX_INTERIOR`]` or `matrix` is not exactly `(m + 2)²` entries.
-pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f32, Vec<usize>)> {
+pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f64, Vec<usize>)> {
     assert!(
         m <= MAX_INTERIOR,
         "held_karp_path: {m} interior nodes exceeds MAX_INTERIOR={MAX_INTERIOR}"
@@ -35,7 +41,7 @@ pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f32, Vec<usize
         "held_karp_path: matrix must be a packed {stride}x{stride} table"
     );
 
-    let d = |a: usize, b: usize| matrix[a * stride + b];
+    let d = |a: usize, b: usize| f64::from(matrix[a * stride + b]);
 
     if m == 0 {
         let cost = d(m, m + 1);
@@ -44,8 +50,8 @@ pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f32, Vec<usize
 
     let states = 1usize << m;
     // dp[mask * m + last] = cheapest path from `start` through exactly `mask`, ending at
-    // `interior[last]`. INFINITY (not f32::MAX) because MAX + d rounds back to MAX.
-    let mut dp = vec![f32::INFINITY; states * m];
+    // `interior[last]`. INFINITY (not f32::MAX) because MAX + d stays MAX under rounding.
+    let mut dp = vec![f64::INFINITY; states * m];
     for i in 0..m {
         dp[(1 << i) * m + i] = d(m, i);
     }
@@ -59,7 +65,7 @@ pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f32, Vec<usize
             if prev_mask == 0 {
                 continue;
             }
-            let mut best = f32::INFINITY;
+            let mut best = f64::INFINITY;
             for prev in 0..m {
                 if prev_mask & (1 << prev) == 0 {
                     continue;
@@ -74,7 +80,7 @@ pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f32, Vec<usize
     }
 
     let full = states - 1;
-    let mut best_cost = f32::INFINITY;
+    let mut best_cost = f64::INFINITY;
     let mut best_last = None;
     for last in 0..m {
         let candidate = dp[full * m + last] + d(last, m + 1);
@@ -101,7 +107,7 @@ pub(crate) fn held_karp_path(matrix: &[f32], m: usize) -> Option<(f32, Vec<usize
             break;
         }
         let mut best_prev = None;
-        let mut best_prev_cost = f32::INFINITY;
+        let mut best_prev_cost = f64::INFINITY;
         for prev in 0..m {
             if prev_mask & (1 << prev) == 0 {
                 continue;
@@ -138,9 +144,9 @@ mod tests {
         matrix
     }
 
-    fn path_cost(matrix: &[f32], m: usize, order: &[usize]) -> f32 {
+    fn path_cost(matrix: &[f32], m: usize, order: &[usize]) -> f64 {
         let stride = m + 2;
-        let d = |a: usize, b: usize| matrix[a * stride + b];
+        let d = |a: usize, b: usize| f64::from(matrix[a * stride + b]);
         if order.is_empty() {
             return d(m, m + 1);
         }
@@ -174,8 +180,8 @@ mod tests {
         }
     }
 
-    fn brute_force(matrix: &[f32], m: usize) -> f32 {
-        let mut best = f32::INFINITY;
+    fn brute_force(matrix: &[f32], m: usize) -> f64 {
+        let mut best = f64::INFINITY;
         for_each_permutation(m, &mut |order| {
             let cost = path_cost(matrix, m, order);
             if cost < best {
@@ -188,14 +194,11 @@ mod tests {
     fn assert_matches_brute_force(matrix: &[f32], m: usize) {
         let (cost, order) = held_karp_path(matrix, m).expect("a finite path exists");
         let expected = brute_force(matrix, m);
-        assert!(
-            (cost - expected).abs() <= 1e-4 * expected.abs().max(1.0),
-            "m={m}: DP cost {cost} disagrees with brute force {expected}"
-        );
+        assert_eq!(cost, expected, "m={m}: DP cost disagrees with brute force");
         let realized = path_cost(matrix, m, &order);
-        assert!(
-            (realized - cost).abs() <= 1e-4 * cost.abs().max(1.0),
-            "m={m}: returned order {order:?} realizes {realized}, not the reported {cost}"
+        assert_eq!(
+            realized, cost,
+            "m={m}: returned order {order:?} does not realize the reported cost"
         );
     }
 
@@ -203,7 +206,7 @@ mod tests {
     fn empty_interior_is_the_direct_edge() {
         let matrix = packed_matrix(0, |a, b| (a * 10 + b) as f32);
         let (cost, order) = held_karp_path(&matrix, 0).unwrap();
-        assert_eq!(cost, matrix[0 * 2 + 1]);
+        assert_eq!(cost, f64::from(matrix[0 * 2 + 1]));
         assert!(order.is_empty());
     }
 
@@ -211,7 +214,7 @@ mod tests {
     fn single_interior_node_has_a_two_edge_path() {
         let matrix = packed_matrix(1, |a, b| (a * 10 + b) as f32);
         let (cost, order) = held_karp_path(&matrix, 1).unwrap();
-        let expected = matrix[1 * 3 + 0] + matrix[0 * 3 + 2];
+        let expected = f64::from(matrix[1 * 3 + 0]) + f64::from(matrix[0 * 3 + 2]);
         assert_eq!(cost, expected);
         assert_eq!(order, vec![0]);
     }
@@ -254,6 +257,24 @@ mod tests {
             let matrix = packed_matrix(m, |_, _| rng.random_range(0..4) as f32);
             assert_matches_brute_force(&matrix, m);
         }
+    }
+
+    /// Regression: an `f32` recurrence ranked `[1, 2, 0]` (exact cost 67,108,870) above the
+    /// true optimum `[1, 0, 2]` (67,108,866) once edges reached `2^24`. The matrix is the
+    /// same one the review reported; all values are exactly representable in `f32`.
+    #[test]
+    fn f64_accumulation_keeps_the_optimal_tour() {
+        let matrix: Vec<f32> = vec![
+            0.0, 16777216.0, 16777216.0, 33554432.0, 16777220.0, //
+            16777216.0, 0.0, 16777216.0, 16777218.0, 16777220.0, //
+            16777216.0, 16777216.0, 0.0, 16777220.0, 16777216.0, //
+            33554432.0, 16777218.0, 16777220.0, 0.0, 16777218.0, //
+            16777220.0, 16777220.0, 16777216.0, 16777218.0, 0.0,
+        ];
+        let (cost, order) = held_karp_path(&matrix, 3).unwrap();
+        assert_eq!(cost, 67_108_866.0);
+        assert_eq!(order, vec![1, 0, 2]);
+        assert_eq!(path_cost(&matrix, 3, &order), cost);
     }
 
     #[test]
