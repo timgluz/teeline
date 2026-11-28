@@ -1,29 +1,19 @@
-/// Bellman-Help-Karp
-///
-/// exact solver using Dynamic Programming
-/// source:
-///
-/// Draft of Chapter 7 (Dynamic Programming) for the planned book A Practical Guide to Discrete
-/// Optimization, with D. Applegate, S. Dash, D. S. Johnson. December 29, 2014.
-/// https://www.math.uwaterloo.ca/~bico/papers/papers.html
-///
-///
-///
-use super::DistanceSource;
-use std::sync::mpsc;
+//! Bellman–Held–Karp exact solver.
+//!
+//! The exponential recurrence lives in the shared [`held_karp_path`] primitive, which is
+//! also POPMUSIC's exact window sub-solver. This module only adapts a TSP problem to it:
+//! the anchor city is both the path start and the end, so the closed tour becomes a
+//! fixed-endpoint path through every other city.
 
+use super::held_karp::held_karp_path;
 use super::progress::ProgressMessage;
 use super::route::Route;
 use super::{HeuristicOptions, Position, Solution, TspProblem};
-
-type FlagSet = u64;
-type DPTable = Vec<Vec<f32>>;
-
-const UNKNOWN_DISTANCE: f32 = f32::MAX;
+use std::sync::mpsc;
 
 pub fn solve(
     problem: &TspProblem,
-    opts: &HeuristicOptions,
+    _opts: &HeuristicOptions,
     progress_tx: Option<&mpsc::Sender<ProgressMessage>>,
     _init_tour: Option<&[usize]>,
 ) -> Solution {
@@ -31,169 +21,61 @@ pub fn solve(
     let distances = &problem.distances;
     let n_cities = cities.len();
     let n_others = n_cities - 1;
-    let n_powersets = 1 << n_others;
+    let anchor = Position::new(n_others);
+    let stride = n_others + 2;
 
-    tracing::info!(n_cities, n_subsets = n_powersets, "BHK starting");
+    tracing::info!(n_cities, interior = n_others, "BHK starting");
 
-    let dists = distances;
-    let mut opt = vec![vec![UNKNOWN_DISTANCE; n_powersets]; n_others];
-
-    tracing::info!("BHK: initialising DP table");
-    let last_pos = Position::new(n_others);
-    for i in 0..n_others {
-        opt[i][1 << i] = dists
-            .distance_by_pos(Position::new(i), last_pos)
-            .unwrap_or(UNKNOWN_DISTANCE);
-
-        if let Some(city_id) = dists.pos2city_id(Position::new(i))
-            && let Some(tx) = progress_tx
-        {
-            let _ = tx.send(ProgressMessage::CityChange(city_id));
+    if let Some(tx) = progress_tx {
+        for i in 0..n_others {
+            if let Some(city_id) = distances.pos2city_id(Position::new(i)) {
+                let _ = tx.send(ProgressMessage::CityChange(city_id));
+            }
         }
     }
 
-    let selected_set = (1 << n_others) - 1;
-    for city_pos in 0..n_others {
-        solve_bhk(
-            &mut opt,
-            dists.as_ref(),
-            selected_set,
-            Position::new(city_pos),
+    // Local index `i < n_others` is interior position `i`; both `n_others` and
+    // `n_others + 1` are the anchor. The DP's distance table is the only place BHK still
+    // touches the distance source, which keeps its inner loop identical to POPMUSIC's.
+    let local_position = |local: usize| {
+        if local < n_others {
+            Position::new(local)
+        } else {
+            anchor
+        }
+    };
+    let mut matrix = vec![0.0f32; stride * stride];
+    for a in 0..stride {
+        for b in 0..stride {
+            matrix[a * stride + b] = distances
+                .distance_by_pos(local_position(a), local_position(b))
+                .unwrap_or(f32::INFINITY);
+        }
+    }
+
+    let (cost, interior) = held_karp_path(&matrix, n_others)
+        .expect("a complete distance source must admit a finite Hamiltonian path");
+    tracing::info!(cost, "BHK: optimal tour found");
+
+    let mut route: Vec<usize> = Vec::with_capacity(n_cities);
+    route.push(
+        distances
+            .pos2city_id(anchor)
+            .expect("the anchor position came from the problem"),
+    );
+    for local in interior {
+        route.push(
+            distances
+                .pos2city_id(Position::new(local))
+                .expect("an interior local index is a valid position"),
         );
     }
 
-    tracing::info!("BHK: DP complete");
-    if opts.verbose {
-        show_table(&opt);
-    }
-
-    let optimal_distance = (0..n_others)
-        .filter_map(|i| {
-            let return_dist = dists.distance_by_pos(Position::new(i), last_pos).ok()?;
-            let sub_cost = opt[i][selected_set as usize];
-            if sub_cost < UNKNOWN_DISTANCE && return_dist < UNKNOWN_DISTANCE {
-                Some(sub_cost + return_dist)
-            } else {
-                None
-            }
-        })
-        .fold(f32::MAX, f32::min);
-
-    tracing::info!(optimal_distance, "BHK: optimal tour found");
-    let route_vec = read_optimal_route(&opt, dists.as_ref(), n_cities, optimal_distance);
-
-    let route = Route::new(route_vec.as_ref());
     if let Some(tx) = progress_tx {
-        let _ = tx.send(ProgressMessage::PathUpdate(route, 0.0));
+        let _ = tx.send(ProgressMessage::PathUpdate(Route::new(&route), cost));
         let _ = tx.send(ProgressMessage::Done);
     }
-
-    Solution::from_parts(&route_vec, distances.as_ref())
-}
-
-fn solve_bhk(
-    opt: &mut DPTable,
-    dm: &dyn DistanceSource,
-    selected_set: FlagSet,
-    city_pos: Position,
-) -> f32 {
-    let mut best_val = f32::MAX;
-
-    let selected_pos = selected_set as usize;
-    if opt[city_pos.into_inner()][selected_pos] < UNKNOWN_DISTANCE {
-        return opt[city_pos.into_inner()][selected_pos];
-    }
-
-    let rest_selected = selected_set & !(1 << city_pos.into_inner());
-    let n_other = opt.len();
-    for i in 0..n_other {
-        if (rest_selected & (1 << i)) == 0 {
-            continue;
-        }
-
-        let step_dist = dm
-            .distance_by_pos(Position::new(i), city_pos)
-            .expect("solve_bhk tried to access non-existent cities");
-        let sub_val = solve_bhk(opt, dm, rest_selected, Position::new(i)) + step_dist;
-        if sub_val < best_val {
-            best_val = sub_val;
-        }
-    }
-
-    opt[city_pos.into_inner()][selected_pos] = best_val;
-    opt[city_pos.into_inner()][selected_pos]
-}
-
-fn read_optimal_route(
-    opt: &DPTable,
-    dm: &dyn DistanceSource,
-    n: usize,
-    best_val: f32,
-) -> Vec<usize> {
-    let mut route_positions = vec![Position::new(0); n];
-    route_positions[0] = Position::new(n - 1);
-
-    let mut unread_set = (1 << (n - 1)) - 1;
-    let mut left_dist = best_val;
-    for i in 1..n {
-        if left_dist <= 0.0 {
-            break;
-        }
-
-        for (j, row) in opt[0..(n - 1)].iter().enumerate() {
-            let step_dist = dm
-                .distance_by_pos(Position::new(j), route_positions[i - 1])
-                .expect("step_dist points are out range");
-
-            let cur_dist = row[unread_set] + step_dist;
-            let is_unprocessed = (unread_set & (1 << j)) > 0;
-            if is_unprocessed && approx(left_dist, cur_dist) {
-                left_dist -= step_dist;
-                route_positions[i] = Position::new(j);
-
-                unread_set &= !(1 << j);
-                break;
-            }
-        }
-    }
-
-    route_positions
-        .iter()
-        .map(|&pos| {
-            dm.pos2city_id(pos)
-                .expect("reconstruction position came from 0..n")
-        })
-        .collect()
-}
-
-fn approx(x1: f32, x2: f32) -> bool {
-    // f32::EPSILON (~1.2e-7) is the gap between 1.0 and the next f32, not a usable
-    // tolerance for sums of distances. Accumulated rounding over N f32 additions
-    // reaches ~N * ULP(result), which for tour costs ~10-3000 is ~1e-5 to ~3e-4.
-    let diff = (x1 - x2).abs();
-    let scale = x1.abs().max(x2.abs()).max(1.0);
-    diff <= scale * 1e-4
-}
-
-fn show_table(opt: &DPTable) {
-    println!("=============================================");
-    println!("Dynamic programming table");
-
-    for row in opt.iter() {
-        print!("| ");
-
-        for val in row.iter() {
-            let fval = if approx(*val, UNKNOWN_DISTANCE) {
-                " - ".to_string()
-            } else {
-                format!("{:.2}", val)
-            };
-
-            print!("{:^10} |", fval);
-        }
-
-        println!(" |");
-    }
+    Solution::from_parts(&route, distances.as_ref())
 }
 
 #[cfg(test)]
@@ -241,10 +123,9 @@ mod tests {
 
     #[test]
     fn test_route_reconstruction_on_larger_instance() {
-        // Regression: read_optimal_route used f32::EPSILON as the comparison
-        // tolerance, which is far too tight for summed f32 distances on 8+ cities.
-        // Accumulated rounding reaches ~1e-6 >> f32::EPSILON, causing the loop
-        // to leave positions as 0, producing repeated cities in the route.
+        // Regression: reconstruction used f32::EPSILON as the comparison tolerance, which
+        // is far too tight for summed f32 distances on 8+ cities and used to leave
+        // repeated cities in the route.
         let coords: &[&[f32]] = &[
             &[0.0, 0.0],
             &[3.0, 1.0],
@@ -291,5 +172,14 @@ mod tests {
             "got {}",
             solution.total
         );
+    }
+
+    #[test]
+    fn test_solve_is_deterministic() {
+        let problem = tsp_5_1_problem();
+        let first = solve(&problem, &HeuristicOptions::default(), None, None);
+        let second = solve(&problem, &HeuristicOptions::default(), None, None);
+        assert_eq!(first.route(), second.route());
+        assert_eq!(first.total, second.total);
     }
 }

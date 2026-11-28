@@ -19,6 +19,7 @@ pub mod genetic_algorithm;
 pub(crate) mod graph;
 pub mod gravitational_search;
 pub mod greedy_edge;
+pub(crate) mod held_karp;
 pub mod insertion;
 pub use insertion::{InsertionOptions, InsertionStrategy};
 pub mod kdtree;
