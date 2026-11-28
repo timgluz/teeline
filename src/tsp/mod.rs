@@ -19,6 +19,7 @@ pub mod genetic_algorithm;
 pub(crate) mod graph;
 pub mod gravitational_search;
 pub mod greedy_edge;
+pub(crate) mod held_karp;
 pub mod insertion;
 pub use insertion::{InsertionOptions, InsertionStrategy};
 pub mod kdtree;
@@ -2045,7 +2046,7 @@ pub fn solve_with_context(
             aco.validate()?;
             ant_colony::solve(problem, &aco, tx, init_tour)
         }
-        Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour),
+        Solvers::BellmanKarp => bellman_karp::solve(problem, &h, tx, init_tour)?,
         Solvers::BranchBound => branch_bound::solve(problem, &h, tx, init_tour),
         Solvers::Christofides => christofides::solve(problem, &h, tx, init_tour),
         Solvers::Savings => savings::solve(problem, &h, tx, init_tour),
