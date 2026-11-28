@@ -98,7 +98,43 @@ pub fn solve(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tsp::{HeuristicOptions, TspProblem, distance_matrix, kdtree};
+    use crate::tsp::{
+        DistanceSource, HeuristicOptions, Position, TspProblem, distance_matrix, kdtree,
+    };
+
+    /// Refuses self-distance queries, so a caller that asks for `d(p, p)` is caught.
+    struct NoSelfDistance {
+        cities: Vec<kdtree::KDPoint>,
+    }
+
+    impl DistanceSource for NoSelfDistance {
+        fn num_cities(&self) -> usize {
+            self.cities.len()
+        }
+
+        fn distance_by_pos(&self, a: Position, b: Position) -> Result<f32, &'static str> {
+            if a == b {
+                Err("self-distance is not defined")
+            } else {
+                Ok(1.0)
+            }
+        }
+
+        fn pos2city_id(&self, pos: Position) -> Option<usize> {
+            self.cities.get(pos.into_inner()).map(|city| city.id)
+        }
+
+        fn city_id2pos(&self, id: usize) -> Option<Position> {
+            self.cities
+                .iter()
+                .position(|city| city.id == id)
+                .map(Position::new)
+        }
+
+        fn point_at(&self, pos: Position) -> Option<kdtree::KDPoint> {
+            self.cities.get(pos.into_inner()).copied()
+        }
+    }
 
     fn tsp_5_1_problem() -> TspProblem {
         let cities = kdtree::build_points(&[
@@ -202,10 +238,13 @@ mod tests {
 
     #[test]
     fn test_singleton_tour_costs_zero_without_a_self_edge_query() {
-        // A source that refuses a self-distance would panic the matrix build if BHK asked.
+        // The source refuses a self-distance; asking for `d(anchor, anchor)` would make the
+        // matrix build fail, so this fails if the self-edge guard is removed.
         let cities = kdtree::build_points(&[vec![0.0, 0.0]]);
-        let dm = distance_matrix::DistanceMatrix::new(1, Vec::new(), cities.clone()).unwrap();
-        let problem = TspProblem::new(cities, dm);
+        let distances = NoSelfDistance {
+            cities: cities.clone(),
+        };
+        let problem = TspProblem::new(cities, distances);
         let solution = solve(&problem, &HeuristicOptions::default(), None, None).unwrap();
         assert_eq!(solution.route().len(), 1);
         assert_eq!(solution.total, 0.0);
